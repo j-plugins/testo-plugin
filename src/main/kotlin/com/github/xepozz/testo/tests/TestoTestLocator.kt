@@ -25,9 +25,7 @@ class TestoTestLocator(pathMapper: PhpPathMapper) :
         val classes = PhpPsiUtil.findAllClasses(file)
         if (classes.isEmpty()) {
             return PsiTreeUtil.findChildrenOfType(file, Function::class.java)
-                .firstOrNull {
-                    it.fqn == "\\" + locationInfo.className
-                }
+                .firstOrNull { it.fqn == locationInfo.className }
                 ?.let {
                     LocationElementStore(
                         it,
@@ -48,6 +46,13 @@ class TestoTestLocator(pathMapper: PhpPathMapper) :
     }
 
 
+    /**
+     * Examples:
+     * - path/to/file.php
+     * - path/to/file.php::\Full\Qualified\ClassName
+     * - path/to/file.php::\Full\Qualified\ClassName::methodName
+     * - path/to/file.php::\Full\Qualified\FunctionName
+     */
     override fun getLocationInfo(link: String): LocationInfo? {
         val locations = link.split("::").dropLastWhile { it.isEmpty() }
 
