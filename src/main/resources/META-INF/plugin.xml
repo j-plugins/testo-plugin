@@ -5,9 +5,27 @@
     <vendor>xepozz</vendor>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.jetbrains.php</depends>
 
     <resource-bundle>messages.TestoBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
+        <runLineMarkerContributor
+                language="PHP"
+                implementationClass="com.github.xepozz.testo.TestoTestRunLineMarkerProvider"/>
+        <configurationType
+                implementation="com.github.xepozz.testo.tests.run.TestoRunConfigurationType"/>
+        <runConfigurationProducer
+                implementation="com.github.xepozz.testo.tests.run.TestoRunConfigurationProducer"/>
+        <runAnything.executionProvider
+                implementation="com.github.xepozz.testo.tests.runAnything.TestoRunAnythingProvider"/>
+
+        <programRunner
+                implementation="com.github.xepozz.testo.tests.run.TestoDebugRunner"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.jetbrains.php">
+        <testFrameworkType
+                implementation="com.github.xepozz.testo.tests.TestoFrameworkType"/>
     </extensions>
 </idea-plugin>
