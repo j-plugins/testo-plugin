@@ -3,6 +3,7 @@ package com.github.xepozz.testo.tests.run
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.TestoFrameworkType
+import com.github.xepozz.testo.tests.TestoTestLocator
 import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.execution.Executor
 import com.intellij.execution.configurations.ConfigurationFactory
