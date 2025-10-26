@@ -4,10 +4,8 @@ import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.Executor
 import com.intellij.execution.Location
-import com.intellij.execution.testframework.actions.AbstractRerunFailedTestsAction
 import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
 import com.intellij.execution.testframework.sm.runner.SMTestLocator
-import com.intellij.execution.ui.ConsoleView
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.pom.Navigatable
 import com.jetbrains.php.lang.psi.elements.Method
@@ -44,5 +42,5 @@ class TestoConsoleProperties(
         }
     }
 
-    override fun isPrintTestingStartedTime() = false
+    override fun isPrintTestingStartedTime() = true
 }
