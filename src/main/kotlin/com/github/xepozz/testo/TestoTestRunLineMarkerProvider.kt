@@ -9,6 +9,7 @@ import com.intellij.psi.util.elementType
 import com.jetbrains.php.config.PhpProjectConfigurationFacade
 import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
 import com.jetbrains.php.lang.lexer.PhpTokenTypes
+import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpNamedElement
@@ -22,7 +23,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
         if (element.nameIdentifier != leaf) return null
 
         return when {
-            element is Method && element.isTesto() -> withExecutorActions(
+            element is Function && element.isTesto() -> withExecutorActions(
                 getTestStateIcon(
                     getLocationHint(element),
                     element.project,
@@ -45,11 +46,13 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
                 RUN_TEST_TOOLTIP_PROVIDER
             )
 
-        private fun getLocationHint(phpClass: Method) =
-            getLocationHint(phpClass.containingClass!!) + "::" + phpClass.name
+        private fun getLocationHint(element: Function) = when (element) {
+            is Method -> getLocationHint(element.containingClass!!) + "::" + element.name
+            else -> getLocationHint(element.containingFile) + "::" + element.fqn
+        }
 
-        private fun getLocationHint(phpClass: PhpClass) = getLocationHint(phpClass.containingFile) + "::" + phpClass.fqn
-        private fun getLocationHint(psiFile: PsiFile) = "php_qn://" + getFilePathDeploymentAware(psiFile.containingFile)
+        private fun getLocationHint(element: PhpClass) = getLocationHint(element.containingFile) + "::" + element.fqn
+        private fun getLocationHint(file: PsiFile) = "php_qn://" + getFilePathDeploymentAware(file)
 
         fun getFilePathDeploymentAware(psiFile: PsiFile): String {
             val localPath = psiFile.virtualFile.path
