@@ -19,7 +19,30 @@ class TestoConsoleProperties(
     executor: Executor,
     val myTestLocator: SMTestLocator,
 ) : SMTRunnerConsoleProperties(config, TestoBundle.message("testo.local.run.display.name"), executor) {
+//    override fun getScope(): GlobalSearchScope {
+//        println("getScope ${super.getScope()}")
+//        return super.getScope()
+//    }
+
     override fun getTestLocator() = this.myTestLocator
+
+    override fun isIdBasedTestTree(): Boolean {
+        return super.isIdBasedTestTree().apply { println("isIdBasedTestTree $this") }
+    }
+    override fun getErrorNavigatable(location: Location<*>, stacktrace: String): Navigatable? {
+        if (location is PhpPsiLocationWithDataSet<*> && location.getPsiElement() !is Method) {
+            return location.getNavigatable()
+        } else {
+            var lines = StringUtil.splitByLinesKeepSeparators(stacktrace)
+//            if (PhpUnitConsoleProperties.isLaravelTestCase(lines)) {
+//                lines = Arrays.copyOfRange<String?>(lines, 0, lines.size - 1) as Array<String>
+//            }
+
+            val reversedStackTrace = (StreamEx.ofReversed<String?>(lines)
+                .filter { line: String? -> !line!!.isEmpty() } as StreamEx<*>).joining()
+            return super.getErrorNavigatable(location, reversedStackTrace)
+        }
+    }
 
     override fun isPrintTestingStartedTime() = false
 }
