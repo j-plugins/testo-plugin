@@ -2,8 +2,10 @@ package com.github.xepozz.testo.tests
 
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiManager
+import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.psi.PhpFile
 import com.jetbrains.php.lang.psi.PhpPsiUtil
+import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.phpunit.LocationInfo
 import com.jetbrains.php.phpunit.PhpUnitQualifiedNameLocationProvider
 import com.jetbrains.php.util.pathmapper.PhpPathMapper
@@ -16,11 +18,24 @@ class TestoTestLocator(pathMapper: PhpPathMapper) :
     ): LocationElementStore? {
         val locationFile = locationInfo?.file ?: return null
         val file = PsiManager.getInstance(project).findFile(locationFile) as? PhpFile ?: return null
-        if (locationInfo.methodName.isNullOrEmpty()) {
+        if (locationInfo.className.isNullOrEmpty()) {
             return LocationElementStore(file, null)
         }
 
-        return PhpPsiUtil.findAllClasses(file)
+        val classes = PhpPsiUtil.findAllClasses(file)
+        if (classes.isEmpty()) {
+            return PsiTreeUtil.findChildrenOfType(file, Function::class.java)
+                .firstOrNull {
+                    it.fqn == "\\" + locationInfo.className
+                }
+                ?.let {
+                    LocationElementStore(
+                        it,
+                        it,
+                    )
+                }
+        }
+        return classes
             .firstNotNullOfOrNull { clazz ->
                 this.getLocation(
                     project,
