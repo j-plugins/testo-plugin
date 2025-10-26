@@ -70,6 +70,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         return TestoConsoleProperties(
             this,
             executor,
+            TestoTestLocator(pathMapper)
 //            InfectionLocationProvider(pathMapper, this.project, this.getConfigurationFileRootPath())
         )
     }
