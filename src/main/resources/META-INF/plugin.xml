@@ -22,7 +22,8 @@
 
         <programRunner
                 implementation="com.github.xepozz.testo.tests.run.TestoDebugRunner"/>
-
+        <implicitUsageProvider
+                implementation="com.github.xepozz.testo.references.TestFunctionImplicitUsageProvider"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.jetbrains.php">
