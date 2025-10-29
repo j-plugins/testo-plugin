@@ -24,7 +24,15 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
         if (element.nameIdentifier != leaf) return null
 
         return when {
-            element is Function && element.isTesto() -> withExecutorActions(
+            element is Function && element.isTestoMethod() -> withExecutorActions(
+                getTestStateIcon(
+                    getLocationHint(element),
+                    element.project,
+                    false,
+                ),
+            )
+
+            element is PhpClass && element.isTestoClass() -> withExecutorActions(
                 getTestStateIcon(
                     getLocationHint(element),
                     element.project,
@@ -47,13 +55,13 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
                 RUN_TEST_TOOLTIP_PROVIDER
             )
 
-         fun getLocationHint(element: Function) = when (element) {
+        fun getLocationHint(element: Function) = when (element) {
             is Method -> getLocationHint(element.containingClass!!) + "::" + element.name
             else -> getLocationHint(element.containingFile) + "::" + element.fqn
         }
 
-         fun getLocationHint(element: PhpClass) = getLocationHint(element.containingFile) + "::" + element.fqn
-         fun getLocationHint(file: PsiFile) = "${TestoFrameworkType.SCHEMA}://" + getFilePathDeploymentAware(file)
+        fun getLocationHint(element: PhpClass) = getLocationHint(element.containingFile) + "::" + element.fqn
+        fun getLocationHint(file: PsiFile) = "${TestoFrameworkType.SCHEMA}://" + getFilePathDeploymentAware(file)
 
         fun getFilePathDeploymentAware(psiFile: PsiFile): String {
             val localPath = psiFile.virtualFile.path

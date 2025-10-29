@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.tests.run
 
-import com.github.xepozz.testo.isTesto
+import com.github.xepozz.testo.isTestoClass
+import com.github.xepozz.testo.isTestoMethod
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Condition
 import com.intellij.openapi.vfs.VirtualFile
@@ -12,7 +13,6 @@ import com.intellij.util.asSafely
 import com.jetbrains.php.lang.psi.PhpFile
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.PhpClass
-import com.jetbrains.php.phpunit.PhpUnitTestDescriptor
 import com.jetbrains.php.testFramework.run.PhpTestConfigurationProducer
 
 class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfiguration>(
@@ -34,7 +34,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     override fun getConfigurationFactory() = TestoRunConfigurationFactory(TestoRunConfigurationType.INSTANCE)
 
     companion object Companion {
-        val METHOD = Condition<PsiElement> { it.isTesto() }
+        val METHOD = Condition<PsiElement> { it.isTestoMethod() }
         private val METHOD_NAMER = { element: PsiElement? -> (element as? Function)?.name }
         private val FILE_TO_SCOPE = { file: PsiFile? ->
             println("file to scope: ${file?.virtualFile?.name}")
@@ -42,7 +42,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 .asSafely<PhpFile>()
                 ?.let { phpFile ->
                     PsiTreeUtil.findChildrenOfType(phpFile, PhpClass::class.java)
-                        .firstOrNull { PhpUnitTestDescriptor.INSTANCE.isTestClassName(it.name) }
+                        .firstOrNull { it.isTestoClass() }
                 }
         }
     }
