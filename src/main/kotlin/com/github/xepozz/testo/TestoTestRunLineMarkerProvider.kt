@@ -46,13 +46,13 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
                 RUN_TEST_TOOLTIP_PROVIDER
             )
 
-        private fun getLocationHint(element: Function) = when (element) {
+         fun getLocationHint(element: Function) = when (element) {
             is Method -> getLocationHint(element.containingClass!!) + "::" + element.name
             else -> getLocationHint(element.containingFile) + "::" + element.fqn
         }
 
-        private fun getLocationHint(element: PhpClass) = getLocationHint(element.containingFile) + "::" + element.fqn
-        private fun getLocationHint(file: PsiFile) = "php_qn://" + getFilePathDeploymentAware(file)
+         fun getLocationHint(element: PhpClass) = getLocationHint(element.containingFile) + "::" + element.fqn
+         fun getLocationHint(file: PsiFile) = "php_qn://" + getFilePathDeploymentAware(file)
 
         fun getFilePathDeploymentAware(psiFile: PsiFile): String {
             val localPath = psiFile.virtualFile.path
@@ -66,7 +66,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 //        fun getLocationHint(containingClass: PhpClass, method: Method, datasetName: String?) =
 //            getLocationHint(containingClass) + "::" + method.name + " with data set " + datasetName
 
-        private fun createPathMapper(project: Project): PhpCommandLinePathProcessor {
+        fun createPathMapper(project: Project): PhpCommandLinePathProcessor {
             val interpreter = PhpProjectConfigurationFacade.getInstance(project).interpreter
             if (interpreter?.isRemote != true) return PhpCommandLinePathProcessor.LOCAL
 
