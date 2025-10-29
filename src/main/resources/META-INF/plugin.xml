@@ -23,16 +23,6 @@
         <programRunner
                 implementation="com.github.xepozz.testo.tests.run.TestoDebugRunner"/>
 
-        <localInspection
-                language="PHP"
-                groupPath="PHP"
-                groupKey="inspection.group"
-                shortName="TestoTestFailedLineInspection"
-                enabledByDefault="true"
-                key="inspection.failedLine"
-                level="WARNING"
-                implementationClass="com.github.xepozz.testo.inspections.TestoTestFailedLineInspection"
-        />
     </extensions>
 
     <extensions defaultExtensionNs="com.jetbrains.php">
