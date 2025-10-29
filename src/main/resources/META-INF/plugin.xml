@@ -24,7 +24,7 @@
                 implementation="com.github.xepozz.testo.tests.run.TestoDebugRunner"/>
         <implicitUsageProvider
                 implementation="com.github.xepozz.testo.references.TestFunctionImplicitUsageProvider"/>
-        <fileType name="PHP" fileNames="testo;testo.php;testo.bat" />
+        <fileType name="PHP" fileNames="testo;testo.php;testo.bat"/>
 
 <!--        <notificationGroup-->
 <!--                id="Testo"-->
@@ -33,6 +33,14 @@
 <!--                isLogByDefault="false"-->
 <!--                bundle="messages.TestoBundle"-->
 <!--                key="notification.group"/>-->
+        <notificationGroup
+                id="Testo"
+                displayType="TOOL_WINDOW"
+                toolWindowId="Run"
+                isLogByDefault="false"
+                bundle="messages.TestoBundle"
+                key="notification.group"/>
+
         <!--                <pathMacroFilter implementation="com.jetbrains.php.phpunit.PhpUnitPathMacroFilter" />-->
 <!--        <iconProvider implementation="com.github.xepozz.testo.ui.TestoIconProvider"/>-->
 
