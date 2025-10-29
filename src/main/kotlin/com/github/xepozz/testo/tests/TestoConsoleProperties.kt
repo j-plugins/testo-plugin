@@ -6,7 +6,6 @@ import com.intellij.execution.Executor
 import com.intellij.execution.Location
 import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
-import com.intellij.execution.testframework.sm.runner.TestProxyFilterProvider
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.pom.Navigatable
@@ -22,15 +21,6 @@ class TestoConsoleProperties(
     val pathMapper: PhpPathMapper,
 ) : SMTRunnerConsoleProperties(config, TestoBundle.message("testo.local.run.display.name"), executor) {
     val myTestLocator = TestoTestLocator(pathMapper)
-
-    override fun getFilterProvider(): TestProxyFilterProvider? {
-        println("getFilterProvider")
-        return TestProxyFilterProvider { nodeType, nodeName, nodeArguments ->
-            println("test proxy filter provider: nodeType: $nodeType, nodeName: $nodeName, nodeArguments: $nodeArguments")
-
-            null
-        }
-    }
 
     override fun getTestStackTraceParser(url: String, proxy: SMTestProxy, project: Project) =
         TestoStackTraceParser.parse(url, proxy.stacktrace, proxy.errorMessage, testLocator, project)

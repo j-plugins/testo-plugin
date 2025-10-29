@@ -1,6 +1,6 @@
 package com.github.xepozz.testo.services
 
-import com.github.xepozz.testo.TestoTestRunLineMarkerProvider
+import com.github.xepozz.testo.tests.TestoFrameworkType
 import com.intellij.execution.TestStateStorage
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
@@ -23,7 +23,7 @@ class TestoFailedLineManager(
         if (testElement !is FunctionReference) return null
         val function = testElement.findParentOfType<Function>() ?: return null
         val locationUrl = getLocationUrl(testElement.containingFile, function)
-        println("getTestLocationUrl: $locationUrl, ${testElement}")
+//        println("getTestLocationUrl: $locationUrl, ${testElement}")
         return locationUrl
     }
 
@@ -36,8 +36,6 @@ class TestoFailedLineManager(
         if (!testStateRecord.failedMethod.contains((testElement as MethodReference).text)) {
             return emptyList()
         }
-
-//        val states = testStateStorage.keys.map { testStateStorage.getState(it) }.filter { it?.failedLine!=-1 }
 
         val records = mutableListOf(testStateRecord)
         if (testStateRecord.failedLine == -1) {
@@ -52,6 +50,7 @@ class TestoFailedLineManager(
 
             records.addAll(dataSetRecords)
         }
+
         return records
     }
 
@@ -60,25 +59,14 @@ class TestoFailedLineManager(
 
     private fun getLocationUrl(containingFile: PsiFile, functionCall: PhpNamedElement): String =
         getLocationUrl(containingFile) + "::" + getElementFqn(functionCall)
-}
 
-private fun getElementFqn(functionCall: PhpNamedElement) = when (functionCall) {
-    is Method -> functionCall.fqn.replace(".", "::")
-    else -> functionCall.fqn
-}
+    private fun getLocationUrl(psiFile: PsiFile) = "${TestoFrameworkType.SCHEMA}://${psiFile.virtualFile.path}"
 
-internal fun getLocationUrl(psiFile: PsiFile): String {
-    return "php_qn://${
-        psiFile.virtualFile.path
-//        TestoTestRunLineMarkerProvider
-//            .getFilePathDeploymentAware(psiFile)
-//            .removePrefix(getProjectPathDeploymentAware(psiFile.project)).trimStart('/')
-    }"
-}
+    companion object {
 
-private fun getProjectPathDeploymentAware(project: Project): String {
-    val projectPath = project.basePath ?: return ""
-    val pathMapper = TestoTestRunLineMarkerProvider.createPathMapper(project)
-
-    return pathMapper.process(projectPath)
+        private fun getElementFqn(functionCall: PhpNamedElement) = when (functionCall) {
+            is Method -> functionCall.fqn.replace(".", "::")
+            else -> functionCall.fqn
+        }
+    }
 }

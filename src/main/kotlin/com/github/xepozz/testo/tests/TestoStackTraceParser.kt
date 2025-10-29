@@ -5,6 +5,7 @@
 package com.jetbrains.php.phpunit
 
 import com.github.xepozz.testo.takeWhileInclusive
+import com.github.xepozz.testo.tests.TestoFrameworkType
 import com.intellij.execution.testframework.sm.runner.ui.TestStackTraceParser
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiDocumentManager
@@ -43,15 +44,13 @@ class TestoStackTraceParser(
 
             val errorMessage = if (errorMessage.isNullOrEmpty()) lines.first() else errorMessage.nullIfEmpty()
 
-            val parts = url.substringAfter("php_qn://").split("::")
+            val parts = url.substringAfter("${TestoFrameworkType.SCHEMA}://").split("::")
             val path = parts.getOrNull(0) ?: return TestoStackTraceParser(errorMessage)
             val classFqn = parts.getOrNull(1)
             val classMethod = parts.getOrNull(2)
 
             val lastLine = lines[lines.size - 1].trim { it in listOf(' ', '(', ')') }
             println("lastLine: $lastLine, url: $url, path: $path, classFqn: $classFqn, classMethod: $classMethod")
-
-            val fqn = '\\' + lastLine.substringAfter("$PREFIX: ")
 
             val failedLine = lines[lines.size - 2]
                 .substringAfter(path)
@@ -62,24 +61,9 @@ class TestoStackTraceParser(
             val failedLineText = getLineText(path, failedLine, project, locator)
 
             if (lastLine.contains("->")) {
-                val classFqn = fqn.split("->").first()
-                val classMethod = fqn.split("->").last()
-
-//                val failedLineText = if (failedLine > 0) getLineText(path, failedLine, project, locator) else null
-
-                println("classFqn: $classFqn, classMethod: $classMethod, failedLine: $failedLine")
                 return TestoStackTraceParser(failedLine, failedLineText, errorMessage, null)
             }
 
-            val functionFqn = fqn
-
-//            if (path != null && lastLine.contains(path)) {
-//            val failedLine = StringUtil.parseInt(lastLine.substring(path.length + 1), -1)
-//            val failedLineText = if (failedLine > 0) getLineText(path, failedLine, project, locator) else null
-
-//            return TestoStackTraceParser(lines.size, lastLine, errorMessage, null)
-
-            println("failedLineText: $failedLineText, failedLine: $failedLine functionFqn: $functionFqn, classFqn: $classFqn, classMethod: $classMethod")
             return TestoStackTraceParser(failedLine, failedLineText, errorMessage, null)
         }
 

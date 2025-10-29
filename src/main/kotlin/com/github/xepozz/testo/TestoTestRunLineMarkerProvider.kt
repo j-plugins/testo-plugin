@@ -1,5 +1,6 @@
 package com.github.xepozz.testo
 
+import com.github.xepozz.testo.tests.TestoFrameworkType
 import com.github.xepozz.testo.tests.actions.TestoRunCommandAction
 import com.intellij.execution.lineMarker.RunLineMarkerContributor
 import com.intellij.openapi.project.Project
@@ -52,7 +53,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
         }
 
          fun getLocationHint(element: PhpClass) = getLocationHint(element.containingFile) + "::" + element.fqn
-         fun getLocationHint(file: PsiFile) = "php_qn://" + getFilePathDeploymentAware(file)
+         fun getLocationHint(file: PsiFile) = "${TestoFrameworkType.SCHEMA}://" + getFilePathDeploymentAware(file)
 
         fun getFilePathDeploymentAware(psiFile: PsiFile): String {
             val localPath = psiFile.virtualFile.path

@@ -5,7 +5,6 @@ import com.github.xepozz.testo.TestoClasses
 import com.github.xepozz.testo.TestoIcons
 import com.intellij.openapi.project.Project
 import com.jetbrains.php.lang.psi.elements.Method
-import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.testFramework.PhpEmptyTestDescriptor
 import com.jetbrains.php.testFramework.PhpTestCreateInfo
 import com.jetbrains.php.testFramework.PhpTestDescriptor
@@ -67,7 +66,8 @@ class TestoFrameworkType : PhpTestFrameworkType() {
     }
 
     companion object Companion {
-        val ID = "Testo"
+        const val ID = "Testo"
+        const val SCHEMA = "php_qn"
         val INSTANCE: TestoFrameworkType
             get() = getTestFrameworkType(ID) as TestoFrameworkType
     }
