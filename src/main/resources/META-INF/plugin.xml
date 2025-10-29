@@ -25,6 +25,25 @@
         <implicitUsageProvider
                 implementation="com.github.xepozz.testo.references.TestFunctionImplicitUsageProvider"/>
         <fileType name="PHP" fileNames="testo;testo.php;testo.bat" />
+
+<!--        <notificationGroup-->
+<!--                id="Testo"-->
+<!--                displayType="TOOL_WINDOW"-->
+<!--                toolWindowId="Run"-->
+<!--                isLogByDefault="false"-->
+<!--                bundle="messages.TestoBundle"-->
+<!--                key="notification.group"/>-->
+        <!--                <pathMacroFilter implementation="com.jetbrains.php.phpunit.PhpUnitPathMacroFilter" />-->
+<!--        <iconProvider implementation="com.github.xepozz.testo.ui.TestoIconProvider"/>-->
+
+<!--        <intentionAction>-->
+<!--            <language>PHP</language>-->
+<!--            <className>com.github.xepozz.testo.actions.PhpNewTestIntention</className>-->
+<!--            <categoryKey>intention.group</categoryKey>-->
+<!--            <bundleName>messages.TestoBundle</bundleName>-->
+<!--        </intentionAction>-->
+
+        <internalFileTemplate name="Testo Test" />
     </extensions>
 
     <extensions defaultExtensionNs="com.jetbrains.php">
@@ -33,4 +52,14 @@
         <composerConfigClient
                 implementation="com.github.xepozz.testo.TestoComposerConfig"/>
     </extensions>
+
+    <actions>
+        <group id="TestoGenerateGroup">
+            <action
+                    id="TestoGenerateTestMethod"
+                    class="com.github.xepozz.testo.actions.TestoGenerateTestMethodAction"/>
+            <separator/>
+            <add-to-group group-id="GenerateGroup" anchor="first"/>
+        </group>
+    </actions>
 </idea-plugin>
