@@ -27,5 +27,7 @@
     <extensions defaultExtensionNs="com.jetbrains.php">
         <testFrameworkType
                 implementation="com.github.xepozz.testo.tests.TestoFrameworkType"/>
+        <composerConfigClient
+                implementation="com.github.xepozz.testo.TestoComposerConfig"/>
     </extensions>
 </idea-plugin>
