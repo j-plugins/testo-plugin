@@ -11,7 +11,6 @@ import com.jetbrains.php.testFramework.PhpTestDescriptor
 import com.jetbrains.php.testFramework.PhpTestFrameworkFormDecorator
 import com.jetbrains.php.testFramework.PhpTestFrameworkFormDecorator.PhpDownloadableTestFormDecorator
 import com.jetbrains.php.testFramework.PhpTestFrameworkType
-import com.jetbrains.php.testFramework.PhpUnitTestCreateInfo
 import com.jetbrains.php.testFramework.ui.PhpTestFrameworkBaseConfigurableForm
 import com.jetbrains.php.testFramework.ui.PhpTestFrameworkConfigurableForm
 
@@ -46,10 +45,7 @@ class TestoFrameworkType : PhpTestFrameworkType() {
                 return emptyList()
             }
 
-            override fun getTestCreateInfos(): Collection<PhpTestCreateInfo?> {
-                println("getTestCreateInfos")
-                return listOf<PhpTestCreateInfo?>(PhpUnitTestCreateInfo())
-            }
+            override fun getTestCreateInfos() = listOf<PhpTestCreateInfo?>(TestoTestCreateInfo.INSTANCE)
         }
     }
 
