@@ -10,6 +10,9 @@
     <resource-bundle>messages.TestoBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
+        <fileType
+                name="PHP"
+                fileNames="testo;testo.php;testo.bat"/>
         <runLineMarkerContributor
                 language="PHP"
                 implementationClass="com.github.xepozz.testo.TestoTestRunLineMarkerProvider"/>
@@ -24,7 +27,8 @@
                 implementation="com.github.xepozz.testo.tests.run.TestoDebugRunner"/>
         <implicitUsageProvider
                 implementation="com.github.xepozz.testo.references.TestFunctionImplicitUsageProvider"/>
-        <fileType name="PHP" fileNames="testo;testo.php;testo.bat"/>
+        <iconProvider
+                implementation="com.github.xepozz.testo.ui.TestoIconProvider" />
 
 <!--        <notificationGroup-->
 <!--                id="Testo"-->
