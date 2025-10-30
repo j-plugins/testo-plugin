@@ -14,29 +14,60 @@ object TestoIcons {
     object PHP {
         @JvmField
         val FILE = IconLoader.getIcon("/icons/php/file.svg", this::class.java)
+
         @JvmField
         val CLASS = IconLoader.getIcon("/icons/php/class.svg", this::class.java)
+
         @JvmField
         val CLASS_ABSTRACT = IconLoader.getIcon("/icons/php/classAbstract.svg", this::class.java)
+
+        @JvmField
+        val FUNCTION = IconLoader.getIcon("/icons/php/function.svg", this::class.java)
     }
 
-    val TEST_FILE = LayeredIcon.layeredIcon {
-        arrayOf(
-            PHP.FILE,
-            AllIcons.Nodes.JunitTestMark,
-        )
+    object Layered {
+        @JvmField
+        val FILE = LayeredIcon.layeredIcon {
+            arrayOf(
+                PHP.FILE,
+                AllIcons.Nodes.JunitTestMark,
+            )
+        }
+
+        @JvmField
+        val FUNCTION = LayeredIcon.layeredIcon {
+            arrayOf(
+                PHP.FUNCTION,
+                AllIcons.Nodes.JunitTestMark,
+            )
+        }
+
+        object Class {
+            @JvmField
+            val CLASS = LayeredIcon.layeredIcon {
+                arrayOf(
+                    PHP.CLASS,
+                    AllIcons.Nodes.JunitTestMark,
+                )
+            }
+
+            @JvmField
+            val CLASS_FINAL = LayeredIcon.layeredIcon {
+                arrayOf(
+                    PHP.CLASS,
+                    AllIcons.Nodes.FinalMark,
+                    AllIcons.Nodes.JunitTestMark,
+                )
+            }
+
+            @JvmField
+            val CLASS_ABSTRACT = LayeredIcon.layeredIcon {
+                arrayOf(
+                    PHP.CLASS_ABSTRACT,
+                    AllIcons.Nodes.JunitTestMark,
+                )
+            }
+        }
     }
-    val FINAL_TESTO_CLASS = LayeredIcon.layeredIcon {
-        arrayOf(
-            PHP.CLASS,
-            AllIcons.Nodes.FinalMark,
-            AllIcons.Nodes.JunitTestMark,
-        )
-    }
-    val ABSTRACT_TESTO_CLASS = LayeredIcon.layeredIcon {
-        arrayOf(
-            PHP.CLASS_ABSTRACT,
-            AllIcons.Nodes.JunitTestMark,
-        )
-    }
+
 }

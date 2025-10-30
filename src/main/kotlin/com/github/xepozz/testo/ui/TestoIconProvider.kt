@@ -16,13 +16,14 @@ class TestoIconProvider : IconProvider() {
 
         if (!phpFile.isTestoFile()) return null
 
-        val phpClass = PsiTreeUtil.findChildOfType(phpFile, PhpClass::class.java)
+        val phpClasses = PsiTreeUtil.findChildrenOfType(phpFile, PhpClass::class.java)
 
         return when {
-            phpClass == null -> TestoIcons.TEST_FILE
-            phpClass.modifier.isAbstract -> TestoIcons.ABSTRACT_TESTO_CLASS
-            phpClass.modifier.isFinal -> TestoIcons.FINAL_TESTO_CLASS
-            else -> TestoIcons.TEST_FILE
+            phpClasses.isEmpty() -> TestoIcons.Layered.FUNCTION
+            phpClasses.size > 1 -> TestoIcons.Layered.FILE
+            phpClasses.first().modifier.isAbstract -> TestoIcons.Layered.Class.CLASS_ABSTRACT
+            phpClasses.first().modifier.isFinal -> TestoIcons.Layered.Class.CLASS_FINAL
+            else -> TestoIcons.Layered.Class.CLASS
         }
     }
 }

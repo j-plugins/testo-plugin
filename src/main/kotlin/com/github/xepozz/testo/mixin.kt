@@ -21,14 +21,15 @@ fun PsiElement.isTestoClass() = when (this) {
 }
 
 fun PsiFile.isTestoFile() = when (this) {
-    is PhpFile -> name.endsWith("Test") ||
-            PsiTreeUtil.findChildrenOfType(this, PhpClass::class.java)
-                .any { it.isTestoClass() } ||
-            PsiTreeUtil.findChildrenOfType(this, Function::class.java)
-                .any { it.isTestoMethod() }
-
+    is PhpFile -> name.endsWith("Test") || isTestoClassFile() || isTestoFunctionFile()
     else -> false
 }
+
+fun PhpFile.isTestoClassFile() = PsiTreeUtil.findChildrenOfType(this, PhpClass::class.java)
+    .any { it.isTestoClass() }
+
+fun PhpFile.isTestoFunctionFile() = PsiTreeUtil.findChildrenOfType(this, Function::class.java)
+    .any { it.isTestoMethod() }
 
 fun <T> Sequence<T>.takeWhileInclusive(predicate: (T) -> Boolean) = sequence {
     with(iterator()) {
