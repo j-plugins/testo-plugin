@@ -5,6 +5,7 @@ import com.github.xepozz.testo.isTestoFile
 import com.intellij.ide.IconProvider
 import com.intellij.openapi.util.Iconable
 import com.intellij.psi.PsiElement
+import com.intellij.psi.search.GlobalSearchScopesCore
 import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.psi.PhpFile
 import com.jetbrains.php.lang.psi.elements.PhpClass
@@ -15,6 +16,9 @@ class TestoIconProvider : IconProvider() {
         val phpFile = element as? PhpFile ?: return null
 
         if (!phpFile.isTestoFile()) return null
+        if (!GlobalSearchScopesCore.projectTestScope(element.project).contains(phpFile.virtualFile)) {
+            return null
+        }
 
         val phpClasses = PsiTreeUtil.findChildrenOfType(phpFile, PhpClass::class.java)
 
