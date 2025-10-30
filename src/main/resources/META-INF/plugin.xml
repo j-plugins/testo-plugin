@@ -52,6 +52,11 @@
 <!--        </intentionAction>-->
 
         <internalFileTemplate name="Testo Test" />
+        <defaultLiveTemplates file="/liveTemplates/Testo.xml"/>
+        <liveTemplateContext
+                contextId="Testo"
+                baseContextId="PHP"
+                implementation="com.github.xepozz.testo.TestoContext"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.jetbrains.php">

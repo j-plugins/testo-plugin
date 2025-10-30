@@ -1,0 +1,22 @@
+<templateSet group="Testo">
+    <template
+            name="test"
+            value="#[Test]&#10;    public function test$NAME$(){&#10;    $BODY$$END$&#10;}"
+            description="Testo: Create a new test method"
+            toReformat="true"
+            toShortenFQNames="true">
+        <variable
+                name="NAME"
+                expression=""
+                defaultValue=""
+                alwaysStopAt="true"/>
+        <variable
+                name="BODY"
+                expression="complete()"
+                defaultValue=""
+                alwaysStopAt="true"/>
+        <context>
+            <option name="Testo" value="true"/>
+        </context>
+    </template>
+</templateSet>
