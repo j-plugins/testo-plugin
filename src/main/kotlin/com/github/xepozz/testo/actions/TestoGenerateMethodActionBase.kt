@@ -112,8 +112,10 @@ abstract class TestoGenerateMethodActionBase(
             if (elementAt != null) {
                 val parentAnchor = PhpPsiUtil.getParentByCondition<PsiElement?>(
                     elementAt,
-                    false
-                ) { canBeAnchor(it, testClass) }
+                    false,
+                    { canBeAnchor(it, testClass) },
+                    null,
+                )
 
                 val result = parentAnchor
                     ?: PhpPsiUtil.getPrevSiblingByCondition(elementAt) { canBeAnchor(it, testClass) }
