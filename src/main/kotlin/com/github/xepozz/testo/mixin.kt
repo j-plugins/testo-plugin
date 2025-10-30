@@ -1,5 +1,6 @@
 package com.github.xepozz.testo
 
+import com.github.xepozz.testo.tests.TestoTestDescriptor
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
@@ -16,12 +17,12 @@ fun PsiElement.isTestoMethod() = when {
 }
 
 fun PsiElement.isTestoClass() = when (this) {
-    is PhpClass -> name.endsWith("Test") || methods.any { it.isTestoMethod() }
+    is PhpClass -> TestoTestDescriptor.isTestClassName(name) || methods.any { it.isTestoMethod() }
     else -> false
 }
 
 fun PsiFile.isTestoFile() = when (this) {
-    is PhpFile -> name.endsWith("Test") || isTestoClassFile() || isTestoFunctionFile()
+    is PhpFile -> TestoTestDescriptor.isTestClassName(name) || isTestoClassFile() || isTestoFunctionFile()
     else -> false
 }
 
