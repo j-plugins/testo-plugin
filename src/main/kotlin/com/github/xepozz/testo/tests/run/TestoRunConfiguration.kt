@@ -56,7 +56,6 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         config: PhpTestFrameworkConfiguration?
     ) = project.basePath
 
-
     override fun createTestConsoleProperties(executor: Executor): SMTRunnerConsoleProperties {
         println("createTestConsoleProperties")
         val manager = PhpRemoteInterpreterManager.getInstance()

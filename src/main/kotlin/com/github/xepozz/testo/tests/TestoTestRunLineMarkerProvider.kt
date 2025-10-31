@@ -1,7 +1,8 @@
-package com.github.xepozz.testo
+package com.github.xepozz.testo.tests
 
 import com.github.xepozz.testo.index.TestoDataProviderUtils
-import com.github.xepozz.testo.tests.TestoFrameworkType
+import com.github.xepozz.testo.isTestoClass
+import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.tests.actions.TestoRunCommandAction
 import com.intellij.execution.lineMarker.RunLineMarkerContributor
 import com.intellij.openapi.project.Project
