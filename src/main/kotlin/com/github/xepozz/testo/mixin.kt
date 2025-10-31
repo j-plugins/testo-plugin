@@ -7,14 +7,22 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.psi.PhpFile
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
+import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
 import com.jetbrains.php.lang.psi.elements.PhpClass
 
-fun PsiElement.isTestoMethod() = when {
-    this !is Function -> false
-    getAttributes(TestoClasses.TEST).isNotEmpty() -> true
-    this is Method && modifier.isPublic && name.startsWith("test") -> true
+fun PsiElement.isTestoExecutable() = isTestoFunction() || isTestoMethod()
+
+fun PsiElement.isTestoFunction() = when {
+    this is Function -> hasAttribute(TestoClasses.TEST)
     else -> false
 }
+
+fun PsiElement.isTestoMethod() = when {
+    this is Method -> modifier.isPublic && name.startsWith("test") || hasAttribute(TestoClasses.TEST)
+    else -> false
+}
+
+fun PhpAttributesOwner.hasAttribute(fqn: String) = getAttributes(fqn).isNotEmpty()
 
 fun PsiElement.isTestoClass() = when (this) {
     is PhpClass -> TestoTestDescriptor.isTestClassName(name) || methods.any { it.isTestoMethod() }
@@ -30,7 +38,7 @@ fun PhpFile.isTestoClassFile() = PsiTreeUtil.findChildrenOfType(this, PhpClass::
     .any { it.isTestoClass() }
 
 fun PhpFile.isTestoFunctionFile() = PsiTreeUtil.findChildrenOfType(this, Function::class.java)
-    .any { it.isTestoMethod() }
+    .any { it.isTestoFunction() }
 
 fun <T> Sequence<T>.takeWhileInclusive(predicate: (T) -> Boolean) = sequence {
     with(iterator()) {

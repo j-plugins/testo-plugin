@@ -24,7 +24,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
         if (element.nameIdentifier != leaf) return null
 
         return when {
-            element is Function && element.isTestoMethod() -> withExecutorActions(
+            element is Function && element.isTestoExecutable() -> withExecutorActions(
                 getTestStateIcon(
                     getLocationHint(element),
                     element.project,

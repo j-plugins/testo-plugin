@@ -1,7 +1,7 @@
 package com.github.xepozz.testo.tests.run
 
+import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.isTestoFile
-import com.github.xepozz.testo.isTestoMethod
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Condition
 import com.intellij.openapi.vfs.VirtualFile
@@ -30,7 +30,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     override fun getConfigurationFactory() = TestoRunConfigurationFactory(TestoRunConfigurationType.INSTANCE)
 
     companion object Companion {
-        val METHOD = Condition<PsiElement> { it.isTestoMethod() }
+        val METHOD = Condition<PsiElement> { it.isTestoExecutable() }
         private val METHOD_NAMER = { element: PsiElement? -> (element as? Function)?.name }
         private val FILE_TO_SCOPE = { file: PsiFile? ->
             println("file to scope: ${file?.virtualFile?.name}")
