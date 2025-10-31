@@ -1,5 +1,6 @@
 package com.github.xepozz.testo
 
+import com.github.xepozz.testo.index.TestoDataProviderUtils
 import com.github.xepozz.testo.tests.TestoFrameworkType
 import com.github.xepozz.testo.tests.actions.TestoRunCommandAction
 import com.intellij.execution.lineMarker.RunLineMarkerContributor
@@ -25,19 +26,15 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 
         return when {
             element is Function && element.isTestoExecutable() -> withExecutorActions(
-                getTestStateIcon(
-                    getLocationHint(element),
-                    element.project,
-                    false,
-                ),
+                getTestStateIcon(getLocationHint(element), element.project, false),
             )
 
             element is PhpClass && element.isTestoClass() -> withExecutorActions(
-                getTestStateIcon(
-                    getLocationHint(element),
-                    element.project,
-                    false,
-                ),
+                getTestStateIcon(getLocationHint(element), element.project, false),
+            )
+
+            element is Method && TestoDataProviderUtils.isDataProvider(element) -> withExecutorActions(
+                getTestStateIcon(getDataProviderLocationHint(element), element.project, false),
             )
 
             else -> null
@@ -62,6 +59,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 
         fun getLocationHint(element: PhpClass) = getLocationHint(element.containingFile) + "::" + element.fqn
         fun getLocationHint(file: PsiFile) = "${TestoFrameworkType.SCHEMA}://" + getFilePathDeploymentAware(file)
+        fun getDataProviderLocationHint(method: Method) = getLocationHint(method) + "::" + method.name
 
         fun getFilePathDeploymentAware(psiFile: PsiFile): String {
             val localPath = psiFile.virtualFile.path

@@ -22,6 +22,11 @@ fun PsiElement.isTestoMethod() = when {
     else -> false
 }
 
+fun PsiElement.isTestoDataProvider() = when {
+    this is Method -> modifier.isPublic && modifier.isStatic
+    else -> false
+}
+
 fun PhpAttributesOwner.hasAttribute(fqn: String) = getAttributes(fqn).isNotEmpty()
 
 fun PsiElement.isTestoClass() = when (this) {

@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.tests.run
 
+import com.github.xepozz.testo.index.TestoDataProviderUtils
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.isTestoFile
 import com.intellij.openapi.project.Project
@@ -9,6 +10,7 @@ import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.jetbrains.php.lang.psi.elements.Function
+import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.testFramework.run.PhpTestConfigurationProducer
 
 class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfiguration>(
@@ -30,7 +32,9 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     override fun getConfigurationFactory() = TestoRunConfigurationFactory(TestoRunConfigurationType.INSTANCE)
 
     companion object Companion {
-        val METHOD = Condition<PsiElement> { it.isTestoExecutable() }
+        val METHOD = Condition<PsiElement> {
+            it.isTestoExecutable() || (it is Method && TestoDataProviderUtils.isDataProvider(it))
+        }
         private val METHOD_NAMER = { element: PsiElement? -> (element as? Function)?.name }
         private val FILE_TO_SCOPE = { file: PsiFile? ->
             println("file to scope: ${file?.virtualFile?.name}")
