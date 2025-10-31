@@ -30,35 +30,47 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     override fun isEnabled(project: Project) = true
 
 
-    override fun setupConfigurationFromContext(
-        configuration: TestoRunConfiguration,
-        context: ConfigurationContext,
-        sourceElement: Ref<PsiElement?>
-    ): Boolean {
-        val location = context.getLocation() as? PsiLocation<*> ?: return false
-        val element = findTestElement(location.psiElement, getWorkingDirectory(location.psiElement))
+    override fun setupConfiguration(
+        testRunnerSettings: PhpTestRunnerSettings,
+        element: PsiElement,
+        virtualFile: VirtualFile
+    ): PsiElement? {
+        val testRunnerSettings = testRunnerSettings as? TestoRunnerSettings ?: return null
+
         if (element is Method) {
-            val usages = TestoDataProviderUtils.findDataProviderUsages(element)
+            val element = findTestElement(element, getWorkingDirectory(element))
+            if (element is Method) {
+                val usages = TestoDataProviderUtils.findDataProviderUsages(element)
 
-            val target = usages.firstOrNull() ?: return false
-            val virtualFile = PsiUtilCore.getVirtualFile(target) ?: return false
-            val testRunnerSettings = configuration.settings.runnerSettings
+                if (usages.isNotEmpty()) {
+                    val target = usages.first()
 
-
-            val methodName = this.myMethodNameProvider.`fun`(target)
-            testRunnerSettings.scope = PhpTestRunnerSettings.Scope.Method
-            testRunnerSettings.methodName = methodName
-            testRunnerSettings.filePath = virtualFile.presentableUrl
-
-            sourceElement.set(target)
-            configuration.name = configuration.suggestedName() ?: configuration.name
-            PhpRunConfigurationExtensionsManager
-                .getInstance()
-                .extendCreatedConfiguration(configuration, location)
-            return true
+                    return super.setupConfiguration(testRunnerSettings, target, target.containingFile.virtualFile)
+                }
+            }
         }
+        return super.setupConfiguration(testRunnerSettings, element, virtualFile)
+    }
 
-        return super.setupConfigurationFromContext(configuration, context, sourceElement)
+    override fun isConfigurationFromContext(
+        testRunnerSettings: PhpTestRunnerSettings,
+        psiElement: PsiElement
+    ): Boolean {
+        if (psiElement is Method) {
+            val usages = TestoDataProviderUtils.findDataProviderUsages(psiElement)
+
+            if (usages.isNotEmpty()) {
+                val target = usages.first()
+
+                return when {
+                    testRunnerSettings.scope != PhpTestRunnerSettings.Scope.Method -> false
+                    testRunnerSettings.methodName != this.myMethodNameProvider.`fun`(target) -> false
+                    testRunnerSettings.filePath != target.containingFile.virtualFile.path -> false
+                    else -> true
+                }
+            }
+        }
+        return super.isConfigurationFromContext(testRunnerSettings, psiElement)
     }
 
     override fun getWorkingDirectory(element: PsiElement): VirtualFile? {
