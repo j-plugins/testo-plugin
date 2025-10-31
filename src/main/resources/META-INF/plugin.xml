@@ -63,6 +63,8 @@
                 implementation="com.github.xepozz.testo.TestoContext"/>
         <console.folding
                 implementation="com.github.xepozz.testo.ui.TestoStackTraceConsoleFolding"/>
+        <fileBasedIndex
+                implementation="com.github.xepozz.testo.index.TestoDataProvidersIndex"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.jetbrains.php">
