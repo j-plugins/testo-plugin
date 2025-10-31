@@ -3,15 +3,23 @@ package com.github.xepozz.testo.tests.run
 import com.github.xepozz.testo.index.TestoDataProviderUtils
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.isTestoFile
+import com.intellij.execution.Location
+import com.intellij.execution.PsiLocation
+import com.intellij.execution.actions.ConfigurationContext
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Condition
+import com.intellij.openapi.util.Ref
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.util.PsiUtilCore
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
+import com.jetbrains.php.phpunit.PhpMethodLocation
+import com.jetbrains.php.run.PhpRunConfigurationExtensionsManager
 import com.jetbrains.php.testFramework.run.PhpTestConfigurationProducer
+import com.jetbrains.php.testFramework.run.PhpTestRunnerSettings
 
 class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfiguration>(
     TestoTestRunnerSettingsValidator,
@@ -20,6 +28,38 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     METHOD,
 ) {
     override fun isEnabled(project: Project) = true
+
+
+    override fun setupConfigurationFromContext(
+        configuration: TestoRunConfiguration,
+        context: ConfigurationContext,
+        sourceElement: Ref<PsiElement?>
+    ): Boolean {
+        val location = context.getLocation() as? PsiLocation<*> ?: return false
+        val element = findTestElement(location.psiElement, getWorkingDirectory(location.psiElement))
+        if (element is Method) {
+            val usages = TestoDataProviderUtils.findDataProviderUsages(element)
+
+            val target = usages.firstOrNull() ?: return false
+            val virtualFile = PsiUtilCore.getVirtualFile(target) ?: return false
+            val testRunnerSettings = configuration.settings.runnerSettings
+
+
+            val methodName = this.myMethodNameProvider.`fun`(target)
+            testRunnerSettings.scope = PhpTestRunnerSettings.Scope.Method
+            testRunnerSettings.methodName = methodName
+            testRunnerSettings.filePath = virtualFile.presentableUrl
+
+            sourceElement.set(target)
+            configuration.name = configuration.suggestedName() ?: configuration.name
+            PhpRunConfigurationExtensionsManager
+                .getInstance()
+                .extendCreatedConfiguration(configuration, location)
+            return true
+        }
+
+        return super.setupConfigurationFromContext(configuration, context, sourceElement)
+    }
 
     override fun getWorkingDirectory(element: PsiElement): VirtualFile? {
         if (element is PsiDirectory) {
