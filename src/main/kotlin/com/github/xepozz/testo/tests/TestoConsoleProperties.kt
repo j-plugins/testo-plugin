@@ -11,7 +11,6 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.pom.Navigatable
 import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.phpunit.PhpPsiLocationWithDataSet
-import com.jetbrains.php.phpunit.TestoStackTraceParser
 import com.jetbrains.php.util.pathmapper.PhpPathMapper
 import one.util.streamex.StreamEx
 

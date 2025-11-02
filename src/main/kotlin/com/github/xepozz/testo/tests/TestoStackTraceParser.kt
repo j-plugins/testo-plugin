@@ -1,16 +1,12 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by FernFlower decompiler)
-//
-package com.jetbrains.php.phpunit
+package com.github.xepozz.testo.tests
 
 import com.github.xepozz.testo.takeWhileInclusive
-import com.github.xepozz.testo.tests.TestoFrameworkType
 import com.intellij.execution.testframework.sm.runner.ui.TestStackTraceParser
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiManager
 import com.intellij.util.DocumentUtil
+import com.jetbrains.php.phpunit.PhpUnitQualifiedNameLocationProvider
 import com.jetbrains.rd.generator.nova.GenerationSpec.Companion.nullIfEmpty
 
 private const val PREFIX = "[internal function]"
@@ -50,7 +46,6 @@ class TestoStackTraceParser(
             val classMethod = parts.getOrNull(2)
 
             val lastLine = lines[lines.size - 1].trim { it in listOf(' ', '(', ')') }
-            println("lastLine: $lastLine, url: $url, path: $path, classFqn: $classFqn, classMethod: $classMethod")
 
             val failedLine = lines[lines.size - 2]
                 .substringAfter(path)
