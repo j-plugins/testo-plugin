@@ -40,6 +40,8 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         }
     }
 
+    override fun suggestedName() = super.suggestedName() as String
+
     override fun createSettings() = TestoRunConfigurationSettings()
 
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> {
