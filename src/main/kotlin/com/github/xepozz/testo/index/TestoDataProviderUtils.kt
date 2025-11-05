@@ -4,6 +4,7 @@ import com.github.xepozz.testo.isTestoDataProvider
 import com.intellij.psi.search.GlobalSearchScopesCore
 import com.intellij.util.indexing.FileBasedIndex
 import com.jetbrains.php.PhpIndex
+import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
 
 object TestoDataProviderUtils {
@@ -19,7 +20,7 @@ object TestoDataProviderUtils {
             .isNotEmpty()
     }
 
-    fun findDataProviderUsages(method: Method): List<Method> {
+    fun findDataProviderUsages(method: Function): List<Method> {
         if (!method.isTestoDataProvider()) return emptyList()
         val phpIndex = PhpIndex.getInstance(method.project)
 

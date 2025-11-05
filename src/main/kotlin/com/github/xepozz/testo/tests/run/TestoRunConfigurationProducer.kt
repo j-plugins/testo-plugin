@@ -23,6 +23,7 @@ import com.intellij.util.Consumer
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.PhpIndex
 import com.jetbrains.php.lang.psi.PhpFile
+import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpNamedElement
@@ -51,9 +52,9 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
 
             return super.setupConfiguration(testRunnerSettings, element.containingFile, element.containingFile.virtualFile)
         }
-        if (element is Method) {
+        if (element is Function) {
             val element = findTestElement(element, getWorkingDirectory(element))
-            if (element is Method) {
+            if (element is Function) {
                 val usages = TestoDataProviderUtils.findDataProviderUsages(element)
 
                 if (usages.isNotEmpty()) {
@@ -77,7 +78,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 else -> true
             }
         }
-        if (element is Method) {
+        if (element is Function) {
             val usages = TestoDataProviderUtils.findDataProviderUsages(element)
 
             if (usages.isNotEmpty()) {
@@ -180,7 +181,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 else -> null
             }
         }
-        val method = PsiTreeUtil.getNonStrictParentOfType(element, Method::class.java)
+        val method = PsiTreeUtil.getNonStrictParentOfType(element, Function::class.java)
         if (method != null && method.isTestoExecutable()) {
             return method
         }
@@ -381,7 +382,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         val METHOD = Condition<PsiElement> {
             it.isTestoExecutable() || (it is Method && TestoDataProviderUtils.isDataProvider(it))
         }
-        private val METHOD_NAMER = { element: PsiElement? -> (element as? com.jetbrains.php.lang.psi.elements.Function)?.name }
+        private val METHOD_NAMER = { element: PsiElement? -> (element as? PhpNamedElement)?.name }
         private val FILE_TO_SCOPE = { file: PsiFile? ->
             file
                 ?.takeIf { it.isTestoFile() }
