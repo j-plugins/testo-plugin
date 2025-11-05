@@ -31,6 +31,8 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         workingDirectory: String
     ) {
         println("runType: $type, $workingDirectory")
+
+        phpCommandSettings.addArgument("--suite=$type")
     }
 
     override fun runDirectory(
@@ -40,9 +42,9 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         workingDirectory: String
     ) {
         println("runDirectory: $directory")
-        if (!directory.isEmpty()) {
-            phpCommandSettings.addArgument("--filter=$directory")
-        }
+        if (directory.isEmpty()) return
+
+        phpCommandSettings.addArgument("--path=$directory")
     }
 
     override fun runFile(
@@ -52,9 +54,9 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         workingDirectory: String
     ) {
         println("runFile: $file")
-        if (!file.isEmpty()) {
-            phpCommandSettings.addArgument("--filter=$file")
-        }
+        if (file.isEmpty()) return
+
+        phpCommandSettings.addArgument("--path=$file")
     }
 
     override fun runMethod(
@@ -67,6 +69,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         println("runMethod: $file, $methodName")
         if (file.isEmpty()) return
 
+        phpCommandSettings.addArgument("--path=$file")
         phpCommandSettings.addArgument("--filter=$methodName")
     }
 }
