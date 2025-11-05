@@ -1,8 +1,8 @@
 package com.github.xepozz.testo.index
 
+import com.github.xepozz.testo.isTestoClass
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.testIntegration.TestFinderHelper
 import com.intellij.util.indexing.DataIndexer
 import com.intellij.util.indexing.FileBasedIndex
 import com.intellij.util.indexing.FileBasedIndexExtension
@@ -16,6 +16,7 @@ import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
 import com.jetbrains.php.lang.psi.stubs.indexes.expectedArguments.PhpExpectedFunctionArgument
 import com.jetbrains.php.lang.psi.stubs.indexes.expectedArguments.PhpExpectedFunctionScalarArgument
+import com.jetbrains.rd.util.printlnError
 import java.io.DataInput
 import java.io.DataOutput
 import java.io.IOException
@@ -26,18 +27,16 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
     override fun getName() = KEY
 
     override fun getIndexer() = DataIndexer<String, TestoDataProvidersIndexType, FileContent?> { inputData ->
-        val map: MutableMap<String, TestoDataProvidersIndexType> = HashMap()
+        val map = mutableMapOf<String, TestoDataProvidersIndexType>()
 
         for (testClass in PhpPsiUtil.findAllClasses(inputData.psiFile)) {
-            if (TestFinderHelper.isTest(testClass)) {
-                for (method in testClass.ownMethods) {
-                    val dataProviders = mutableSetOf<Pair<String, String>>()
-                    dataProviders.addAll(getDataProvidersFromAttributes(method))
+            if (!testClass.isTestoClass()) continue
+            for (method in testClass.ownMethods) {
+                val dataProviders = getDataProvidersFromAttributes(method)
 
-                    for (dataProvider in dataProviders) {
-                        map.computeIfAbsent(dataProvider.second) { mutableSetOf() }
-                            .add(DataProviderUsage(testClass.fqn, method.name, dataProvider.first))
-                    }
+                for (dataProvider in dataProviders) {
+                    map.computeIfAbsent(dataProvider.second) { mutableSetOf() }
+                        .add(DataProviderUsage(testClass.fqn, method.name, dataProvider.first))
                 }
             }
         }
@@ -108,14 +107,42 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
         private fun getDataProvidersFromAttributes(method: Method): MutableSet<Pair<String, String>> {
             val result = mutableSetOf<Pair<String, String>>()
 
+            val targetFQN = method.containingClass?.fqn ?: method.fqn
+
             for (dataProvider in method.getAttributes(PHPUNIT_DATA_PROVIDER_ATTRIBUTE)) {
                 val argument = getAttributeArgument(dataProvider, "provider", 0) ?: continue
                 val methodNameArg = argument as? PhpExpectedFunctionScalarArgument ?: continue
-                val containingClass = method.containingClass ?: continue
-                if (methodNameArg.isStringLiteral) {
-                    result.add(
-                        Pair.create(containingClass.fqn, StringUtil.unquoteString(methodNameArg.value))
+                val attributeValue = methodNameArg.value
+
+                when {
+                    methodNameArg.isStringLiteral -> result.add(
+                        Pair.create(targetFQN, StringUtil.unquoteString(attributeValue))
                     )
+
+                    attributeValue.startsWith("[") && attributeValue.endsWith("]") -> {
+                        // todo: replace with PSI creation
+                        val classMethodPair = attributeValue
+                            .substring(1, attributeValue.length - 1)
+                            .split(",")
+                            .map { it.trim() }
+                        if (classMethodPair.size != 2) continue
+
+                        val classFQN = when {
+                            classMethodPair.first() in arrayOf("self::class", "static::class") -> targetFQN
+                            else -> classMethodPair.first()
+                        }
+
+                        result.add(
+                            Pair.create(classFQN, StringUtil.unquoteString(classMethodPair.last()))
+                        )
+                    }
+
+                    else -> {
+                        printlnError("Unknown data provider type: $attributeValue")
+//                        result.add(
+//                            Pair.create(targetFQN, attributeValue)
+//                        )
+                    }
                 }
             }
 

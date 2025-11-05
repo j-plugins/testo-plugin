@@ -3,7 +3,6 @@ package com.github.xepozz.testo.tests
 import com.github.xepozz.testo.index.TestoDataProviderUtils
 import com.github.xepozz.testo.isTestoClass
 import com.github.xepozz.testo.isTestoExecutable
-import com.github.xepozz.testo.tests.actions.TestoRunCommandAction
 import com.intellij.execution.lineMarker.RunLineMarkerContributor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
@@ -34,7 +33,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
                 getTestStateIcon(getLocationHint(element), element.project, false),
             )
 
-            element is Method && TestoDataProviderUtils.isDataProvider(element) -> withExecutorActions(
+            element is Function && TestoDataProviderUtils.isDataProvider(element) -> withExecutorActions(
                 getTestStateIcon(getDataProviderLocationHint(element), element.project, false),
             )
 
@@ -44,15 +43,6 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
     }
 
     companion object Companion {
-        val RUN_TEST_TOOLTIP_PROVIDER = { it: PsiElement -> "Run Testo" }
-
-        private fun getInfo(url: String, project: Project, isClass: Boolean) =
-            Info(
-                getTestStateIcon(url, project, isClass),
-                arrayOf(TestoRunCommandAction("")),
-                RUN_TEST_TOOLTIP_PROVIDER
-            )
-
         fun getLocationHint(element: Function) = when (element) {
             is Method -> getLocationHint(element.containingClass!!) + "::" + element.name
             else -> getLocationHint(element.containingFile) + "::" + element.fqn
@@ -60,7 +50,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 
         fun getLocationHint(element: PhpClass) = getLocationHint(element.containingFile) + "::" + element.fqn
         fun getLocationHint(file: PsiFile) = "${TestoFrameworkType.SCHEMA}://" + getFilePathDeploymentAware(file)
-        fun getDataProviderLocationHint(method: Method) = getLocationHint(method) + "::" + method.name
+        fun getDataProviderLocationHint(function: Function) = getLocationHint(function) + "::" + function.name
 
         fun getFilePathDeploymentAware(psiFile: PsiFile): String {
             val localPath = psiFile.virtualFile.path

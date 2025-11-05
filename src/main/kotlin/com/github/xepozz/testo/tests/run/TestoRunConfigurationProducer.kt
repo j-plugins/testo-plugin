@@ -2,6 +2,7 @@ package com.github.xepozz.testo.tests.run
 
 import com.github.xepozz.testo.index.TestoDataProviderUtils
 import com.github.xepozz.testo.isTestoClass
+import com.github.xepozz.testo.isTestoDataProviderLike
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.isTestoFile
 import com.intellij.execution.Location
@@ -18,7 +19,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
-import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.util.Consumer
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.PhpIndex
@@ -50,7 +51,11 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         if (element is PhpClass) {
             val element = findTestElement(element, getWorkingDirectory(element)) as? PhpClass ?: return null
 
-            return super.setupConfiguration(testRunnerSettings, element.containingFile, element.containingFile.virtualFile)
+            return super.setupConfiguration(
+                testRunnerSettings,
+                element.containingFile,
+                element.containingFile.virtualFile
+            )
         }
         if (element is Function) {
             val element = findTestElement(element, getWorkingDirectory(element))
@@ -58,9 +63,9 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 val usages = TestoDataProviderUtils.findDataProviderUsages(element)
 
                 if (usages.isNotEmpty()) {
-                    val target = usages.first()
+//                    val target = usages.first()
 
-                    return super.setupConfiguration(testRunnerSettings, target, target.containingFile.virtualFile)
+                    return super.setupConfiguration(testRunnerSettings, element, element.containingFile.virtualFile)
                 }
             }
         }
@@ -82,14 +87,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             val usages = TestoDataProviderUtils.findDataProviderUsages(element)
 
             if (usages.isNotEmpty()) {
-                val target = usages.first()
-
-                return when {
-                    testRunnerSettings.scope != PhpTestRunnerSettings.Scope.Method -> false
-                    testRunnerSettings.methodName != this.myMethodNameProvider.`fun`(target) -> false
-                    testRunnerSettings.filePath != target.containingFile.virtualFile.path -> false
-                    else -> true
-                }
+                return false
             }
         }
         return super.isConfigurationFromContext(testRunnerSettings, element)
@@ -116,8 +114,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         val testRunnerSettings = testoRunConfiguration.testoSettings.runnerSettings
         val location = context.getLocation()
         if (location is PsiLocation<*>) {
-            val psiElement = location.getPsiElement()
-            val element = findTestElement(psiElement, getWorkingDirectory(location.getPsiElement()))
+            val psiElement = location.psiElement
+            val element = findTestElement(psiElement, getWorkingDirectory(location.psiElement))
 
             if (element is PhpClass) {
                 if (tryRunAbstract(
@@ -133,38 +131,33 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 }
             }
 
+            if (element is Function && element.isTestoDataProviderLike()) {
+                val dataSetUsages = TestoDataProviderUtils.findDataProviderUsages(element)
+                println("dataSetUsages: $dataSetUsages for dataSet: $element")
+                if (dataSetUsages.size > 1) {
+                    showDataSetUsageChooser(
+                        element,
+                        dataSetUsages,
+                        context,
+                        testRunnerSettings,
+                        startRunnable,
+                        testoRunConfiguration,
+                    )
+                    return
+                }
 
-//            val method = location.psiElement as? Method
-//            if (method != null) {
-////                val dataSetUsages = TestoDataProviderUtils.findDataProviderUsages(method)
-////            val dataSet = extractDataSetFromDataProvider(location.getPsiElement())
-////            val dataSetUsages = if (dataSet != null) PhpUnitDataProvidersIndex.getDataProviderUsages((dataSet.psiElement as Method?)!!)
-////                    .toList()
-////            else mutableListOf<Method?>()
-////                if (dataSetUsages.size > 1) {
-////                    showDataSetUsageChooser(
-////                        dataSet,
-////                        dataSetUsages,
-////                        context,
-////                        testRunnerSettings,
-////                        startRunnable,
-////                        phpUnitLocalRunConfiguration
-////                    )
-////                    return
-////                }
-//
-//                if (tryRunAbstract(
-//                        element,
-//                        context.dataContext,
-//                        testRunnerSettings,
-//                        startRunnable,
-//                        phpUnitLocalRunConfiguration,
-//                        location
-//                    )
-//                ) {
-//                    return
-//                }
+//            if (tryRunAbstract(
+//                    element,
+//                    context.dataContext,
+//                    testRunnerSettings,
+//                    startRunnable,
+//                    testoRunConfiguration,
+//                    location
+//                )
+//            ) {
+//                return
 //            }
+            }
         }
 
         super.onFirstRun(configuration, context, startRunnable)
@@ -173,27 +166,17 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     override fun findTestElement(element: PsiElement?, workingDirectory: VirtualFile?): PsiElement? {
         if (element == null || DumbService.getInstance(element.project).isDumb) return null
 
-        if (element is PsiDirectory) {
-            return when {
-                PhpUnitRuntimeConfigurationProducer.checkDirectoryContainsPhpFiles(element.virtualFile, element.project)
-                    -> element
-
-                else -> null
-            }
+        val target = when (element) {
+            is LeafPsiElement -> element.parent
+            else -> element
         }
-        val method = PsiTreeUtil.getNonStrictParentOfType(element, Function::class.java)
-        if (method != null && method.isTestoExecutable()) {
-            return method
+        return when (target) {
+            is Function -> target.takeIf { it.isTestoExecutable() || it.isTestoDataProviderLike() }
+            is PhpClass -> target.takeIf { it.isTestoClass() }
+            is PhpFile -> target.takeIf { it.isTestoFile() }
+            is PsiDirectory -> target.takeIf { PhpUnitRuntimeConfigurationProducer.checkDirectoryContainsPhpFiles(target.virtualFile, target.project) }
+            else -> null
         }
-        val aClass = PsiTreeUtil.getNonStrictParentOfType(element, PhpClass::class.java)
-        if (aClass != null && aClass.isTestoClass()) {
-            return aClass
-        }
-        val psiFile = PsiTreeUtil.getNonStrictParentOfType(element, PsiFile::class.java)
-        if (psiFile is PhpFile) {
-            return psiFile.takeIf { it.isTestoFile() }
-        }
-        return null
     }
 
     private fun tryRunAbstract(
@@ -204,7 +187,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         configuration: TestoRunConfiguration,
         location: Location<*>
     ): Boolean {
-        val testClass = when(testTarget) {
+        val testClass = when (testTarget) {
             is PhpClass -> testTarget
             is Method -> getContainingClass(location, testTarget)
             else -> null
@@ -212,18 +195,18 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
 
         if (testClass.isAbstract) {
             val testSubClasses = PhpIndex.getInstance(testClass.project).getAllSubclasses(testClass.fqn)
-                    .filter {  it.isTestoClass() }
+                .filter { it.isTestoClass() }
 //            if (testSubClasses.size > 1) {
-                showInheritorChooses(
-                    testTarget!!,
-                    context,
-                    testRunnerSettings,
-                    startRunnable,
-                    configuration,
-                    location,
-                    testSubClasses
-                )
-                return true
+            showInheritorChooses(
+                testTarget!!,
+                context,
+                testRunnerSettings,
+                startRunnable,
+                configuration,
+                location,
+                testSubClasses
+            )
+            return true
 //            }
 
 //            if (testSubClasses.size == 1) {
@@ -271,38 +254,48 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         ).showInBestPositionFor(context)
     }
 
-//    private fun showDataSetUsageChooser(
-//        dataSet: PhpMethodLocation,
-//        dataSetUsages: MutableList<Method>,
-//        context: ConfigurationContext,
-//        testRunnerSettings: PhpUnitTestRunnerSettings,
-//        startRunnable: Runnable,
-//        configuration: PhpUnitLocalRunConfiguration
-//    ) {
-//        val name = Objects.requireNonNull<String?>(dataSet.getDataSet()) as String
-//        val callback =
-//            getRunDataSetUsagesCallback(testRunnerSettings, startRunnable, configuration, dataSetUsages, name)
-//        createChooserPopup(
-//            dataSetUsages,
-//            PhpBundle.message("choose.test.method.to.run.dataset.0", *arrayOf<Any>(name)),
-//            true,
-//            callback
-//        ).showInBestPositionFor(context.getDataContext())
-//    }
+    private fun showDataSetUsageChooser(
+        dataSet: Function,
+        dataSetUsages: Collection<Method>,
+        context: ConfigurationContext,
+        testRunnerSettings: TestoRunnerSettings,
+        startRunnable: Runnable,
+        configuration: TestoRunConfiguration
+    ) {
+        val callback = getRunDataSetUsagesCallback(
+            testRunnerSettings,
+            startRunnable,
+            configuration,
+            dataSetUsages,
+            dataSet.name,
+        )
+        createChooserPopup(
+            dataSetUsages,
+            PhpBundle.message("choose.test.method.to.run.dataset.0", *arrayOf(dataSet.name)),
+            true,
+            callback,
+        ).showInBestPositionFor(context.dataContext)
+    }
 
     private fun createChooserPopup(
         elements: Collection<PsiElement>,
         title: String,
         showMethodName: Boolean,
-        callback: Consumer<MutableSet<*>>
+        callback: Consumer<Set<*>>
     ): JBPopup {
         val jbListItems = mutableListOf<PsiElement?>(*elements.toTypedArray())
-        jbListItems.add(0, null)
+        // todo: use ListSelectionModel.MULTIPLE_INTERVAL_SELECTION when add All option
+//        jbListItems.add(0, null)
 
         return JBPopupFactory.getInstance()
             .createPopupChooserBuilder(jbListItems)
-            .setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION)
-            .setRenderer(com.github.xepozz.testo.tests.overrides.PhpRunInheritorsListCellRenderer(elements.size, showMethodName))
+            .setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
+            .setRenderer(
+                com.github.xepozz.testo.tests.overrides.PhpRunInheritorsListCellRenderer(
+                    elements.size,
+                    showMethodName
+                )
+            )
             .setTitle(title)
             .setMovable(false)
             .setResizable(false)
@@ -311,10 +304,29 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             .createPopup()
     }
 
+    private fun getRunDataSetUsagesCallback(
+        testRunnerSettings: TestoRunnerSettings,
+        startRunnable: Runnable,
+        configuration: TestoRunConfiguration,
+        values: Collection<Method>,
+        dataSetName: String
+    ): Consumer<Set<*>> {
+        return Consumer { selectedValues: Set<*> ->
+            val selected = selectedValues.firstOrNull() as? Method ?: return@Consumer
+
+            testRunnerSettings.scope = PhpTestRunnerSettings.Scope.Method
+            testRunnerSettings.methodName = selected.name
+            testRunnerSettings.filePath = selected.containingFile.virtualFile.presentableUrl
+
+            configuration.name = configuration.suggestedName()
+            startRunnable.run()
+        }
+    }
+//
 //    private fun getRunDataSetUsagesCallback(
-//        testRunnerSettings: PhpUnitTestRunnerSettings,
+//        testRunnerSettings: TestoRunnerSettings,
 //        startRunnable: Runnable,
-//        configuration: PhpUnitLocalRunConfiguration,
+//        configuration: TestoRunConfiguration,
 //        values: MutableList<Method>,
 //        dataSetName: String
 //    ): Consumer<MutableSet<*>?> {
@@ -342,8 +354,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         location: Location<*>,
         testSubClasses: Collection<PhpClass>,
         targetName: String
-    ): Consumer<MutableSet<*>> {
-        return Consumer { selectedValues: MutableSet<*> ->
+    ): Consumer<Set<*>> {
+        return Consumer { selectedValues: Set<*> ->
             val valuesToRun = when {
                 selectedValues.any { Objects.isNull(it) } -> testSubClasses
                 else -> selectedValues.filterIsInstance<PhpClass>()
