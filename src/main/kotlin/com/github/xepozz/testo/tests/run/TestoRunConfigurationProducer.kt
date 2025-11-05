@@ -23,6 +23,7 @@ import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.util.Consumer
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.PhpIndex
+import com.jetbrains.php.PhpIndexImpl
 import com.jetbrains.php.lang.psi.PhpFile
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
@@ -194,7 +195,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         } ?: return false
 
         if (testClass.isAbstract) {
-            val testSubClasses = PhpIndex.getInstance(testClass.project).getAllSubclasses(testClass.fqn)
+            val testSubClasses = (PhpIndex.getInstance(testClass.project) as PhpIndexImpl).getAllSubclasses(testClass.fqn)
                 .filter { it.isTestoClass() }
 //            if (testSubClasses.size > 1) {
             showInheritorChooses(
