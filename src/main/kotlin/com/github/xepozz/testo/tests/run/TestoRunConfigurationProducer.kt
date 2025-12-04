@@ -20,6 +20,7 @@ import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.impl.source.tree.LeafPsiElement
+import com.intellij.psi.util.parentOfType
 import com.intellij.util.Consumer
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.PhpIndex
@@ -170,14 +171,26 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         val target = when (element) {
             is LeafPsiElement -> element.parent
             else -> element
+        } ?: return null
+
+        return findTestElement(target)
+            ?: findTestElement(target.parentOfType<Function>(true))
+            ?: findTestElement(target.parentOfType<PhpClass>(true))
+            ?: findTestElement(target.parentOfType<PhpFile>(true))
+    }
+
+    private fun findTestElement(target: PsiElement?): PsiElement? = when (target) {
+        is Function -> target.takeIf { it.isTestoExecutable() || it.isTestoDataProviderLike() }
+        is PhpClass -> target.takeIf { it.isTestoClass() }
+        is PhpFile -> target.takeIf { it.isTestoFile() }
+        is PsiDirectory -> target.takeIf {
+            PhpUnitRuntimeConfigurationProducer.checkDirectoryContainsPhpFiles(
+                target.virtualFile,
+                target.project
+            )
         }
-        return when (target) {
-            is Function -> target.takeIf { it.isTestoExecutable() || it.isTestoDataProviderLike() }
-            is PhpClass -> target.takeIf { it.isTestoClass() }
-            is PhpFile -> target.takeIf { it.isTestoFile() }
-            is PsiDirectory -> target.takeIf { PhpUnitRuntimeConfigurationProducer.checkDirectoryContainsPhpFiles(target.virtualFile, target.project) }
-            else -> null
-        }
+
+        else -> null
     }
 
     private fun tryRunAbstract(
