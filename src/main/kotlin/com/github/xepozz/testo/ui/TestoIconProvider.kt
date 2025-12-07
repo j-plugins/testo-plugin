@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.ui
 
 import com.github.xepozz.testo.TestoIcons
+import com.github.xepozz.testo.TestoUtil
 import com.github.xepozz.testo.isTestoFile
 import com.intellij.ide.IconProvider
 import com.intellij.openapi.util.Iconable
@@ -14,6 +15,7 @@ import javax.swing.Icon
 class TestoIconProvider : IconProvider() {
     override fun getIcon(element: PsiElement, @Iconable.IconFlags flags: Int): Icon? {
         val phpFile = element as? PhpFile ?: return null
+        if (!TestoUtil.isEnabled(element.project)) return null
 
         if (!phpFile.isTestoFile()) return null
         if (!GlobalSearchScopesCore.projectTestScope(element.project).contains(phpFile.virtualFile)) {

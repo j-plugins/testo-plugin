@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.tests.run
 
+import com.github.xepozz.testo.TestoUtil
 import com.github.xepozz.testo.index.TestoDataProviderUtils
 import com.github.xepozz.testo.isTestoClass
 import com.github.xepozz.testo.isTestoDataProviderLike
@@ -44,7 +45,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     METHOD_NAMER,
     METHOD,
 ) {
-    override fun isEnabled(project: Project) = true
+    override fun isEnabled(project: Project) = TestoUtil.isEnabled(project)
 
     override fun setupConfiguration(
         testRunnerSettings: PhpTestRunnerSettings,
