@@ -32,6 +32,7 @@ import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpNamedElement
 import com.jetbrains.php.phpunit.PhpMethodLocation
 import com.jetbrains.php.phpunit.PhpUnitRuntimeConfigurationProducer
+import com.jetbrains.php.phpunit.PhpUnitUtil
 import com.jetbrains.php.testFramework.run.PhpTestConfigurationProducer
 import com.jetbrains.php.testFramework.run.PhpTestRunnerSettings
 import java.util.*
@@ -105,7 +106,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
 
     override fun getConfigurationFactory() = TestoRunConfigurationFactory(TestoRunConfigurationType.INSTANCE)
 
-    override fun shouldReplace(self: ConfigurationFromContext, other: ConfigurationFromContext) = true
+    override fun shouldReplace(self: ConfigurationFromContext, other: ConfigurationFromContext) = false
 
     override fun onFirstRun(
         configuration: ConfigurationFromContext,
@@ -172,6 +173,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             is LeafPsiElement -> element.parent
             else -> element
         } ?: return null
+
+        if (PhpUnitUtil.isPhpUnitTestFile(element.containingFile)) return null
 
         return findTestElement(target)
             ?: findTestElement(target.parentOfType<Function>(true))

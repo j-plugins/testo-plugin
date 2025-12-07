@@ -14,7 +14,7 @@
                 name="PHP"
                 fileNames="testo;testo.php;testo.bat"/>
         <runLineMarkerContributor
-                language="PHP"
+                language="PHP" order="first"
                 implementationClass="com.github.xepozz.testo.tests.TestoTestRunLineMarkerProvider"/>
         <configurationType
                 implementation="com.github.xepozz.testo.tests.run.TestoRunConfigurationType"/>

@@ -5,7 +5,7 @@ import com.github.xepozz.testo.tests.run.TestoRunConfigurationType
 import com.jetbrains.php.testFramework.PhpTestFrameworkComposerConfig
 
 class TestoComposerConfig : PhpTestFrameworkComposerConfig(TestoFrameworkType.INSTANCE, PACKAGE, RELATIVE_PATH) {
-    override fun getDefaultConfigName() = "phpunit.xml"
+    override fun getDefaultConfigName() = "testo.php"
 
     override fun getConfigurationType() = TestoRunConfigurationType.INSTANCE
 

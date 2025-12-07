@@ -3,6 +3,7 @@ package com.github.xepozz.testo.tests
 import com.github.xepozz.testo.index.TestoDataProviderUtils
 import com.github.xepozz.testo.isTestoClass
 import com.github.xepozz.testo.isTestoExecutable
+import com.intellij.execution.lineMarker.ExecutorAction
 import com.intellij.execution.lineMarker.RunLineMarkerContributor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
@@ -17,8 +18,11 @@ import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpNamedElement
 import com.jetbrains.php.run.remote.PhpRemoteInterpreterManager
 import java.util.concurrent.ExecutionException
+import javax.swing.Icon
 
 class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
+    override fun producesAllPossibleConfigurations(file: PsiFile) = true
+
     override fun getInfo(leaf: PsiElement): Info? {
         if (leaf.elementType != PhpTokenTypes.IDENTIFIER) return null
         val element = leaf.parent as? PhpNamedElement ?: return null
@@ -61,6 +65,11 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
             }
         }
 
+        fun withExecutorActions(icon: Icon) = TestoTestRunLineMarkerProviderInfo(
+            icon,
+            ExecutorAction.getActions(),
+            RUN_TEST_TOOLTIP_PROVIDER,
+        )
 //        fun getLocationHint(containingClass: PhpClass, method: Method, datasetName: String?) =
 //            getLocationHint(containingClass) + "::" + method.name + " with data set " + datasetName
 

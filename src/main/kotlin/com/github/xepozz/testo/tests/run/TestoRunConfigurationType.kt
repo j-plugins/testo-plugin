@@ -18,7 +18,7 @@ class TestoRunConfigurationType :
         TestoRunConfiguration(project, this)
 
     companion object Companion {
-        const val ID = "TestoRunConfiguration"
+        val ID = TestoRunConfiguration::class.java.simpleName
 
         val INSTANCE
             get() = findConfigurationType(TestoRunConfigurationType::class.java)
