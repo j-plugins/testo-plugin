@@ -416,7 +416,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         private val FILE_TO_SCOPE = { file: PsiFile? ->
             file
                 ?.takeIf { it.isTestoFile() }
-                .apply { println("file to scope: $file -> $this") }
+//                .apply { println("file to scope: $file -> $this") }
         }
     }
 }

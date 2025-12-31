@@ -32,10 +32,8 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         get() = settings as TestoRunConfigurationSettings
 
     override fun createMethodFieldCompletionProvider(editor: PhpTestRunnerConfigurationEditor): TextFieldCompletionProvider {
-        println("createMethodFieldCompletionProvider $editor")
         return object : TextFieldCompletionProvider() {
             override fun addCompletionVariants(text: String, offset: Int, prefix: String, result: CompletionResultSet) {
-                println("addCompletionVariants: $text, $offset, $prefix")
             }
         }
     }

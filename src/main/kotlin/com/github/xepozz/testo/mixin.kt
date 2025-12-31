@@ -13,12 +13,12 @@ import com.jetbrains.php.lang.psi.elements.PhpClass
 fun PsiElement.isTestoExecutable() = isTestoFunction() || isTestoMethod()
 
 fun PsiElement.isTestoFunction() = when(this) {
-    is Function -> hasAttribute(TestoClasses.TEST)
+    is Function -> hasAnyAttribute(TestoClasses.TEST, TestoClasses.TEST_INLINE)
     else -> false
 }
 
 fun PsiElement.isTestoMethod() = when(this) {
-    is Method -> modifier.isPublic && name.startsWith("test") || hasAttribute(TestoClasses.TEST)
+    is Method -> modifier.isPublic && name.startsWith("test") || hasAnyAttribute(TestoClasses.TEST, TestoClasses.TEST_INLINE)
     else -> false
 }
 
@@ -29,6 +29,7 @@ fun PsiElement.isTestoDataProviderLike() = when (this) {
 }
 
 fun PhpAttributesOwner.hasAttribute(fqn: String) = getAttributes(fqn).isNotEmpty()
+fun PhpAttributesOwner.hasAnyAttribute(vararg fqn: String) = attributes.any { it.fqn in fqn }
 
 fun PsiElement.isTestoClass() = when (this) {
     is PhpClass -> TestoTestDescriptor.isTestClassName(name) || ownMethods.any { it.isTestoMethod() }
