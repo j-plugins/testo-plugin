@@ -175,7 +175,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             else -> element
         } ?: return null
 
-        if (PhpUnitUtil.isPhpUnitTestFile(element.containingFile)) return null
+        if (element.containingFile == null || PhpUnitUtil.isPhpUnitTestFile(element.containingFile)) return null
 
         return findTestElement(target)
             ?: findTestElement(target.parentOfType<Function>(true))
