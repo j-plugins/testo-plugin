@@ -21,7 +21,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
 //            addArgument("-q")
 //            addArgument("--logger-gitlab=php://stdout")
         }
-        println("commandSettings: $commandSettings")
+//        println("commandSettings: $commandSettings")
     }
 
     override fun runType(
@@ -30,7 +30,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         type: String,
         workingDirectory: String
     ) {
-        println("runType: $type, $workingDirectory")
+//        println("runType: $type, $workingDirectory")
 
         phpCommandSettings.addArgument("--suite=$type")
     }
@@ -41,7 +41,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         directory: String,
         workingDirectory: String
     ) {
-        println("runDirectory: $directory")
+//        println("runDirectory: $directory")
         if (directory.isEmpty()) return
 
         phpCommandSettings.addArgument("--path=$directory")
@@ -53,7 +53,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         file: String,
         workingDirectory: String
     ) {
-        println("runFile: $file")
+//        println("runFile: $file")
         if (file.isEmpty()) return
 
         phpCommandSettings.addArgument("--path=$file")
@@ -66,7 +66,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         methodName: String,
         workingDirectory: String
     ) {
-        println("runMethod: $file, $methodName")
+//        println("runMethod: $file, $methodName")
         if (file.isEmpty()) return
 
         phpCommandSettings.addArgument("--path=$file")
