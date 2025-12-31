@@ -65,6 +65,9 @@
                 implementation="com.github.xepozz.testo.ui.TestoStackTraceConsoleFolding"/>
         <fileBasedIndex
                 implementation="com.github.xepozz.testo.index.TestoDataProvidersIndex"/>
+
+        <spellchecker.bundledDictionaryProvider
+                implementation="com.github.xepozz.testo.SpellcheckingDictionaryProvider"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.jetbrains.php">
