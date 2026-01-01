@@ -14,7 +14,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
 
     override fun prepareCommand(project: Project, commandSettings: PhpCommandSettings, exe: String, version: String?) {
         commandSettings.apply {
-            setScript(exe, false)
+            setScript(exe, true)
             addArgument("run")
 //            addArgument("--no-progress")
 //            addArgument("-n")
@@ -32,7 +32,10 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
     ) {
 //        println("runType: $type, $workingDirectory")
 
-        phpCommandSettings.addArgument("--suite=$type")
+        phpCommandSettings.apply {
+            addArgument("--suite")
+            addArgument(type)
+        }
     }
 
     override fun runDirectory(
@@ -44,7 +47,10 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
 //        println("runDirectory: $directory")
         if (directory.isEmpty()) return
 
-        phpCommandSettings.addArgument("--path=$directory")
+        phpCommandSettings.apply {
+            addArgument("--path")
+            addRelativePathArgument(directory, workingDirectory)
+        }
     }
 
     override fun runFile(
@@ -56,7 +62,10 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
 //        println("runFile: $file")
         if (file.isEmpty()) return
 
-        phpCommandSettings.addArgument("--path=$file")
+        phpCommandSettings.apply {
+            addArgument("--path")
+            addRelativePathArgument(file, workingDirectory)
+        }
     }
 
     override fun runMethod(
@@ -66,10 +75,25 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         methodName: String,
         workingDirectory: String
     ) {
-//        println("runMethod: $file, $methodName")
+        println("runMethod: $file, $methodName")
         if (file.isEmpty()) return
 
-        phpCommandSettings.addArgument("--path=$file")
-        phpCommandSettings.addArgument("--filter=$methodName")
+        val myMethodName = methodName.substringBefore('#')
+        val dataProvider = methodName.substringAfter('#', "")
+
+        println("method: $myMethodName, dataProvider: $dataProvider")
+
+        phpCommandSettings.apply {
+            addArgument("--path")
+            addRelativePathArgument(file, workingDirectory)
+            if (myMethodName.isNotEmpty()) {
+                addArgument("--filter")
+                addArgument(myMethodName)
+            }
+            if (dataProvider.isNotEmpty()) {
+                addArgument("--data-provider")
+                addArgument(dataProvider)
+            }
+        }
     }
 }
