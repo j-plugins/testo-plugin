@@ -34,7 +34,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
             )
 
             element is PhpClass && element.isTestoClass() -> withExecutorActions(
-                getTestStateIcon(getLocationHint(element), element.project, false),
+                getTestStateIcon(getLocationHint(element), element.project, true),
             )
 
             element is Function && TestoDataProviderUtils.isDataProvider(element) -> withExecutorActions(
