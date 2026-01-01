@@ -72,7 +72,7 @@ class TestoStackTraceParser(
             val psiFile = PsiManager.getInstance(project).findFile(vFile) ?: return null
             val document = PsiDocumentManager.getInstance(project).getDocument(psiFile) ?: return null
 
-            if (line > document.lineCount) return null
+            if (line < 1 || line > document.lineCount) return null
 
             val range = DocumentUtil.getLineTextRange(document, line - 1)
 

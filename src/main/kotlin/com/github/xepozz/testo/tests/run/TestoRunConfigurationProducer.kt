@@ -137,7 +137,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
 
             if (element is Function && element.isTestoDataProviderLike()) {
                 val dataSetUsages = TestoDataProviderUtils.findDataProviderUsages(element)
-                println("dataSetUsages: $dataSetUsages for dataSet: $element")
+//                println("dataSetUsages: $dataSetUsages for dataSet: $element")
                 if (dataSetUsages.size > 1) {
                     showDataSetUsageChooser(
                         element,
