@@ -1,16 +1,15 @@
 package com.github.xepozz.testo.tests.run
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.TestoFrameworkType
-import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.execution.Executor
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
-import com.intellij.util.TextFieldCompletionProvider
 import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
 import com.jetbrains.php.run.PhpAsyncRunConfiguration
 import com.jetbrains.php.run.remote.PhpRemoteInterpreterManager
@@ -31,12 +30,8 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     val testoSettings
         get() = settings as TestoRunConfigurationSettings
 
-    override fun createMethodFieldCompletionProvider(editor: PhpTestRunnerConfigurationEditor): TextFieldCompletionProvider {
-        return object : TextFieldCompletionProvider() {
-            override fun addCompletionVariants(text: String, offset: Int, prefix: String, result: CompletionResultSet) {
-            }
-        }
-    }
+    override fun createMethodFieldCompletionProvider(editor: PhpTestRunnerConfigurationEditor) =
+        createMethodFileCompletionProvider(project, editor, { it.isTestoExecutable() })
 
     override fun suggestedName() = super.suggestedName() as String
 

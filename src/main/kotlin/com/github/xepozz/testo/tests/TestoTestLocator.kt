@@ -16,6 +16,7 @@ class TestoTestLocator(pathMapper: PhpPathMapper) :
         locationInfo: LocationInfo?,
         project: Project,
     ): LocationElementStore? {
+//        println("findElement: $locationInfo")
         val locationFile = locationInfo?.file ?: return null
         val file = PsiManager.getInstance(project).findFile(locationFile) as? PhpFile ?: return null
         if (locationInfo.className.isNullOrEmpty()) {
@@ -55,6 +56,7 @@ class TestoTestLocator(pathMapper: PhpPathMapper) :
      */
     override fun getLocationInfo(link: String): LocationInfo? {
         val locations = link.split("::").dropLastWhile { it.isEmpty() }
+//        println("locations: $locations, link: $link")
 
         return when (locations.size) {
             1 -> LocationInfo(null, null, this.myPathMapper.getLocalFile(locations[0]))

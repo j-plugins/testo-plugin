@@ -75,13 +75,13 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         methodName: String,
         workingDirectory: String
     ) {
-        println("runMethod: $file, $methodName")
+//        println("runMethod: $file, $methodName")
         if (file.isEmpty()) return
 
         val myMethodName = methodName.substringBefore('#')
         val dataProvider = methodName.substringAfter('#', "")
 
-        println("method: $myMethodName, dataProvider: $dataProvider")
+//        println("method: $myMethodName, dataProvider: $dataProvider")
 
         phpCommandSettings.apply {
             addArgument("--path")

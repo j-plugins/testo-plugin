@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.tests
 
+import com.github.xepozz.testo.TestoClasses
 import com.github.xepozz.testo.index.TestoDataProviderUtils
 import com.github.xepozz.testo.isTestoClass
 import com.github.xepozz.testo.isTestoExecutable
@@ -14,8 +15,11 @@ import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
 import com.jetbrains.php.lang.lexer.PhpTokenTypes
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
+import com.jetbrains.php.lang.psi.elements.PhpAttribute
+import com.jetbrains.php.lang.psi.elements.PhpAttributesList
 import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpNamedElement
+import com.jetbrains.php.lang.psi.elements.PhpPsiElement
 import com.jetbrains.php.run.remote.PhpRemoteInterpreterManager
 import java.util.concurrent.ExecutionException
 import javax.swing.Icon
@@ -25,25 +29,33 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 
     override fun getInfo(leaf: PsiElement): Info? {
         if (leaf.elementType != PhpTokenTypes.IDENTIFIER) return null
-        val element = leaf.parent as? PhpNamedElement ?: return null
-        if (element.nameIdentifier != leaf) return null
+        val parent = leaf.parent as? PhpPsiElement ?: return null
 
-        return when {
-            element is Function && element.isTestoExecutable() -> withExecutorActions(
-                getTestStateIcon(getLocationHint(element), element.project, false),
-            )
+        val url = when {
+            parent.parent is PhpAttribute -> {
+                val attribute = parent.parent as PhpAttribute
+                if (attribute.fqn != TestoClasses.TEST_INLINE) {
+                    return null
+                }
 
-            element is PhpClass && element.isTestoClass() -> withExecutorActions(
-                getTestStateIcon(getLocationHint(element), element.project, true),
-            )
+                val index = (attribute.parent as PhpAttributesList).attributes.indexOf(attribute)
 
-            element is Function && TestoDataProviderUtils.isDataProvider(element) -> withExecutorActions(
-                getTestStateIcon(getDataProviderLocationHint(element), element.project, false),
-            )
+                getInlineTestLocationHint(attribute.owner, index)
+            }
+
+            parent is PhpNamedElement -> {
+                if (parent.nameIdentifier != leaf) return null
+
+                getLocationInfo(parent)
+            }
 
             else -> null
-        }
+        } ?: return null
 
+//        println("url: $url")
+        return withExecutorActions(
+            getTestStateIcon(url, leaf.project, false),
+        )
     }
 
     companion object Companion {
@@ -54,7 +66,8 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 
         fun getLocationHint(element: PhpClass) = getLocationHint(element.containingFile) + "::" + element.fqn
         fun getLocationHint(file: PsiFile) = "${TestoFrameworkType.SCHEMA}://" + getFilePathDeploymentAware(file)
-        fun getDataProviderLocationHint(function: Function) = getLocationHint(function) + "::" + function.name
+        fun getDataProviderLocationHint(function: Function) = getLocationHint(function) + "::@" + function.name
+        fun getInlineTestLocationHint(element: PsiElement, index: Int) = getLocationInfo(element) + "#" + index
 
         fun getFilePathDeploymentAware(psiFile: PsiFile): String {
             val localPath = psiFile.virtualFile.path
@@ -85,6 +98,13 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
             } catch (_: ExecutionException) {
                 PhpCommandLinePathProcessor.LOCAL
             }
+        }
+
+        private fun getLocationInfo(element: PsiElement) = when {
+            element is Function && element.isTestoExecutable() -> getLocationHint(element)
+            element is PhpClass && element.isTestoClass() -> getLocationHint(element)
+            element is Function && TestoDataProviderUtils.isDataProvider(element) -> getDataProviderLocationHint(element)
+            else -> null
         }
     }
 }

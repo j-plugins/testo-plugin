@@ -29,6 +29,8 @@ import com.jetbrains.php.PhpIndexImpl
 import com.jetbrains.php.lang.psi.PhpFile
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
+import com.jetbrains.php.lang.psi.elements.PhpAttribute
+import com.jetbrains.php.lang.psi.elements.PhpAttributesList
 import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpNamedElement
 import com.jetbrains.php.phpunit.PhpMethodLocation
@@ -52,6 +54,12 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         element: PsiElement,
         virtualFile: VirtualFile
     ): PsiElement? {
+        if (element is PhpAttribute) {
+            setupConfiguration(testRunnerSettings, element.owner, element.containingFile.virtualFile) ?: return null
+            testRunnerSettings.methodName += "#" + (element.parent as PhpAttributesList).attributes.indexOf(element)
+
+            return element
+        }
         if (element is PhpClass) {
             val element = findTestElement(element, getWorkingDirectory(element)) as? PhpClass ?: return null
 
@@ -116,7 +124,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     ) {
         val testoRunConfiguration = configuration.configuration as TestoRunConfiguration
         val testRunnerSettings = testoRunConfiguration.testoSettings.runnerSettings
-        val location = context.getLocation()
+        val location = context.location
         if (location is PsiLocation<*>) {
             val psiElement = location.psiElement
             val element = findTestElement(psiElement, getWorkingDirectory(location.psiElement))
@@ -178,12 +186,14 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         if (element.containingFile == null || PhpUnitUtil.isPhpUnitTestFile(element.containingFile)) return null
 
         return findTestElement(target)
+            ?: findTestElement(target.parentOfType<PhpAttribute>(true))
             ?: findTestElement(target.parentOfType<Function>(true))
             ?: findTestElement(target.parentOfType<PhpClass>(true))
             ?: findTestElement(target.parentOfType<PhpFile>(true))
     }
 
     private fun findTestElement(target: PsiElement?): PsiElement? = when (target) {
+        is PhpAttribute -> target.takeIf { it.owner.isTestoExecutable() || it.owner.isTestoDataProviderLike() }
         is Function -> target.takeIf { it.isTestoExecutable() || it.isTestoDataProviderLike() }
         is PhpClass -> target.takeIf { it.isTestoClass() }
         is PhpFile -> target.takeIf { it.isTestoFile() }
