@@ -9,7 +9,7 @@ import com.jetbrains.php.testFramework.run.PhpDefaultTestRunnerSettingsValidator
 object TestoTestMethodFinder : PhpDefaultTestRunnerSettingsValidator.PhpTestMethodFinder {
     override fun find(file: PsiFile, testName: String): Boolean {
         if (!file.isTestoFile()) return false
-        val setIndex = testName.indexOf('#')
+        val setIndex = testName.indexOf(':')
         val functionName = when {
             setIndex == -1 -> testName
             else -> testName.substring(0, setIndex)

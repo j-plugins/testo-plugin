@@ -6,6 +6,7 @@ import com.github.xepozz.testo.isTestoClass
 import com.github.xepozz.testo.isTestoDataProviderLike
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.isTestoFile
+import com.github.xepozz.testo.util.ExitStatementsVisitor
 import com.intellij.execution.Location
 import com.intellij.execution.PsiLocation
 import com.intellij.execution.actions.ConfigurationContext
@@ -33,6 +34,7 @@ import com.jetbrains.php.lang.psi.elements.PhpAttribute
 import com.jetbrains.php.lang.psi.elements.PhpAttributesList
 import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpNamedElement
+import com.jetbrains.php.lang.psi.elements.PhpYield
 import com.jetbrains.php.phpunit.PhpMethodLocation
 import com.jetbrains.php.phpunit.PhpUnitRuntimeConfigurationProducer
 import com.jetbrains.php.phpunit.PhpUnitUtil
@@ -54,9 +56,32 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         element: PsiElement,
         virtualFile: VirtualFile
     ): PsiElement? {
+        val testRunnerSettings = testRunnerSettings as TestoRunnerSettings
+
         if (element is PhpAttribute) {
             setupConfiguration(testRunnerSettings, element.owner, element.containingFile.virtualFile) ?: return null
-            testRunnerSettings.methodName += "#" + (element.parent as PhpAttributesList).attributes.indexOf(element)
+            val index = (element.parent as PhpAttributesList).attributes.indexOf(element)
+            testRunnerSettings.methodName += ":$index"
+            testRunnerSettings.dataProviderIndex = index
+            testRunnerSettings.dataSetIndex = 0
+
+            return element
+        }
+        if (element is PhpYield) {
+            val method = element.parentOfType<Method>() ?: return null
+            val exitStatementsVisitor = ExitStatementsVisitor(element)
+            method.accept(exitStatementsVisitor)
+            if (exitStatementsVisitor.index == -1) return null
+
+            val usages = TestoDataProviderUtils.findDataProviderUsages(method)
+            if (usages.isEmpty()) return null
+
+            // todo handle all [usages] with popup
+            val usage = usages.first()
+            setupConfiguration(testRunnerSettings, usage, element.containingFile.virtualFile) ?: return null
+            testRunnerSettings.methodName += ":0:${exitStatementsVisitor.index}"
+            testRunnerSettings.dataProviderIndex = 0
+            testRunnerSettings.dataSetIndex = exitStatementsVisitor.index
 
             return element
         }
@@ -204,6 +229,11 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             )
         }
 
+        is PhpYield -> target.takeIf {
+            val method = it.parentOfType<Method>()
+            method?.isTestoDataProviderLike() == true && TestoDataProviderUtils.isDataProvider(method)
+        }
+
         else -> null
     }
 
@@ -222,8 +252,9 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         } ?: return false
 
         if (testClass.isAbstract) {
-            val testSubClasses = (PhpIndex.getInstance(testClass.project) as PhpIndexImpl).getAllSubclasses(testClass.fqn)
-                .filter { it.isTestoClass() }
+            val testSubClasses =
+                (PhpIndex.getInstance(testClass.project) as PhpIndexImpl).getAllSubclasses(testClass.fqn)
+                    .filter { it.isTestoClass() }
 //            if (testSubClasses.size > 1) {
             showInheritorChooses(
                 testTarget!!,

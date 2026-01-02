@@ -4,6 +4,8 @@ import com.jetbrains.php.phpunit.coverage.PhpUnitCoverageEngine.CoverageEngine
 import com.jetbrains.php.testFramework.run.PhpTestRunnerSettings
 
 class TestoRunnerSettings(
+    var dataProviderIndex: Int = -1,
+    var dataSetIndex: Int = -1,
     var coverageEngine: CoverageEngine = CoverageEngine.XDEBUG,
     var parallelTestingEnabled: Boolean = false,
 ) : PhpTestRunnerSettings() {
