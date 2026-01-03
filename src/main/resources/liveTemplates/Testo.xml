@@ -19,4 +19,24 @@
             <option name="Testo" value="true"/>
         </context>
     </template>
+    <template
+            name="data"
+            value="public static function $NAME$(): iterable{&#10;    yield $BODY$$END$;&#10;}"
+            description="Testo: Create a new data provider"
+            toReformat="true"
+            toShortenFQNames="true">
+        <variable
+                name="NAME"
+                expression=""
+                defaultValue=""
+                alwaysStopAt="true"/>
+        <variable
+                name="BODY"
+                expression="complete()"
+                defaultValue=""
+                alwaysStopAt="true"/>
+        <context>
+            <option name="Testo" value="true"/>
+        </context>
+    </template>
 </templateSet>
