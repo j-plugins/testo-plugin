@@ -16,6 +16,7 @@ import com.jetbrains.php.config.PhpProjectConfigurationFacade
 import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
 import com.jetbrains.php.lang.lexer.PhpTokenTypes
 import com.jetbrains.php.lang.psi.PhpPsiUtil
+import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
@@ -43,11 +44,11 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
     }
 
    private fun getInfoIdentifier(leaf: PsiElement): String? {
-        val parent = leaf.parent as? PhpPsiElement ?: return null
+        val element = leaf.parent as? PhpPsiElement ?: return null
 
         return when {
-            parent.parent is PhpAttribute -> {
-                val attribute = parent.parent as PhpAttribute
+            element is ClassReference && element.parent is PhpAttribute -> {
+                val attribute = element.parent as PhpAttribute
                 if (attribute.fqn !in runnableAttributes) return null
 
                 val index = (attribute.parent as PhpAttributesList).attributes.indexOf(attribute)
@@ -55,10 +56,10 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
                 getInlineTestLocationHint(attribute.owner, index)
             }
 
-            parent is PhpNamedElement -> {
-                if (parent.nameIdentifier != leaf) return null
+            element is PhpNamedElement -> {
+                if (element.nameIdentifier != leaf) return null
 
-                getLocationInfo(parent)
+                getLocationInfo(element)
             }
 
             else -> null
