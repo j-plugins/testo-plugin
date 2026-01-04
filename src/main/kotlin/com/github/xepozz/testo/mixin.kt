@@ -18,7 +18,7 @@ fun PsiElement.isTestoFunction() = when(this) {
 }
 
 fun PsiElement.isTestoMethod() = when(this) {
-    is Method -> modifier.isPublic && name.startsWith("test") || hasAnyAttribute(TestoClasses.TEST, TestoClasses.TEST_INLINE)
+    is Method -> (modifier.isPublic && name.startsWith("test")) || hasAnyAttribute(TestoClasses.TEST, TestoClasses.TEST_INLINE)
     else -> false
 }
 
@@ -37,7 +37,7 @@ fun PsiElement.isTestoClass() = when (this) {
 }
 
 fun PsiFile.isTestoFile() = when (this) {
-    is PhpFile -> TestoTestDescriptor.isTestClassName(name) && (isTestoClassFile() || isTestoFunctionFile())
+    is PhpFile -> TestoTestDescriptor.isTestClassName(virtualFile.nameWithoutExtension) && (isTestoClassFile() || isTestoFunctionFile())
     else -> false
 }
 
