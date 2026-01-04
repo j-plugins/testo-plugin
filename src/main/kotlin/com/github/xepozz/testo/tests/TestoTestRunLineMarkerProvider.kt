@@ -38,7 +38,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
             else -> null
         } ?: return null
 
-        println("leaf: $leaf, url: $url")
+//        println("leaf: $leaf, url: $url")
         return withExecutorActions(getTestStateIcon(url, leaf.project, false))
     }
 

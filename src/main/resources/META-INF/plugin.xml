@@ -68,6 +68,9 @@
 
         <spellchecker.bundledDictionaryProvider
                 implementation="com.github.xepozz.testo.SpellcheckingDictionaryProvider"/>
+        <lang.inspectionSuppressor
+                language="PHP"
+                implementationClass="com.github.xepozz.testo.tests.inspections.TestoInspectionSuppressor"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.jetbrains.php">
