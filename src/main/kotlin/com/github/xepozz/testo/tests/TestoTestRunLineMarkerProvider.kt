@@ -5,6 +5,7 @@ import com.github.xepozz.testo.index.TestoDataProviderUtils
 import com.github.xepozz.testo.isTestoClass
 import com.github.xepozz.testo.isTestoDataProviderLike
 import com.github.xepozz.testo.isTestoExecutable
+import com.github.xepozz.testo.util.PsiUtil
 import com.intellij.execution.lineMarker.ExecutorAction
 import com.intellij.execution.lineMarker.RunLineMarkerContributor
 import com.intellij.openapi.project.Project
@@ -20,7 +21,7 @@ import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
-import com.jetbrains.php.lang.psi.elements.PhpAttributesList
+import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
 import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpNamedElement
 import com.jetbrains.php.lang.psi.elements.PhpPsiElement
@@ -43,17 +44,18 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
         return withExecutorActions(getTestStateIcon(url, leaf.project, false))
     }
 
-   private fun getInfoIdentifier(leaf: PsiElement): String? {
+    private fun getInfoIdentifier(leaf: PsiElement): String? {
         val element = leaf.parent as? PhpPsiElement ?: return null
 
         return when {
             element is ClassReference && element.parent is PhpAttribute -> {
                 val attribute = element.parent as PhpAttribute
-                if (attribute.fqn !in runnableAttributes) return null
+                if (attribute.fqn !in RUNNABLE_ATTRIBUTES) return null
 
-                val index = (attribute.parent as PhpAttributesList).attributes.indexOf(attribute)
+                val attributesOwner = attribute.owner as PhpAttributesOwner
+                val index = PsiUtil.getAttributeOrder(attribute, attributesOwner)
 
-                getInlineTestLocationHint(attribute.owner, index)
+                getInlineTestLocationHint(attributesOwner, index)
             }
 
             element is PhpNamedElement -> {
@@ -83,7 +85,12 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
     }
 
     companion object Companion {
-        val runnableAttributes = arrayOf(TestoClasses.DATA_PROVIDER, TestoClasses.TEST_INLINE)
+        val RUNNABLE_ATTRIBUTES = arrayOf(
+            TestoClasses.DATA_PROVIDER,
+            TestoClasses.DATA_SET,
+            TestoClasses.TEST_INLINE,
+        )
+
         fun getLocationHint(element: Function) = when (element) {
             is Method -> getLocationHint(element.containingClass!!) + "::" + element.name
             else -> getLocationHint(element.containingFile) + "::" + element.fqn
@@ -92,7 +99,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
         fun getLocationHint(element: PhpClass) = getLocationHint(element.containingFile) + "::" + element.fqn
         fun getLocationHint(file: PsiFile) = "${TestoFrameworkType.SCHEMA}://" + getFilePathDeploymentAware(file)
         fun getDataProviderLocationHint(function: Function) = getLocationHint(function) // + "::@" + function.name
-        fun getInlineTestLocationHint(element: PsiElement, index: Int) = getLocationInfo(element) + "#" + index
+        fun getInlineTestLocationHint(element: PhpAttributesOwner, index: Int) = getLocationInfo(element) + "#" + index
 
         fun getFilePathDeploymentAware(psiFile: PsiFile): String {
             val localPath = psiFile.virtualFile.path
@@ -125,10 +132,10 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
             }
         }
 
-        private fun getLocationInfo(element: PsiElement) = when {
-            element is Function && element.isTestoExecutable() -> getLocationHint(element)
-            element is PhpClass && element.isTestoClass() -> getLocationHint(element)
-            element is Function && TestoDataProviderUtils.isDataProvider(element) -> getDataProviderLocationHint(element)
+        private fun getLocationInfo(element: PsiElement) = when (element) {
+            is Function if element.isTestoExecutable() -> getLocationHint(element)
+            is PhpClass if element.isTestoClass() -> getLocationHint(element)
+            is Function if TestoDataProviderUtils.isDataProvider(element) -> getDataProviderLocationHint(element)
             else -> null
         }
     }

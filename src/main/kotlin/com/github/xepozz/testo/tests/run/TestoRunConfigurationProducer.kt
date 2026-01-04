@@ -71,8 +71,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         }
         if (element is PhpYield) {
             val function = element.parentOfType<Function>() ?: return null
-            val index = PsiUtil.getExitStatementOrder(element, function)
-            if (index == -1) return null
+            val datasetIndex = PsiUtil.getExitStatementOrder(element, function)
+            if (datasetIndex == -1) return null
 
             val usages = TestoDataProviderUtils.findDataProviderUsages(function)
             if (usages.isEmpty()) return null
@@ -81,13 +81,11 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             val usage = usages.first()
             setupConfiguration(testRunnerSettings, usage, element.containingFile.virtualFile) ?: return null
 
+            val dataProviderIndex = TestoDataProviderUtils.findDataProviderUsagesIndex(usage, function)
 
-//            val index = PsiUtil.getAttributeOrder(element, function)
-//            if (index == -1) return null
-
-            testRunnerSettings.methodName += ":0:$index"
-            testRunnerSettings.dataProviderIndex = 0
-            testRunnerSettings.dataSetIndex = index
+            testRunnerSettings.methodName += ":$dataProviderIndex:$datasetIndex"
+            testRunnerSettings.dataProviderIndex = dataProviderIndex
+            testRunnerSettings.dataSetIndex = datasetIndex
 
             return element
         }
@@ -106,9 +104,9 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 val usages = TestoDataProviderUtils.findDataProviderUsages(element)
 
                 if (usages.isNotEmpty()) {
-//                    val target = usages.first()
+                    val target = usages.first()
 
-                    return super.setupConfiguration(testRunnerSettings, element, element.containingFile.virtualFile)
+                    return super.setupConfiguration(testRunnerSettings, target, element.containingFile.virtualFile)
                 }
             }
         }
@@ -158,7 +156,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         val location = context.location
         if (location is PsiLocation<*>) {
             val psiElement = location.psiElement
-            val element = findTestElement(psiElement, getWorkingDirectory(location.psiElement))
+            val element = findTestElement(psiElement, getWorkingDirectory(psiElement))
 
             if (element is PhpClass) {
                 if (tryRunAbstract(
@@ -428,7 +426,11 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             testRunnerSettings.scope = PhpTestRunnerSettings.Scope.Method
             testRunnerSettings.filePath = function.containingFile.virtualFile.presentableUrl
 
-            testRunnerSettings.methodName = function.name+":$index"
+            if (datasetIndex > -1) {
+                testRunnerSettings.methodName = function.name + ":$index:$datasetIndex"
+            } else {
+                testRunnerSettings.methodName = function.name + ":$index"
+            }
             testRunnerSettings.dataProviderIndex = index
             testRunnerSettings.dataSetIndex = datasetIndex
 
