@@ -7,6 +7,7 @@ import com.github.xepozz.testo.isTestoDataProviderLike
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.isTestoFile
 import com.github.xepozz.testo.util.ExitStatementsVisitor
+import com.github.xepozz.testo.util.PsiUtil
 import com.intellij.execution.Location
 import com.intellij.execution.PsiLocation
 import com.intellij.execution.actions.ConfigurationContext
@@ -31,7 +32,6 @@ import com.jetbrains.php.lang.psi.PhpFile
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
-import com.jetbrains.php.lang.psi.elements.PhpAttributesList
 import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpNamedElement
 import com.jetbrains.php.lang.psi.elements.PhpYield
@@ -59,26 +59,34 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         val testRunnerSettings = testRunnerSettings as TestoRunnerSettings
 
         if (element is PhpAttribute) {
-            setupConfiguration(testRunnerSettings, element.owner, element.containingFile.virtualFile) ?: return null
-            val index = (element.parent as PhpAttributesList).attributes.indexOf(element)
+            val function = element.owner as? Function ?: return null
+            setupConfiguration(testRunnerSettings, function, element.containingFile.virtualFile) ?: return null
+            val index = PsiUtil.getAttributeOrder(element, function)
+            if (index == -1) return null
+
             testRunnerSettings.methodName += ":$index"
             testRunnerSettings.dataProviderIndex = index
-            testRunnerSettings.dataSetIndex = 0
+            testRunnerSettings.dataSetIndex = -1
 
             return element
         }
         if (element is PhpYield) {
-            val method = element.parentOfType<Method>() ?: return null
+            val function = element.parentOfType<Function>() ?: return null
             val exitStatementsVisitor = ExitStatementsVisitor(element)
-            method.accept(exitStatementsVisitor)
+            function.accept(exitStatementsVisitor)
             if (exitStatementsVisitor.index == -1) return null
 
-            val usages = TestoDataProviderUtils.findDataProviderUsages(method)
+            val usages = TestoDataProviderUtils.findDataProviderUsages(function)
             if (usages.isEmpty()) return null
 
             // todo handle all [usages] with popup
             val usage = usages.first()
             setupConfiguration(testRunnerSettings, usage, element.containingFile.virtualFile) ?: return null
+
+
+//            val index = PsiUtil.getAttributeOrder(element, function)
+//            if (index == -1) return null
+
             testRunnerSettings.methodName += ":0:${exitStatementsVisitor.index}"
             testRunnerSettings.dataProviderIndex = 0
             testRunnerSettings.dataSetIndex = exitStatementsVisitor.index
