@@ -3,6 +3,7 @@ package com.github.xepozz.testo.index
 import com.github.xepozz.testo.isTestoClass
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.util.asSafely
 import com.intellij.util.indexing.DataIndexer
 import com.intellij.util.indexing.FileBasedIndex
 import com.intellij.util.indexing.FileBasedIndexExtension
@@ -12,6 +13,7 @@ import com.intellij.util.io.DataExternalizer
 import com.intellij.util.io.EnumeratorStringDescriptor
 import com.jetbrains.php.lang.PhpFileType
 import com.jetbrains.php.lang.psi.PhpPsiUtil
+import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
 import com.jetbrains.php.lang.psi.stubs.indexes.expectedArguments.PhpExpectedFunctionArgument
@@ -104,12 +106,12 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
         val KEY = ID.create<String, TestoDataProvidersIndexType>("Testo.DataProviders")
         private const val PHPUNIT_DATA_PROVIDER_ATTRIBUTE = "\\Testo\\Sample\\DataProvider"
 
-        private fun getDataProvidersFromAttributes(method: Method): MutableSet<Pair<String, String>> {
+        fun getDataProvidersFromAttributes(function: Function): MutableSet<Pair<String, String>> {
             val result = mutableSetOf<Pair<String, String>>()
 
-            val targetFQN = method.containingClass?.fqn ?: method.fqn
+            val targetFQN = function.asSafely<Method>()?.containingClass?.fqn ?: function.fqn
 
-            for (dataProvider in method.getAttributes(PHPUNIT_DATA_PROVIDER_ATTRIBUTE)) {
+            for (dataProvider in function.getAttributes(PHPUNIT_DATA_PROVIDER_ATTRIBUTE)) {
                 val argument = getAttributeArgument(dataProvider, "provider", 0) ?: continue
                 val methodNameArg = argument as? PhpExpectedFunctionScalarArgument ?: continue
                 val attributeValue = methodNameArg.value

@@ -6,7 +6,6 @@ import com.github.xepozz.testo.isTestoClass
 import com.github.xepozz.testo.isTestoDataProviderLike
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.isTestoFile
-import com.github.xepozz.testo.util.ExitStatementsVisitor
 import com.github.xepozz.testo.util.PsiUtil
 import com.intellij.execution.Location
 import com.intellij.execution.PsiLocation
@@ -72,9 +71,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         }
         if (element is PhpYield) {
             val function = element.parentOfType<Function>() ?: return null
-            val exitStatementsVisitor = ExitStatementsVisitor(element)
-            function.accept(exitStatementsVisitor)
-            if (exitStatementsVisitor.index == -1) return null
+            val index = PsiUtil.getExitStatementOrder(element, function)
+            if (index == -1) return null
 
             val usages = TestoDataProviderUtils.findDataProviderUsages(function)
             if (usages.isEmpty()) return null
@@ -87,9 +85,9 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
 //            val index = PsiUtil.getAttributeOrder(element, function)
 //            if (index == -1) return null
 
-            testRunnerSettings.methodName += ":0:${exitStatementsVisitor.index}"
+            testRunnerSettings.methodName += ":0:$index"
             testRunnerSettings.dataProviderIndex = 0
-            testRunnerSettings.dataSetIndex = exitStatementsVisitor.index
+            testRunnerSettings.dataSetIndex = index
 
             return element
         }
@@ -176,36 +174,74 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 }
             }
 
-            if (element is Function && element.isTestoDataProviderLike()) {
-                val dataSetUsages = TestoDataProviderUtils.findDataProviderUsages(element)
-//                println("dataSetUsages: $dataSetUsages for dataSet: $element")
-                if (dataSetUsages.size > 1) {
-                    showDataSetUsageChooser(
-                        element,
-                        dataSetUsages,
+            if (element is PhpYield) {
+                val function = element.parentOfType<Function>() ?: return
+                val datasetIndex = PsiUtil.getExitStatementOrder(element, function)
+
+                if (onFirstRunOnFunction(
+                        function,
                         context,
                         testRunnerSettings,
                         startRunnable,
                         testoRunConfiguration,
+                        datasetIndex,
                     )
-                    return
-                }
+                ) return
+            }
 
-//            if (tryRunAbstract(
-//                    element,
-//                    context.dataContext,
-//                    testRunnerSettings,
-//                    startRunnable,
-//                    testoRunConfiguration,
-//                    location
-//                )
-//            ) {
-//                return
-//            }
+            if (element is Function) {
+                if (onFirstRunOnFunction(
+                        element,
+                        context,
+                        testRunnerSettings,
+                        startRunnable,
+                        testoRunConfiguration,
+                        -1,
+                    )
+                ) return
             }
         }
 
         super.onFirstRun(configuration, context, startRunnable)
+    }
+
+    private fun onFirstRunOnFunction(
+        function: Function,
+        context: ConfigurationContext,
+        testRunnerSettings: TestoRunnerSettings,
+        startRunnable: Runnable,
+        testoRunConfiguration: TestoRunConfiguration,
+        datasetIndex: Int,
+    ): Boolean {
+        if (!function.isTestoDataProviderLike()) return false
+
+        val dataSetUsages = TestoDataProviderUtils.findDataProviderUsages(function)
+        //                println("dataSetUsages: $dataSetUsages for dataSet: $element")
+        if (dataSetUsages.size > 1) {
+            showDataSetUsageChooser(
+                function,
+                dataSetUsages,
+                context,
+                testRunnerSettings,
+                startRunnable,
+                testoRunConfiguration,
+                datasetIndex,
+            )
+            return true
+        }
+
+        //            if (tryRunAbstract(
+        //                    element,
+        //                    context.dataContext,
+        //                    testRunnerSettings,
+        //                    startRunnable,
+        //                    testoRunConfiguration,
+        //                    location
+        //                )
+        //            ) {
+        //                return
+        //            }
+        return false
     }
 
     override fun findTestElement(element: PsiElement?, workingDirectory: VirtualFile?): PsiElement? {
@@ -327,18 +363,20 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         context: ConfigurationContext,
         testRunnerSettings: TestoRunnerSettings,
         startRunnable: Runnable,
-        configuration: TestoRunConfiguration
+        configuration: TestoRunConfiguration,
+        datasetIndex: Int,
     ) {
         val callback = getRunDataSetUsagesCallback(
             testRunnerSettings,
             startRunnable,
             configuration,
             dataSetUsages,
-            dataSet.name,
+            dataSet,
+            datasetIndex,
         )
         createChooserPopup(
             dataSetUsages,
-            PhpBundle.message("choose.test.method.to.run.dataset.0", *arrayOf(dataSet.name)),
+            PhpBundle.message("choose.test.method.to.run.dataset.0", dataSet.name),
             true,
             callback,
         ).showInBestPositionFor(context.dataContext)
@@ -376,16 +414,26 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         startRunnable: Runnable,
         configuration: TestoRunConfiguration,
         values: Collection<Method>,
-        dataSetName: String
+        dataProvider: Function,
+        datasetIndex: Int,
     ): Consumer<Set<*>> {
         return Consumer { selectedValues: Set<*> ->
-            val selected = selectedValues.firstOrNull() as? Method ?: return@Consumer
+            val function = selectedValues.firstOrNull() as? Function ?: return@Consumer
+            val index = TestoDataProviderUtils.findDataProviderUsagesIndex(function, dataProvider)
+
+//            setupConfiguration(testRunnerSettings, function, function.containingFile.virtualFile) ?: return@Consumer
+//            val index = PsiUtil.getAttributeOrder(attribute, function)
+//            if (index == -1) return@Consumer
 
             testRunnerSettings.scope = PhpTestRunnerSettings.Scope.Method
-            testRunnerSettings.methodName = selected.name
-            testRunnerSettings.filePath = selected.containingFile.virtualFile.presentableUrl
+            testRunnerSettings.filePath = function.containingFile.virtualFile.presentableUrl
+
+            testRunnerSettings.methodName = function.name+":$index"
+            testRunnerSettings.dataProviderIndex = index
+            testRunnerSettings.dataSetIndex = datasetIndex
 
             configuration.name = configuration.suggestedName()
+
             startRunnable.run()
         }
     }
