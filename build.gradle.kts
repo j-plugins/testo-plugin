@@ -1,4 +1,3 @@
-import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
@@ -70,19 +69,6 @@ intellijPlatform {
             }
         }
 
-        val changelog = project.changelog // local variable for configuration cache compatibility
-        // Get the latest available change notes from the changelog file
-        changeNotes = providers.gradleProperty("pluginVersion").map { pluginVersion ->
-            with(changelog) {
-                renderItem(
-                    (getOrNull(pluginVersion) ?: getUnreleased())
-                        .withHeader(false)
-                        .withEmptySections(false),
-                    Changelog.OutputType.HTML,
-                )
-            }
-        }
-
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
         }
@@ -109,12 +95,6 @@ intellijPlatform {
     }
 }
 
-// Configure Gradle Changelog Plugin - read more: https://github.com/JetBrains/gradle-changelog-plugin
-changelog {
-    groups.empty()
-    repositoryUrl = providers.gradleProperty("pluginRepositoryUrl")
-}
-
 // Configure Gradle Kover Plugin - read more: https://github.com/Kotlin/kotlinx-kover#configuration
 kover {
     reports {
@@ -129,10 +109,6 @@ kover {
 tasks {
     wrapper {
         gradleVersion = providers.gradleProperty("gradleVersion").get()
-    }
-
-    publishPlugin {
-        dependsOn(patchChangelog)
     }
 }
 
