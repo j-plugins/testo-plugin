@@ -10,7 +10,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         val INSTANCE = TestoRunConfigurationHandler()
     }
 
-    override fun getConfigFileOption() = "--configuration"
+    override fun getConfigFileOption() = "--config"
 
     override fun prepareCommand(project: Project, commandSettings: PhpCommandSettings, exe: String, version: String?) {
         commandSettings.apply {
