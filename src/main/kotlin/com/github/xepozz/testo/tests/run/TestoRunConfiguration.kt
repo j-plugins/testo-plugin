@@ -4,10 +4,12 @@ import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.TestoFrameworkType
+import com.github.xepozz.testo.tests.actions.TestoRerunFailedTestsAction
 import com.intellij.execution.Executor
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
+import com.intellij.execution.ui.ConsoleView
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
 import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
@@ -36,6 +38,11 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     override fun suggestedName() = super.suggestedName() as String
 
     override fun createSettings() = TestoRunConfigurationSettings()
+
+    override fun createRerunAction(
+        consoleView: ConsoleView,
+        properties: SMTRunnerConsoleProperties,
+    ) = TestoRerunFailedTestsAction(consoleView, properties)
 
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> {
         val editor = super.getConfigurationEditor() as PhpTestRunConfigurationEditor
