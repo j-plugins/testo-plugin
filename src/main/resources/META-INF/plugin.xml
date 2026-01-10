@@ -81,6 +81,9 @@
     </extensions>
 
     <actions>
+        <action id="TestoNewTestFromClass" class="com.github.xepozz.testo.tests.actions.TestoNewTestFromClassAction">
+            <add-to-group group-id="PhpNewTestGroup" anchor="last" />
+        </action>
         <group id="TestoGenerateGroup">
             <action
                     id="TestoGenerateTestMethod"
