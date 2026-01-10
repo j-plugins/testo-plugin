@@ -37,7 +37,7 @@ fun PsiElement.isTestoClass() = when (this) {
 }
 
 fun PsiFile.isTestoFile() = when (this) {
-    is PhpFile -> TestoTestDescriptor.isTestClassName(name.substringBeforeLast(".")) && (isTestoClassFile() || isTestoFunctionFile())
+    is PhpFile -> TestoTestDescriptor.isTestClassName(name.substringBeforeLast(".")) || (isTestoClassFile() || isTestoFunctionFile())
     else -> false
 }
 
