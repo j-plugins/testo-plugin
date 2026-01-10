@@ -13,5 +13,4 @@ use ${TESTED_NAMESPACE}\\${TESTED_NAME};
 use Testo\Attribute\Test;
 
 final class ${NAME} {
-
 }
