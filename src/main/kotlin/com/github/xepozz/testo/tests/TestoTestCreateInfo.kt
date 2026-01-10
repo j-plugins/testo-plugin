@@ -1,8 +1,10 @@
 package com.github.xepozz.testo.tests
 
 import com.github.xepozz.testo.TestoIcons
+import com.github.xepozz.testo.isTestoClass
 import com.intellij.openapi.project.Project
 import com.jetbrains.php.lang.PhpCodeUtil
+import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.testFramework.PhpUnitAbstractTestCreateInfo
 
 class TestoTestCreateInfo : PhpUnitAbstractTestCreateInfo() {
@@ -11,6 +13,8 @@ class TestoTestCreateInfo : PhpUnitAbstractTestCreateInfo() {
     override fun getName() = "Testo"
 
     override fun getTemplateName() = "Testo Test"
+
+    override fun canCreateTestFor(clazz: PhpClass) = !clazz.isTestoClass() && super.canCreateTestFor(clazz)
 
     override fun getTestMethodText(project: Project, classFqn: String, methodName: String): String {
         return PhpCodeUtil.getCodeTemplate(
