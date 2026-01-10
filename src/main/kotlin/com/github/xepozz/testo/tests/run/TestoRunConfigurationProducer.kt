@@ -92,11 +92,14 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         if (element is PhpClass) {
             val element = findTestElement(element, getWorkingDirectory(element)) as? PhpClass ?: return null
 
-            return super.setupConfiguration(
-                testRunnerSettings,
-                element.containingFile,
-                element.containingFile.virtualFile
-            )
+            /**
+             * Classes are configured through the file, unfortunately.
+             * But this should return a PhpClass not to be kicked out by Codeception precise target
+             */
+            val psiFile = element.containingFile
+
+            super.setupConfiguration(testRunnerSettings, psiFile, psiFile.virtualFile)
+            return element
         }
         if (element is Function) {
             val element = findTestElement(element, getWorkingDirectory(element))
@@ -250,7 +253,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             else -> element
         } ?: return null
 
-        if (element.containingFile == null || PhpUnitUtil.isPhpUnitTestFile(element.containingFile)) return null
+        val psiFile = element.containingFile ?: return null
+        if (PhpUnitUtil.isPhpUnitTestFile(psiFile)) return null
 
         return findTestElement(target)
             ?: findTestElement(target.parentOfType<PhpAttribute>(true))
