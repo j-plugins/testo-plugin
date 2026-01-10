@@ -253,6 +253,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             else -> element
         } ?: return null
 
+        if (element is PsiDirectory) return element
+
         val psiFile = element.containingFile ?: return null
         if (PhpUnitUtil.isPhpUnitTestFile(psiFile)) return null
 
