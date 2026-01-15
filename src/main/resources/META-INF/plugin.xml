@@ -71,6 +71,8 @@
         <lang.inspectionSuppressor
                 language="PHP"
                 implementationClass="com.github.xepozz.testo.tests.inspections.TestoInspectionSuppressor"/>
+        <testActionProvider order="last"
+            implementation="com.github.xepozz.testo.tests.actions.TestoTestActionProvider"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.jetbrains.php">
