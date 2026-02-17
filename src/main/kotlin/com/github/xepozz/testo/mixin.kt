@@ -5,12 +5,17 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.psi.PhpFile
-import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
+import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
 import com.jetbrains.php.lang.psi.elements.PhpClass
 
-fun PsiElement.isTestoExecutable() = isTestoFunction() || isTestoMethod()
+fun PsiElement.isTestoExecutable() = isTestoFunction() || isTestoMethod() || isTestoBench()
+
+fun PsiElement.isTestoBench() = when(this) {
+    is Method -> hasAnyAttribute(TestoClasses.BENCH_WITH)
+    else -> false
+}
 
 fun PsiElement.isTestoFunction() = when(this) {
     is Function -> hasAnyAttribute(TestoClasses.TEST_OLD,TestoClasses.TEST_NEW, TestoClasses.TEST_INLINE_NEW, TestoClasses.TEST_INLINE_OLD)
@@ -32,12 +37,12 @@ fun PhpAttributesOwner.hasAttribute(fqn: String) = getAttributes(fqn).isNotEmpty
 fun PhpAttributesOwner.hasAnyAttribute(vararg fqn: String) = attributes.any { it.fqn in fqn }
 
 fun PsiElement.isTestoClass() = when (this) {
-    is PhpClass -> TestoTestDescriptor.isTestClassName(name) || ownMethods.any { it.isTestoMethod() }
+    is PhpClass -> TestoTestDescriptor.isTestClassName(name) || ownMethods.any { it.isTestoMethod() || it.isTestoBench() }
     else -> false
 }
 
 fun PsiFile.isTestoFile() = when (this) {
-    is PhpFile -> TestoTestDescriptor.isTestClassName(name.substringBeforeLast(".")) || (isTestoClassFile() || isTestoFunctionFile())
+    is PhpFile -> TestoTestDescriptor.isTestClassName(name.substringBeforeLast(".")) || (isTestoClassFile() || isTestoFunctionFile() || isTestBenchFile())
     else -> false
 }
 
@@ -46,6 +51,9 @@ fun PhpFile.isTestoClassFile() = PsiTreeUtil.findChildrenOfType(this, PhpClass::
 
 fun PhpFile.isTestoFunctionFile() = PsiTreeUtil.findChildrenOfType(this, Function::class.java)
     .any { it.isTestoFunction() }
+
+fun PhpFile.isTestBenchFile() = PsiTreeUtil.findChildrenOfType(this, Function::class.java)
+    .any { it.isTestoBench() }
 
 fun <T> Sequence<T>.takeWhileInclusive(predicate: (T) -> Boolean) = sequence {
     with(iterator()) {

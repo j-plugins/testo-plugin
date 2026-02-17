@@ -5,6 +5,7 @@ import com.github.xepozz.testo.index.TestoDataProviderUtils
 import com.github.xepozz.testo.isTestoClass
 import com.github.xepozz.testo.isTestoDataProviderLike
 import com.github.xepozz.testo.isTestoExecutable
+import com.github.xepozz.testo.tests.TestoTestRunLineMarkerProvider.Companion.getLocationHint
 import com.github.xepozz.testo.util.PsiUtil
 import com.intellij.execution.lineMarker.ExecutorAction
 import com.intellij.execution.lineMarker.RunLineMarkerContributor
@@ -18,8 +19,8 @@ import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
 import com.jetbrains.php.lang.lexer.PhpTokenTypes
 import com.jetbrains.php.lang.psi.PhpPsiUtil
 import com.jetbrains.php.lang.psi.elements.ClassReference
-import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
+import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
 import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
 import com.jetbrains.php.lang.psi.elements.PhpClass
@@ -95,6 +96,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
             TestoClasses.DATA_ZIP,
             TestoClasses.TEST_INLINE_OLD,
             TestoClasses.TEST_INLINE_NEW,
+            TestoClasses.BENCH_WITH,
         )
 
         fun getLocationHint(element: Function) = when (element) {

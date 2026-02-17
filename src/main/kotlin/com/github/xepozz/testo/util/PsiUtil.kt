@@ -19,6 +19,7 @@ object PsiUtil {
         TestoClasses.DATA_UNION,
         TestoClasses.DATA_CROSS,
         TestoClasses.DATA_ZIP,
+        TestoClasses.BENCH_WITH,
     )
 
     fun getAttributeOrder(attribute: PhpAttribute, owner: PhpAttributesOwner): Int = owner
