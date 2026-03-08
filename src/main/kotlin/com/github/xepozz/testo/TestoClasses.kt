@@ -1,8 +1,8 @@
 package com.github.xepozz.testo
 
 object TestoClasses {
-    const val TEST_OLD = "\\Testo\\Attribute\\Test"
-    const val TEST_NEW = "\\Testo\\Application\\Attribute\\Test"
+    const val TEST_NEW = "\\Testo\\Attribute\\Test"
+    const val TEST_OLD = "\\Testo\\Application\\Attribute\\Test"
     const val TEST_INLINE_OLD = "\\Testo\\Sample\\TestInline"
     const val TEST_INLINE_NEW = "\\Testo\\Inline\\TestInline"
 
@@ -19,4 +19,25 @@ object TestoClasses {
     const val ASSERT = "\\Testo\\Assert"
     const val ASSERTION_EXCEPTION = "\\Testo\\Assert\\State\\Assertion\\AssertionException"
     const val EXPECT = "\\Testo\\Expect"
+
+    val DATA_ATTRIBUTES = arrayOf(
+        DATA_PROVIDER_OLD,
+        DATA_PROVIDER_NEW,
+        DATA_SET_OLD,
+        DATA_SET_NEW,
+        DATA_UNION,
+        DATA_CROSS,
+        DATA_ZIP,
+    )
+    val TEST_ATTRIBUTES = arrayOf(
+        TEST_NEW,
+        TEST_OLD,
+    )
+    val TEST_INLINE_ATTRIBUTES = arrayOf(
+        TEST_INLINE_OLD,
+        TEST_INLINE_NEW,
+    )
+    val BENCH_ATTRIBUTES = arrayOf(
+        BENCH_WITH,
+    )
 }
