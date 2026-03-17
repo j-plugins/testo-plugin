@@ -120,7 +120,6 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             }
         }
         val result = super.setupConfiguration(testRunnerSettings, element, virtualFile)
-        testRunnerSettings.testoType = resolveTestoType(element)
         return result
     }
 
