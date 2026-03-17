@@ -12,13 +12,6 @@ class TestoLineMarkerCompanionTest : TestCase() {
         }
     }
 
-    fun testRunnableAttributes_containsInlineTestAttributes() {
-        val runnable = TestoTestRunLineMarkerProvider.RUNNABLE_ATTRIBUTES.toSet()
-        for (attr in TestoClasses.TEST_INLINE_ATTRIBUTES) {
-            assertTrue("Missing inline test attribute: $attr", runnable.contains(attr))
-        }
-    }
-
     fun testRunnableAttributes_containsBenchAttributes() {
         val runnable = TestoTestRunLineMarkerProvider.RUNNABLE_ATTRIBUTES.toSet()
         for (attr in TestoClasses.BENCH_ATTRIBUTES) {
@@ -40,7 +33,7 @@ class TestoLineMarkerCompanionTest : TestCase() {
 
     fun testRunnableAttributes_totalCount() {
         val expected = TestoClasses.DATA_ATTRIBUTES.size +
-                TestoClasses.TEST_INLINE_ATTRIBUTES.size +
+                TestoClasses.TEST_ATTRIBUTES.size +
                 TestoClasses.BENCH_ATTRIBUTES.size
         assertEquals(expected, TestoTestRunLineMarkerProvider.RUNNABLE_ATTRIBUTES.size)
     }

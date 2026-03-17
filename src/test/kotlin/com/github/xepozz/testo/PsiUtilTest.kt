@@ -14,9 +14,6 @@ class PsiUtilTest : TestCase() {
         for (attr in TestoClasses.TEST_ATTRIBUTES) {
             assertTrue("Missing test attribute: $attr", meaningful.contains(attr))
         }
-        for (attr in TestoClasses.TEST_INLINE_ATTRIBUTES) {
-            assertTrue("Missing inline test attribute: $attr", meaningful.contains(attr))
-        }
         for (attr in TestoClasses.BENCH_ATTRIBUTES) {
             assertTrue("Missing bench attribute: $attr", meaningful.contains(attr))
         }
@@ -25,7 +22,6 @@ class PsiUtilTest : TestCase() {
     fun testMeaningfulAttributes_totalCount() {
         val expected = TestoClasses.DATA_ATTRIBUTES.size +
                 TestoClasses.TEST_ATTRIBUTES.size +
-                TestoClasses.TEST_INLINE_ATTRIBUTES.size +
                 TestoClasses.BENCH_ATTRIBUTES.size
         assertEquals(expected, PsiUtil.MEANINGFUL_ATTRIBUTES.size)
     }

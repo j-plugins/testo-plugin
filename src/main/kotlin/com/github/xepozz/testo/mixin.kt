@@ -18,12 +18,12 @@ fun PsiElement.isTestoBench() = when(this) {
 }
 
 fun PsiElement.isTestoFunction() = when(this) {
-    is Function -> hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES, *TestoClasses.TEST_INLINE_ATTRIBUTES)
+    is Function -> hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
     else -> false
 }
 
 fun PsiElement.isTestoMethod() = when(this) {
-    is Method -> (modifier.isPublic && name.startsWith("test")) || hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES, *TestoClasses.TEST_INLINE_ATTRIBUTES)
+    is Method -> (modifier.isPublic && name.startsWith("test")) || hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
     else -> false
 }
 

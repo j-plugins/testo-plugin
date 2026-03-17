@@ -11,13 +11,6 @@ class TestoClassesTest : TestCase() {
         assertTrue(attrs.contains("\\Testo\\Application\\Attribute\\Test"))
     }
 
-    fun testTestInlineAttributes_containsExpectedValues() {
-        val attrs = TestoClasses.TEST_INLINE_ATTRIBUTES
-        assertEquals(2, attrs.size)
-        assertTrue(attrs.contains("\\Testo\\Sample\\TestInline"))
-        assertTrue(attrs.contains("\\Testo\\Inline\\TestInline"))
-    }
-
     fun testDataAttributes_containsAllDataTypes() {
         val attrs = TestoClasses.DATA_ATTRIBUTES
         assertEquals(7, attrs.size)
@@ -56,14 +49,10 @@ class TestoClassesTest : TestCase() {
     fun testDataAttributes_noOverlapWithTestAttributes() {
         val dataSet = TestoClasses.DATA_ATTRIBUTES.toSet()
         val testSet = TestoClasses.TEST_ATTRIBUTES.toSet()
-        val inlineSet = TestoClasses.TEST_INLINE_ATTRIBUTES.toSet()
         val benchSet = TestoClasses.BENCH_ATTRIBUTES.toSet()
 
         assertTrue(dataSet.intersect(testSet).isEmpty())
-        assertTrue(dataSet.intersect(inlineSet).isEmpty())
         assertTrue(dataSet.intersect(benchSet).isEmpty())
-        assertTrue(testSet.intersect(inlineSet).isEmpty())
         assertTrue(testSet.intersect(benchSet).isEmpty())
-        assertTrue(inlineSet.intersect(benchSet).isEmpty())
     }
 }

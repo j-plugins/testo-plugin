@@ -10,7 +10,6 @@ object PsiUtil {
     val MEANINGFUL_ATTRIBUTES = arrayOf(
         *TestoClasses.DATA_ATTRIBUTES,
         *TestoClasses.TEST_ATTRIBUTES,
-        *TestoClasses.TEST_INLINE_ATTRIBUTES,
         *TestoClasses.BENCH_ATTRIBUTES,
     )
 
