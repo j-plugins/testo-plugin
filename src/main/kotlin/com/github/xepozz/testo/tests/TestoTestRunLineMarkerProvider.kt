@@ -54,6 +54,10 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
                 getLocationHint(element.containingFile)
             }
 
+            element is ClassReference && element.parent is NewExpression && element.fqn == TestoClasses.SUITE_CONFIG -> {
+                getLocationHint(element.containingFile)
+            }
+
             element is ClassReference && element.parent is PhpAttribute -> {
                 val attribute = element.parent as PhpAttribute
                 if (attribute.fqn !in RUNNABLE_ATTRIBUTES) return null
