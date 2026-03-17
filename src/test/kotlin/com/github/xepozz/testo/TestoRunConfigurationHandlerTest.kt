@@ -64,6 +64,30 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertEquals("bench", arguments[1])
     }
 
+    fun testPrepareArguments_withTestoType_test() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.testoType = "test"
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        assertEquals(2, arguments.size)
+        assertEquals("--type", arguments[0])
+        assertEquals("test", arguments[1])
+    }
+
+    fun testPrepareArguments_withTestoType_inline() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.testoType = "inline"
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        assertEquals(2, arguments.size)
+        assertEquals("--type", arguments[0])
+        assertEquals("inline", arguments[1])
+    }
+
     fun testPrepareArguments_withTestoType_empty_skipped() {
         val settings = TestoRunConfigurationSettings()
         settings.runnerSettings.testoType = ""
@@ -72,6 +96,19 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
         assertTrue("Empty testoType should not add arguments", arguments.isEmpty())
+    }
+
+    fun testPrepareArguments_defaultTestoType_noTypeFlag() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.suite = "unit"
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        assertEquals(2, arguments.size)
+        assertEquals("--suite", arguments[0])
+        assertEquals("unit", arguments[1])
+        assertFalse("No --type flag when testoType is default", arguments.contains("--type"))
     }
 
     fun testPrepareArguments_withSuite() {

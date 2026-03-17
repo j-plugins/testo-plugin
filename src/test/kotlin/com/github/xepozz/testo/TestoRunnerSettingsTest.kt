@@ -17,6 +17,7 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals("", settings.excludeGroup)
         assertEquals(0, settings.repeat)
         assertEquals(0, settings.parallel)
+        assertEquals("", settings.testoType)
     }
 
     fun testCustomValues() {
@@ -30,6 +31,7 @@ class TestoRunnerSettingsTest : TestCase() {
             excludeGroup = "slow",
             repeat = 3,
             parallel = 4,
+            testoType = "bench",
         )
         assertEquals(3, settings.dataProviderIndex)
         assertEquals(5, settings.dataSetIndex)
@@ -40,6 +42,7 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals("slow", settings.excludeGroup)
         assertEquals(3, settings.repeat)
         assertEquals(4, settings.parallel)
+        assertEquals("bench", settings.testoType)
     }
 
     fun testFromPhpTestRunnerSettings_baseSettings() {
@@ -71,6 +74,7 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals("", result.excludeGroup)
         assertEquals(0, result.repeat)
         assertEquals(0, result.parallel)
+        assertEquals("", result.testoType)
     }
 
     fun testFromPhpTestRunnerSettings_testoSettings() {
@@ -84,6 +88,7 @@ class TestoRunnerSettingsTest : TestCase() {
             excludeGroup = "slow",
             repeat = 5,
             parallel = 8,
+            testoType = "inline",
         )
         source.scope = PhpTestRunnerSettings.Scope.Method
         source.filePath = "/test.php"
@@ -105,5 +110,6 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals("slow", result.excludeGroup)
         assertEquals(5, result.repeat)
         assertEquals(8, result.parallel)
+        assertEquals("inline", result.testoType)
     }
 }
