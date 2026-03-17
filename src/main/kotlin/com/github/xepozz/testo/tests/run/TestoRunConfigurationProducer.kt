@@ -1,12 +1,16 @@
 package com.github.xepozz.testo.tests.run
 
+import com.github.xepozz.testo.TestoClasses
 import com.github.xepozz.testo.TestoUtil
+import com.github.xepozz.testo.hasAttribute
 import com.github.xepozz.testo.index.TestoDataProviderUtils
 import com.github.xepozz.testo.isTestoBench
 import com.github.xepozz.testo.isTestoClass
 import com.github.xepozz.testo.isTestoDataProviderLike
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.isTestoFile
+import com.github.xepozz.testo.isTestoFunction
+import com.github.xepozz.testo.isTestoMethod
 import com.github.xepozz.testo.util.PsiUtil
 import com.intellij.execution.Location
 import com.intellij.execution.PsiLocation
@@ -67,10 +71,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             testRunnerSettings.methodName += ":$index"
             testRunnerSettings.dataProviderIndex = index
             testRunnerSettings.dataSetIndex = -1
-
-            if (function.isTestoBench()) {
-                testRunnerSettings.testoType = BENCH_TYPE
-            }
+            testRunnerSettings.testoType = resolveTestoType(element)
 
             return element
         }
@@ -119,9 +120,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             }
         }
         val result = super.setupConfiguration(testRunnerSettings, element, virtualFile)
-        if (element.isTestoBench()) {
-            testRunnerSettings.testoType = BENCH_TYPE
-        }
+        testRunnerSettings.testoType = resolveTestoType(element)
         return result
     }
 
@@ -523,7 +522,28 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     }
 
     companion object Companion {
+        const val TEST_TYPE = "test"
+        const val INLINE_TYPE = "inline"
         const val BENCH_TYPE = "bench"
+
+        fun resolveTestoType(element: PsiElement): String = when {
+            element is PhpAttribute -> resolveTestoTypeFromAttribute(element)
+            element.isTestoBench() -> BENCH_TYPE
+            element.isTestoFunction() && (element as Function).hasAttribute(TestoClasses.TEST_INLINE) -> INLINE_TYPE
+            element.isTestoMethod() || element.isTestoFunction() -> TEST_TYPE
+            else -> ""
+        }
+
+        private fun resolveTestoTypeFromAttribute(attribute: PhpAttribute): String {
+            val fqn = attribute.fqn ?: return ""
+            return when (fqn) {
+                in TestoClasses.BENCH_ATTRIBUTES -> BENCH_TYPE
+                TestoClasses.TEST_INLINE -> INLINE_TYPE
+                TestoClasses.TEST -> TEST_TYPE
+                in TestoClasses.DATA_ATTRIBUTES -> TEST_TYPE
+                else -> ""
+            }
+        }
 
         val METHOD = Condition<PsiElement> {
             it.isTestoExecutable() || (it is Method && TestoDataProviderUtils.isDataProvider(it))
