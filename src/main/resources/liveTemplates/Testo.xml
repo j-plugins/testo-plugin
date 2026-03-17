@@ -39,4 +39,24 @@
             <option name="Testo" value="true"/>
         </context>
     </template>
+    <template
+            name="bench"
+            value="#[Bench]&#10;    public function $NAME$(){&#10;    $BODY$$END$;&#10;}"
+            description="Testo: Create a new bench method"
+            toReformat="true"
+            toShortenFQNames="true">
+        <variable
+                name="NAME"
+                expression=""
+                defaultValue=""
+                alwaysStopAt="true"/>
+        <variable
+                name="BODY"
+                expression="complete()"
+                defaultValue=""
+                alwaysStopAt="true"/>
+        <context>
+            <option name="Testo" value="true"/>
+        </context>
+    </template>
 </templateSet>
