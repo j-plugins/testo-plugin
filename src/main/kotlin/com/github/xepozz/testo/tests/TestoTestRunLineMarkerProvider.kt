@@ -87,16 +87,9 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 
     companion object Companion {
         val RUNNABLE_ATTRIBUTES = arrayOf(
-            TestoClasses.DATA_PROVIDER_OLD,
-            TestoClasses.DATA_PROVIDER_NEW,
-            TestoClasses.DATA_SET_OLD,
-            TestoClasses.DATA_SET_NEW,
-            TestoClasses.DATA_UNION,
-            TestoClasses.DATA_CROSS,
-            TestoClasses.DATA_ZIP,
-            TestoClasses.TEST_INLINE_OLD,
-            TestoClasses.TEST_INLINE_NEW,
-            TestoClasses.BENCH_WITH,
+            *TestoClasses.DATA_ATTRIBUTES,
+            *TestoClasses.TEST_INLINE_ATTRIBUTES,
+            *TestoClasses.BENCH_ATTRIBUTES,
         )
 
         fun getLocationHint(element: Function) = when (element) {
