@@ -41,6 +41,7 @@ import com.jetbrains.php.lang.psi.elements.NewExpression
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
 import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpNamedElement
+import com.jetbrains.php.lang.psi.elements.StringLiteralExpression
 import com.jetbrains.php.lang.psi.elements.PhpYield
 import com.jetbrains.php.phpunit.PhpMethodLocation
 import com.jetbrains.php.phpunit.PhpUnitRuntimeConfigurationProducer
@@ -69,6 +70,15 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             testRunnerSettings.scope = PhpTestRunnerSettings.Scope.ConfigurationFile
             testRunnerSettings.isUseAlternativeConfigurationFile = true
             testRunnerSettings.configurationFilePath = virtualFile.path
+            return element
+        }
+        if (element is ClassReference && element.parent is NewExpression && element.fqn == TestoClasses.SUITE_CONFIG) {
+            val newExpression = element.parent as NewExpression
+            val suiteName = extractSuiteName(newExpression) ?: return null
+            testRunnerSettings.scope = PhpTestRunnerSettings.Scope.ConfigurationFile
+            testRunnerSettings.isUseAlternativeConfigurationFile = true
+            testRunnerSettings.configurationFilePath = virtualFile.path
+            testRunnerSettings.suite = suiteName
             return element
         }
         if (element is PhpAttribute) {
@@ -145,6 +155,14 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         if (element is ClassReference && element.parent is NewExpression && element.fqn == TestoClasses.APPLICATION_CONFIG) {
             return testRunnerSettings.scope == PhpTestRunnerSettings.Scope.ConfigurationFile
                 && testRunnerSettings.configurationFilePath == element.containingFile.virtualFile.path
+        }
+        if (element is ClassReference && element.parent is NewExpression && element.fqn == TestoClasses.SUITE_CONFIG) {
+            val testoSettings = testRunnerSettings as? TestoRunnerSettings ?: return false
+            val newExpression = element.parent as NewExpression
+            val suiteName = extractSuiteName(newExpression) ?: return false
+            return testoSettings.scope == PhpTestRunnerSettings.Scope.ConfigurationFile
+                && testoSettings.configurationFilePath == element.containingFile.virtualFile.path
+                && testoSettings.suite == suiteName
         }
         if (element is PhpClass) {
             return when {
@@ -292,7 +310,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     }
 
     private fun findTestElement(target: PsiElement?): PsiElement? = when (target) {
-        is ClassReference -> target.takeIf { it.parent is NewExpression && it.fqn == TestoClasses.APPLICATION_CONFIG }
+        is ClassReference -> target.takeIf { it.parent is NewExpression && (it.fqn == TestoClasses.APPLICATION_CONFIG || it.fqn == TestoClasses.SUITE_CONFIG) }
         is PhpAttribute -> target.takeIf { it.owner.isTestoExecutable() || it.owner.isTestoDataProviderLike() }
         is Function -> target.takeIf { it.isTestoExecutable() || it.isTestoDataProviderLike() }
         is PhpClass -> target.takeIf { it.isTestoClass() }
@@ -533,6 +551,15 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             configuration.name = configuration.suggestedName()
             startRunnable.run()
         }
+    }
+
+    private fun extractSuiteName(newExpression: NewExpression): String? {
+        val firstParam = newExpression.parameters.firstOrNull() ?: return null
+        if (firstParam is StringLiteralExpression) {
+            return firstParam.contents
+        }
+        val literal = com.intellij.psi.util.PsiTreeUtil.findChildOfType(firstParam, StringLiteralExpression::class.java)
+        return literal?.contents
     }
 
     private fun getContainingClass(location: Location<*>, method: Method) = when (location) {
