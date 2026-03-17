@@ -30,6 +30,7 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.psi.util.parentOfType
 import com.intellij.util.Consumer
+import com.intellij.util.asSafely
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.PhpIndex
 import com.jetbrains.php.PhpIndexImpl
@@ -554,12 +555,11 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     }
 
     private fun extractSuiteName(newExpression: NewExpression): String? {
-        val firstParam = newExpression.parameters.firstOrNull() ?: return null
-        if (firstParam is StringLiteralExpression) {
-            return firstParam.contents
-        }
-        val literal = com.intellij.psi.util.PsiTreeUtil.findChildOfType(firstParam, StringLiteralExpression::class.java)
-        return literal?.contents
+        return newExpression
+            .parameters
+            .firstOrNull()
+            ?.asSafely<StringLiteralExpression>()
+            ?.contents
     }
 
     private fun getContainingClass(location: Location<*>, method: Method) = when (location) {
