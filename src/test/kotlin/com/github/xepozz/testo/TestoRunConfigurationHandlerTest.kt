@@ -52,6 +52,28 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertTrue("No arguments should be added for default settings", arguments.isEmpty())
     }
 
+    fun testPrepareArguments_withSelectedType_bench() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.selectedType = "bench"
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        assertEquals(2, arguments.size)
+        assertEquals("--type", arguments[0])
+        assertEquals("bench", arguments[1])
+    }
+
+    fun testPrepareArguments_withSelectedType_empty_skipped() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.selectedType = ""
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        assertTrue("Empty selectedType should not add arguments", arguments.isEmpty())
+    }
+
     fun testPrepareArguments_withSuite() {
         val settings = TestoRunConfigurationSettings()
         settings.runnerSettings.suite = "unit"
@@ -125,6 +147,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_allOptions() {
         val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.selectedType = "bench"
         settings.runnerSettings.suite = "integration"
         settings.runnerSettings.group = "db"
         settings.runnerSettings.excludeGroup = "slow"
@@ -134,7 +157,9 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        assertEquals(10, arguments.size)
+        assertEquals(12, arguments.size)
+        assertTrue(arguments.contains("--type"))
+        assertTrue(arguments.contains("bench"))
         assertTrue(arguments.contains("--suite"))
         assertTrue(arguments.contains("integration"))
         assertTrue(arguments.contains("--group"))
@@ -149,6 +174,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_orderIsCorrect() {
         val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.selectedType = "bench"
         settings.runnerSettings.suite = "unit"
         settings.runnerSettings.group = "fast"
         settings.runnerSettings.parallel = 2
@@ -156,12 +182,14 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        // suite comes first, then group, then parallel
-        assertEquals("--suite", arguments[0])
-        assertEquals("unit", arguments[1])
-        assertEquals("--group", arguments[2])
-        assertEquals("fast", arguments[3])
-        assertEquals("--parallel", arguments[4])
-        assertEquals("2", arguments[5])
+        // type comes first, then suite, then group, then parallel
+        assertEquals("--type", arguments[0])
+        assertEquals("bench", arguments[1])
+        assertEquals("--suite", arguments[2])
+        assertEquals("unit", arguments[3])
+        assertEquals("--group", arguments[4])
+        assertEquals("fast", arguments[5])
+        assertEquals("--parallel", arguments[6])
+        assertEquals("2", arguments[7])
     }
 }

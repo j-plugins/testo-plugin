@@ -14,6 +14,7 @@ object TestoClasses {
     const val DATA_CROSS = "\\Testo\\Data\\DataCross"
     const val DATA_ZIP = "\\Testo\\Data\\DataZip"
 
+    const val BENCH = "\\Testo\\Bench\\Bench"
     const val BENCH_WITH = "\\Testo\\Bench\\BenchWith"
 
     const val ASSERT = "\\Testo\\Assert"
@@ -38,6 +39,7 @@ object TestoClasses {
         TEST_INLINE_NEW,
     )
     val BENCH_ATTRIBUTES = arrayOf(
+        BENCH,
         BENCH_WITH,
     )
 }

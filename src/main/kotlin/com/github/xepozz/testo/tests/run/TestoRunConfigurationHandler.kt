@@ -32,6 +32,10 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
     fun prepareArguments(arguments: MutableList<String?>, testoSettings: TestoRunConfigurationSettings) {
         val runner = testoSettings.runnerSettings
 
+        if (runner.selectedType.isNotEmpty()) {
+            arguments.add("--type")
+            arguments.add(runner.selectedType)
+        }
         if (runner.suite.isNotEmpty()) {
             arguments.add("--suite")
             arguments.add(runner.suite)

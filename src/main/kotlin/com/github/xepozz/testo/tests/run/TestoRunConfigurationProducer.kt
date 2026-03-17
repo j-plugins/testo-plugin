@@ -2,6 +2,7 @@ package com.github.xepozz.testo.tests.run
 
 import com.github.xepozz.testo.TestoUtil
 import com.github.xepozz.testo.index.TestoDataProviderUtils
+import com.github.xepozz.testo.isTestoBench
 import com.github.xepozz.testo.isTestoClass
 import com.github.xepozz.testo.isTestoDataProviderLike
 import com.github.xepozz.testo.isTestoExecutable
@@ -67,6 +68,10 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             testRunnerSettings.dataProviderIndex = index
             testRunnerSettings.dataSetIndex = -1
 
+            if (function.isTestoBench()) {
+                testRunnerSettings.selectedType = BENCH_TYPE
+            }
+
             return element
         }
         if (element is PhpYield) {
@@ -113,7 +118,11 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 }
             }
         }
-        return super.setupConfiguration(testRunnerSettings, element, virtualFile)
+        val result = super.setupConfiguration(testRunnerSettings, element, virtualFile)
+        if (element.isTestoBench()) {
+            testRunnerSettings.selectedType = BENCH_TYPE
+        }
+        return result
     }
 
     override fun isConfigurationFromContext(
@@ -514,6 +523,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     }
 
     companion object Companion {
+        const val BENCH_TYPE = "bench"
+
         val METHOD = Condition<PsiElement> {
             it.isTestoExecutable() || (it is Method && TestoDataProviderUtils.isDataProvider(it))
         }

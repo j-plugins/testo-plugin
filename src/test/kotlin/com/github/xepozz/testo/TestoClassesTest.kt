@@ -32,8 +32,13 @@ class TestoClassesTest : TestCase() {
 
     fun testBenchAttributes_containsExpectedValues() {
         val attrs = TestoClasses.BENCH_ATTRIBUTES
-        assertEquals(1, attrs.size)
+        assertEquals(2, attrs.size)
+        assertTrue(attrs.contains("\\Testo\\Bench\\Bench"))
         assertTrue(attrs.contains("\\Testo\\Bench\\BenchWith"))
+    }
+
+    fun testConstants_bench() {
+        assertEquals("\\Testo\\Bench\\Bench", TestoClasses.BENCH)
     }
 
     fun testConstants_assertionException() {

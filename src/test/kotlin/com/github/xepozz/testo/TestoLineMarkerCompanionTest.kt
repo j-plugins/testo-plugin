@@ -26,6 +26,11 @@ class TestoLineMarkerCompanionTest : TestCase() {
         }
     }
 
+    fun testRunnableAttributes_containsBenchAttribute() {
+        val runnable = TestoTestRunLineMarkerProvider.RUNNABLE_ATTRIBUTES.toSet()
+        assertTrue("Should contain \\Testo\\Bench\\Bench", runnable.contains(TestoClasses.BENCH))
+    }
+
     fun testRunnableAttributes_doesNotContainPlainTestAttributes() {
         val runnable = TestoTestRunLineMarkerProvider.RUNNABLE_ATTRIBUTES.toSet()
         for (attr in TestoClasses.TEST_ATTRIBUTES) {
