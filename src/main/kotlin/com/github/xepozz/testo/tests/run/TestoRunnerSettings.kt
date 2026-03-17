@@ -29,6 +29,9 @@ class TestoRunnerSettings(
 
     @Attribute("parallel")
     var parallel: Int = 0,
+
+    @Attribute("testo_type")
+    var testoType: String = "",
 ) : PhpTestRunnerSettings() {
     companion object Companion {
         @JvmStatic
@@ -55,6 +58,7 @@ class TestoRunnerSettings(
                 runnerSettings.excludeGroup = settings.excludeGroup
                 runnerSettings.repeat = settings.repeat
                 runnerSettings.parallel = settings.parallel
+                runnerSettings.testoType = settings.testoType
             }
 
             return runnerSettings

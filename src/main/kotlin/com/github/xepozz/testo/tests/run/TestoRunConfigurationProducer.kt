@@ -69,7 +69,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             testRunnerSettings.dataSetIndex = -1
 
             if (function.isTestoBench()) {
-                testRunnerSettings.selectedType = BENCH_TYPE
+                testRunnerSettings.testoType = BENCH_TYPE
             }
 
             return element
@@ -120,7 +120,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         }
         val result = super.setupConfiguration(testRunnerSettings, element, virtualFile)
         if (element.isTestoBench()) {
-            testRunnerSettings.selectedType = BENCH_TYPE
+            testRunnerSettings.testoType = BENCH_TYPE
         }
         return result
     }

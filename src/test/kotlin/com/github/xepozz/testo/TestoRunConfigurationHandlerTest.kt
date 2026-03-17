@@ -52,9 +52,9 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertTrue("No arguments should be added for default settings", arguments.isEmpty())
     }
 
-    fun testPrepareArguments_withSelectedType_bench() {
+    fun testPrepareArguments_withTestoType_bench() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.selectedType = "bench"
+        settings.runnerSettings.testoType = "bench"
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
@@ -64,14 +64,14 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertEquals("bench", arguments[1])
     }
 
-    fun testPrepareArguments_withSelectedType_empty_skipped() {
+    fun testPrepareArguments_withTestoType_empty_skipped() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.selectedType = ""
+        settings.runnerSettings.testoType = ""
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        assertTrue("Empty selectedType should not add arguments", arguments.isEmpty())
+        assertTrue("Empty testoType should not add arguments", arguments.isEmpty())
     }
 
     fun testPrepareArguments_withSuite() {
@@ -147,7 +147,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_allOptions() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.selectedType = "bench"
+        settings.runnerSettings.testoType = "bench"
         settings.runnerSettings.suite = "integration"
         settings.runnerSettings.group = "db"
         settings.runnerSettings.excludeGroup = "slow"
@@ -174,7 +174,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_orderIsCorrect() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.selectedType = "bench"
+        settings.runnerSettings.testoType = "bench"
         settings.runnerSettings.suite = "unit"
         settings.runnerSettings.group = "fast"
         settings.runnerSettings.parallel = 2
