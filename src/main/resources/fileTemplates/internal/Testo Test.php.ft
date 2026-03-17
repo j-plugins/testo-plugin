@@ -10,7 +10,7 @@ use ${TESTED_NAME};
 #elseif (${TESTED_NAME} && ${TESTED_NAMESPACE} && ${NAMESPACE} != ${TESTED_NAMESPACE})
 use ${TESTED_NAMESPACE}\\${TESTED_NAME};
 #end
-use Testo\Attribute\Test;
+use Testo\Test;
 
 final class ${NAME} {
 }
