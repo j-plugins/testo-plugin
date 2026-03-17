@@ -137,28 +137,27 @@ The plugin registers extensions in `plugin.xml` under two namespaces:
 - `com.intellij.modules.platform` — IntelliJ Platform core
 - `com.jetbrains.php` — PHP language support (makes this plugin work in PhpStorm / IDEA Ultimate with PHP plugin)
 
-### Testo PHP Framework — Supported Classes
+### Testo PHP Framework — Supported Attributes
 
-The plugin recognizes these PHP namespaces/attributes (defined in `TestoClasses.kt`):
+The plugin recognizes PHP attributes defined in `TestoClasses.kt`. Constants are grouped into arrays for reuse across the codebase:
 
-| Category        | Old namespace (`\Testo\Sample\*`, `\Testo\Attribute\*`) | New namespace (`\Testo\Application\*`, `\Testo\Data\*`, etc.) |
-|-----------------|----------------------------------------------------------|---------------------------------------------------------------|
-| Test attribute  | `\Testo\Attribute\Test`                                  | `\Testo\Application\Attribute\Test`                           |
-| Inline test     | `\Testo\Sample\TestInline`                               | `\Testo\Inline\TestInline`                                    |
-| Data provider   | `\Testo\Sample\DataProvider`                             | `\Testo\Data\DataProvider`                                    |
-| Data set        | `\Testo\Sample\DataSet`                                  | `\Testo\Data\DataSet`                                        |
-| Data union      | —                                                        | `\Testo\Data\DataUnion`                                       |
-| Data cross      | —                                                        | `\Testo\Data\DataCross`                                       |
-| Data zip        | —                                                        | `\Testo\Data\DataZip`                                         |
-| Benchmark       | —                                                        | `\Testo\Bench\BenchWith`                                      |
-| Assertions      | —                                                        | `\Testo\Assert`, `\Testo\Expect`                              |
+| Group (array)          | Attributes (FQN)                                                                                      |
+|------------------------|-------------------------------------------------------------------------------------------------------|
+| `TEST_ATTRIBUTES`      | `\Testo\Attribute\Test` (new), `\Testo\Application\Attribute\Test` (old)                             |
+| `TEST_INLINE_ATTRIBUTES` | `\Testo\Sample\TestInline` (old), `\Testo\Inline\TestInline` (new)                                 |
+| `DATA_ATTRIBUTES`      | `\Testo\Sample\DataProvider`, `\Testo\Data\DataProvider`, `\Testo\Sample\DataSet`, `\Testo\Data\DataSet`, `\Testo\Data\DataUnion`, `\Testo\Data\DataCross`, `\Testo\Data\DataZip` |
+| `BENCH_ATTRIBUTES`     | `\Testo\Bench\BenchWith`                                                                              |
+
+Other constants: `ASSERT` (`\Testo\Assert`), `EXPECT` (`\Testo\Expect`), `ASSERTION_EXCEPTION`.
+
+These arrays are spread into `RUNNABLE_ATTRIBUTES` (line markers) and `MEANINGFUL_ATTRIBUTES` (PsiUtil) — adding a new attribute to the group array automatically propagates it everywhere.
 
 ### Test Detection Logic (mixin.kt)
 
 A PHP element is recognized as a Testo test when:
-- **Method:** public + name starts with `test`, OR has `#[Test]` / `#[TestInline]` attribute
-- **Function:** has `#[Test]` / `#[TestInline]` attribute (standalone test functions)
-- **Benchmark:** has `#[BenchWith]` attribute
+- **Method:** public + name starts with `test`, OR has any `TEST_ATTRIBUTES` / `TEST_INLINE_ATTRIBUTES`
+- **Function:** has any `TEST_ATTRIBUTES` / `TEST_INLINE_ATTRIBUTES` (standalone test functions)
+- **Benchmark:** has any `BENCH_ATTRIBUTES`
 - **Class:** name ends with `Test` or `TestBase`, OR contains test/bench methods
 - **File:** filename matches test class pattern, OR contains test classes/functions/benchmarks
 
