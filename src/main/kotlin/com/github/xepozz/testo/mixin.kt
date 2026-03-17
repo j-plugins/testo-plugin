@@ -8,6 +8,8 @@ import com.jetbrains.php.lang.psi.PhpFile
 import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
+import com.jetbrains.php.lang.psi.elements.ClassReference
+import com.jetbrains.php.lang.psi.elements.NewExpression
 import com.jetbrains.php.lang.psi.elements.PhpClass
 
 fun PsiElement.isTestoExecutable() = isTestoFunction() || isTestoMethod() || isTestoBench()
@@ -42,9 +44,12 @@ fun PsiElement.isTestoClass() = when (this) {
 }
 
 fun PsiFile.isTestoFile() = when (this) {
-    is PhpFile -> TestoTestDescriptor.isTestClassName(name.substringBeforeLast(".")) || (isTestoClassFile() || isTestoFunctionFile() || isTestBenchFile())
+    is PhpFile -> TestoTestDescriptor.isTestClassName(name.substringBeforeLast(".")) || isTestoClassFile() || isTestoFunctionFile() || isTestBenchFile() || isTestoConfigFile()
     else -> false
 }
+
+fun PhpFile.isTestoConfigFile() = PsiTreeUtil.findChildrenOfType(this, ClassReference::class.java)
+    .any { it.parent is NewExpression && it.fqn == TestoClasses.APPLICATION_CONFIG }
 
 fun PhpFile.isTestoClassFile() = PsiTreeUtil.findChildrenOfType(this, PhpClass::class.java)
     .any { it.isTestoClass() }

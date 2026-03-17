@@ -20,6 +20,7 @@ import com.jetbrains.php.lang.lexer.PhpTokenTypes
 import com.jetbrains.php.lang.psi.PhpPsiUtil
 import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.Method
+import com.jetbrains.php.lang.psi.elements.NewExpression
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
 import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
@@ -49,7 +50,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
         val element = leaf.parent as? PhpPsiElement ?: return null
 
         return when {
-            element is ClassReference && element.fqn == TestoClasses.APPLICATION_CONFIG -> {
+            element is ClassReference && element.parent is NewExpression && element.fqn == TestoClasses.APPLICATION_CONFIG -> {
                 getLocationHint(element.containingFile)
             }
 
