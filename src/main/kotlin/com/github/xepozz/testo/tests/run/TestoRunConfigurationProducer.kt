@@ -33,6 +33,7 @@ import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.PhpIndex
 import com.jetbrains.php.PhpIndexImpl
 import com.jetbrains.php.lang.psi.PhpFile
+import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
@@ -62,6 +63,12 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     ): PsiElement? {
         val testRunnerSettings = testRunnerSettings as TestoRunnerSettings
 
+        if (element is ClassReference && element.fqn == TestoClasses.APPLICATION_CONFIG) {
+            testRunnerSettings.scope = PhpTestRunnerSettings.Scope.ConfigurationFile
+            testRunnerSettings.isUseAlternativeConfigurationFile = true
+            testRunnerSettings.configurationFilePath = virtualFile.path
+            return element
+        }
         if (element is PhpAttribute) {
             val function = element.owner as? Function ?: return null
             setupConfiguration(testRunnerSettings, function, element.containingFile.virtualFile) ?: return null
@@ -127,6 +134,10 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         testRunnerSettings: PhpTestRunnerSettings,
         element: PsiElement
     ): Boolean {
+        if (element is ClassReference && element.fqn == TestoClasses.APPLICATION_CONFIG) {
+            return testRunnerSettings.scope == PhpTestRunnerSettings.Scope.ConfigurationFile
+                && testRunnerSettings.configurationFilePath == element.containingFile.virtualFile.path
+        }
         if (element is PhpClass) {
             return when {
                 testRunnerSettings.scope != PhpTestRunnerSettings.Scope.File -> false
@@ -273,6 +284,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     }
 
     private fun findTestElement(target: PsiElement?): PsiElement? = when (target) {
+        is ClassReference -> target.takeIf { it.fqn == TestoClasses.APPLICATION_CONFIG }
         is PhpAttribute -> target.takeIf { it.owner.isTestoExecutable() || it.owner.isTestoDataProviderLike() }
         is Function -> target.takeIf { it.isTestoExecutable() || it.isTestoDataProviderLike() }
         is PhpClass -> target.takeIf { it.isTestoClass() }

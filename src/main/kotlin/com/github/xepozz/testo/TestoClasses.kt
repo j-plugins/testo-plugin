@@ -12,6 +12,8 @@ object TestoClasses {
 
     const val BENCH = "\\Testo\\Bench"
 
+    const val APPLICATION_CONFIG = "\\Testo\\Application\\Config\\ApplicationConfig"
+
     const val ASSERT = "\\Testo\\Assert"
     const val ASSERTION_EXCEPTION = "\\Testo\\Assert\\State\\Assertion\\AssertionException"
     const val EXPECT = "\\Testo\\Expect"

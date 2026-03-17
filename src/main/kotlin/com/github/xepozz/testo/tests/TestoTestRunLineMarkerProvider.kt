@@ -49,6 +49,10 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
         val element = leaf.parent as? PhpPsiElement ?: return null
 
         return when {
+            element is ClassReference && element.fqn == TestoClasses.APPLICATION_CONFIG -> {
+                getLocationHint(element.containingFile)
+            }
+
             element is ClassReference && element.parent is PhpAttribute -> {
                 val attribute = element.parent as PhpAttribute
                 if (attribute.fqn !in RUNNABLE_ATTRIBUTES) return null
