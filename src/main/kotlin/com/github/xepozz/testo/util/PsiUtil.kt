@@ -15,15 +15,19 @@ object PsiUtil {
 
     val ATTRIBUTE_GROUPS: Array<Array<String>> = arrayOf(
         TestoClasses.DATA_ATTRIBUTES,
-        TestoClasses.TEST_INLINE_ATTRIBUTES,
-        TestoClasses.BENCH_ATTRIBUTES,
     )
 
-    fun getAttributeGroup(fqn: String?): Array<String>? =
-        ATTRIBUTE_GROUPS.firstOrNull { fqn in it }
+    fun getAttributeGroup(fqn: String?): Array<String>? {
+        if (fqn == null) return null
+        val group = ATTRIBUTE_GROUPS.firstOrNull { fqn in it }
+        if (group != null) return group
+        if (fqn in MEANINGFUL_ATTRIBUTES && fqn != TestoClasses.TEST) return arrayOf(fqn)
+        return null
+    }
 
     fun getAttributeOrder(attribute: PhpAttribute, owner: PhpAttributesOwner): Int {
-        val group = getAttributeGroup(attribute.fqn) ?: return -1
+        val fqn = attribute.fqn ?: return -1
+        val group = getAttributeGroup(fqn) ?: return -1
         return owner.attributes
             .filter { it.fqn in group }
             .indexOf(attribute)
