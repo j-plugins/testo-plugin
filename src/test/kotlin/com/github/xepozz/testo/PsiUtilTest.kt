@@ -35,49 +35,42 @@ class PsiUtilTest : TestCase() {
 
     fun testGetAttributeGroup_dataProviderInDataGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.DATA_PROVIDER)
-        assertNotNull("DataProvider should have a group", group)
         assertSame(TestoClasses.DATA_ATTRIBUTES, group)
     }
 
     fun testGetAttributeGroup_dataSetInDataGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.DATA_SET)
-        assertNotNull("DataSet should have a group", group)
         assertSame(TestoClasses.DATA_ATTRIBUTES, group)
     }
 
     fun testGetAttributeGroup_dataUnionInDataGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.DATA_UNION)
-        assertNotNull("DataUnion should have a group", group)
         assertSame(TestoClasses.DATA_ATTRIBUTES, group)
     }
 
     fun testGetAttributeGroup_dataCrossInDataGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.DATA_CROSS)
-        assertNotNull("DataCross should have a group", group)
         assertSame(TestoClasses.DATA_ATTRIBUTES, group)
     }
 
     fun testGetAttributeGroup_dataZipInDataGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.DATA_ZIP)
-        assertNotNull("DataZip should have a group", group)
         assertSame(TestoClasses.DATA_ATTRIBUTES, group)
     }
 
-    fun testGetAttributeGroup_testInlineHasGroup() {
+    fun testGetAttributeGroup_testInlineInInlineGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.TEST_INLINE)
-        assertNotNull("TestInline should have a group", group)
-        assertTrue(group!!.contains(TestoClasses.TEST_INLINE))
+        assertSame(TestoClasses.TEST_INLINE_ATTRIBUTES, group)
     }
 
-    fun testGetAttributeGroup_benchHasGroup() {
+    fun testGetAttributeGroup_benchInBenchGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.BENCH)
-        assertNotNull("Bench should have a group", group)
-        assertTrue(group!!.contains(TestoClasses.BENCH))
+        assertSame(TestoClasses.BENCH_ATTRIBUTES, group)
     }
 
     fun testGetAttributeGroup_testHasNoGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.TEST)
-        assertNull("Plain Test attribute should not have a numbered group", group)
+        assertNull("Test attribute is a marker, not numbered", group)
     }
 
     fun testGetAttributeGroup_nullReturnsNull() {
@@ -88,26 +81,7 @@ class PsiUtilTest : TestCase() {
         assertNull(PsiUtil.getAttributeGroup("\\Some\\Unknown\\Attribute"))
     }
 
-    fun testGetAttributeGroup_allDataAttributesShareSameGroup() {
-        val groups = TestoClasses.DATA_ATTRIBUTES.map { PsiUtil.getAttributeGroup(it) }
-        val first = groups.first()
-        for (group in groups) {
-            assertSame("All data attributes should share the same group instance", first, group)
-        }
-    }
-
-    fun testGetAttributeGroup_inlineAndBenchAreSeparateGroups() {
-        val inlineGroup = PsiUtil.getAttributeGroup(TestoClasses.TEST_INLINE)
-        val benchGroup = PsiUtil.getAttributeGroup(TestoClasses.BENCH)
-        assertNotNull(inlineGroup)
-        assertNotNull(benchGroup)
-        assertFalse(
-            "Inline and bench groups should not overlap",
-            inlineGroup!!.toSet().intersect(benchGroup!!.toSet()).isNotEmpty()
-        )
-    }
-
-    fun testAttributeGroups_allExplicitGroupsAreInMeaningful() {
+    fun testAttributeGroups_allGroupedAttributesAreInMeaningful() {
         val meaningful = PsiUtil.MEANINGFUL_ATTRIBUTES.toSet()
         for (group in PsiUtil.ATTRIBUTE_GROUPS) {
             for (attr in group) {
@@ -116,7 +90,7 @@ class PsiUtilTest : TestCase() {
         }
     }
 
-    fun testAttributeGroups_noOverlapBetweenExplicitGroups() {
+    fun testAttributeGroups_noOverlapBetweenGroups() {
         val groups = PsiUtil.ATTRIBUTE_GROUPS
         for (i in groups.indices) {
             for (j in i + 1 until groups.size) {
@@ -124,5 +98,13 @@ class PsiUtilTest : TestCase() {
                 assertTrue("Groups $i and $j should not overlap, but share: $overlap", overlap.isEmpty())
             }
         }
+    }
+
+    fun testAttributeGroups_totalCount() {
+        val totalGrouped = PsiUtil.ATTRIBUTE_GROUPS.sumOf { it.size }
+        val expectedGrouped = TestoClasses.DATA_ATTRIBUTES.size +
+                TestoClasses.TEST_INLINE_ATTRIBUTES.size +
+                TestoClasses.BENCH_ATTRIBUTES.size
+        assertEquals(expectedGrouped, totalGrouped)
     }
 }

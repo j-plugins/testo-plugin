@@ -96,7 +96,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 
     companion object Companion {
         val RUNNABLE_ATTRIBUTES = arrayOf(
-            TestoClasses.TEST_INLINE,
+            *TestoClasses.TEST_ATTRIBUTES,
             *TestoClasses.BENCH_ATTRIBUTES,
             *TestoClasses.DATA_ATTRIBUTES,
         )
