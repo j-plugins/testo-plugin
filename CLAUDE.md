@@ -144,7 +144,6 @@ The plugin recognizes PHP attributes defined in `TestoClasses.kt`. Constants are
 | Group (array)            | Attributes (FQN)                                                                  |
 |--------------------------|-----------------------------------------------------------------------------------|
 | `TEST_ATTRIBUTES`        | `\Testo\Test`, `\Testo\Inline\TestInline`                                        |
-| `TEST_INLINE_ATTRIBUTES` | `\Testo\Inline\TestInline`                                                        |
 | `DATA_ATTRIBUTES`        | `\Testo\Data\DataProvider`, `\Testo\Data\DataSet`, `\Testo\Data\DataUnion`, `\Testo\Data\DataCross`, `\Testo\Data\DataZip` |
 | `BENCH_ATTRIBUTES`       | `\Testo\Bench`                                                                    |
 
@@ -154,13 +153,13 @@ These arrays are spread into `RUNNABLE_ATTRIBUTES` (line markers) and `MEANINGFU
 
 ### Attribute Group Numbering
 
-Attributes on a function/method are numbered **within their own group**, not globally. Each group has independent 0-based indexing. The groups are defined in `PsiUtil.ATTRIBUTE_GROUPS`:
+Attributes on a function/method are numbered **within their own group**, not globally. Each group has independent 0-based indexing:
 
-| Group             | Source array              | Used for                                      |
-|-------------------|---------------------------|-----------------------------------------------|
-| test data         | `DATA_ATTRIBUTES`         | Data providers for `#[Test]` methods          |
-| inline            | `TEST_INLINE_ATTRIBUTES`  | Inline test cases (`#[TestInline]`)           |
-| bench             | `BENCH_ATTRIBUTES`        | Benchmark data (`#[Bench]`)                   |
+- **test data** group: all `DATA_ATTRIBUTES` (DataProvider, DataSet, DataUnion, DataCross, DataZip) share one group — numbered together
+- **inline** group: each `TestInline` is numbered among other `TestInline` attributes (same FQN)
+- **bench** group: each `Bench` is numbered among other `Bench` attributes (same FQN)
+
+Explicit multi-attribute groups are defined in `PsiUtil.ATTRIBUTE_GROUPS` (currently only `DATA_ATTRIBUTES`). All other meaningful attributes (except `Test`) are grouped by their own FQN — attributes with the same FQN form a group automatically.
 
 The `#[Test]` attribute itself is **not numbered** — it is a marker only. The method/function name already gets its own gutter line marker.
 
@@ -178,13 +177,13 @@ Example for a function `foo` with multiple attributes:
 #[Bench(...)]           → type=bench, foo:1
 ```
 
-`RUNNABLE_ATTRIBUTES` (used for gutter line markers) contains `TEST_INLINE_ATTRIBUTES + BENCH_ATTRIBUTES + DATA_ATTRIBUTES` — it does **not** include `Test` since the method already gets a run marker via `getLocationInfo`.
+`RUNNABLE_ATTRIBUTES` (used for gutter line markers) contains `TestInline + BENCH_ATTRIBUTES + DATA_ATTRIBUTES` — it does **not** include `Test` since the method already gets a run marker via `getLocationInfo`.
 
 ### Test Detection Logic (mixin.kt)
 
 A PHP element is recognized as a Testo test when:
-- **Method:** public + name starts with `test`, OR has any `TEST_ATTRIBUTES` / `TEST_INLINE_ATTRIBUTES`
-- **Function:** has any `TEST_ATTRIBUTES` / `TEST_INLINE_ATTRIBUTES` (standalone test functions)
+- **Method:** public + name starts with `test`, OR has any `TEST_ATTRIBUTES`
+- **Function:** has any `TEST_ATTRIBUTES` (standalone test functions)
 - **Benchmark:** has any `BENCH_ATTRIBUTES`
 - **Class:** name ends with `Test` or `TestBase`, OR contains test/bench methods
 - **File:** filename matches test class pattern, OR contains test classes/functions/benchmarks
