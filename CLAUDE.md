@@ -141,11 +141,12 @@ The plugin registers extensions in `plugin.xml` under two namespaces:
 
 The plugin recognizes PHP attributes defined in `TestoClasses.kt`. Constants are grouped into arrays for reuse across the codebase:
 
-| Group (array)            | Attributes (FQN)                                                                  |
-|--------------------------|-----------------------------------------------------------------------------------|
-| `TEST_ATTRIBUTES`        | `\Testo\Test`, `\Testo\Inline\TestInline`                                        |
-| `DATA_ATTRIBUTES`        | `\Testo\Data\DataProvider`, `\Testo\Data\DataSet`, `\Testo\Data\DataUnion`, `\Testo\Data\DataCross`, `\Testo\Data\DataZip` |
-| `BENCH_ATTRIBUTES`       | `\Testo\Bench`                                                                    |
+| Group (array)              | Attributes (FQN)                                                                  |
+|----------------------------|-----------------------------------------------------------------------------------|
+| `TEST_ATTRIBUTES`          | `\Testo\Test`, `\Testo\Inline\TestInline`                                        |
+| `TEST_INLINE_ATTRIBUTES`  | `\Testo\Inline\TestInline`                                                        |
+| `DATA_ATTRIBUTES`          | `\Testo\Data\DataProvider`, `\Testo\Data\DataSet`, `\Testo\Data\DataUnion`, `\Testo\Data\DataCross`, `\Testo\Data\DataZip` |
+| `BENCH_ATTRIBUTES`         | `\Testo\Bench`                                                                    |
 
 Other constants: `ASSERT` (`\Testo\Assert`), `EXPECT` (`\Testo\Expect`), `ASSERTION_EXCEPTION`.
 
@@ -153,13 +154,15 @@ These arrays are spread into `RUNNABLE_ATTRIBUTES` (line markers) and `MEANINGFU
 
 ### Attribute Group Numbering
 
-Attributes on a function/method are numbered **within their own group**, not globally. Each group has independent 0-based indexing:
+Attributes on a function/method are numbered **within their own group**, not globally. Each group has independent 0-based indexing. The groups are defined in `PsiUtil.ATTRIBUTE_GROUPS`:
 
-- **test data** group: all `DATA_ATTRIBUTES` (DataProvider, DataSet, DataUnion, DataCross, DataZip) share one group — numbered together
-- **inline** group: each `TestInline` is numbered among other `TestInline` attributes (same FQN)
-- **bench** group: each `Bench` is numbered among other `Bench` attributes (same FQN)
+| Group             | Source array              | Used for                                      |
+|-------------------|---------------------------|-----------------------------------------------|
+| test data         | `DATA_ATTRIBUTES`         | Data providers for `#[Test]` methods          |
+| inline            | `TEST_INLINE_ATTRIBUTES`  | Inline test cases (`#[TestInline]`)           |
+| bench             | `BENCH_ATTRIBUTES`        | Benchmark data (`#[Bench]`)                   |
 
-Explicit multi-attribute groups are defined in `PsiUtil.ATTRIBUTE_GROUPS` (currently only `DATA_ATTRIBUTES`). All other meaningful attributes (except `Test`) are grouped by their own FQN — attributes with the same FQN form a group automatically.
+The `#[Test]` attribute itself is **not numbered** — it is a marker only. The method/function name already gets its own gutter line marker. `Test` IS included in `RUNNABLE_ATTRIBUTES` (it's runnable), but `getAttributeOrder` returns `-1` for it, and the line marker falls back to `getLocationInfo`.
 
 The `#[Test]` attribute itself is **not numbered** — it is a marker only. The method/function name already gets its own gutter line marker.
 
@@ -177,7 +180,7 @@ Example for a function `foo` with multiple attributes:
 #[Bench(...)]           → type=bench, foo:1
 ```
 
-`RUNNABLE_ATTRIBUTES` (used for gutter line markers) contains `TestInline + BENCH_ATTRIBUTES + DATA_ATTRIBUTES` — it does **not** include `Test` since the method already gets a run marker via `getLocationInfo`.
+`RUNNABLE_ATTRIBUTES` (used for gutter line markers) contains `TEST_ATTRIBUTES + BENCH_ATTRIBUTES + DATA_ATTRIBUTES`.
 
 ### Test Detection Logic (mixin.kt)
 
