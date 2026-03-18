@@ -33,10 +33,6 @@ object TestoClasses {
     val TEST_INLINE_ATTRIBUTES = arrayOf(
         TEST_INLINE,
     )
-    val TEST_DATA_ATTRIBUTES = arrayOf(
-        TEST,
-        *DATA_ATTRIBUTES,
-    )
     val BENCH_ATTRIBUTES = arrayOf(
         BENCH,
     )
