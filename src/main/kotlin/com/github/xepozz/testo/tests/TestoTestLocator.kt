@@ -54,7 +54,7 @@ class TestoTestLocator(pathMapper: PhpPathMapper) :
      * - path/to/file.php::\Full\Qualified\ClassName::methodName
      * - path/to/file.php::\Full\Qualified\FunctionName
      */
-    override fun getLocationInfo(link: String): LocationInfo? {
+    public override fun getLocationInfo(link: String): LocationInfo? {
         val locations = link.split("::").dropLastWhile { it.isEmpty() }
 //        println("locations: $locations, link: $link")
 
