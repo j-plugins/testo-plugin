@@ -158,17 +158,19 @@ Attributes on a function/method are numbered **within their own group**, not glo
 
 | Group             | Source array              | Used for                                      |
 |-------------------|---------------------------|-----------------------------------------------|
-| test + data       | `TEST_DATA_ATTRIBUTES`    | `#[Test]` + data providers, numbered together |
+| data              | `DATA_ATTRIBUTES`         | Data providers, numbered together             |
 | inline            | `TEST_INLINE_ATTRIBUTES`  | Inline test cases (`#[TestInline]`)           |
 | bench             | `BENCH_ATTRIBUTES`        | Benchmark data (`#[Bench]`)                   |
 
+`#[Test]` is **not numbered** — it is runnable (in `RUNNABLE_ATTRIBUTES`) but has no index. It runs the test with `--type=test`.
+
 Example for a function `foo` with multiple attributes:
 ```
-#[Test]                 → type=test, foo:0
-#[DataProvider(...)]    → type=test, foo:1
-#[DataSet([...])]       → type=test, foo:2
-#[DataZip(...)]         → type=test, foo:3
-#[DataCross(...)]       → type=test, foo:4
+#[Test]                 → runnable, no index (--type=test)
+#[DataProvider(...)]    → type=test, foo:0
+#[DataSet([...])]       → type=test, foo:1
+#[DataZip(...)]         → type=test, foo:2
+#[DataCross(...)]       → type=test, foo:3
 #[TestInline(...)]      → type=inline, foo:0
 #[TestInline(...)]      → type=inline, foo:1
 #[TestInline(...)]      → type=inline, foo:2
