@@ -158,21 +158,17 @@ Attributes on a function/method are numbered **within their own group**, not glo
 
 | Group             | Source array              | Used for                                      |
 |-------------------|---------------------------|-----------------------------------------------|
-| test data         | `DATA_ATTRIBUTES`         | Data providers for `#[Test]` methods          |
+| test + data       | `TEST_DATA_ATTRIBUTES`    | `#[Test]` + data providers, numbered together |
 | inline            | `TEST_INLINE_ATTRIBUTES`  | Inline test cases (`#[TestInline]`)           |
 | bench             | `BENCH_ATTRIBUTES`        | Benchmark data (`#[Bench]`)                   |
 
-The `#[Test]` attribute itself is **not numbered** — it is a marker only. The method/function name already gets its own gutter line marker. `Test` IS included in `RUNNABLE_ATTRIBUTES` (it's runnable), but `getAttributeOrder` returns `-1` for it, and the line marker falls back to `getLocationInfo`.
-
-The `#[Test]` attribute itself is **not numbered** — it is a marker only. The method/function name already gets its own gutter line marker.
-
 Example for a function `foo` with multiple attributes:
 ```
-#[Test]                 → type=test (no index, marker only)
-#[DataProvider(...)]    → type=test, foo:0
-#[DataSet([...])]       → type=test, foo:1
-#[DataZip(...)]         → type=test, foo:2
-#[DataCross(...)]       → type=test, foo:3
+#[Test]                 → type=test, foo:0
+#[DataProvider(...)]    → type=test, foo:1
+#[DataSet([...])]       → type=test, foo:2
+#[DataZip(...)]         → type=test, foo:3
+#[DataCross(...)]       → type=test, foo:4
 #[TestInline(...)]      → type=inline, foo:0
 #[TestInline(...)]      → type=inline, foo:1
 #[TestInline(...)]      → type=inline, foo:2
