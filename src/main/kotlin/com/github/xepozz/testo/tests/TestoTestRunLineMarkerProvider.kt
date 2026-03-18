@@ -64,8 +64,8 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 
                 val attributesOwner = attribute.owner as PhpAttributesOwner
                 val index = PsiUtil.getAttributeOrder(attribute, attributesOwner)
-
-                getInlineTestLocationHint(attributesOwner, index)
+                if (index < 0) getLocationInfo(attributesOwner)
+                else getInlineTestLocationHint(attributesOwner, index)
             }
 
             element is PhpNamedElement -> {
@@ -96,7 +96,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 
     companion object Companion {
         val RUNNABLE_ATTRIBUTES = arrayOf(
-            *TestoClasses.TEST_ATTRIBUTES,
+            *TestoClasses.TEST_INLINE_ATTRIBUTES,
             *TestoClasses.BENCH_ATTRIBUTES,
             *TestoClasses.DATA_ATTRIBUTES,
         )
