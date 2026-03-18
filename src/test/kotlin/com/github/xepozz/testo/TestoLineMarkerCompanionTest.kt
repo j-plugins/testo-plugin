@@ -21,19 +21,24 @@ class TestoLineMarkerCompanionTest : TestCase() {
 
     fun testRunnableAttributes_containsBenchAttribute() {
         val runnable = TestoTestRunLineMarkerProvider.RUNNABLE_ATTRIBUTES.toSet()
-        assertTrue("Should contain \\Testo\\Bench\\Bench", runnable.contains(TestoClasses.BENCH))
+        assertTrue("Should contain \\Testo\\Bench", runnable.contains(TestoClasses.BENCH))
     }
 
-    fun testRunnableAttributes_doesNotContainPlainTestAttributes() {
+    fun testRunnableAttributes_containsTestInlineAttributes() {
         val runnable = TestoTestRunLineMarkerProvider.RUNNABLE_ATTRIBUTES.toSet()
-        for (attr in TestoClasses.TEST_ATTRIBUTES) {
-            assertFalse("Should not contain plain test attribute: $attr", runnable.contains(attr))
+        for (attr in TestoClasses.TEST_INLINE_ATTRIBUTES) {
+            assertTrue("Missing test inline attribute: $attr", runnable.contains(attr))
         }
+    }
+
+    fun testRunnableAttributes_doesNotContainPlainTestAttribute() {
+        val runnable = TestoTestRunLineMarkerProvider.RUNNABLE_ATTRIBUTES.toSet()
+        assertFalse("Should not contain plain Test attribute", runnable.contains(TestoClasses.TEST))
     }
 
     fun testRunnableAttributes_totalCount() {
         val expected = TestoClasses.DATA_ATTRIBUTES.size +
-                TestoClasses.TEST_ATTRIBUTES.size +
+                TestoClasses.TEST_INLINE_ATTRIBUTES.size +
                 TestoClasses.BENCH_ATTRIBUTES.size
         assertEquals(expected, TestoTestRunLineMarkerProvider.RUNNABLE_ATTRIBUTES.size)
     }

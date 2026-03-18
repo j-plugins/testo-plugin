@@ -13,10 +13,21 @@ object PsiUtil {
         *TestoClasses.BENCH_ATTRIBUTES,
     )
 
-    fun getAttributeOrder(attribute: PhpAttribute, owner: PhpAttributesOwner): Int = owner
-        .attributes
-        .filter { it.fqn in MEANINGFUL_ATTRIBUTES }
-        .indexOf(attribute)
+    val ATTRIBUTE_GROUPS: Array<Array<String>> = arrayOf(
+        TestoClasses.DATA_ATTRIBUTES,
+        TestoClasses.TEST_INLINE_ATTRIBUTES,
+        TestoClasses.BENCH_ATTRIBUTES,
+    )
+
+    fun getAttributeGroup(fqn: String?): Array<String>? =
+        ATTRIBUTE_GROUPS.firstOrNull { fqn in it }
+
+    fun getAttributeOrder(attribute: PhpAttribute, owner: PhpAttributesOwner): Int {
+        val group = getAttributeGroup(attribute.fqn) ?: return -1
+        return owner.attributes
+            .filter { it.fqn in group }
+            .indexOf(attribute)
+    }
 
     fun getExitStatementOrder(element: PsiElement, function: Function): Int = ExitStatementsVisitor(element)
         .apply { function.accept(this) }

@@ -141,16 +141,44 @@ The plugin registers extensions in `plugin.xml` under two namespaces:
 
 The plugin recognizes PHP attributes defined in `TestoClasses.kt`. Constants are grouped into arrays for reuse across the codebase:
 
-| Group (array)          | Attributes (FQN)                                                                                      |
-|------------------------|-------------------------------------------------------------------------------------------------------|
-| `TEST_ATTRIBUTES`      | `\Testo\Attribute\Test` (new), `\Testo\Application\Attribute\Test` (old)                             |
-| `TEST_INLINE_ATTRIBUTES` | `\Testo\Sample\TestInline` (old), `\Testo\Inline\TestInline` (new)                                 |
-| `DATA_ATTRIBUTES`      | `\Testo\Sample\DataProvider`, `\Testo\Data\DataProvider`, `\Testo\Sample\DataSet`, `\Testo\Data\DataSet`, `\Testo\Data\DataUnion`, `\Testo\Data\DataCross`, `\Testo\Data\DataZip` |
-| `BENCH_ATTRIBUTES`     | `\Testo\Bench\BenchWith`                                                                              |
+| Group (array)            | Attributes (FQN)                                                                  |
+|--------------------------|-----------------------------------------------------------------------------------|
+| `TEST_ATTRIBUTES`        | `\Testo\Test`, `\Testo\Inline\TestInline`                                        |
+| `TEST_INLINE_ATTRIBUTES` | `\Testo\Inline\TestInline`                                                        |
+| `DATA_ATTRIBUTES`        | `\Testo\Data\DataProvider`, `\Testo\Data\DataSet`, `\Testo\Data\DataUnion`, `\Testo\Data\DataCross`, `\Testo\Data\DataZip` |
+| `BENCH_ATTRIBUTES`       | `\Testo\Bench`                                                                    |
 
 Other constants: `ASSERT` (`\Testo\Assert`), `EXPECT` (`\Testo\Expect`), `ASSERTION_EXCEPTION`.
 
 These arrays are spread into `RUNNABLE_ATTRIBUTES` (line markers) and `MEANINGFUL_ATTRIBUTES` (PsiUtil) — adding a new attribute to the group array automatically propagates it everywhere.
+
+### Attribute Group Numbering
+
+Attributes on a function/method are numbered **within their own group**, not globally. Each group has independent 0-based indexing. The groups are defined in `PsiUtil.ATTRIBUTE_GROUPS`:
+
+| Group             | Source array              | Used for                                      |
+|-------------------|---------------------------|-----------------------------------------------|
+| test data         | `DATA_ATTRIBUTES`         | Data providers for `#[Test]` methods          |
+| inline            | `TEST_INLINE_ATTRIBUTES`  | Inline test cases (`#[TestInline]`)           |
+| bench             | `BENCH_ATTRIBUTES`        | Benchmark data (`#[Bench]`)                   |
+
+The `#[Test]` attribute itself is **not numbered** — it is a marker only. The method/function name already gets its own gutter line marker.
+
+Example for a function `foo` with multiple attributes:
+```
+#[Test]                 → type=test (no index, marker only)
+#[DataProvider(...)]    → type=test, foo:0
+#[DataSet([...])]       → type=test, foo:1
+#[DataZip(...)]         → type=test, foo:2
+#[DataCross(...)]       → type=test, foo:3
+#[TestInline(...)]      → type=inline, foo:0
+#[TestInline(...)]      → type=inline, foo:1
+#[TestInline(...)]      → type=inline, foo:2
+#[Bench(...)]           → type=bench, foo:0
+#[Bench(...)]           → type=bench, foo:1
+```
+
+`RUNNABLE_ATTRIBUTES` (used for gutter line markers) contains `TEST_INLINE_ATTRIBUTES + BENCH_ATTRIBUTES + DATA_ATTRIBUTES` — it does **not** include `Test` since the method already gets a run marker via `getLocationInfo`.
 
 ### Test Detection Logic (mixin.kt)
 
