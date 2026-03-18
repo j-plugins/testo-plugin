@@ -33,29 +33,34 @@ class PsiUtilTest : TestCase() {
 
     // --- Attribute group tests ---
 
-    fun testGetAttributeGroup_dataProviderInDataGroup() {
+    fun testGetAttributeGroup_testInTestDataGroup() {
+        val group = PsiUtil.getAttributeGroup(TestoClasses.TEST)
+        assertSame(TestoClasses.TEST_DATA_ATTRIBUTES, group)
+    }
+
+    fun testGetAttributeGroup_dataProviderInTestDataGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.DATA_PROVIDER)
-        assertSame(TestoClasses.DATA_ATTRIBUTES, group)
+        assertSame(TestoClasses.TEST_DATA_ATTRIBUTES, group)
     }
 
-    fun testGetAttributeGroup_dataSetInDataGroup() {
+    fun testGetAttributeGroup_dataSetInTestDataGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.DATA_SET)
-        assertSame(TestoClasses.DATA_ATTRIBUTES, group)
+        assertSame(TestoClasses.TEST_DATA_ATTRIBUTES, group)
     }
 
-    fun testGetAttributeGroup_dataUnionInDataGroup() {
+    fun testGetAttributeGroup_dataUnionInTestDataGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.DATA_UNION)
-        assertSame(TestoClasses.DATA_ATTRIBUTES, group)
+        assertSame(TestoClasses.TEST_DATA_ATTRIBUTES, group)
     }
 
-    fun testGetAttributeGroup_dataCrossInDataGroup() {
+    fun testGetAttributeGroup_dataCrossInTestDataGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.DATA_CROSS)
-        assertSame(TestoClasses.DATA_ATTRIBUTES, group)
+        assertSame(TestoClasses.TEST_DATA_ATTRIBUTES, group)
     }
 
-    fun testGetAttributeGroup_dataZipInDataGroup() {
+    fun testGetAttributeGroup_dataZipInTestDataGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.DATA_ZIP)
-        assertSame(TestoClasses.DATA_ATTRIBUTES, group)
+        assertSame(TestoClasses.TEST_DATA_ATTRIBUTES, group)
     }
 
     fun testGetAttributeGroup_testInlineInInlineGroup() {
@@ -66,11 +71,6 @@ class PsiUtilTest : TestCase() {
     fun testGetAttributeGroup_benchInBenchGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.BENCH)
         assertSame(TestoClasses.BENCH_ATTRIBUTES, group)
-    }
-
-    fun testGetAttributeGroup_testHasNoGroup() {
-        val group = PsiUtil.getAttributeGroup(TestoClasses.TEST)
-        assertNull("Test attribute is a marker, not numbered", group)
     }
 
     fun testGetAttributeGroup_nullReturnsNull() {
@@ -102,9 +102,18 @@ class PsiUtilTest : TestCase() {
 
     fun testAttributeGroups_totalCount() {
         val totalGrouped = PsiUtil.ATTRIBUTE_GROUPS.sumOf { it.size }
-        val expectedGrouped = TestoClasses.DATA_ATTRIBUTES.size +
+        val expectedGrouped = TestoClasses.TEST_DATA_ATTRIBUTES.size +
                 TestoClasses.TEST_INLINE_ATTRIBUTES.size +
                 TestoClasses.BENCH_ATTRIBUTES.size
         assertEquals(expectedGrouped, totalGrouped)
+    }
+
+    fun testTestDataAttributes_containsTestAndAllData() {
+        val testData = TestoClasses.TEST_DATA_ATTRIBUTES.toSet()
+        assertTrue(testData.contains(TestoClasses.TEST))
+        for (attr in TestoClasses.DATA_ATTRIBUTES) {
+            assertTrue("Missing: $attr", testData.contains(attr))
+        }
+        assertEquals(1 + TestoClasses.DATA_ATTRIBUTES.size, TestoClasses.TEST_DATA_ATTRIBUTES.size)
     }
 }
