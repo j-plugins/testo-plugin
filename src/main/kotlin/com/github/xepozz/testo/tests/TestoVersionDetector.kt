@@ -7,7 +7,7 @@ import com.jetbrains.php.PhpTestFrameworkVersionDetector
 object TestoVersionDetector : PhpTestFrameworkVersionDetector<String>() {
     override fun getPresentableName() = TestoBundle.message("testo.local.run.display.name")
 
-    override fun getVersionOptions() = arrayOf("--version", "--no-ansi")
+    public override fun getVersionOptions() = arrayOf("--version", "--no-ansi")
 
     public override fun parse(s: String): String {
         val version = s.substringAfter("Testo ")

@@ -20,6 +20,7 @@ import com.jetbrains.php.lang.lexer.PhpTokenTypes
 import com.jetbrains.php.lang.psi.PhpPsiUtil
 import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.Method
+import com.jetbrains.php.lang.psi.elements.NewExpression
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
 import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
@@ -49,14 +50,22 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
         val element = leaf.parent as? PhpPsiElement ?: return null
 
         return when {
+            element is ClassReference && element.parent is NewExpression && element.fqn == TestoClasses.APPLICATION_CONFIG -> {
+                getLocationHint(element.containingFile)
+            }
+
+            element is ClassReference && element.parent is NewExpression && element.fqn == TestoClasses.SUITE_CONFIG -> {
+                getLocationHint(element.containingFile)
+            }
+
             element is ClassReference && element.parent is PhpAttribute -> {
                 val attribute = element.parent as PhpAttribute
                 if (attribute.fqn !in RUNNABLE_ATTRIBUTES) return null
 
                 val attributesOwner = attribute.owner as PhpAttributesOwner
                 val index = PsiUtil.getAttributeOrder(attribute, attributesOwner)
-
-                getInlineTestLocationHint(attributesOwner, index)
+                if (index < 0) getLocationInfo(attributesOwner)
+                else getInlineTestLocationHint(attributesOwner, index)
             }
 
             element is PhpNamedElement -> {
@@ -87,9 +96,9 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 
     companion object Companion {
         val RUNNABLE_ATTRIBUTES = arrayOf(
-            *TestoClasses.DATA_ATTRIBUTES,
-            *TestoClasses.TEST_INLINE_ATTRIBUTES,
+            *TestoClasses.TEST_ATTRIBUTES,
             *TestoClasses.BENCH_ATTRIBUTES,
+            *TestoClasses.DATA_ATTRIBUTES,
         )
 
         fun getLocationHint(element: Function) = when (element) {

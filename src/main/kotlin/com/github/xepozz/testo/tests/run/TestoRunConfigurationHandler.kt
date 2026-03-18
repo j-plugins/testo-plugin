@@ -13,15 +13,49 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
     override fun getConfigFileOption() = "--config"
 
     override fun prepareCommand(project: Project, commandSettings: PhpCommandSettings, exe: String, version: String?) {
+        prepareCommand(project, commandSettings, exe, version, "run")
+    }
+
+    fun prepareCommand(
+        project: Project,
+        commandSettings: PhpCommandSettings,
+        exe: String,
+        version: String?,
+        command: String,
+    ) {
         commandSettings.apply {
             setScript(exe, true)
-            addArgument("run")
-//            addArgument("--no-progress")
-//            addArgument("-n")
-//            addArgument("-q")
-//            addArgument("--logger-gitlab=php://stdout")
+            addArgument(command)
         }
-//        println("commandSettings: $commandSettings")
+    }
+
+    fun prepareArguments(arguments: MutableList<String?>, testoSettings: TestoRunConfigurationSettings) {
+        val runner = testoSettings.runnerSettings
+
+        if (runner.testoType.isNotEmpty()) {
+            arguments.add("--type")
+            arguments.add(runner.testoType)
+        }
+        if (runner.suite.isNotEmpty()) {
+            arguments.add("--suite")
+            arguments.add(runner.suite)
+        }
+        if (runner.group.isNotEmpty()) {
+            arguments.add("--group")
+            arguments.add(runner.group)
+        }
+        if (runner.excludeGroup.isNotEmpty()) {
+            arguments.add("--exclude-group")
+            arguments.add(runner.excludeGroup)
+        }
+        if (runner.repeat > 0) {
+            arguments.add("--repeat")
+            arguments.add(runner.repeat.toString())
+        }
+        if (runner.parallel > 0) {
+            arguments.add("--parallel")
+            arguments.add(runner.parallel.toString())
+        }
     }
 
     override fun runType(
@@ -30,8 +64,6 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         type: String,
         workingDirectory: String
     ) {
-//        println("runType: $type, $workingDirectory")
-
         phpCommandSettings.apply {
             addArgument("--suite")
             addArgument(type)
@@ -44,7 +76,6 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         directory: String,
         workingDirectory: String
     ) {
-//        println("runDirectory: $directory")
         if (directory.isEmpty()) return
 
         phpCommandSettings.apply {
@@ -59,7 +90,6 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         file: String,
         workingDirectory: String
     ) {
-//        println("runFile: $file")
         if (file.isEmpty()) return
 
         phpCommandSettings.apply {
@@ -75,25 +105,32 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         methodName: String,
         workingDirectory: String
     ) {
-//        println("runMethod: $file, $methodName")
         if (file.isEmpty()) return
 
-        val myMethodName = methodName.substringBefore('#')
-        val dataProvider = methodName.substringAfter('#', "")
-
-//        println("method: $myMethodName, dataProvider: $dataProvider")
+        val parsed = parseMethodName(methodName)
 
         phpCommandSettings.apply {
             addArgument("--path")
             addRelativePathArgument(file, workingDirectory)
-            if (myMethodName.isNotEmpty()) {
+            if (parsed.method.isNotEmpty()) {
                 addArgument("--filter")
-                addArgument(myMethodName)
+                addArgument(parsed.method)
             }
-            if (dataProvider.isNotEmpty()) {
+            if (parsed.dataProvider.isNotEmpty()) {
                 addArgument("--data-provider")
-                addArgument(dataProvider)
+                addArgument(parsed.dataProvider)
             }
         }
+    }
+
+    data class ParsedMethodName(
+        val method: String,
+        val dataProvider: String,
+    )
+
+    fun parseMethodName(methodName: String): ParsedMethodName {
+        val method = methodName.substringBefore('#')
+        val dataProvider = methodName.substringAfter('#', "")
+        return ParsedMethodName(method, dataProvider)
     }
 }

@@ -1,11 +1,17 @@
 package com.github.xepozz.testo.tests.run
 
+import com.github.xepozz.testo.TestoClasses
 import com.github.xepozz.testo.TestoUtil
+import com.github.xepozz.testo.hasAttribute
 import com.github.xepozz.testo.index.TestoDataProviderUtils
+import com.github.xepozz.testo.isTestoBench
 import com.github.xepozz.testo.isTestoClass
 import com.github.xepozz.testo.isTestoDataProviderLike
 import com.github.xepozz.testo.isTestoExecutable
+import com.github.xepozz.testo.isTestoConfigFile
 import com.github.xepozz.testo.isTestoFile
+import com.github.xepozz.testo.isTestoFunction
+import com.github.xepozz.testo.isTestoMethod
 import com.github.xepozz.testo.util.PsiUtil
 import com.intellij.execution.Location
 import com.intellij.execution.PsiLocation
@@ -24,15 +30,19 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.impl.source.tree.LeafPsiElement
 import com.intellij.psi.util.parentOfType
 import com.intellij.util.Consumer
+import com.intellij.util.asSafely
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.PhpIndex
 import com.jetbrains.php.PhpIndexImpl
 import com.jetbrains.php.lang.psi.PhpFile
+import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
+import com.jetbrains.php.lang.psi.elements.NewExpression
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
 import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpNamedElement
+import com.jetbrains.php.lang.psi.elements.StringLiteralExpression
 import com.jetbrains.php.lang.psi.elements.PhpYield
 import com.jetbrains.php.phpunit.PhpMethodLocation
 import com.jetbrains.php.phpunit.PhpUnitRuntimeConfigurationProducer
@@ -57,6 +67,21 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     ): PsiElement? {
         val testRunnerSettings = testRunnerSettings as TestoRunnerSettings
 
+        if (element is ClassReference && element.parent is NewExpression && element.fqn == TestoClasses.APPLICATION_CONFIG) {
+            testRunnerSettings.scope = PhpTestRunnerSettings.Scope.ConfigurationFile
+            testRunnerSettings.isUseAlternativeConfigurationFile = true
+            testRunnerSettings.configurationFilePath = virtualFile.path
+            return element
+        }
+        if (element is ClassReference && element.parent is NewExpression && element.fqn == TestoClasses.SUITE_CONFIG) {
+            val newExpression = element.parent as NewExpression
+            val suiteName = extractSuiteName(newExpression) ?: return null
+            testRunnerSettings.scope = PhpTestRunnerSettings.Scope.ConfigurationFile
+            testRunnerSettings.isUseAlternativeConfigurationFile = true
+            testRunnerSettings.configurationFilePath = virtualFile.path
+            testRunnerSettings.suite = suiteName
+            return element
+        }
         if (element is PhpAttribute) {
             val function = element.owner as? Function ?: return null
             setupConfiguration(testRunnerSettings, function, element.containingFile.virtualFile) ?: return null
@@ -66,6 +91,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             testRunnerSettings.methodName += ":$index"
             testRunnerSettings.dataProviderIndex = index
             testRunnerSettings.dataSetIndex = -1
+            testRunnerSettings.testoType = resolveTestoType(element)
 
             return element
         }
@@ -113,13 +139,32 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 }
             }
         }
-        return super.setupConfiguration(testRunnerSettings, element, virtualFile)
+        if (element is PhpFile && element.isTestoConfigFile()) {
+            testRunnerSettings.scope = PhpTestRunnerSettings.Scope.ConfigurationFile
+            testRunnerSettings.isUseAlternativeConfigurationFile = true
+            testRunnerSettings.configurationFilePath = virtualFile.path
+            return element
+        }
+        val result = super.setupConfiguration(testRunnerSettings, element, virtualFile)
+        return result
     }
 
     override fun isConfigurationFromContext(
         testRunnerSettings: PhpTestRunnerSettings,
         element: PsiElement
     ): Boolean {
+        if (element is ClassReference && element.parent is NewExpression && element.fqn == TestoClasses.APPLICATION_CONFIG) {
+            return testRunnerSettings.scope == PhpTestRunnerSettings.Scope.ConfigurationFile
+                && testRunnerSettings.configurationFilePath == element.containingFile.virtualFile.path
+        }
+        if (element is ClassReference && element.parent is NewExpression && element.fqn == TestoClasses.SUITE_CONFIG) {
+            val testoSettings = testRunnerSettings as? TestoRunnerSettings ?: return false
+            val newExpression = element.parent as NewExpression
+            val suiteName = extractSuiteName(newExpression) ?: return false
+            return testoSettings.scope == PhpTestRunnerSettings.Scope.ConfigurationFile
+                && testoSettings.configurationFilePath == element.containingFile.virtualFile.path
+                && testoSettings.suite == suiteName
+        }
         if (element is PhpClass) {
             return when {
                 testRunnerSettings.scope != PhpTestRunnerSettings.Scope.File -> false
@@ -266,6 +311,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     }
 
     private fun findTestElement(target: PsiElement?): PsiElement? = when (target) {
+        is ClassReference -> target.takeIf { it.parent is NewExpression && (it.fqn == TestoClasses.APPLICATION_CONFIG || it.fqn == TestoClasses.SUITE_CONFIG) }
         is PhpAttribute -> target.takeIf { it.owner.isTestoExecutable() || it.owner.isTestoDataProviderLike() }
         is Function -> target.takeIf { it.isTestoExecutable() || it.isTestoDataProviderLike() }
         is PhpClass -> target.takeIf { it.isTestoClass() }
@@ -508,12 +554,43 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         }
     }
 
+    private fun extractSuiteName(newExpression: NewExpression): String? {
+        return newExpression
+            .parameters
+            .firstOrNull()
+            ?.asSafely<StringLiteralExpression>()
+            ?.contents
+    }
+
     private fun getContainingClass(location: Location<*>, method: Method) = when (location) {
         is PhpMethodLocation -> location.containingClass
         else -> method.containingClass
     }
 
     companion object Companion {
+        const val TEST_TYPE = "test"
+        const val INLINE_TYPE = "inline"
+        const val BENCH_TYPE = "bench"
+
+        fun resolveTestoType(element: PsiElement): String = when {
+            element is PhpAttribute -> resolveTestoTypeFromAttribute(element)
+            element.isTestoBench() -> BENCH_TYPE
+            element.isTestoFunction() && (element as Function).hasAttribute(TestoClasses.TEST_INLINE) -> INLINE_TYPE
+            element.isTestoMethod() || element.isTestoFunction() -> TEST_TYPE
+            else -> ""
+        }
+
+        private fun resolveTestoTypeFromAttribute(attribute: PhpAttribute): String {
+            val fqn = attribute.fqn ?: return ""
+            return when (fqn) {
+                in TestoClasses.BENCH_ATTRIBUTES -> BENCH_TYPE
+                TestoClasses.TEST_INLINE -> INLINE_TYPE
+                TestoClasses.TEST -> TEST_TYPE
+                in TestoClasses.DATA_ATTRIBUTES -> TEST_TYPE
+                else -> ""
+            }
+        }
+
         val METHOD = Condition<PsiElement> {
             it.isTestoExecutable() || (it is Method && TestoDataProviderUtils.isDataProvider(it))
         }
