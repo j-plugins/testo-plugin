@@ -54,22 +54,9 @@ class TestoRerunFailedTestsAction(
                             val clone = runConfiguration.clone() as TestoRunConfiguration
                             clone.settings.runnerSettings.filePath = ""
 
-                            val arguments = SmartList<String?>()
                             val failedTests = getFailedTests(project)
-                            val schemaPrefix = "${TestoFrameworkType.SCHEMA}://"
-                            for (test in failedTests) {
-                                val url = test.locationUrl ?: continue
-                                val location = url.removePrefix(schemaPrefix)
-                                // location format: path/to/file.php::\Class::method or path/to/file.php::\Function
-                                val parts = location.split("::")
-                                val filter = when (parts.size) {
-                                    3 -> "${parts[1]}::${parts[2]}" // \Class::method
-                                    2 -> parts[1]                    // \Function
-                                    else -> continue
-                                }
-                                arguments.add("--filter")
-                                arguments.add(filter)
-                            }
+                            val locationUrls = failedTests.mapNotNull { it.locationUrl }
+                            val arguments = buildFilterArguments(locationUrls)
 
                             val command = clone.createCommand(
                                 interpreter,
@@ -92,5 +79,28 @@ class TestoRerunFailedTestsAction(
 
     companion object {
         private val LOG = Logger.getInstance(TestoRerunFailedTestsAction::class.java)
+        private val SCHEMA_PREFIX = "${TestoFrameworkType.SCHEMA}://"
+
+        fun buildFilterArguments(locationUrls: List<String>): SmartList<String?> {
+            val arguments = SmartList<String?>()
+            for (url in locationUrls) {
+                val filter = extractFilter(url) ?: continue
+                arguments.add("--filter")
+                arguments.add(filter)
+            }
+            return arguments
+        }
+
+        fun extractFilter(locationUrl: String): String? {
+            val location = locationUrl.removePrefix(SCHEMA_PREFIX)
+            // location format: path/to/file.php::\Class::method
+            val parts = location.split("::")
+            // only method-level: file::\Class::method (3 parts)
+            if (parts.size != 3) return null
+            val className = parts[1]
+            val methodName = parts[2]
+            if (className.isEmpty() || methodName.isEmpty()) return null
+            return "$className::$methodName"
+        }
     }
 }
