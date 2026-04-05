@@ -53,10 +53,23 @@ class TestoRerunFailedTestsAction(
                         if (frameworkConfiguration != null) {
                             val clone = runConfiguration.clone() as TestoRunConfiguration
                             clone.settings.runnerSettings.filePath = ""
+
+                            val arguments = SmartList<String?>()
+                            val failedTests = getFailedTests(project)
+                            val schemaPrefix = "${TestoFrameworkType.SCHEMA}://"
+                            for (test in failedTests) {
+                                val url = test.locationUrl ?: continue
+                                val location = url.removePrefix(schemaPrefix)
+                                if (location.isNotEmpty()) {
+                                    arguments.add("--location")
+                                    arguments.add(location)
+                                }
+                            }
+
                             val command = clone.createCommand(
                                 interpreter,
                                 mutableMapOf(),
-                                SmartList(mutableListOf("-g", "failed")),
+                                arguments,
                                 frameworkConfiguration,
                                 false,
                             )
