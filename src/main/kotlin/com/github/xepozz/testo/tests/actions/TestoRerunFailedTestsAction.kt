@@ -60,10 +60,15 @@ class TestoRerunFailedTestsAction(
                             for (test in failedTests) {
                                 val url = test.locationUrl ?: continue
                                 val location = url.removePrefix(schemaPrefix)
-                                if (location.isNotEmpty()) {
-                                    arguments.add("--location")
-                                    arguments.add(location)
+                                // location format: path/to/file.php::\Class::method or path/to/file.php::\Function
+                                val parts = location.split("::")
+                                val filter = when (parts.size) {
+                                    3 -> "${parts[1]}::${parts[2]}" // \Class::method
+                                    2 -> parts[1]                    // \Function
+                                    else -> continue
                                 }
+                                arguments.add("--filter")
+                                arguments.add(filter)
                             }
 
                             val command = clone.createCommand(
