@@ -24,9 +24,18 @@ fun PsiElement.isTestoFunction() = when(this) {
     else -> false
 }
 
-fun PsiElement.isTestoMethod() = when(this) {
-    is Method -> (modifier.isPublic && name.startsWith("test")) || hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
+fun PsiElement.isTestoMethod() = when (this) {
+    is Method -> hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
+            || (modifier.isPublic && name.startsWith("test"))
+            || isPublicMethodOfTestoMarkedClass()
     else -> false
+}
+
+private fun Method.isPublicMethodOfTestoMarkedClass() = when {
+    !modifier.isPublic -> false
+    modifier.isAbstract -> false
+    name.startsWith("__") -> false
+    else -> containingClass?.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES) == true
 }
 
 fun PsiElement.isTestoDataProviderLike() = when (this) {
@@ -39,7 +48,9 @@ fun PhpAttributesOwner.hasAttribute(fqn: String) = getAttributes(fqn).isNotEmpty
 fun PhpAttributesOwner.hasAnyAttribute(vararg fqn: String) = attributes.any { it.fqn in fqn }
 
 fun PsiElement.isTestoClass() = when (this) {
-    is PhpClass -> TestoTestDescriptor.isTestClassName(name) || ownMethods.any { it.isTestoMethod() || it.isTestoBench() }
+    is PhpClass -> TestoTestDescriptor.isTestClassName(name)
+            || hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
+            || ownMethods.any { it.isTestoMethod() || it.isTestoBench() }
     else -> false
 }
 
