@@ -1,6 +1,9 @@
 package com.github.xepozz.testo
 
 import com.github.xepozz.testo.tests.TestoTestDescriptor
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
@@ -11,6 +14,8 @@ import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
 import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.NewExpression
 import com.jetbrains.php.lang.psi.elements.PhpClass
+
+private val LOG = Logger.getInstance("#com.github.xepozz.testo.mixin")
 
 fun PsiElement.isTestoExecutable() = isTestoFunction() || isTestoMethod() || isTestoBench()
 
@@ -54,9 +59,28 @@ fun PsiElement.isTestoClass() = when (this) {
     else -> false
 }
 
-fun PsiFile.isTestoFile() = when (this) {
-    is PhpFile -> TestoTestDescriptor.isTestClassName(name.substringBeforeLast(".")) || isTestoClassFile() || isTestoFunctionFile() || isTestBenchFile() || isTestoConfigFile()
-    else -> false
+fun PsiFile.isTestoFile(): Boolean {
+    if (this !is PhpFile) return false
+    val vFile = virtualFile ?: return false
+    if (!vFile.isValid) return false
+
+    val fileIndex = ProjectFileIndex.getInstance(project)
+    if (!fileIndex.isInContent(vFile)) return false
+    if (fileIndex.isExcluded(vFile)) return false
+    if (fileIndex.isUnderIgnored(vFile)) return false
+
+    return try {
+        TestoTestDescriptor.isTestClassName(name.substringBeforeLast("."))
+            || isTestoClassFile()
+            || isTestoFunctionFile()
+            || isTestBenchFile()
+            || isTestoConfigFile()
+    } catch (e: ProcessCanceledException) {
+        throw e
+    } catch (e: Throwable) {
+        LOG.warn("Failed to determine whether ${vFile.path} is a Testo file", e)
+        false
+    }
 }
 
 fun PhpFile.isTestoConfigFile() = PsiTreeUtil.findChildrenOfType(this, ClassReference::class.java)
