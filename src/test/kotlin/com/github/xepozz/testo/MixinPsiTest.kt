@@ -254,4 +254,97 @@ class MixinPsiTest : BasePlatformTestCase() {
         val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
         assertTrue("Method named exactly 'test' should be a Testo method", method.isTestoMethod())
     }
+
+    // ---- Class-level #[Testo\Test] attribute ----
+
+    fun testIsTestoClass_classLevelTestAttribute() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php
+            namespace App;
+            #[\Testo\Test]
+            class UserService { public function it_works(): void {} }"""
+        )
+        val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
+        assertTrue("Class with #[Testo\\Test] attribute should be a Testo class", phpClass.isTestoClass())
+    }
+
+    fun testIsTestoMethod_publicMethodInClassWithTestAttribute() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php
+            #[\Testo\Test]
+            class Foo { public function it_works(): void {} }"""
+        )
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+        assertTrue("Public method in class marked with #[Testo\\Test] should be runnable", method.isTestoMethod())
+    }
+
+    fun testIsTestoMethod_privateMethodInClassWithTestAttribute() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php
+            #[\Testo\Test]
+            class Foo { private function helper(): void {} }"""
+        )
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+        assertFalse("Private method in #[Testo\\Test] class should not be runnable", method.isTestoMethod())
+    }
+
+    fun testIsTestoMethod_staticMethodInClassWithTestAttribute() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php
+            #[\Testo\Test]
+            class Foo { public static function provide(): iterable { yield [1]; } }"""
+        )
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+        assertFalse("Public static method in #[Testo\\Test] class should not be runnable", method.isTestoMethod())
+    }
+
+    fun testIsTestoMethod_magicMethodInClassWithTestAttribute() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php
+            #[\Testo\Test]
+            class Foo { public function __construct() {} }"""
+        )
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+        assertFalse("Magic method in #[Testo\\Test] class should not be runnable", method.isTestoMethod())
+    }
+
+    fun testIsTestoMethod_abstractMethodInClassWithTestAttribute() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php
+            #[\Testo\Test]
+            abstract class Foo { abstract public function it_works(): void; }"""
+        )
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+        assertFalse("Abstract method in #[Testo\\Test] class should not be runnable", method.isTestoMethod())
+    }
+
+    fun testIsTestoMethod_publicMethodInRegularClass() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php class Foo { public function it_works(): void {} }"""
+        )
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+        assertFalse("Public method in non-Testo class should not be runnable", method.isTestoMethod())
+    }
+
+    fun testIsTestoMethod_benchMethodInClassWithTestAttribute() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php
+            #[\Testo\Test]
+            class Foo {
+                #[\Testo\Bench]
+                public function bench_it(): void {}
+            }"""
+        )
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+        assertFalse("Bench method should not be reported as a Testo test method", method.isTestoMethod())
+        assertTrue("Bench method should still be detected as a Testo bench", method.isTestoBench())
+    }
 }
