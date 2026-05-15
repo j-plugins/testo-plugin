@@ -6,6 +6,7 @@
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.jetbrains.php</depends>
+    <depends optional="true" config-file="coverage.xml">com.intellij.modules.coverage</depends>
 
     <resource-bundle>messages.TestoBundle</resource-bundle>
 
