@@ -43,9 +43,15 @@ fun PsiElement.isTestoClass() = when (this) {
     else -> false
 }
 
-fun PsiFile.isTestoFile() = when (this) {
-    is PhpFile -> TestoTestDescriptor.isTestClassName(name.substringBeforeLast(".")) || isTestoClassFile() || isTestoFunctionFile() || isTestBenchFile() || isTestoConfigFile()
-    else -> false
+fun PsiFile.isTestoFile(): Boolean {
+    if (this !is PhpFile) return false
+    val vFile = virtualFile ?: return false
+    if (!vFile.isValid) return false
+    return TestoTestDescriptor.isTestClassName(name.substringBeforeLast("."))
+        || isTestoClassFile()
+        || isTestoFunctionFile()
+        || isTestBenchFile()
+        || isTestoConfigFile()
 }
 
 fun PhpFile.isTestoConfigFile() = PsiTreeUtil.findChildrenOfType(this, ClassReference::class.java)

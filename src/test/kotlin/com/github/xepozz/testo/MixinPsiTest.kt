@@ -1,5 +1,6 @@
 package com.github.xepozz.testo
 
+import com.intellij.openapi.application.WriteAction
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.testFramework.TestDataPath
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
@@ -153,6 +154,24 @@ class MixinPsiTest : BasePlatformTestCase() {
             """<?php class FeatureTest { public function testFeature(): void {} }"""
         )
         assertTrue("File containing test class should be a Testo file", psiFile.isTestoFile())
+    }
+
+    fun testIsTestoFile_invalidVirtualFile_returnsFalse() {
+        val psiFile = myFixture.configureByText(
+            "DeletedTest.php",
+            """<?php class DeletedTest { public function testSomething(): void {} }"""
+        ) as PhpFile
+
+        assertTrue("Precondition: file should initially be detected as a Testo file", psiFile.isTestoFile())
+
+        val vFile = psiFile.virtualFile!!
+        WriteAction.runAndWait<Throwable> { vFile.delete(this) }
+
+        assertFalse("VirtualFile should be invalid after deletion", vFile.isValid)
+        assertFalse(
+            "isTestoFile must return false when the underlying VirtualFile is invalid",
+            psiFile.isTestoFile()
+        )
     }
 
     // ---- isTestoExecutable ----
