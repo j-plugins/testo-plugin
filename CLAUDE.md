@@ -17,8 +17,8 @@ Provides full IDE integration: test discovery, run configurations, code generati
 |----------------------|---------------------------|
 | Language             | Kotlin 2.3.0              |
 | JVM Toolchain        | Java 21                   |
-| IntelliJ Platform    | 2024.3.4 (IU — Ultimate)  |
-| Min platform build   | 243 (2024.3.x)            |
+| IntelliJ Platform    | 2025.2.6 (IU — Ultimate)  |
+| Min platform build   | 252 (2025.2.x)            |
 | Build system         | Gradle 9.3.0              |
 | IntelliJ Plugin SDK  | `org.jetbrains.intellij.platform` 2.11.0 |
 | Changelog plugin     | `org.jetbrains.changelog` 2.5.0 |
@@ -204,7 +204,7 @@ A PHP element is recognized as a Testo test when:
 ## Constraints & Important Notes
 
 - **Platform:** IntelliJ IDEA Ultimate or PhpStorm only (requires `com.jetbrains.php` plugin)
-- **Min IDE version:** 2024.3 (build 243+)
+- **Min IDE version:** 2025.2 (build 252+)
 - **Kotlin stdlib is NOT bundled** (`kotlin.stdlib.default.dependency = false`) — uses the one shipped with IntelliJ
 - **Gradle Configuration Cache** and **Build Cache** are enabled
 - **Code and comments language:** English
