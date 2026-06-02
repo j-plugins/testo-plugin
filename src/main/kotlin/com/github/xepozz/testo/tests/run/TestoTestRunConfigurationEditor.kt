@@ -3,11 +3,13 @@ package com.github.xepozz.testo.tests.run
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.DocumentAdapter
+import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.RightGap
 import com.intellij.ui.dsl.builder.RowLayout
 import com.intellij.ui.dsl.builder.panel
+import com.jetbrains.php.phpunit.coverage.PhpUnitCoverageEngine.CoverageEngine
 import com.jetbrains.php.testFramework.run.PhpTestRunConfigurationEditor
 import java.lang.reflect.InvocationTargetException
 import javax.swing.JComponent
@@ -25,6 +27,15 @@ class TestoTestRunConfigurationEditor(
     private val excludeGroupField = JBTextField()
     private val repeatField = JSpinner(SpinnerNumberModel(0, 0, 10000, 1))
     private val parallelField = JSpinner(SpinnerNumberModel(0, 0, 64, 1))
+    private val coverageEngineField = ComboBox(SUPPORTED_COVERAGE_ENGINES.toTypedArray()).apply {
+        renderer = SimpleListCellRenderer.create("") { engine ->
+            when (engine) {
+                CoverageEngine.XDEBUG -> "Xdebug"
+                CoverageEngine.PCOV -> "PCOV"
+                else -> engine?.name ?: ""
+            }
+        }
+    }
 
     private val myMainPanel = panel {
         row {
@@ -84,6 +95,15 @@ class TestoTestRunConfigurationEditor(
             }
                 .layout(RowLayout.PARENT_GRID)
                 .rowComment("--parallel=<N> (0 = disabled)")
+
+            row {
+                label("Preferred coverage engine")
+                    .gap(RightGap.COLUMNS)
+                cell(coverageEngineField)
+                    .align(AlignX.FILL)
+            }
+                .layout(RowLayout.PARENT_GRID)
+                .rowComment("Engine used to collect code coverage")
         }
     }
 
@@ -99,6 +119,7 @@ class TestoTestRunConfigurationEditor(
         excludeGroupField.document.addDocumentListener(documentAdapter)
         repeatField.addChangeListener { listener() }
         parallelField.addChangeListener { listener() }
+        coverageEngineField.addActionListener { listener() }
     }
 
     override fun createEditor(): JComponent = myMainPanel
@@ -111,6 +132,7 @@ class TestoTestRunConfigurationEditor(
                 || excludeGroupField.text != runner.excludeGroup
                 || (repeatField.value as Int) != runner.repeat
                 || (parallelField.value as Int) != runner.parallel
+                || coverageEngineField.selectedItem != runner.coverageEngine
                 || parentEditor.isSpecificallyModified
     }
 
@@ -122,6 +144,7 @@ class TestoTestRunConfigurationEditor(
         excludeGroupField.text = runnerSettings.excludeGroup
         repeatField.value = runnerSettings.repeat
         parallelField.value = runnerSettings.parallel
+        coverageEngineField.selectedItem = runnerSettings.coverageEngine
 
         parentEditor.javaClass.declaredMethods.find { it.name == "resetEditorFrom" && it.parameterCount == 1 }?.let {
             it.isAccessible = true
@@ -149,5 +172,10 @@ class TestoTestRunConfigurationEditor(
         runnerSettings.excludeGroup = excludeGroupField.text
         runnerSettings.repeat = repeatField.value as? Int ?: 0
         runnerSettings.parallel = parallelField.value as? Int ?: 0
+        runnerSettings.coverageEngine = coverageEngineField.selectedItem as? CoverageEngine ?: CoverageEngine.XDEBUG
+    }
+
+    companion object {
+        val SUPPORTED_COVERAGE_ENGINES: List<CoverageEngine> = listOf(CoverageEngine.XDEBUG, CoverageEngine.PCOV)
     }
 }

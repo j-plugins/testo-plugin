@@ -17,7 +17,7 @@ Provides full IDE integration: test discovery, run configurations, code generati
 |----------------------|---------------------------|
 | Language             | Kotlin 2.3.0              |
 | JVM Toolchain        | Java 21                   |
-| IntelliJ Platform    | 2025.2.6 (IU — Ultimate)  |
+| IntelliJ Platform    | 2025.2.6.2 (IU — Ultimate)  |
 | Min platform build   | 252 (2025.2.x)            |
 | Build system         | Gradle 9.3.0              |
 | IntelliJ Plugin SDK  | `org.jetbrains.intellij.platform` 2.11.0 |

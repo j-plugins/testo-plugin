@@ -61,14 +61,15 @@ open class TestoCoverageProgramRunner : PhpCoverageRunner() {
             true,
         )
 
-        val options = when (runConfiguration.testoSettings.getTestoRunnerSettings().coverageEngine) {
+        val coverageEngine = runConfiguration.testoSettings.getTestoRunnerSettings().coverageEngine
+        val options = when (coverageEngine) {
             CoverageEngine.XDEBUG -> XdebugConfigurationOptionsManager
                 .getConfigurationOptionsProvider(runConfiguration.project, interpreter)
                 .enableCoverage()
                 .createXdebugConfigurations()
 
             CoverageEngine.PCOV -> listOf(PhpConfigurationOption("pcov.enabled", 1))
-            else -> throw IllegalArgumentException("Unsupported coverage engine.")
+            else -> throw IllegalArgumentException("Unsupported coverage engine $coverageEngine.")
         }
         command.addConfigurationOptions(options)
         setAdditionalMapping(localCoverage, targetCoverage, command)
