@@ -1,0 +1,72 @@
+package com.github.xepozz.testo.tests.console
+
+import com.intellij.execution.testframework.TestConsoleProperties
+import com.intellij.execution.testframework.sm.runner.OutputToGeneralTestEventsConverter
+import jetbrains.buildServer.messages.serviceMessages.ServiceMessage
+import jetbrains.buildServer.messages.serviceMessages.ServiceMessageVisitor
+
+class TestoOutputToGeneralEventsConverter(
+    testFrameworkName: String,
+    consoleProperties: TestConsoleProperties,
+    private val store: ChannelOutputStore,
+) : OutputToGeneralTestEventsConverter(testFrameworkName, consoleProperties) {
+
+    private val locations = java.util.Collections.synchronizedMap(HashMap<String, String>())
+
+    override fun processServiceMessage(message: ServiceMessage, visitor: ServiceMessageVisitor) {
+        val attrs = message.attributes
+
+        when (message.messageName) {
+            TEST_STARTED -> {
+                val name = attrs["name"]
+                val location = attrs["locationHint"]
+                if (name != null && location != null) locations[name] = location
+            }
+
+            TEST_STD_OUT, TEST_STD_ERR -> {
+                val key = keyFor(attrs["name"])
+                val out = attrs["out"] ?: ""
+                val level = attrs["level"]
+                if (key != null) store.appendAll(key, out, level)
+
+                val channel = attrs["channel"]
+                if (!channel.isNullOrEmpty() && key != null) {
+                    attrs["icon"]?.takeIf { it.isNotBlank() }?.let { store.setChannelIcon(channel, it) }
+                    attrs["color"]?.takeIf { it.isNotBlank() }?.let { store.setChannelColor(channel, it) }
+                    store.append(key, channel, out, level)
+                    return
+                }
+                if (key != null) store.appendOutput(key, out, level)
+            }
+
+            TEST_FAILED -> {
+                val key = keyFor(attrs["name"])
+                if (key != null) {
+                    val failMessage = attrs["message"].orEmpty()
+                    val details = attrs["details"].orEmpty()
+                    val text = if (failMessage.isBlank()) details else "$failMessage\n$details"
+                    if (text.isNotBlank()) {
+                        store.appendAll(key, "\n$text\n", "stderr")
+                        store.appendOutput(key, "\n$text\n", "stderr")
+                    }
+                }
+            }
+        }
+
+        super.processServiceMessage(message, visitor)
+    }
+
+    private fun keyFor(name: String?): String? {
+        if (name == null) return null
+        return locations[name] ?: name
+    }
+
+    companion object {
+        private const val TEST_STARTED = "testStarted"
+        private const val TEST_STD_OUT = "testStdOut"
+        private const val TEST_STD_ERR = "testStdErr"
+        private const val TEST_FAILED = "testFailed"
+
+        fun keyFor(locationUrl: String?, name: String?): String? = locationUrl ?: name
+    }
+}

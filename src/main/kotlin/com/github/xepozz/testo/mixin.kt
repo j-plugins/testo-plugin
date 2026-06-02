@@ -3,6 +3,7 @@ package com.github.xepozz.testo
 import com.github.xepozz.testo.tests.TestoTestDescriptor
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -69,9 +70,11 @@ fun PsiFile.isTestoFile(): Boolean {
     if (fileIndex.isExcluded(vFile)) return false
     if (fileIndex.isUnderIgnored(vFile)) return false
 
+    if (TestoTestDescriptor.isTestClassName(name.substringBeforeLast("."))) return true
+    if (DumbService.isDumb(project)) return false
+
     return try {
-        TestoTestDescriptor.isTestClassName(name.substringBeforeLast("."))
-            || isTestoClassFile()
+        isTestoClassFile()
             || isTestoFunctionFile()
             || isTestBenchFile()
             || isTestoConfigFile()

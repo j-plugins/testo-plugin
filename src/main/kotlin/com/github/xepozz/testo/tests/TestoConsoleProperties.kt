@@ -1,9 +1,14 @@
 package com.github.xepozz.testo.tests
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.tests.console.ChannelOutputStore
+import com.github.xepozz.testo.tests.console.TestoOutputToGeneralEventsConverter
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.Executor
 import com.intellij.execution.Location
+import com.intellij.execution.testframework.TestConsoleProperties
+import com.intellij.execution.testframework.sm.SMCustomMessagesParsing
+import com.intellij.execution.testframework.sm.runner.OutputToGeneralTestEventsConverter
 import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.openapi.project.Project
@@ -18,8 +23,18 @@ class TestoConsoleProperties(
     config: TestoRunConfiguration,
     executor: Executor,
     val pathMapper: PhpPathMapper,
-) : SMTRunnerConsoleProperties(config, TestoBundle.message("testo.local.run.display.name"), executor) {
+) : SMTRunnerConsoleProperties(config, TestoBundle.message("testo.local.run.display.name"), executor),
+    SMCustomMessagesParsing {
     val myTestLocator = TestoTestLocator(pathMapper)
+
+    /** Holds channel-tagged output split out of the main console; shared with the channel tabs UI. */
+    val channelStore = ChannelOutputStore()
+
+    override fun createTestEventsConverter(
+        testFrameworkName: String,
+        consoleProperties: TestConsoleProperties,
+    ): OutputToGeneralTestEventsConverter =
+        TestoOutputToGeneralEventsConverter(testFrameworkName, consoleProperties, channelStore)
 
     override fun getTestStackTraceParser(url: String, proxy: SMTestProxy, project: Project) =
         TestoStackTraceParser.parse(url, proxy.stacktrace, proxy.errorMessage, testLocator, project)
@@ -30,13 +45,10 @@ class TestoConsoleProperties(
         if (location is PhpPsiLocationWithDataSet<*> && location.getPsiElement() !is Method) {
             return location.navigatable
         } else {
-            var lines = StringUtil.splitByLinesKeepSeparators(stacktrace)
-//            if (PhpUnitConsoleProperties.isLaravelTestCase(lines)) {
-//                lines = Arrays.copyOfRange<String?>(lines, 0, lines.size - 1) as Array<String>
-//            }
-
-            val reversedStackTrace = (StreamEx.ofReversed<String?>(lines)
-                .filter { line: String? -> !line!!.isEmpty() } as StreamEx<*>).joining()
+            val reversedStackTrace = StringUtil.splitByLinesKeepSeparators(stacktrace)
+                .reversed()
+                .filter { it.isNotEmpty() }
+                .joinToString("")
             return super.getErrorNavigatable(location, reversedStackTrace)
         }
     }

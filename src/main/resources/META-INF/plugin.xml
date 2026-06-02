@@ -64,6 +64,8 @@
                 implementation="com.github.xepozz.testo.TestoContext"/>
         <console.folding
                 implementation="com.github.xepozz.testo.ui.TestoStackTraceConsoleFolding"/>
+        <console.folding
+                implementation="com.github.xepozz.testo.tests.console.TestoRepeatedFrameFolding"/>
         <fileBasedIndex
                 implementation="com.github.xepozz.testo.index.TestoDataProvidersIndex"/>
 
@@ -72,8 +74,6 @@
         <lang.inspectionSuppressor
                 language="PHP"
                 implementationClass="com.github.xepozz.testo.tests.inspections.TestoInspectionSuppressor"/>
-        <testActionProvider order="last"
-            implementation="com.github.xepozz.testo.tests.actions.TestoTestActionProvider"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.jetbrains.php">
@@ -83,10 +83,22 @@
                 implementation="com.github.xepozz.testo.TestoComposerConfig"/>
     </extensions>
 
+    <projectListeners>
+        <listener class="com.github.xepozz.testo.tests.console.TestoConsoleAugmenter"
+                  topic="com.intellij.execution.ExecutionListener"/>
+    </projectListeners>
+
     <actions>
         <action id="TestoNewTestFromClass" class="com.github.xepozz.testo.tests.actions.TestoNewTestFromClassAction">
             <add-to-group group-id="PhpNewTestGroup" anchor="last" />
         </action>
+        <group id="Testo.ToolsMenu" text="Testo" popup="true">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+            <action id="Testo.ShowChannelIcons"
+                    class="com.github.xepozz.testo.tests.console.TestoShowChannelIconsAction"
+                    text="Channel Icons"
+                    description="Preview the mapping of Testo channel icon hints to IDE icons"/>
+        </group>
         <group id="TestoGenerateGroup">
             <action
                     id="TestoGenerateTestMethod"
