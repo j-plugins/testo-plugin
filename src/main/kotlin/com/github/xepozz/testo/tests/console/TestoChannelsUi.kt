@@ -60,6 +60,10 @@ object TestoChannelsUi {
         private var tabs: JBTabbedPane? = null
         private var outputComponent: JComponent? = null
         private val dynamicConsoles = mutableListOf<ConsoleViewImpl>()
+        private val subscriptions = mutableListOf<() -> Unit>()
+        private val activeAggregates = mutableListOf<LiveAggregate>()
+        private var currentSelected: SMTestProxy? = null
+        private var currentModel: TestFrameworkRunningModel? = null
 
         override fun onTestingStarted(viewer: TestResultsViewer) {
             store.clear()
@@ -75,6 +79,8 @@ object TestoChannelsUi {
             val platform = outputComponent ?: return
             while (tabbed.tabCount > 0) tabbed.removeTabAt(0)
             disposeDynamicConsoles()
+            currentSelected = selected
+            currentModel = model
 
             if (selected == null) {
                 tabbed.addTab(OUTPUT_TAB, AllIcons.Debugger.Console, platform)
@@ -83,31 +89,63 @@ object TestoChannelsUi {
 
             if (!selected.isLeaf) {
                 val leaves = selected.allTests.filter { it !== selected && it.isLeaf }
-                addTab(tabbed, ALL_TAB, AllIcons.Actions.Show, aggregate(leaves, viewer, prependHeader = true) { store.allFor(it) })
-                addTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, aggregate(leaves, viewer) { store.outputFor(it) })
+                addAggregateTab(tabbed, ALL_TAB, AllIcons.Actions.Show, viewer, leaves, prependHeader = true, store::attachAll)
+                addAggregateTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, viewer, leaves, attach = store::attachOutput)
                 for (channel in channelsAcross(leaves)) {
                     val sample = leaves.firstNotNullOfOrNull { leaf ->
                         keyOf(leaf)?.let { store.channelsFor(it)[channel] }?.takeIf { it.isNotEmpty() }
                     } ?: emptyList()
-                    addTab(tabbed, humanize(channel), channelIcon(channel, sample), aggregate(leaves, viewer) {
-                        store.channelsFor(it)[channel] ?: emptyList()
-                    })
+                    addAggregateTab(tabbed, humanize(channel), channelIcon(channel, sample), viewer, leaves) { key, sink ->
+                        store.attachChannel(key, channel, sink)
+                    }
                 }
                 return
             }
 
             val key = keyOf(selected)
-            val all = key?.let { store.allFor(it) }.orEmpty()
             val header = store.header()
-            if (all.isNotEmpty() || header.isNotEmpty()) {
-                val allView = newConsole(header + all)
-                addTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allView)
+            if (key != null) {
+                // Header printed once, then the "all" stream replays and stays live so a streaming test's output
+                // appears as it arrives instead of freezing on the first chunk.
+                addTab(tabbed, ALL_TAB, AllIcons.Actions.Show, newLiveConsole(header) { store.attachAll(key, it) })
+            } else if (header.isNotEmpty()) {
+                addTab(tabbed, ALL_TAB, AllIcons.Actions.Show, newConsole(header))
             }
             tabbed.addTab(OUTPUT_TAB, AllIcons.Debugger.Console, platform)
-            val channels = key?.let { store.channelsFor(it) }.orEmpty()
-            for ((channel, chunks) in channels) {
-                addTab(tabbed, humanize(channel), channelIcon(channel, chunks), newConsole(chunks))
+            if (key != null) {
+                for ((channel, chunks) in store.channelsFor(key)) {
+                    val view = newLiveConsole(emptyList()) { store.attachChannel(key, channel, it) }
+                    addTab(tabbed, humanize(channel), channelIcon(channel, chunks), view)
+                }
             }
+        }
+
+        override fun onTestNodeAdded(viewer: TestResultsViewer, test: SMTestProxy) {
+            // Fired off the EDT (test-events thread), so any console/tab mutation must hop to the EDT.
+            if (!test.isLeaf) return
+            ApplicationManager.getApplication().invokeLater {
+                val current = currentSelected ?: return@invokeLater
+                if (current.isLeaf || !isUnder(current, test)) return@invokeLater
+                // A leaf that appears after its ancestor was selected must join the shown view:
+                //  - if the ancestor is already an aggregate, just subscribe the new leaf (no rebuild);
+                //  - if it was selected while still EMPTY it looked like a leaf and was rendered as one (no
+                //    aggregates); now that it has a child it is a suite, so re-render it as an aggregate — that also
+                //    creates the channel tabs an empty selection could not yet know about.
+                if (activeAggregates.isEmpty()) {
+                    currentModel?.let { onSelected(current, viewer, it) }
+                } else {
+                    activeAggregates.forEach { it.addLeaf(test) }
+                }
+            }
+        }
+
+        private fun isUnder(ancestor: SMTestProxy, node: SMTestProxy): Boolean {
+            var parent: SMTestProxy? = node.parent
+            while (parent != null) {
+                if (parent === ancestor) return true
+                parent = parent.parent
+            }
+            return false
         }
 
         override fun dispose() {
@@ -121,6 +159,9 @@ object TestoChannelsUi {
         }
 
         private fun disposeDynamicConsoles() {
+            subscriptions.forEach { it() }
+            subscriptions.clear()
+            activeAggregates.clear()
             dynamicConsoles.forEach { Disposer.dispose(it) }
             dynamicConsoles.clear()
         }
@@ -168,28 +209,51 @@ object TestoChannelsUi {
             }.getOrNull()
         }
 
-        private fun aggregate(
-            leaves: List<SMTestProxy>,
+        private fun addAggregateTab(
+            tabbed: JBTabbedPane,
+            title: String,
+            icon: Icon,
             viewer: TestResultsViewer,
+            leaves: List<SMTestProxy>,
             prependHeader: Boolean = false,
-            chunksFor: (String) -> List<ChannelOutputStore.Chunk>,
-        ): ConsoleViewImpl? {
-            val sections = leaves.mapNotNull { leaf ->
-                val key = keyOf(leaf) ?: return@mapNotNull null
-                val chunks = chunksFor(key)
-                if (chunks.isEmpty()) null else leaf to chunks
-            }
-            val header = if (prependHeader) store.header() else emptyList()
-            if (sections.isEmpty() && header.isEmpty()) return null
+            attach: (String, (ChannelOutputStore.Chunk) -> Unit) -> (() -> Unit),
+        ) {
             val view = newConsole(emptyList())
-            printChunks(view, header)
-            sections.forEachIndexed { index, (leaf, chunks) ->
-                if (index > 0) view.print("\n\n", ConsoleViewContentType.NORMAL_OUTPUT)
-                view.printHyperlink(fullName(leaf), HyperlinkInfo { selectInTree(viewer, leaf) })
-                view.print("\n", ConsoleViewContentType.NORMAL_OUTPUT)
-                printChunks(view, chunks)
+            if (prependHeader) printChunks(view, store.header())
+            val aggregate = LiveAggregate(view, viewer, attach)
+            leaves.forEach { aggregate.addLeaf(it) }
+            activeAggregates += aggregate
+            addTab(tabbed, title, icon, view)
+        }
+
+        /**
+         * One parent-node tab: subscribes leaves' streams into a single console and appends as output arrives. A
+         * leaf's hyperlinked header is printed lazily on its first chunk and re-printed when output switches to
+         * another leaf, so replayed history and the live tail stay grouped per test (tests run sequentially, so
+         * arrival order already matches that grouping). [addLeaf] also accepts leaves discovered after selection.
+         */
+        private inner class LiveAggregate(
+            private val view: ConsoleViewImpl,
+            private val viewer: TestResultsViewer,
+            private val attach: (String, (ChannelOutputStore.Chunk) -> Unit) -> (() -> Unit),
+        ) {
+            private var lastKey: String? = null
+            private val attached = HashSet<String>()
+
+            fun addLeaf(leaf: SMTestProxy) {
+                val key = keyOf(leaf) ?: return
+                if (!attached.add(key)) return
+                val decoder = AnsiEscapeDecoder()
+                subscriptions += attach(key) { chunk ->
+                    if (lastKey != key) {
+                        if (lastKey != null) view.print("\n\n", ConsoleViewContentType.NORMAL_OUTPUT)
+                        view.printHyperlink(fullName(leaf), HyperlinkInfo { selectInTree(viewer, leaf) })
+                        view.print("\n", ConsoleViewContentType.NORMAL_OUTPUT)
+                        lastKey = key
+                    }
+                    printChunk(decoder, view, chunk)
+                }
             }
-            return view
         }
 
         private fun selectInTree(viewer: TestResultsViewer, leaf: SMTestProxy) {
@@ -212,8 +276,7 @@ object TestoChannelsUi {
             return if (leaf.presentableName == method) fqn else "$fqn:${leaf.presentableName}"
         }
 
-        private fun keyOf(leaf: SMTestProxy): String? =
-            TestoOutputToGeneralEventsConverter.keyFor(leaf.locationUrl, leaf.name)
+        private fun keyOf(leaf: SMTestProxy): String? = store.keyFor(leaf.name)
 
         private fun humanize(channel: String): String =
             channel.replace('-', ' ').replace('_', ' ').trim()
@@ -229,6 +292,17 @@ object TestoChannelsUi {
             return view
         }
 
+        // A leaf-view console: prints the header (if any), then replays+streams one store stream into itself. The
+        // subscription is recorded so disposal detaches it. No per-leaf hyperlink header (unlike LiveAggregate).
+        private fun newLiveConsole(
+            header: List<ChannelOutputStore.Chunk>,
+            attach: ((ChannelOutputStore.Chunk) -> Unit) -> (() -> Unit),
+        ): ConsoleViewImpl {
+            val view = newConsole(header)
+            subscriptions += attach(liveSink(view))
+            return view
+        }
+
         private fun attachFilters(view: ConsoleViewImpl) {
             view.addMessageFilter(PhpBacktraceFileFilter(project))
             for (provider in ConsoleFilterProvider.FILTER_PROVIDERS.extensionList) {
@@ -236,14 +310,22 @@ object TestoChannelsUi {
             }
         }
 
+        // A live consumer for one console: its own AnsiEscapeDecoder so escape sequences spanning chunks decode
+        // correctly across the replayed history and the streamed-in tail.
+        private fun liveSink(view: ConsoleViewImpl): (ChannelOutputStore.Chunk) -> Unit {
+            val decoder = AnsiEscapeDecoder()
+            return { chunk -> printChunk(decoder, view, chunk) }
+        }
+
         private fun printChunks(view: ConsoleViewImpl, chunks: List<ChannelOutputStore.Chunk>) {
             val decoder = AnsiEscapeDecoder()
-            for (chunk in chunks) {
-                val outputType =
-                    if (chunk.level == "stderr") ProcessOutputTypes.STDERR else ProcessOutputTypes.STDOUT
-                decoder.escapeText(chunk.text, outputType) { text, key ->
-                    view.print(text, ConsoleViewContentType.getConsoleViewType(key))
-                }
+            for (chunk in chunks) printChunk(decoder, view, chunk)
+        }
+
+        private fun printChunk(decoder: AnsiEscapeDecoder, view: ConsoleViewImpl, chunk: ChannelOutputStore.Chunk) {
+            val outputType = if (chunk.level == "stderr") ProcessOutputTypes.STDERR else ProcessOutputTypes.STDOUT
+            decoder.escapeText(chunk.text, outputType) { text, key ->
+                view.print(text, ConsoleViewContentType.getConsoleViewType(key))
             }
         }
 
@@ -261,6 +343,9 @@ object TestoChannelsUi {
 
             holder.remove(original)
             val tabbed = JBTabbedPane()
+            // JBTabbedPane wraps every tab's content in PANEL_SMALL_INSETS; null disables that so the console sits
+            // flush like the stock one instead of gaining a padding border.
+            tabbed.tabComponentInsets = null
             tabbed.addTab(OUTPUT_TAB, AllIcons.Debugger.Console, original)
             holder.add(tabbed, BorderLayout.CENTER)
             holder.revalidate()

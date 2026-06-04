@@ -158,4 +158,174 @@ class ChannelOutputStoreTest {
         assertTrue(store.allFor("missing").isEmpty())
         assertTrue(store.outputFor("missing").isEmpty())
     }
+
+    @Test
+    fun attachAllReplaysExistingThenStreamsLiveInOrder() {
+        val store = ChannelOutputStore()
+        store.appendAll("t1", "past-1", null)
+        store.appendAll("t1", "past-2", null)
+
+        val seen = mutableListOf<String>()
+        store.attachAll("t1") { seen.add(it.text) }
+        // Replay delivered the backlog immediately.
+        assertEquals(listOf("past-1", "past-2"), seen)
+
+        store.appendAll("t1", "live-1", null)
+        store.appendAll("t1", "live-2", null)
+        // Later appends stream straight to the sink, after the replay, in order.
+        assertEquals(listOf("past-1", "past-2", "live-1", "live-2"), seen)
+    }
+
+    @Test
+    fun attachAllDetachStopsDelivery() {
+        val store = ChannelOutputStore()
+        val seen = mutableListOf<String>()
+        val detach = store.attachAll("t1") { seen.add(it.text) }
+
+        store.appendAll("t1", "a", null)
+        detach()
+        store.appendAll("t1", "b", null)
+
+        assertEquals(listOf("a"), seen)
+    }
+
+    @Test
+    fun attachChannelReplaysAndStreamsOnlyItsChannel() {
+        val store = ChannelOutputStore()
+        store.append("t1", "sql", "select 1", null)
+
+        val seen = mutableListOf<String>()
+        store.attachChannel("t1", "sql") { seen.add(it.text) }
+        store.append("t1", "sql", "select 2", null)
+        store.append("t1", "log", "ignored", null)
+
+        assertEquals(listOf("select 1", "select 2"), seen)
+    }
+
+    @Test
+    fun multipleSinksEachReceiveLiveChunks() {
+        val store = ChannelOutputStore()
+        val a = mutableListOf<String>()
+        val b = mutableListOf<String>()
+        store.attachAll("t1") { a.add(it.text) }
+        store.attachAll("t1") { b.add(it.text) }
+
+        store.appendAll("t1", "x", null)
+
+        assertEquals(listOf("x"), a)
+        assertEquals(listOf("x"), b)
+    }
+
+    @Test
+    fun liveAppendsStillLandInSnapshot() {
+        val store = ChannelOutputStore()
+        store.attachAll("t1") { }
+        store.appendAll("t1", "a", null)
+        // Subscribing must not divert chunks away from the snapshot getters.
+        assertEquals(listOf("a"), store.allFor("t1").map { it.text })
+    }
+
+    @Test
+    fun keyForFallsBackToNameUntilLocationRemembered() {
+        val store = ChannelOutputStore()
+        assertEquals("stream", store.keyFor("stream"))
+        store.rememberLocation("stream", "php_qn://StreamTest.php::StreamTest::stream")
+        assertEquals("php_qn://StreamTest.php::StreamTest::stream", store.keyFor("stream"))
+    }
+
+    @Test
+    fun clearResetsRememberedLocations() {
+        val store = ChannelOutputStore()
+        store.rememberLocation("stream", "loc")
+        store.clear()
+        assertEquals("stream", store.keyFor("stream"))
+    }
+
+    @Test
+    fun producerAndLookupKeysAgreeViaSharedKeyFor() {
+        // The bug was that output was stored under the location key while the view subscribed by a name/locationUrl
+        // that lagged. Both sides now derive the key from the same keyFor(name), so a subscriber finds the output.
+        val store = ChannelOutputStore()
+        store.rememberLocation("stream", "php_qn://StreamTest::stream")
+        store.appendAll(store.keyFor("stream"), "line 1", null)
+
+        val seen = mutableListOf<String>()
+        store.attachAll(store.keyFor("stream")) { seen.add(it.text) }
+        store.appendAll(store.keyFor("stream"), "line 2", null)
+
+        assertEquals(listOf("line 1", "line 2"), seen)
+    }
+
+    @Test
+    fun attachOutputReplaysExistingThenStreamsLive() {
+        val store = ChannelOutputStore()
+        store.appendOutput("t1", "past", null)
+
+        val seen = mutableListOf<String>()
+        store.attachOutput("t1") { seen.add(it.text) }
+        assertEquals(listOf("past"), seen)
+
+        store.appendOutput("t1", "live", null)
+        assertEquals(listOf("past", "live"), seen)
+    }
+
+    @Test
+    fun attachOutputDetachStopsDelivery() {
+        val store = ChannelOutputStore()
+        val seen = mutableListOf<String>()
+        val detach = store.attachOutput("t1") { seen.add(it.text) }
+
+        store.appendOutput("t1", "a", null)
+        detach()
+        store.appendOutput("t1", "b", null)
+
+        assertEquals(listOf("a"), seen)
+    }
+
+    @Test
+    fun outputAllAndChannelAreIndependentStreams() {
+        val store = ChannelOutputStore()
+        val out = mutableListOf<String>()
+        val all = mutableListOf<String>()
+        val sql = mutableListOf<String>()
+        store.attachOutput("t1") { out.add(it.text) }
+        store.attachAll("t1") { all.add(it.text) }
+        store.attachChannel("t1", "sql") { sql.add(it.text) }
+
+        store.appendOutput("t1", "o", null)
+        store.appendAll("t1", "a", null)
+        store.append("t1", "sql", "s", null)
+
+        assertEquals(listOf("o"), out)
+        assertEquals(listOf("a"), all)
+        assertEquals(listOf("s"), sql)
+    }
+
+    @Test
+    fun attachChannelDetachStopsDelivery() {
+        val store = ChannelOutputStore()
+        val seen = mutableListOf<String>()
+        val detach = store.attachChannel("t1", "sql") { seen.add(it.text) }
+
+        store.append("t1", "sql", "a", null)
+        detach()
+        store.append("t1", "sql", "b", null)
+
+        assertEquals(listOf("a"), seen)
+    }
+
+    @Test
+    fun clearDropsLiveSinks() {
+        val store = ChannelOutputStore()
+        val seen = mutableListOf<String>()
+        store.attachAll("t1") { seen.add(it.text) }
+        store.appendAll("t1", "before", null)
+
+        store.clear()
+        store.appendAll("t1", "after", null)
+
+        // The subscription was attached to the pre-clear buffer, which clear() dropped; new output goes to a fresh
+        // buffer with no sinks, so the stale console stops receiving.
+        assertEquals(listOf("before"), seen)
+    }
 }

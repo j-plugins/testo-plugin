@@ -11,8 +11,6 @@ class TestoOutputToGeneralEventsConverter(
     private val store: ChannelOutputStore,
 ) : OutputToGeneralTestEventsConverter(testFrameworkName, consoleProperties) {
 
-    private val locations = java.util.Collections.synchronizedMap(HashMap<String, String>())
-
     override fun processServiceMessage(message: ServiceMessage, visitor: ServiceMessageVisitor) {
         val attrs = message.attributes
 
@@ -20,7 +18,7 @@ class TestoOutputToGeneralEventsConverter(
             TEST_STARTED -> {
                 val name = attrs["name"]
                 val location = attrs["locationHint"]
-                if (name != null && location != null) locations[name] = location
+                if (name != null && location != null) store.rememberLocation(name, location)
             }
 
             TEST_STD_OUT, TEST_STD_ERR -> {
@@ -56,17 +54,12 @@ class TestoOutputToGeneralEventsConverter(
         super.processServiceMessage(message, visitor)
     }
 
-    private fun keyFor(name: String?): String? {
-        if (name == null) return null
-        return locations[name] ?: name
-    }
+    private fun keyFor(name: String?): String? = name?.let { store.keyFor(it) }
 
     companion object {
         private const val TEST_STARTED = "testStarted"
         private const val TEST_STD_OUT = "testStdOut"
         private const val TEST_STD_ERR = "testStdErr"
         private const val TEST_FAILED = "testFailed"
-
-        fun keyFor(locationUrl: String?, name: String?): String? = locationUrl ?: name
     }
 }
