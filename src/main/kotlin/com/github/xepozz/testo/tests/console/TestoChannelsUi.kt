@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.tests.console
 
+import com.github.xepozz.testo.TestoIcons
 import com.intellij.execution.filters.ConsoleFilterProvider
 import com.intellij.execution.filters.HyperlinkInfo
 import com.intellij.execution.impl.ConsoleViewImpl
@@ -14,6 +15,10 @@ import com.intellij.execution.ui.ConsoleViewContentType
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.editor.EditorCustomElementRenderer
+import com.intellij.openapi.editor.Inlay
+import com.intellij.openapi.editor.ex.EditorEx
+import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
@@ -26,6 +31,7 @@ import java.awt.Color
 import java.awt.Component
 import java.awt.Graphics
 import java.awt.Graphics2D
+import java.awt.Rectangle
 import java.awt.RenderingHints
 import java.lang.reflect.Field
 import javax.swing.Icon
@@ -276,8 +282,10 @@ object TestoChannelsUi {
                     if (!levelFilter.isVisible(chunk.level)) return@attach
                     if (lastKey != key) {
                         if (lastKey != null) view.print("\n\n", ConsoleViewContentType.NORMAL_OUTPUT)
+                        val headerOffset = view.contentSize
                         view.printHyperlink(fullName(leaf), HyperlinkInfo { selectInTree(viewer, leaf) })
                         view.print("\n", ConsoleViewContentType.NORMAL_OUTPUT)
+                        addTestoIconInlay(view, headerOffset)
                         lastKey = key
                     }
                     printChunk(decoder, view, chunk)
@@ -358,6 +366,17 @@ object TestoChannelsUi {
             }
         }
 
+        // Prefix the aggregate's per-test header (a hyperlink to the test) with the Testo icon. Console output is
+        // buffered, so the editor offset only resolves once it is flushed — hence performWhenNoDeferredOutput.
+        private fun addTestoIconInlay(view: ConsoleViewImpl, offset: Int) {
+            view.performWhenNoDeferredOutput {
+                val editor = view.editor as? EditorEx ?: return@performWhenNoDeferredOutput
+                if (offset in 0..editor.document.textLength) {
+                    editor.inlayModel.addInlineElement(offset, false, TestoIconInlayRenderer)
+                }
+            }
+        }
+
         private fun ensureInstalled(): JBTabbedPane? {
             tabs?.let { return it }
             val original = myConsoleField.get(console.resultsViewer) as? JComponent ?: run {
@@ -418,6 +437,18 @@ object TestoChannelsUi {
                 "grey" to Color(0x808080),
                 "orange" to Color(0xCC7832),
             )
+        }
+    }
+
+    // Renders the Testo icon inline, vertically centered, with a small gap before the following text.
+    private object TestoIconInlayRenderer : EditorCustomElementRenderer {
+        private val icon get() = TestoIcons.TESTO
+
+        override fun calcWidthInPixels(inlay: Inlay<*>): Int = icon.iconWidth + JBUI.scale(4)
+
+        override fun paint(inlay: Inlay<*>, g: Graphics, targetRegion: Rectangle, textAttributes: TextAttributes) {
+            val y = targetRegion.y + (targetRegion.height - icon.iconHeight) / 2
+            icon.paintIcon(inlay.editor.component, g, targetRegion.x, maxOf(targetRegion.y, y))
         }
     }
 
