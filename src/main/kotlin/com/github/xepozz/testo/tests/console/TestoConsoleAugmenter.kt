@@ -20,19 +20,8 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             val descriptor = findDescriptor(executorId, handler) ?: return@invokeLater
             val console = descriptor.executionConsole as? SMTRunnerConsoleView ?: return@invokeLater
             val props = console.properties as? TestoConsoleProperties ?: return@invokeLater
-            captureHeader(props, handler)
-            TestoChannelsUi.install(console, props.channelStore, props.levelFilter, project, console)
+            installChannels(project, console, props, handler)
         }
-    }
-
-    // Stored on the channel store rather than printed: SM rewrites the platform console per test selection,
-    // so the channel UI renders this as the first line of the "All" tab instead.
-    private fun captureHeader(props: TestoConsoleProperties, handler: ProcessHandler) {
-        val commandLine = (handler as? OSProcessHandler)?.commandLine ?: return
-        val startedAt = DateFormatUtil.formatTimeWithSeconds(System.currentTimeMillis())
-        props.channelStore.setHeader(
-            listOf(ChannelOutputStore.Chunk("$commandLine\nTesting started at $startedAt\n\n", null))
-        )
     }
 
     private fun findDescriptor(executorId: String, handler: ProcessHandler): RunContentDescriptor? {
@@ -41,5 +30,32 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             manager.findContentDescriptor(executor, handler)?.let { return it }
         }
         return manager.allDescriptors.firstOrNull { it.processHandler === handler }
+    }
+
+    companion object {
+        // Single entry point for wiring the channel tabs, shared by the run-path listener above and the debug runner
+        // (which installs them directly because its descriptor isn't registered when processStarted fires). The
+        // channelsInstalled flag keeps a second caller for the same console from installing twice.
+        fun installChannels(
+            project: Project,
+            console: SMTRunnerConsoleView,
+            props: TestoConsoleProperties,
+            handler: ProcessHandler,
+        ) {
+            if (props.channelsInstalled) return
+            props.channelsInstalled = true
+            captureHeader(props, handler)
+            TestoChannelsUi.install(console, props.channelStore, props.levelFilter, project, console)
+        }
+
+        // Stored on the channel store rather than printed: SM rewrites the platform console per test selection,
+        // so the channel UI renders this as the first line of the "All" tab instead.
+        private fun captureHeader(props: TestoConsoleProperties, handler: ProcessHandler) {
+            val commandLine = (handler as? OSProcessHandler)?.commandLine ?: return
+            val startedAt = DateFormatUtil.formatTimeWithSeconds(System.currentTimeMillis())
+            props.channelStore.setHeader(
+                listOf(ChannelOutputStore.Chunk("$commandLine\nTesting started at $startedAt\n\n", null))
+            )
+        }
     }
 }

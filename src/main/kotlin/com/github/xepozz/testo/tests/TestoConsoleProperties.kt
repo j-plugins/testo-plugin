@@ -32,6 +32,10 @@ class TestoConsoleProperties(
 
     val levelFilter = LogLevelFilter()
 
+    // Guards the channel-tab install: set once whoever wires the tabs first (the run-path ExecutionListener or the
+    // debug runner, which installs them directly), so the other side is a no-op instead of a double install.
+    var channelsInstalled = false
+
     override fun createTestEventsConverter(
         testFrameworkName: String,
         consoleProperties: TestConsoleProperties,
@@ -56,6 +60,16 @@ class TestoConsoleProperties(
     }
 
     override fun isPrintTestingStartedTime() = true
+
+    // The log-level filter belongs on the test results toolbar's visible row. Adding it here (rather than via
+    // appendAdditionalActions, which the platform routes into the gear submenu) puts it among the primary actions at
+    // construction time — so it survives the snapshot that RunTab merges into the run tab's toolbar, and it shows in
+    // the standalone debug console toolbar too.
+    override fun createImportActions(): Array<com.intellij.openapi.actionSystem.AnAction> =
+        arrayOf(
+            com.github.xepozz.testo.tests.console.TestoLogLevelFilterAction(levelFilter),
+            *(super.createImportActions() ?: emptyArray()),
+        )
 
     // Promote Expand All / Collapse All onto the test toolbar; they bind to the TreeExpander it already supplies.
     override fun appendAdditionalActions(

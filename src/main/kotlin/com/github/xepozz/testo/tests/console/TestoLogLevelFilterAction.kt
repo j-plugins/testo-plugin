@@ -22,7 +22,11 @@ import com.intellij.openapi.project.DumbAware
  * Registered statically on the run-tab toolbar (`RunTab.TopToolbar`), so a single shared instance is shown on every run
  * tab; it resolves the current tab's [LogLevelFilter] from the action context and hides itself on non-Testo tabs.
  */
-class TestoLogLevelFilterAction : ActionGroup(), DumbAware {
+// explicitFilter is used by the debug runner, whose toolbar context carries no RUN_CONTENT_DESCRIPTOR to resolve from;
+// the statically-registered run-tab instance leaves it null and resolves the filter from the action context instead.
+class TestoLogLevelFilterAction(
+    private val explicitFilter: LogLevelFilter? = null,
+) : ActionGroup(), DumbAware {
     init {
         isPopup = true
         templatePresentation.icon = AllIcons.Actions.Show
@@ -34,6 +38,8 @@ class TestoLogLevelFilterAction : ActionGroup(), DumbAware {
     override fun update(e: AnActionEvent) {
         e.presentation.isEnabledAndVisible = resolveFilter(e) != null
     }
+
+    private fun resolveFilter(e: AnActionEvent?): LogLevelFilter? = explicitFilter ?: resolveContextFilter(e)
 
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
         val filter = resolveFilter(e) ?: return AnAction.EMPTY_ARRAY
@@ -68,7 +74,7 @@ class TestoLogLevelFilterAction : ActionGroup(), DumbAware {
 
     companion object {
         // Resolve the current run tab's Testo filter from context; null on any non-Testo run tab (hides the button).
-        private fun resolveFilter(e: AnActionEvent?): LogLevelFilter? {
+        private fun resolveContextFilter(e: AnActionEvent?): LogLevelFilter? {
             val descriptor = e?.getData(LangDataKeys.RUN_CONTENT_DESCRIPTOR) ?: return null
             val console = descriptor.executionConsole as? SMTRunnerConsoleView ?: return null
             return (console.properties as? TestoConsoleProperties)?.levelFilter
