@@ -39,13 +39,19 @@ object TestoChannelsUi {
             .apply { isAccessible = true }
     }.getOrNull()
 
-    fun install(console: SMTRunnerConsoleView, store: ChannelOutputStore, project: Project, parent: Disposable) {
+    fun install(
+        console: SMTRunnerConsoleView,
+        store: ChannelOutputStore,
+        levelFilter: LogLevelFilter,
+        project: Project,
+        parent: Disposable,
+    ) {
         val field = myConsoleField
         if (field == null) {
             thisLogger().warn("Testo channels disabled: TestResultsPanel.myConsole not found")
             return
         }
-        val controller = ChannelTabsController(project, store, console, field)
+        val controller = ChannelTabsController(project, store, levelFilter, console, field)
         Disposer.register(parent, controller)
         console.resultsViewer.addEventsListener(controller)
     }
@@ -53,6 +59,7 @@ object TestoChannelsUi {
     private class ChannelTabsController(
         private val project: Project,
         private val store: ChannelOutputStore,
+        private val levelFilter: LogLevelFilter,
         private val console: SMTRunnerConsoleView,
         private val myConsoleField: Field,
     ) : TestResultsViewer.EventsListener, Disposable {
@@ -64,6 +71,18 @@ object TestoChannelsUi {
         private val activeAggregates = mutableListOf<LiveAggregate>()
         private var currentSelected: SMTestProxy? = null
         private var currentModel: TestFrameworkRunningModel? = null
+        private var currentViewer: TestResultsViewer? = null
+
+        init {
+            // Toggling a log level rebuilds the shown tabs: hidden-only channels disappear, re-enabled ones return.
+            levelFilter.onChange = {
+                ApplicationManager.getApplication().invokeLater {
+                    val viewer = currentViewer
+                    val model = currentModel
+                    if (viewer != null && model != null) onSelected(currentSelected, viewer, model)
+                }
+            }
+        }
 
         override fun onTestingStarted(viewer: TestResultsViewer) {
             store.clear()
@@ -81,6 +100,7 @@ object TestoChannelsUi {
             disposeDynamicConsoles()
             currentSelected = selected
             currentModel = model
+            currentViewer = viewer
 
             if (selected == null) {
                 tabbed.addTab(OUTPUT_TAB, AllIcons.Debugger.Console, platform)
@@ -92,6 +112,7 @@ object TestoChannelsUi {
                 addAggregateTab(tabbed, ALL_TAB, AllIcons.Actions.Show, viewer, leaves, prependHeader = true, store::attachAll)
                 addAggregateTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, viewer, leaves, attach = store::attachOutput)
                 for (channel in channelsAcross(leaves)) {
+                    if (!channelHasVisible(leaves, channel)) continue
                     val sample = leaves.firstNotNullOfOrNull { leaf ->
                         keyOf(leaf)?.let { store.channelsFor(it)[channel] }?.takeIf { it.isNotEmpty() }
                     } ?: emptyList()
@@ -114,6 +135,7 @@ object TestoChannelsUi {
             tabbed.addTab(OUTPUT_TAB, AllIcons.Debugger.Console, platform)
             if (key != null) {
                 for ((channel, chunks) in store.channelsFor(key)) {
+                    if (chunks.none { levelFilter.isVisible(it.level) }) continue
                     val view = newLiveConsole(emptyList()) { store.attachChannel(key, channel, it) }
                     addTab(tabbed, humanize(channel), channelIcon(channel, chunks), view)
                 }
@@ -149,6 +171,7 @@ object TestoChannelsUi {
         }
 
         override fun dispose() {
+            levelFilter.onChange = null
             disposeDynamicConsoles()
             tabs = null
             outputComponent = null
@@ -171,6 +194,11 @@ object TestoChannelsUi {
             for (leaf in leaves) keyOf(leaf)?.let { channels.addAll(store.channelsFor(it).keys) }
             return channels
         }
+
+        private fun channelHasVisible(leaves: List<SMTestProxy>, channel: String): Boolean =
+            leaves.any { leaf ->
+                keyOf(leaf)?.let { store.channelsFor(it)[channel] }?.any { levelFilter.isVisible(it.level) } == true
+            }
 
         private fun channelIcon(channel: String, chunks: List<ChannelOutputStore.Chunk>): Icon {
             val color = channelColor(channel, chunks)
@@ -245,6 +273,7 @@ object TestoChannelsUi {
                 if (!attached.add(key)) return
                 val decoder = AnsiEscapeDecoder()
                 subscriptions += attach(key) { chunk ->
+                    if (!levelFilter.isVisible(chunk.level)) return@attach
                     if (lastKey != key) {
                         if (lastKey != null) view.print("\n\n", ConsoleViewContentType.NORMAL_OUTPUT)
                         view.printHyperlink(fullName(leaf), HyperlinkInfo { selectInTree(viewer, leaf) })
@@ -314,12 +343,12 @@ object TestoChannelsUi {
         // correctly across the replayed history and the streamed-in tail.
         private fun liveSink(view: ConsoleViewImpl): (ChannelOutputStore.Chunk) -> Unit {
             val decoder = AnsiEscapeDecoder()
-            return { chunk -> printChunk(decoder, view, chunk) }
+            return { chunk -> if (levelFilter.isVisible(chunk.level)) printChunk(decoder, view, chunk) }
         }
 
         private fun printChunks(view: ConsoleViewImpl, chunks: List<ChannelOutputStore.Chunk>) {
             val decoder = AnsiEscapeDecoder()
-            for (chunk in chunks) printChunk(decoder, view, chunk)
+            for (chunk in chunks) if (levelFilter.isVisible(chunk.level)) printChunk(decoder, view, chunk)
         }
 
         private fun printChunk(decoder: AnsiEscapeDecoder, view: ConsoleViewImpl, chunk: ChannelOutputStore.Chunk) {

@@ -116,6 +116,13 @@
         <action id="Rerun" overrides="true"
                 class="com.github.xepozz.testo.tests.actions.TestoAwareRerunAction"/>
 
+        <!-- Log-level filter: a primary toolbar dropdown on the test run tab. It resolves the current tab's filter from
+             context and hides on non-Testo tabs. Placed before the test view options (Sorting / Show Passed). -->
+        <group id="Testo.LogLevelFilter"
+               class="com.github.xepozz.testo.tests.console.TestoLogLevelFilterAction">
+            <add-to-group group-id="RunTab.TopToolbar" anchor="after" relative-to-action="Stop"/>
+        </group>
+
         <group id="Testo.ToolsMenu" text="Testo" popup="true">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <action id="Testo.ShowChannelIcons"

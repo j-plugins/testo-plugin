@@ -9,6 +9,7 @@ class TestoOutputToGeneralEventsConverter(
     testFrameworkName: String,
     consoleProperties: TestConsoleProperties,
     private val store: ChannelOutputStore,
+    private val levelFilter: LogLevelFilter,
 ) : OutputToGeneralTestEventsConverter(testFrameworkName, consoleProperties) {
 
     override fun processServiceMessage(message: ServiceMessage, visitor: ServiceMessageVisitor) {
@@ -25,6 +26,8 @@ class TestoOutputToGeneralEventsConverter(
                 val key = keyFor(attrs["name"])
                 val out = attrs["out"] ?: ""
                 val level = attrs["level"]
+                // Record the level so the filter menu can list it; storage keeps every chunk regardless.
+                levelFilter.noteSeen(level)
                 if (key != null) store.appendAll(key, out, level)
 
                 val channel = attrs["channel"]

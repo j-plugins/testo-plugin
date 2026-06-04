@@ -2,6 +2,7 @@ package com.github.xepozz.testo.tests
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.tests.console.ChannelOutputStore
+import com.github.xepozz.testo.tests.console.LogLevelFilter
 import com.github.xepozz.testo.tests.console.TestoOutputToGeneralEventsConverter
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.Executor
@@ -29,11 +30,13 @@ class TestoConsoleProperties(
 
     val channelStore = ChannelOutputStore()
 
+    val levelFilter = LogLevelFilter()
+
     override fun createTestEventsConverter(
         testFrameworkName: String,
         consoleProperties: TestConsoleProperties,
     ): OutputToGeneralTestEventsConverter =
-        TestoOutputToGeneralEventsConverter(testFrameworkName, consoleProperties, channelStore)
+        TestoOutputToGeneralEventsConverter(testFrameworkName, consoleProperties, channelStore, levelFilter)
 
     override fun getTestStackTraceParser(url: String, proxy: SMTestProxy, project: Project) =
         TestoStackTraceParser.parse(url, proxy.stacktrace, proxy.errorMessage, testLocator, project)

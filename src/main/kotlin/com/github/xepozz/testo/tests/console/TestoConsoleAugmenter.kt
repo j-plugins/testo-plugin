@@ -21,7 +21,7 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             val console = descriptor.executionConsole as? SMTRunnerConsoleView ?: return@invokeLater
             val props = console.properties as? TestoConsoleProperties ?: return@invokeLater
             captureHeader(props, handler)
-            TestoChannelsUi.install(console, props.channelStore, project, console)
+            TestoChannelsUi.install(console, props.channelStore, props.levelFilter, project, console)
         }
     }
 
