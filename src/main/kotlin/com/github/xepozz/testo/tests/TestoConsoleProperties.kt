@@ -27,7 +27,6 @@ class TestoConsoleProperties(
     SMCustomMessagesParsing {
     val myTestLocator = TestoTestLocator(pathMapper)
 
-    /** Holds channel-tagged output split out of the main console; shared with the channel tabs UI. */
     val channelStore = ChannelOutputStore()
 
     override fun createTestEventsConverter(
@@ -54,4 +53,16 @@ class TestoConsoleProperties(
     }
 
     override fun isPrintTestingStartedTime() = true
+
+    // Promote Expand All / Collapse All onto the test toolbar; they bind to the TreeExpander it already supplies.
+    override fun appendAdditionalActions(
+        actionGroup: com.intellij.openapi.actionSystem.DefaultActionGroup,
+        parent: javax.swing.JComponent,
+        target: TestConsoleProperties,
+    ) {
+        super.appendAdditionalActions(actionGroup, parent, target)
+        val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
+        listOfNotNull(actionManager.getAction("ExpandAll"), actionManager.getAction("CollapseAll"))
+            .forEach(actionGroup::add)
+    }
 }

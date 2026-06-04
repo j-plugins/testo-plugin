@@ -2,6 +2,7 @@ package com.github.xepozz.testo.tests.run
 
 import com.intellij.util.xmlb.annotations.Attribute
 import com.intellij.util.xmlb.annotations.Tag
+import com.intellij.util.xmlb.annotations.Transient
 import com.jetbrains.php.phpunit.coverage.PhpUnitCoverageEngine.CoverageEngine
 import com.jetbrains.php.testFramework.run.PhpTestRunnerSettings
 
@@ -33,6 +34,10 @@ class TestoRunnerSettings(
     @Attribute("testo_type")
     var testoType: String = "",
 ) : PhpTestRunnerSettings() {
+    // Set only on a "Rerun Failed Tests" clone, never persisted to the saved configuration.
+    @Transient
+    var rerunFilters: List<String> = emptyList()
+
     companion object Companion {
         @JvmStatic
         fun fromPhpTestRunnerSettings(settings: PhpTestRunnerSettings): TestoRunnerSettings {

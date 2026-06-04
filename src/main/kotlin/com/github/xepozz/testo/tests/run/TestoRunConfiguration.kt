@@ -50,10 +50,10 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
 
     override fun createSettings() = TestoRunConfigurationSettings()
 
-//    override fun createRerunAction(
-//        consoleView: ConsoleView,
-//        properties: SMTRunnerConsoleProperties,
-//    ) = TestoRerunFailedTestsAction(consoleView, properties)
+    override fun createRerunAction(
+        consoleView: ConsoleView,
+        properties: SMTRunnerConsoleProperties,
+    ) = TestoRerunFailedTestsAction(consoleView, properties)
 
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> {
         val editor = super.getConfigurationEditor() as PhpTestRunConfigurationEditor
@@ -156,8 +156,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
                 command.addPathArgument(configurationFilePath)
             }
 
-            val scope = testRunnerSettings.scope
-            when (scope) {
+            when (testRunnerSettings.scope) {
                 PhpTestRunnerSettings.Scope.Type -> handler.runType(
                     project,
                     command,

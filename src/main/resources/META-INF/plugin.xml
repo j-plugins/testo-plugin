@@ -92,12 +92,41 @@
         <action id="TestoNewTestFromClass" class="com.github.xepozz.testo.tests.actions.TestoNewTestFromClassAction">
             <add-to-group group-id="PhpNewTestGroup" anchor="last" />
         </action>
+
+        <!-- Variant A (TestoRerunStyle.MIRROR_AWARE): executor-pinned rerun trio, placed BEFORE the platform
+             "Rerun" (FakeRerunAction, which mirrors the current executor). Each button hides itself when it would
+             duplicate the platform "Rerun", so there are always 3 distinct rerun options. -->
+        <group id="Testo.RerunExecutors">
+            <action id="Testo.Rerun"
+                    class="com.github.xepozz.testo.tests.actions.TestoRerunAction"/>
+            <action id="Testo.RerunWithCoverage"
+                    class="com.github.xepozz.testo.tests.actions.TestoRerunWithCoverageAction"/>
+            <action id="Testo.RerunWithDebugger"
+                    class="com.github.xepozz.testo.tests.actions.TestoRerunWithDebuggerAction"/>
+            <add-to-group group-id="RunTab.TopToolbar" anchor="before" relative-to-action="Rerun"/>
+        </group>
+
+        <!-- Variant B (TestoRerunStyle.SPLIT_BUTTON): single split button replacing the trio + platform "Rerun". -->
+        <action id="Testo.RerunSplit"
+                class="com.github.xepozz.testo.tests.actions.TestoRerunSplitButtonAction">
+            <add-to-group group-id="RunTab.TopToolbar" anchor="before" relative-to-action="Rerun"/>
+        </action>
+
+        <!-- Override the platform "Rerun" so it can step aside for the split button in variant B. -->
+        <action id="Rerun" overrides="true"
+                class="com.github.xepozz.testo.tests.actions.TestoAwareRerunAction"/>
+
         <group id="Testo.ToolsMenu" text="Testo" popup="true">
             <add-to-group group-id="ToolsMenu" anchor="last"/>
             <action id="Testo.ShowChannelIcons"
                     class="com.github.xepozz.testo.tests.console.TestoShowChannelIconsAction"
                     text="Channel Icons"
                     description="Preview the mapping of Testo channel icon hints to IDE icons"/>
+            <separator/>
+            <action id="Testo.RerunStyle.Mirror"
+                    class="com.github.xepozz.testo.tests.actions.TestoRerunStyleMirrorAction"/>
+            <action id="Testo.RerunStyle.Split"
+                    class="com.github.xepozz.testo.tests.actions.TestoRerunStyleSplitAction"/>
         </group>
         <group id="TestoGenerateGroup">
             <action

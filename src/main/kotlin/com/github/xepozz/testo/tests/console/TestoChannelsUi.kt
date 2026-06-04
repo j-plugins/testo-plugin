@@ -32,6 +32,7 @@ import javax.swing.Icon
 import javax.swing.JComponent
 
 object TestoChannelsUi {
+    // The platform console lives in TestResultsPanel.myConsole with no public accessor; reach it via reflection.
     private val myConsoleField: Field? = runCatching {
         Class.forName("com.intellij.execution.testframework.ui.TestResultsPanel")
             .getDeclaredField("myConsole")
@@ -82,7 +83,7 @@ object TestoChannelsUi {
 
             if (!selected.isLeaf) {
                 val leaves = selected.allTests.filter { it !== selected && it.isLeaf }
-                addTab(tabbed, ALL_TAB, AllIcons.Actions.Show, aggregate(leaves, viewer) { store.allFor(it) })
+                addTab(tabbed, ALL_TAB, AllIcons.Actions.Show, aggregate(leaves, viewer, prependHeader = true) { store.allFor(it) })
                 addTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, aggregate(leaves, viewer) { store.outputFor(it) })
                 for (channel in channelsAcross(leaves)) {
                     val sample = leaves.firstNotNullOfOrNull { leaf ->
@@ -96,10 +97,14 @@ object TestoChannelsUi {
             }
 
             val key = keyOf(selected)
-            val all = if (key != null) store.allFor(key) else emptyList()
-            if (all.isNotEmpty()) addTab(tabbed, ALL_TAB, AllIcons.Actions.Show, newConsole(all))
+            val all = key?.let { store.allFor(it) }.orEmpty()
+            val header = store.header()
+            if (all.isNotEmpty() || header.isNotEmpty()) {
+                val allView = newConsole(header + all)
+                addTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allView)
+            }
             tabbed.addTab(OUTPUT_TAB, AllIcons.Debugger.Console, platform)
-            val channels = if (key != null) store.channelsFor(key) else emptyMap()
+            val channels = key?.let { store.channelsFor(it) }.orEmpty()
             for ((channel, chunks) in channels) {
                 addTab(tabbed, humanize(channel), channelIcon(channel, chunks), newConsole(chunks))
             }
@@ -166,6 +171,7 @@ object TestoChannelsUi {
         private fun aggregate(
             leaves: List<SMTestProxy>,
             viewer: TestResultsViewer,
+            prependHeader: Boolean = false,
             chunksFor: (String) -> List<ChannelOutputStore.Chunk>,
         ): ConsoleViewImpl? {
             val sections = leaves.mapNotNull { leaf ->
@@ -173,8 +179,10 @@ object TestoChannelsUi {
                 val chunks = chunksFor(key)
                 if (chunks.isEmpty()) null else leaf to chunks
             }
-            if (sections.isEmpty()) return null
+            val header = if (prependHeader) store.header() else emptyList()
+            if (sections.isEmpty() && header.isEmpty()) return null
             val view = newConsole(emptyList())
+            printChunks(view, header)
             sections.forEachIndexed { index, (leaf, chunks) ->
                 if (index > 0) view.print("\n\n", ConsoleViewContentType.NORMAL_OUTPUT)
                 view.printHyperlink(fullName(leaf), HyperlinkInfo { selectInTree(viewer, leaf) })

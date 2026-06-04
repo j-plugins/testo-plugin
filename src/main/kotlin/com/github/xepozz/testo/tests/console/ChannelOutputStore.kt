@@ -10,6 +10,16 @@ class ChannelOutputStore {
     private val iconByChannel = HashMap<String, String>()
     private val colorByChannel = HashMap<String, String>()
 
+    private var headerChunks: List<Chunk> = emptyList()
+
+    fun setHeader(chunks: List<Chunk>) {
+        synchronized(lock) { headerChunks = chunks }
+    }
+
+    fun header(): List<Chunk> {
+        synchronized(lock) { return headerChunks }
+    }
+
     fun append(testKey: String, channel: String, text: String, level: String?) {
         synchronized(lock) {
             byTest
@@ -62,6 +72,7 @@ class ChannelOutputStore {
         synchronized(lock) { return outputByTest[testKey]?.toList() ?: emptyList() }
     }
 
+    // headerChunks deliberately survives clear(): the header is set once per run, before per-test clears fire.
     fun clear() {
         synchronized(lock) {
             byTest.clear()

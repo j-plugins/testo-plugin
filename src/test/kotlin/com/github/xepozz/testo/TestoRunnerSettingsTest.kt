@@ -18,6 +18,7 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals(0, settings.repeat)
         assertEquals(0, settings.parallel)
         assertEquals("", settings.testoType)
+        assertTrue("rerunFilters defaults to empty", settings.rerunFilters.isEmpty())
     }
 
     fun testCustomValues() {
@@ -93,6 +94,7 @@ class TestoRunnerSettingsTest : TestCase() {
         source.scope = PhpTestRunnerSettings.Scope.Method
         source.filePath = "/test.php"
         source.methodName = "testIt"
+        source.rerunFilters = listOf("\\Foo\\Bar::baz")
 
         val result = TestoRunnerSettings.fromPhpTestRunnerSettings(source)
 
@@ -111,5 +113,7 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals(5, result.repeat)
         assertEquals(8, result.parallel)
         assertEquals("inline", result.testoType)
+        // rerunFilters is @Transient and intentionally NOT copied — stays empty on the result.
+        assertTrue("rerunFilters is not copied (transient)", result.rerunFilters.isEmpty())
     }
 }

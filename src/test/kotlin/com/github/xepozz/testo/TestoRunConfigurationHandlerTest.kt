@@ -209,6 +209,59 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertTrue(arguments.contains("4"))
     }
 
+    fun testPrepareArguments_withSingleRerunFilter() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.rerunFilters = listOf("\\Foo\\Bar::baz")
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        assertEquals(2, arguments.size)
+        assertEquals("--filter", arguments[0])
+        assertEquals("\\Foo\\Bar::baz", arguments[1])
+    }
+
+    fun testPrepareArguments_withTwoRerunFilters() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.rerunFilters = listOf("\\Foo\\Bar::baz", "\\Foo\\Qux::quux")
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        assertEquals(4, arguments.size)
+        assertEquals("--filter", arguments[0])
+        assertEquals("\\Foo\\Bar::baz", arguments[1])
+        assertEquals("--filter", arguments[2])
+        assertEquals("\\Foo\\Qux::quux", arguments[3])
+    }
+
+    fun testPrepareArguments_emptyRerunFilters_skipped() {
+        val settings = TestoRunConfigurationSettings()
+        // rerunFilters defaults to empty
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        assertFalse("No --filter when rerunFilters is empty", arguments.contains("--filter"))
+        assertTrue(arguments.isEmpty())
+    }
+
+    fun testPrepareArguments_rerunFiltersCombinedWithGroup() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.group = "fast"
+        settings.runnerSettings.rerunFilters = listOf("\\Foo\\Bar::baz")
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        // group is emitted before rerunFilters in the method body
+        assertEquals(4, arguments.size)
+        assertEquals("--group", arguments[0])
+        assertEquals("fast", arguments[1])
+        assertEquals("--filter", arguments[2])
+        assertEquals("\\Foo\\Bar::baz", arguments[3])
+    }
+
     fun testPrepareArguments_orderIsCorrect() {
         val settings = TestoRunConfigurationSettings()
         settings.runnerSettings.testoType = "bench"

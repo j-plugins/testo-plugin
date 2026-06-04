@@ -56,6 +56,10 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
             arguments.add("--parallel")
             arguments.add(runner.parallel.toString())
         }
+        for (filter in runner.rerunFilters) {
+            arguments.add("--filter")
+            arguments.add(filter)
+        }
     }
 
     override fun runType(
@@ -128,9 +132,8 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         val dataProvider: String,
     )
 
-    fun parseMethodName(methodName: String): ParsedMethodName {
-        val method = methodName.substringBefore('#')
-        val dataProvider = methodName.substringAfter('#', "")
-        return ParsedMethodName(method, dataProvider)
-    }
+    fun parseMethodName(methodName: String) = ParsedMethodName(
+        method = methodName.substringBefore('#'),
+        dataProvider = methodName.substringAfter('#', ""),
+    )
 }

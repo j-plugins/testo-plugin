@@ -110,6 +110,48 @@ class ChannelOutputStoreTest {
     }
 
     @Test
+    fun setHeaderThenHeaderReturnsIt() {
+        val store = ChannelOutputStore()
+        val chunks = listOf(ChannelOutputStore.Chunk("cmd\n", null))
+        store.setHeader(chunks)
+        assertEquals(chunks, store.header())
+    }
+
+    @Test
+    fun defaultHeaderIsEmpty() {
+        val store = ChannelOutputStore()
+        assertTrue(store.header().isEmpty())
+    }
+
+    @Test
+    fun headerSurvivesClearWhilePerTestMapsAreEmptied() {
+        val store = ChannelOutputStore()
+        val header = listOf(ChannelOutputStore.Chunk("cmd\n", null))
+        store.setHeader(header)
+        store.append("t1", "sql", "a", null)
+        store.appendAll("t1", "b", null)
+        store.appendOutput("t1", "c", null)
+
+        store.clear()
+
+        // Per-test maps are emptied...
+        assertTrue(store.channelsFor("t1").isEmpty())
+        assertTrue(store.allFor("t1").isEmpty())
+        assertTrue(store.outputFor("t1").isEmpty())
+        // ...but the header deliberately survives clear().
+        assertEquals(header, store.header())
+    }
+
+    @Test
+    fun setHeaderOverwritesPreviousHeader() {
+        val store = ChannelOutputStore()
+        store.setHeader(listOf(ChannelOutputStore.Chunk("first\n", null)))
+        val second = listOf(ChannelOutputStore.Chunk("second\n", "info"))
+        store.setHeader(second)
+        assertEquals(second, store.header())
+    }
+
+    @Test
     fun unknownKeysReturnEmptyNotNull() {
         val store = ChannelOutputStore()
         assertTrue(store.channelsFor("missing").isEmpty())
