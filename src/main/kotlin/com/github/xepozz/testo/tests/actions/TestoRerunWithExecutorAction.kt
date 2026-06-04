@@ -4,8 +4,12 @@ import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.ExecutionManager
 import com.intellij.execution.ExecutorRegistry
+import com.intellij.execution.RunManager
+import com.intellij.execution.RunnerAndConfigurationSettings
 import com.intellij.execution.executors.DefaultDebugExecutor
 import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.execution.configurations.RunConfiguration
+import com.intellij.execution.configurations.RunProfile
 import com.intellij.execution.configurations.WrappingRunConfiguration
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.ExecutionEnvironmentBuilder
@@ -23,7 +27,7 @@ import javax.swing.Icon
 
 // Unwrap the "Rerun Failed Tests" WrappingRunConfiguration to the real TestoRunConfiguration: keeps our buttons
 // visible and gives executor runners (notably coverage) a profile they accept, with the failed-subset filters intact.
-internal fun ExecutionEnvironment.testoRunProfile(): com.intellij.execution.configurations.RunProfile? =
+internal fun ExecutionEnvironment.testoRunProfile(): RunProfile? =
     when (val profile = runProfile) {
         is TestoRunConfiguration -> profile
         is WrappingRunConfiguration<*> -> profile.peer as? TestoRunConfiguration
@@ -62,13 +66,26 @@ open class TestoRerunWithExecutorAction(
         val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT) ?: return
         val target = environment.testoRunProfile() ?: return
         val executor = ExecutorRegistry.getInstance().getExecutorById(executorId) ?: return
-        val runner = ProgramRunner.getRunner(executorId, target) ?: return
-        val relaunch = ExecutionEnvironmentBuilder(environment)
-            .executor(executor)
-            .runner(runner)
-            .runProfile(target)
-            .build()
+        // Build the env from RunnerAndConfigurationSettings, the way the platform executor action does, so the
+        // executor's own RunnerSettings are attached (e.g. CoverageRunnerData — without it the Coverage tool window
+        // never opens).
+        val settings = settingsFor(environment, target) ?: return
+        val relaunch = ExecutionEnvironmentBuilder.createOrNull(executor, settings)
+            ?.dataContext(e.dataContext)
+            ?.build()
+            ?: return
         ExecutionManager.getInstance(relaunch.project).restartRunProfile(relaunch)
+    }
+
+    // Reuse the tab's saved settings when they describe this exact config; for the "rerun failed" clone (which lives
+    // outside RunManager) wrap it in throwaway settings so the executor's RunnerSettings are still created.
+    private fun settingsFor(environment: ExecutionEnvironment, target: RunProfile): RunnerAndConfigurationSettings? {
+        environment.runnerAndConfigurationSettings
+            ?.takeIf { it.configuration === target }
+            ?.let { return it }
+        val configuration = target as? RunConfiguration ?: return null
+        val factory = configuration.factory ?: return null
+        return RunManager.getInstance(configuration.project).createConfiguration(configuration, factory)
     }
 }
 

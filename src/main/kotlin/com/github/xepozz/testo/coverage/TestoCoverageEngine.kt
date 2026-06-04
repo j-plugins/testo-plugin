@@ -25,6 +25,22 @@ class TestoCoverageEnabledConfiguration(
         configuration.project.basePath?.let { "$it/runtime/clover.xml" } ?: super.getCoverageFilePath()!!
 }
 
+/**
+ * The Clover report lives inside the project (runtime/clover.xml), not under [com.intellij.openapi.application.PathManager.getSystemPath].
+ * The platform's default [CoverageSuite.deleteCachedCoverageData] stays silent only for files under the system dir;
+ * for a project file it pops a "Delete file '…' on disk?" confirmation on every rerun. The report is regenerated each
+ * run, so we don't delete it — which also removes the prompt.
+ */
+class TestoCoverageSuite(
+    name: String,
+    project: Project,
+    coverageRunner: CoverageRunner,
+    fileProvider: CoverageFileProvider,
+    timeStamp: Long,
+) : PhpCoverageSuite(name, project, coverageRunner, fileProvider, timeStamp) {
+    override fun deleteCachedCoverageData() = Unit
+}
+
 class TestoCoverageEngine : PhpUnitCoverageEngine() {
     override fun isApplicableTo(conf: RunConfigurationBase<*>) = conf is TestoRunConfiguration
 
@@ -40,7 +56,7 @@ class TestoCoverageEngine : PhpUnitCoverageEngine() {
         config: CoverageEnabledConfiguration
     ): CoverageSuite? {
         if (config is TestoCoverageEnabledConfiguration) {
-            return PhpCoverageSuite(name, project, coverageRunner, fileProvider, timeStamp)
+            return TestoCoverageSuite(name, project, coverageRunner, fileProvider, timeStamp)
         }
 
         return super.createCoverageSuite(name, project, coverageRunner, fileProvider, timeStamp, config)
