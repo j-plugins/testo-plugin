@@ -190,6 +190,7 @@ object TestoChannelsUi {
             val tabbed = ensureInstalled() ?: return
             val platform = outputComponent ?: return
             tabbed.removeAllTabs()
+            lazyTabs.clear()
             disposeDynamicConsoles()
             currentSelected = selected
             currentModel = model
@@ -218,9 +219,12 @@ object TestoChannelsUi {
                     val sample = leaves.firstNotNullOfOrNull { leaf ->
                         keyOf(leaf)?.let { store.channelsFor(it)[channel] }?.takeIf { it.isNotEmpty() }
                     } ?: emptyList()
-                    val cards = newCards(channelFileType(channel))
-                    addCardsAggregate(cards, viewer, leaves) { key, sink -> store.attachChannel(key, channel, sink) }
-                    addComponentTab(tabbed, humanize(channel), channelIcon(channel, sample), cards.component)
+                    // Build this channel's cards only when its tab is opened — see addLazyTab.
+                    addLazyTab(tabbed, humanize(channel), channelIcon(channel, sample)) {
+                        val cards = newCards(channelFileType(channel))
+                        addCardsAggregate(cards, viewer, leaves) { key, sink -> store.attachChannel(key, channel, sink) }
+                        cards.component
+                    }
                 }
                 return
             }
@@ -287,6 +291,36 @@ object TestoChannelsUi {
 
         private fun addComponentTab(tabbed: JBEditorTabs, title: String, icon: Icon, component: JComponent) {
             tabbed.addTab(TabInfo(component).setText(title).setIcon(icon))
+        }
+
+        // Each card is a full editor, so building every channel tab up front (10+ tabs × up to MAX_CARDS editors) froze
+        // the EDT for ~1.8s when a big suite/root was selected. A lazy tab builds its (potentially hundreds of) editors
+        // only the first time it is shown — selecting a node now only builds the visible "All" tab.
+        private class LazyTab(val build: () -> JComponent) {
+            var built = false
+        }
+
+        // Builder per lazy tab, keyed by its TabInfo (a side map avoids TabInfo.setObject/getObject, whose getter is
+        // absent on some builds). Cleared on every re-render in onSelected.
+        private val lazyTabs = HashMap<TabInfo, LazyTab>()
+
+        private fun addLazyTab(tabbed: JBEditorTabs, title: String, icon: Icon, build: () -> JComponent) {
+            val placeholder = JBPanel<Nothing>(BorderLayout()).apply { isOpaque = false }
+            val info = TabInfo(placeholder).setText(title).setIcon(icon)
+            lazyTabs[info] = LazyTab(build)
+            tabbed.addTab(info)
+        }
+
+        private fun buildLazyTab(info: TabInfo?) {
+            val tab = info ?: return
+            val lazy = lazyTabs[tab] ?: return
+            if (lazy.built) return
+            lazy.built = true
+            (tab.component as? JComponent)?.apply {
+                add(lazy.build(), BorderLayout.CENTER)
+                revalidate()
+                repaint()
+            }
         }
 
         private fun addCardsAggregate(
@@ -510,6 +544,10 @@ object TestoChannelsUi {
             private var index = 0
             private var released = false
             private var truncated = false
+            // Replaying a big aggregate (one card == one editor) blocked the EDT for ~1s. Cards built during the
+            // synchronous replay are queued and flushed in small batches off the event so selection stays responsive.
+            private val pending = ArrayDeque<Runnable>()
+            private var flushScheduled = false
             private val editors = mutableListOf<EditorEx>()
             private val fileEditors = mutableListOf<Pair<FileEditorProvider, FileEditor>>()
 
@@ -522,10 +560,37 @@ object TestoChannelsUi {
             // `released` also stops a chunk task queued just before this from materializing (and leaking) a new editor.
             fun release() {
                 released = true
+                pending.clear()
                 editors.forEach { EditorFactory.getInstance().releaseEditor(it) }
                 editors.clear()
                 fileEditors.forEach { (provider, fileEditor) -> runCatching { provider.disposeEditor(fileEditor) } }
                 fileEditors.clear()
+            }
+
+            // Queue a card-build to run in a later, small batch (keeps replay order; FIFO). Used for the on-EDT replay;
+            // live chunks (off the EDT) still post one-by-one as they arrive.
+            private fun schedule(task: Runnable) {
+                pending.addLast(task)
+                if (flushScheduled) return
+                flushScheduled = true
+                ApplicationManager.getApplication().invokeLater(::flushBatch)
+            }
+
+            private fun flushBatch() {
+                flushScheduled = false
+                if (released) {
+                    pending.clear()
+                    return
+                }
+                var n = 0
+                while (pending.isNotEmpty() && n < CARDS_PER_BATCH) {
+                    pending.removeFirst().run()
+                    n++
+                }
+                if (pending.isNotEmpty()) {
+                    flushScheduled = true
+                    ApplicationManager.getApplication().invokeLater(::flushBatch)
+                }
             }
 
             // Chunks arrive on the test-reader thread (replay happens on the EDT inside onSelected); hop to the EDT for
@@ -572,7 +637,7 @@ object TestoChannelsUi {
                     list.revalidate()
                     list.repaint()
                 }
-                if (app.isDispatchThread) task.run() else app.invokeLater(task)
+                if (app.isDispatchThread) schedule(task) else app.invokeLater(task)
             }
 
             private fun truncationNotice(): JComponent =
@@ -985,6 +1050,9 @@ object TestoChannelsUi {
             // The editor's own tabs widget: one row that scrolls and shows a "hidden tabs" dropdown when the channels
             // don't fit, instead of wrapping to extra rows like JBTabbedPane.
             val tabbed = JBEditorTabs(project, this)
+            tabbed.addListener(object : com.intellij.ui.tabs.TabsListener {
+                override fun selectionChanged(oldSelection: TabInfo?, newSelection: TabInfo?) = buildLazyTab(newSelection)
+            })
             addComponentTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, original)
             holder.add(tabbed.component, BorderLayout.CENTER)
             holder.revalidate()
@@ -1001,6 +1069,9 @@ object TestoChannelsUi {
 
             // Each message is a full editor; cap how many we materialize so a chatty channel can't spawn thousands.
             private const val MAX_CARDS = 300
+
+            // Cards built per EDT event during replay — small enough to keep the UI responsive, big enough to fill fast.
+            private const val CARDS_PER_BATCH = 25
 
             private val BASE_ICONS = listOf(
                 AllIcons.General.Filter,
