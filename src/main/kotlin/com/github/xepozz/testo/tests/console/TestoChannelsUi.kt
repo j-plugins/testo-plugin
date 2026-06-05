@@ -369,18 +369,20 @@ object TestoChannelsUi {
         private fun channelIcon(channel: String, chunks: List<ChannelOutputStore.Chunk>): Icon {
             // A channel whose suffix maps to a real file type shows that type's file icon (query.sql -> the SQL icon).
             channelFileType(channel)?.icon?.let { return it }
+            // Colour is always resolvable: explicit hint, ANSI in the output, else a stable hue hashed from the name.
             val color = channelColor(channel, chunks)
-            val mapped = store.channelIcon(channel)?.lowercase()?.let { ChannelIcons.MAP[it] }
-            if (mapped != null) return if (color != null) IconUtil.colorize(mapped, color) else mapped
-            if (color == null) return AllIcons.General.Filter
+            // Semantic icon: the explicit `icon=` hint first, then the channel name itself, matched against the map.
+            val mapped = store.channelIcon(channel)?.let { ChannelIcons.match(it) } ?: ChannelIcons.match(channel)
+            if (mapped != null) return IconUtil.colorize(mapped, color)
+            // No name match: a stable icon from the pool, tinted with the channel colour.
             val index = ((channel.hashCode() % ICON_POOL_SIZE) + ICON_POOL_SIZE) % ICON_POOL_SIZE
             return if (index < BASE_ICONS.size) IconUtil.colorize(BASE_ICONS[index], color) else DotIcon(color)
         }
 
-        private fun channelColor(channel: String, chunks: List<ChannelOutputStore.Chunk>): Color? {
+        private fun channelColor(channel: String, chunks: List<ChannelOutputStore.Chunk>): Color {
             store.channelColor(channel)?.let { parseColor(it) }?.let { return it }
             val decoder = AnsiEscapeDecoder()
-            return chunks.firstNotNullOfOrNull { chunk ->
+            val ansi = chunks.firstNotNullOfOrNull { chunk ->
                 val outputType =
                     if (chunk.level == "stderr") ProcessOutputTypes.STDERR else ProcessOutputTypes.STDOUT
                 var found: Color? = null
@@ -392,6 +394,14 @@ object TestoChannelsUi {
                 }
                 found
             }
+            // No declared/ANSI colour: derive a stable one from the name so the tab still gets a distinct, tinted icon.
+            return ansi ?: hashColor(channel)
+        }
+
+        // Deterministic per-name colour: hue from the name hash, fixed saturation/brightness tuned per theme.
+        private fun hashColor(channel: String): Color {
+            val hue = (((channel.hashCode() % 360) + 360) % 360) / 360f
+            return JBColor(Color.getHSBColor(hue, 0.55f, 0.55f), Color.getHSBColor(hue, 0.50f, 0.82f))
         }
 
         private fun parseColor(spec: String): Color? {

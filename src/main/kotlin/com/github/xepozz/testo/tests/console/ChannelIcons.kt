@@ -5,11 +5,24 @@ import com.intellij.icons.AllIcons
 import javax.swing.Icon
 
 /**
- * Maps a channel's `icon='...'` service-message hint to the platform icon shown on its tab. Shared by the tab
- * builder ([TestoChannelsUi]) and the preview action (`Tools | Testo | Channel Icons`). Keys are matched
- * lower-cased; the icon is tinted with the channel colour at display time.
+ * Maps a channel's `icon='...'` service-message hint — or, failing that, its own name — to the platform icon shown
+ * on its tab. Shared by the tab builder ([TestoChannelsUi]) and the preview action (`Tools | Testo | Channel Icons`).
+ * Keys are matched lower-cased; the icon is tinted with the channel colour at display time.
  */
 object ChannelIcons {
+
+    private val NON_ALNUM = Regex("[^a-z0-9]+")
+
+    /**
+     * Resolves an `icon=` hint OR a raw channel name to an icon: the lower-cased value as a whole first, then each
+     * alphanumeric token in it (so `assert_history` matches `assert`, `stdout` matches `stdout`). Null when nothing fits.
+     */
+    fun match(hint: String): Icon? {
+        val key = hint.lowercase()
+        MAP[key]?.let { return it }
+        return key.split(NON_ALNUM).firstNotNullOfOrNull { token -> token.takeIf { it.isNotEmpty() }?.let(MAP::get) }
+    }
+
     val MAP: Map<String, Icon> = linkedMapOf(
         // the one true channel — Testo's khinkali
         "testo" to TestoIcons.TESTO,
