@@ -55,10 +55,10 @@ internal fun openTestoHistory(project: Project, file: VirtualFile, targetUrl: St
  */
 internal fun openTestoHistoryForTest(project: Project, url: String) {
     com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread {
-        val root = com.intellij.execution.TestStateStorage.getTestHistoryRoot(project)
-        val files = com.intellij.execution.testframework.sm.TestHistoryConfiguration.getInstance(project).files
-            .map { File(root, it) }
-            .filter { it.exists() }
+        // Scan the directory directly (not TestHistoryConfiguration.files): a freshly-saved run lands on disk before
+        // it's registered there.
+        val files = (com.intellij.execution.TestStateStorage.getTestHistoryRoot(project)
+            .listFiles { f -> f.isFile && f.name.endsWith(".xml") } ?: emptyArray())
             .sortedByDescending { it.lastModified() }
         // Only the run that actually contains this test — do NOT fall back to an unrelated latest run (a saved run that
         // included the test may have been pruned out of the 10-file history; the lens still shows because the last

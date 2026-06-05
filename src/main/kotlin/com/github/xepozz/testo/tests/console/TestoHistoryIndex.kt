@@ -2,7 +2,6 @@ package com.github.xepozz.testo.tests.console
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.execution.TestStateStorage
-import com.intellij.execution.testframework.sm.TestHistoryConfiguration
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import java.io.File
@@ -35,10 +34,11 @@ internal object TestoHistoryIndex {
         return url in urls || urls.any { it.startsWith(url) }
     }
 
-    private fun historyFiles(project: Project): List<File> {
-        val root = TestStateStorage.getTestHistoryRoot(project)
-        return TestHistoryConfiguration.getInstance(project).files.map { File(root, it) }.filter { it.exists() }
-    }
+    // List the history directory directly rather than TestHistoryConfiguration.files: a just-saved run's file lands on
+    // disk before it is registered there, and we want the lens to appear as soon as the run is written.
+    private fun historyFiles(project: Project): List<File> =
+        TestStateStorage.getTestHistoryRoot(project).listFiles { f -> f.isFile && f.name.endsWith(".xml") }?.toList()
+            ?: emptyList()
 
     private fun scheduleRebuild(project: Project, key: String, files: List<File>, stamp: Long) {
         if (!building.add(key)) return
