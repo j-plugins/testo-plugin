@@ -52,7 +52,9 @@ internal fun openTestoHistory(project: Project, file: VirtualFile) {
  * Mirrors `AbstractImportTestsAction.ImportRunProfile` (reused for parsing the saved `<config>` and resolving the
  * target), but its first [getState] returns our [TestoImportedRunnableState] so the console is built on our properties.
  */
-private class TestoImportRunProfile(
+// Internal (not private) so the rerun actions' ExecutionEnvironment.testoRunProfile() can recognize an imported Testo
+// history tab as a Testo run tab and surface our toolbar's rerun split button on it.
+internal class TestoImportRunProfile(
     file: VirtualFile,
     project: Project,
     private val executor: Executor,
@@ -64,14 +66,17 @@ private class TestoImportRunProfile(
 
     val target get() = inner.target
 
+    /** The Testo run configuration reconstructed from the history `<config>`, if any — used by the rerun actions. */
+    val testoConfiguration: RunConfiguration? get() = inner.initialConfiguration
+
     override fun getState(executor: Executor, environment: ExecutionEnvironment): RunProfileState? {
         val config = inner.initialConfiguration
         if (!imported && config is SMRunnerConsolePropertiesProvider) {
             imported = true
             return TestoImportedRunnableState(config as RunConfiguration, ioFile)
         }
-        // Re-run from an imported tab (second invocation) or an unrecognized config: defer to the platform.
-        return inner.getState(executor, environment)
+        // Re-run from an imported tab (second invocation): run the original configuration's tests, not a re-import.
+        return config?.getState(executor, environment) ?: inner.getState(executor, environment)
     }
 
     override fun getName(): String = inner.initialConfiguration?.name ?: fallbackName

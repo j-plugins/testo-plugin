@@ -31,6 +31,9 @@ internal fun ExecutionEnvironment.testoRunProfile(): RunProfile? =
     when (val profile = runProfile) {
         is TestoRunConfiguration -> profile
         is WrappingRunConfiguration<*> -> profile.peer as? TestoRunConfiguration
+        // An imported Testo history tab — recognize it so the rerun split button shows there too. Its rerun runs the
+        // original reconstructed configuration.
+        is com.github.xepozz.testo.tests.console.TestoImportRunProfile -> profile.testoConfiguration as? TestoRunConfiguration
         else -> null
     }
 
