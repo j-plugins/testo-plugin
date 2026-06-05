@@ -185,21 +185,16 @@ object TestoChannelsUi {
 
                 addAggregateTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, viewer, leaves, attach = store::attachOutput)
 
+                // Every channel renders as cards (one per test, that test's messages merged); only the Output tab above
+                // stays a console. A language channel highlights each card; a format-less one keeps its ANSI.
                 for (channel in channelsAcross(leaves)) {
                     if (!channelHasVisible(leaves, channel)) continue
                     val sample = leaves.firstNotNullOfOrNull { leaf ->
                         keyOf(leaf)?.let { store.channelsFor(it)[channel] }?.takeIf { it.isNotEmpty() }
                     } ?: emptyList()
-                    val fileType = channelFileType(channel)
-                    if (fileType != null) {
-                        val cards = newCards(fileType)
-                        addCardsAggregate(cards, viewer, leaves) { key, sink -> store.attachChannel(key, channel, sink) }
-                        addComponentTab(tabbed, humanize(channel), channelIcon(channel, sample), cards.component)
-                    } else {
-                        addAggregateTab(tabbed, humanize(channel), channelIcon(channel, sample), viewer, leaves) { key, sink ->
-                            store.attachChannel(key, channel, sink)
-                        }
-                    }
+                    val cards = newCards(channelFileType(channel))
+                    addCardsAggregate(cards, viewer, leaves) { key, sink -> store.attachChannel(key, channel, sink) }
+                    addComponentTab(tabbed, humanize(channel), channelIcon(channel, sample), cards.component)
                 }
                 return
             }
@@ -218,15 +213,9 @@ object TestoChannelsUi {
             if (key != null) {
                 for ((channel, chunks) in store.channelsFor(key)) {
                     if (chunks.none { levelFilter.isVisible(it.level) }) continue
-                    val fileType = channelFileType(channel)
-                    if (fileType != null) {
-                        val cards = newCards(fileType)
-                        subscriptions += store.attachChannel(key, channel) { cards.add(it) }
-                        addComponentTab(tabbed, humanize(channel), channelIcon(channel, chunks), cards.component)
-                    } else {
-                        val view = newLiveConsole(emptyList()) { store.attachChannel(key, channel, it) }
-                        addTab(tabbed, humanize(channel), channelIcon(channel, chunks), view)
-                    }
+                    val cards = newCards(channelFileType(channel))
+                    subscriptions += store.attachChannel(key, channel) { cards.add(it) }
+                    addComponentTab(tabbed, humanize(channel), channelIcon(channel, chunks), cards.component)
                 }
             }
         }
@@ -892,29 +881,11 @@ object TestoChannelsUi {
             return view
         }
 
-        // A leaf-view console: prints the header (if any), then replays+streams one store stream into itself. The
-        // subscription is recorded so disposal detaches it. No per-leaf hyperlink header (unlike LiveAggregate).
-        private fun newLiveConsole(
-            header: List<ChannelOutputStore.Chunk>,
-            attach: ((ChannelOutputStore.Chunk) -> Unit) -> (() -> Unit),
-        ): ConsoleViewImpl {
-            val view = newConsole(header)
-            subscriptions += attach(liveSink(view))
-            return view
-        }
-
         private fun attachFilters(view: ConsoleViewImpl) {
             view.addMessageFilter(PhpBacktraceFileFilter(project))
             for (provider in ConsoleFilterProvider.FILTER_PROVIDERS.extensionList) {
                 runCatching { provider.getDefaultFilters(project) }.getOrNull()?.forEach { view.addMessageFilter(it) }
             }
-        }
-
-        // A live consumer for one console: its own AnsiEscapeDecoder so escape sequences spanning chunks decode
-        // correctly across the replayed history and the streamed-in tail.
-        private fun liveSink(view: ConsoleViewImpl): (ChannelOutputStore.Chunk) -> Unit {
-            val decoder = AnsiEscapeDecoder()
-            return { chunk -> if (levelFilter.isVisible(chunk.level)) printChunk(decoder, view, chunk) }
         }
 
         private fun printChunks(view: ConsoleViewImpl, chunks: List<ChannelOutputStore.Chunk>) {
