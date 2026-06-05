@@ -10,7 +10,6 @@ import com.intellij.execution.testframework.sm.runner.history.ImportedTestConsol
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.execution.ui.RunContentManager
-import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.util.concurrency.EdtScheduledExecutorService
@@ -38,11 +37,10 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             val descriptor = findDescriptor(executorId, handler) ?: return@invokeLater
             val console = descriptor.executionConsole as? SMTRunnerConsoleView ?: return@invokeLater
             if (console.properties !is TestoConsoleProperties) return@invokeLater
-            // The run's history XML is written on a background task after the process ends, and nothing else nudges the
-            // editor's daemon — so the "Show history" lens (gated on the history index) wouldn't appear for the tests
-            // that just ran. Restart the daemon a couple of times across the save window; once it sees the new file the
-            // index rebuilds and re-triggers the daemon itself.
-            val refresh = Runnable { if (!project.isDisposed) DaemonCodeAnalyzer.getInstance(project).restart() }
+            // The run's history XML is written on a background task after the process ends, so nudge the lens a couple
+            // of times across the save window. Once the index sees the new file it re-invalidates the lens itself; the
+            // first nudge that lands after the save is what makes the just-run test's lens appear (no IDE restart).
+            val refresh = Runnable { TestoHistoryIndex.refreshLens(project) }
             EdtScheduledExecutorService.getInstance().schedule(refresh, 1500, java.util.concurrent.TimeUnit.MILLISECONDS)
             EdtScheduledExecutorService.getInstance().schedule(refresh, 4000, java.util.concurrent.TimeUnit.MILLISECONDS)
         }

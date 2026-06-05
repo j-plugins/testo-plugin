@@ -1,8 +1,10 @@
 package com.github.xepozz.testo.tests.console
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
+import com.intellij.codeInsight.hints.codeVision.ModificationStampUtil
 import com.intellij.execution.TestStateStorage
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.project.Project
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -49,12 +51,31 @@ internal object TestoHistoryIndex {
                     runCatching { locationUrl.findAll(f.readText()).forEach { urls.add(it.groupValues[1]) } }
                 }
                 cache[key] = Snapshot(stamp, urls)
-                ApplicationManager.getApplication().invokeLater {
-                    if (!project.isDisposed) DaemonCodeAnalyzer.getInstance(project).restart()
-                }
+                refreshLens(project)
             } finally {
                 building.remove(key)
             }
+        }
+    }
+
+    /**
+     * Recompute the "Show history" lenses now. Code vision is gated by a PSI modification stamp: the daemon's code-vision
+     * pass self-skips when the file's stamp is unchanged, and a test run never touches the PHP source — so neither
+     * DaemonCodeAnalyzer.restart() nor CodeVisionHost.invalidateProvider re-runs getHint (the lens only refreshed on a
+     * full IDE restart). The platform's own recipe (CodeVisionHost.subscribeCVSettingsChanged) is to clear that stamp on
+     * each editor and then restart the daemon, which forces the pass to recompute getHint and repopulate the cache.
+     */
+    fun refreshLens(project: Project) {
+        ApplicationManager.getApplication().invokeLater {
+            if (project.isDisposed) return@invokeLater
+            // ModificationStampUtil is internal platform API; if it ever moves, degrade to "refreshes on next edit"
+            // rather than crashing — the restart below still runs.
+            runCatching {
+                EditorFactory.getInstance().allEditors
+                    .filter { it.project == project }
+                    .forEach { ModificationStampUtil.clearModificationStamp(it) }
+            }
+            DaemonCodeAnalyzer.getInstance(project).restart()
         }
     }
 }
