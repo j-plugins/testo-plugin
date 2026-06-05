@@ -52,7 +52,10 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
         // so the channel UI renders this as the first line of the "All" tab instead.
         private fun captureHeader(props: TestoConsoleProperties, handler: ProcessHandler) {
             val commandLine = (handler as? OSProcessHandler)?.commandLine ?: return
+            // DateFormatUtil emits a narrow no-break space (U+202F) before AM/PM on modern JDKs, which renders as a
+            // tofu box in the channel editor; normalize it (and NBSP) to a plain space.
             val startedAt = DateFormatUtil.formatTimeWithSeconds(System.currentTimeMillis())
+                .replace(' ', ' ').replace(' ', ' ')
             props.channelStore.setHeader(
                 listOf(ChannelOutputStore.Chunk("$commandLine\nTesting started at $startedAt\n\n", null))
             )

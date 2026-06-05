@@ -26,12 +26,13 @@ class TestoOutputToGeneralEventsConverter(
                 val key = keyFor(attrs["name"])
                 val out = attrs["out"] ?: ""
                 val level = attrs["level"]
+                val channel = attrs["channel"]?.takeIf { it.isNotEmpty() }
                 // Record the level so the filter menu can list it; storage keeps every chunk regardless.
                 levelFilter.noteSeen(level)
-                if (key != null) store.appendAll(key, out, level)
+                // Tag the all-stream chunk with its channel so the aggregated All tab can highlight per message.
+                if (key != null) store.appendAll(key, out, level, channel)
 
-                val channel = attrs["channel"]
-                if (!channel.isNullOrEmpty() && key != null) {
+                if (channel != null && key != null) {
                     attrs["icon"]?.takeIf { it.isNotBlank() }?.let { store.setChannelIcon(channel, it) }
                     attrs["color"]?.takeIf { it.isNotBlank() }?.let { store.setChannelColor(channel, it) }
                     store.append(key, channel, out, level)

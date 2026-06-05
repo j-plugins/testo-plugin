@@ -1,8 +1,11 @@
 package com.github.xepozz.testo.tests.console
 
 import com.github.xepozz.testo.TestoIcons
+import com.intellij.execution.filters.CompositeFilter
 import com.intellij.execution.filters.ConsoleFilterProvider
+import com.intellij.execution.filters.Filter
 import com.intellij.execution.filters.HyperlinkInfo
+import com.intellij.execution.impl.EditorHyperlinkSupport
 import com.intellij.execution.impl.ConsoleViewImpl
 import com.intellij.execution.process.AnsiEscapeDecoder
 import com.intellij.execution.process.ProcessOutputTypes
@@ -11,24 +14,57 @@ import com.intellij.execution.testframework.TestFrameworkRunningModel
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.testframework.sm.runner.ui.TestResultsViewer
+import com.intellij.codeInsight.folding.CodeFoldingManager
 import com.intellij.execution.ui.ConsoleViewContentType
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.EditorCustomElementRenderer
+import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.Inlay
 import com.intellij.openapi.editor.ex.EditorEx
+import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
+import com.intellij.openapi.editor.markup.HighlighterLayer
+import com.intellij.openapi.editor.markup.HighlighterTargetArea
 import com.intellij.openapi.editor.markup.TextAttributes
+import com.intellij.openapi.ide.CopyPasteManager
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.fileEditor.FileEditor
+import com.intellij.openapi.fileEditor.FileEditorProvider
+import com.intellij.openapi.fileEditor.TextEditorWithPreview
+import com.intellij.openapi.fileEditor.ex.FileEditorProviderManager
+import com.intellij.openapi.ui.popup.IconButton
+import com.intellij.openapi.fileTypes.FileType
+import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.fileTypes.PlainTextFileType
+import com.intellij.openapi.fileTypes.UnknownFileType
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.testFramework.LightVirtualFile
 import com.intellij.util.IconUtil
-import com.intellij.ui.components.JBTabbedPane
+import com.intellij.ui.HyperlinkLabel
+import com.intellij.ui.InplaceButton
+import com.intellij.ui.JBColor
+import com.intellij.ui.components.JBLabel
+import com.intellij.ui.components.JBLayeredPane
+import com.intellij.ui.components.JBPanel
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.panels.VerticalLayout
+import com.intellij.ui.tabs.TabInfo
+import com.intellij.ui.tabs.impl.JBEditorTabs
 import com.intellij.util.ui.JBUI
+import java.awt.AlphaComposite
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Component
+import java.awt.Cursor
+import java.awt.Dimension
+import java.awt.FlowLayout
+import java.awt.datatransfer.StringSelection
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Rectangle
@@ -36,6 +72,27 @@ import java.awt.RenderingHints
 import java.lang.reflect.Field
 import javax.swing.Icon
 import javax.swing.JComponent
+import javax.swing.JLayeredPane
+import javax.swing.Scrollable
+
+// The label shown for a test in aggregated channel output (the per-test header / hyperlink). Pure string logic, kept
+// top-level so it is unit-testable without the IDE platform. Handles:
+//  - a class method:            php_qn://file::\Ns\Class::method            -> \Ns\Class::method
+//  - a root-namespace method:   php_qn://file::\Class::method               -> \Class::method
+//  - a standalone function:     php_qn://file::\Ns\func (or \func)          -> \Ns\func (no doubling of the short name)
+//  - a dataset:                 php_qn://file::\Class::method with data set #N (presentable "Dataset #0:0 [0]")
+//                               -> \Class::method:Dataset #0:0 [0]  (Testo's " with data set #N" suffix is dropped in
+//                                  favour of the dataset's own presentable name, which already carries the index/value)
+internal fun testoDisplayName(locationUrl: String?, presentableName: String): String {
+    val raw = locationUrl
+        ?.substringAfter("://", "")
+        ?.substringAfter("::", "")
+        ?.takeIf { it.isNotBlank() }
+        ?: return presentableName
+    val fqn = raw.substringBefore(" with data set")
+    val method = fqn.substringAfterLast("::").substringAfterLast('\\')
+    return if (presentableName == method) fqn else "$fqn:$presentableName"
+}
 
 object TestoChannelsUi {
     // The platform console lives in TestResultsPanel.myConsole with no public accessor; reach it via reflection.
@@ -70,11 +127,14 @@ object TestoChannelsUi {
         private val myConsoleField: Field,
     ) : TestResultsViewer.EventsListener, Disposable {
 
-        private var tabs: JBTabbedPane? = null
+        private var tabs: JBEditorTabs? = null
         private var outputComponent: JComponent? = null
         private val dynamicConsoles = mutableListOf<ConsoleViewImpl>()
         private val subscriptions = mutableListOf<() -> Unit>()
-        private val activeAggregates = mutableListOf<LiveAggregate>()
+        // A per-parent live stream: console (LiveAggregate) or syntax-highlighted cards (CardsAggregate). Late leaves
+        // (onTestNodeAdded) are pushed into every active stream.
+        private val activeAggregates = mutableListOf<LeafStream>()
+        private val activeCards = mutableListOf<MessageCards>()
         private var currentSelected: SMTestProxy? = null
         private var currentModel: TestFrameworkRunningModel? = null
         private var currentViewer: TestResultsViewer? = null
@@ -102,28 +162,42 @@ object TestoChannelsUi {
         ) {
             val tabbed = ensureInstalled() ?: return
             val platform = outputComponent ?: return
-            while (tabbed.tabCount > 0) tabbed.removeTabAt(0)
+            tabbed.removeAllTabs()
             disposeDynamicConsoles()
             currentSelected = selected
             currentModel = model
             currentViewer = viewer
 
             if (selected == null) {
-                tabbed.addTab(OUTPUT_TAB, AllIcons.Debugger.Console, platform)
+                addComponentTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, platform)
                 return
             }
 
             if (!selected.isLeaf) {
                 val leaves = selected.allTests.filter { it !== selected && it.isLeaf }
-                addAggregateTab(tabbed, ALL_TAB, AllIcons.Actions.Show, viewer, leaves, prependHeader = true, store::attachAll)
+
+                // All: syntax-highlighted cards, language picked per message from its own channel.
+                val allCards = newCards(null)
+                store.header().forEach { allCards.add(it) }
+                addCardsAggregate(allCards, viewer, leaves) { key, sink -> store.attachAll(key, sink) }
+                addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
+
                 addAggregateTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, viewer, leaves, attach = store::attachOutput)
+
                 for (channel in channelsAcross(leaves)) {
                     if (!channelHasVisible(leaves, channel)) continue
                     val sample = leaves.firstNotNullOfOrNull { leaf ->
                         keyOf(leaf)?.let { store.channelsFor(it)[channel] }?.takeIf { it.isNotEmpty() }
                     } ?: emptyList()
-                    addAggregateTab(tabbed, humanize(channel), channelIcon(channel, sample), viewer, leaves) { key, sink ->
-                        store.attachChannel(key, channel, sink)
+                    val fileType = channelFileType(channel)
+                    if (fileType != null) {
+                        val cards = newCards(fileType)
+                        addCardsAggregate(cards, viewer, leaves) { key, sink -> store.attachChannel(key, channel, sink) }
+                        addComponentTab(tabbed, humanize(channel), channelIcon(channel, sample), cards.component)
+                    } else {
+                        addAggregateTab(tabbed, humanize(channel), channelIcon(channel, sample), viewer, leaves) { key, sink ->
+                            store.attachChannel(key, channel, sink)
+                        }
                     }
                 }
                 return
@@ -131,19 +205,27 @@ object TestoChannelsUi {
 
             val key = keyOf(selected)
             val header = store.header()
-            if (key != null) {
-                // Header printed once, then the "all" stream replays and stays live so a streaming test's output
-                // appears as it arrives instead of freezing on the first chunk.
-                addTab(tabbed, ALL_TAB, AllIcons.Actions.Show, newLiveConsole(header) { store.attachAll(key, it) })
-            } else if (header.isNotEmpty()) {
-                addTab(tabbed, ALL_TAB, AllIcons.Actions.Show, newConsole(header))
+            // All: highlighted cards (per-message language). Header chunks first, then the live "all" stream replays
+            // and keeps appending, so a streaming test's messages show up as they arrive.
+            if (key != null || header.isNotEmpty()) {
+                val allCards = newCards(null)
+                header.forEach { allCards.add(it) }
+                if (key != null) subscriptions += store.attachAll(key) { allCards.add(it) }
+                addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
             }
-            tabbed.addTab(OUTPUT_TAB, AllIcons.Debugger.Console, platform)
+            addComponentTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, platform)
             if (key != null) {
                 for ((channel, chunks) in store.channelsFor(key)) {
                     if (chunks.none { levelFilter.isVisible(it.level) }) continue
-                    val view = newLiveConsole(emptyList()) { store.attachChannel(key, channel, it) }
-                    addTab(tabbed, humanize(channel), channelIcon(channel, chunks), view)
+                    val fileType = channelFileType(channel)
+                    if (fileType != null) {
+                        val cards = newCards(fileType)
+                        subscriptions += store.attachChannel(key, channel) { cards.add(it) }
+                        addComponentTab(tabbed, humanize(channel), channelIcon(channel, chunks), cards.component)
+                    } else {
+                        val view = newLiveConsole(emptyList()) { store.attachChannel(key, channel, it) }
+                        addTab(tabbed, humanize(channel), channelIcon(channel, chunks), view)
+                    }
                 }
             }
         }
@@ -183,17 +265,45 @@ object TestoChannelsUi {
             outputComponent = null
         }
 
-        private fun addTab(tabbed: JBTabbedPane, title: String, icon: Icon, view: ConsoleViewImpl?) {
-            if (view != null) tabbed.addTab(title, icon, view.component)
+        private fun addTab(tabbed: JBEditorTabs, title: String, icon: Icon, view: ConsoleViewImpl?) {
+            if (view != null) addComponentTab(tabbed, title, icon, view.component)
+        }
+
+        private fun addComponentTab(tabbed: JBEditorTabs, title: String, icon: Icon, component: JComponent) {
+            tabbed.addTab(TabInfo(component).setText(title).setIcon(icon))
+        }
+
+        private fun addCardsAggregate(
+            cards: MessageCards,
+            viewer: TestResultsViewer,
+            leaves: List<SMTestProxy>,
+            attach: (String, (ChannelOutputStore.Chunk) -> Unit) -> (() -> Unit),
+        ) {
+            val aggregate = CardsAggregate(cards, viewer, attach)
+            leaves.forEach { aggregate.addLeaf(it) }
+            activeAggregates += aggregate
+        }
+
+        // The channel suffix after the last dot picks the language (query.sql -> SQL); null when there's no real
+        // language to highlight (no suffix, or the language's plugin isn't installed) -> caller falls back to console.
+        private fun channelFileType(channel: String?): FileType? {
+            val ext = channel?.substringAfterLast('.', "")?.takeIf { it.isNotBlank() } ?: return null
+            val fileType = FileTypeManager.getInstance().getFileTypeByExtension(ext)
+            return fileType.takeUnless { it is UnknownFileType || it is PlainTextFileType }
         }
 
         private fun disposeDynamicConsoles() {
             subscriptions.forEach { it() }
             subscriptions.clear()
             activeAggregates.clear()
+            activeCards.forEach { it.release() }
+            activeCards.clear()
             dynamicConsoles.forEach { Disposer.dispose(it) }
             dynamicConsoles.clear()
         }
+
+        private fun newCards(fixedFileType: FileType?): MessageCards =
+            MessageCards(fixedFileType).also { activeCards += it }
 
         private fun channelsAcross(leaves: List<SMTestProxy>): Set<String> {
             val channels = LinkedHashSet<String>()
@@ -207,6 +317,8 @@ object TestoChannelsUi {
             }
 
         private fun channelIcon(channel: String, chunks: List<ChannelOutputStore.Chunk>): Icon {
+            // A channel whose suffix maps to a real file type shows that type's file icon (query.sql -> the SQL icon).
+            channelFileType(channel)?.icon?.let { return it }
             val color = channelColor(channel, chunks)
             val mapped = store.channelIcon(channel)?.lowercase()?.let { ChannelIcons.MAP[it] }
             if (mapped != null) return if (color != null) IconUtil.colorize(mapped, color) else mapped
@@ -243,8 +355,18 @@ object TestoChannelsUi {
             }.getOrNull()
         }
 
+        // Tint a level label by PSR severity; unknown levels stay neutral gray.
+        private fun levelColor(level: String): Color = when (level.lowercase()) {
+            "emergency", "alert", "critical", "error", "stderr" -> NAMED_COLORS.getValue("red")
+            "warning" -> NAMED_COLORS.getValue("orange")
+            "notice" -> NAMED_COLORS.getValue("yellow")
+            "info" -> NAMED_COLORS.getValue("blue")
+            "debug" -> NAMED_COLORS.getValue("cyan")
+            else -> JBColor.GRAY
+        }
+
         private fun addAggregateTab(
-            tabbed: JBTabbedPane,
+            tabbed: JBEditorTabs,
             title: String,
             icon: Icon,
             viewer: TestResultsViewer,
@@ -260,6 +382,26 @@ object TestoChannelsUi {
             addTab(tabbed, title, icon, view)
         }
 
+        // A parent-node tab fed by several leaves; late leaves (onTestNodeAdded) are pushed in after selection.
+        private interface LeafStream {
+            fun addLeaf(leaf: SMTestProxy)
+        }
+
+        // Cards counterpart of LiveAggregate: each leaf's chunks become highlighted cards, tagged with the test name.
+        private inner class CardsAggregate(
+            private val cards: MessageCards,
+            private val viewer: TestResultsViewer,
+            private val attach: (String, (ChannelOutputStore.Chunk) -> Unit) -> (() -> Unit),
+        ) : LeafStream {
+            private val attached = HashSet<String>()
+
+            override fun addLeaf(leaf: SMTestProxy) {
+                val key = keyOf(leaf) ?: return
+                if (!attached.add(key)) return
+                subscriptions += attach(key) { chunk -> cards.add(chunk, fullName(leaf)) { selectInTree(viewer, leaf) } }
+            }
+        }
+
         /**
          * One parent-node tab: subscribes leaves' streams into a single console and appends as output arrives. A
          * leaf's hyperlinked header is printed lazily on its first chunk and re-printed when output switches to
@@ -270,11 +412,11 @@ object TestoChannelsUi {
             private val view: ConsoleViewImpl,
             private val viewer: TestResultsViewer,
             private val attach: (String, (ChannelOutputStore.Chunk) -> Unit) -> (() -> Unit),
-        ) {
+        ) : LeafStream {
             private var lastKey: String? = null
             private val attached = HashSet<String>()
 
-            fun addLeaf(leaf: SMTestProxy) {
+            override fun addLeaf(leaf: SMTestProxy) {
                 val key = keyOf(leaf) ?: return
                 if (!attached.add(key)) return
                 val decoder = AnsiEscapeDecoder()
@@ -293,6 +435,365 @@ object TestoChannelsUi {
             }
         }
 
+        // A vertical, scrollable stack of read-only "cards" — one per message. Each card body is a real viewer editor
+        // over a PSI-backed light file, so it renders with the full editor experience: language syntax highlighting,
+        // folding and annotators. fixedFileType is set for single-language channel tabs; null means derive the language
+        // per message from its own channel (used by the mixed All tab).
+        private inner class MessageCards(private val fixedFileType: FileType?) {
+            private val list = object : JBPanel<Nothing>(VerticalLayout(JBUI.scale(6))), Scrollable {
+                override fun getPreferredScrollableViewportSize(): Dimension = preferredSize
+                override fun getScrollableUnitIncrement(r: Rectangle, orientation: Int, direction: Int) = JBUI.scale(16)
+                override fun getScrollableBlockIncrement(r: Rectangle, orientation: Int, direction: Int) = JBUI.scale(96)
+                override fun getScrollableTracksViewportWidth() = true
+                override fun getScrollableTracksViewportHeight() = false
+            }.apply { border = JBUI.Borders.empty(4) }
+
+            val component: JComponent = JBScrollPane(list).apply { border = JBUI.Borders.empty() }
+
+            private var index = 0
+            private var released = false
+            private var truncated = false
+            private val editors = mutableListOf<EditorEx>()
+            private val fileEditors = mutableListOf<Pair<FileEditorProvider, FileEditor>>()
+
+            // The previous card, for folding consecutive format-less same-channel messages into one canvas.
+            private var lastMergeKey: String? = null
+            private var lastEditor: EditorEx? = null
+            private var lastCard: JComponent? = null
+
+            // Editors aren't released by merely removing their Swing component; the controller calls this on rebuild.
+            // `released` also stops a chunk task queued just before this from materializing (and leaking) a new editor.
+            fun release() {
+                released = true
+                editors.forEach { EditorFactory.getInstance().releaseEditor(it) }
+                editors.clear()
+                fileEditors.forEach { (provider, fileEditor) -> runCatching { provider.disposeEditor(fileEditor) } }
+                fileEditors.clear()
+            }
+
+            // Chunks arrive on the test-reader thread (replay happens on the EDT inside onSelected); hop to the EDT for
+            // the Swing/editor mutation. invokeLater is FIFO, so message order is preserved. onLeafClick, when set,
+            // makes the per-test name in the header navigate back to that test in the tree.
+            fun add(chunk: ChannelOutputStore.Chunk, leafLabel: String? = null, onLeafClick: (() -> Unit)? = null) {
+                if (released || !levelFilter.isVisible(chunk.level)) return
+                // Decode ANSI once: the plain text drives the blank check and the body; segments tint plain cards.
+                val (plain, segments) = decodeAnsi(chunk.text.trim('\n'))
+                if (plain.isBlank()) return
+                val fileType = fixedFileType ?: channelFileType(chunk.channel)
+                val app = ApplicationManager.getApplication()
+                val task = Runnable {
+                    if (released) return@Runnable
+                    // Consecutive format-less messages from the same channel/test fold into one canvas: append to the
+                    // previous card's editor instead of stacking another card.
+                    val mergeKey = if (fileType == null) "${chunk.channel} $leafLabel" else null
+                    val target = if (mergeKey != null && mergeKey == lastMergeKey) {
+                        lastEditor?.takeUnless { it.isDisposed }
+                    } else {
+                        null
+                    }
+                    if (target != null) {
+                        appendToEditor(target, plain, segments)
+                        lastCard?.revalidate()
+                        list.revalidate()
+                        list.repaint()
+                        return@Runnable
+                    }
+                    if (index >= MAX_CARDS) {
+                        if (!truncated) {
+                            truncated = true
+                            list.add(truncationNotice())
+                            list.revalidate()
+                            list.repaint()
+                        }
+                        return@Runnable
+                    }
+                    val (component, editor) = card(++index, chunk, leafLabel, onLeafClick, fileType, plain, segments)
+                    list.add(component)
+                    lastMergeKey = mergeKey
+                    lastEditor = if (mergeKey != null) editor else null
+                    lastCard = component
+                    list.revalidate()
+                    list.repaint()
+                }
+                if (app.isDispatchThread) task.run() else app.invokeLater(task)
+            }
+
+            private fun truncationNotice(): JComponent =
+                JBLabel("… further messages hidden (showing first $MAX_CARDS)").apply {
+                    font = JBUI.Fonts.smallFont()
+                    foreground = JBColor.GRAY
+                    border = JBUI.Borders.empty(6)
+                }
+
+            private fun card(
+                n: Int,
+                chunk: ChannelOutputStore.Chunk,
+                leafLabel: String?,
+                onLeafClick: (() -> Unit)?,
+                fileType: FileType?,
+                plain: String,
+                segments: List<AnsiSegment>,
+            ): Pair<JComponent, EditorEx?> {
+                // Left: #N · channel, then (in aggregate tabs) the test name as a link that re-selects it in the tree.
+                val left = JBPanel<Nothing>(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+                    isOpaque = false
+                    border = JBUI.Borders.empty(3, 6, 2, 6)
+                    val idText = buildString { append('#').append(n); chunk.channel?.let { append("  ·  ").append(it) } }
+                    add(JBLabel(idText).apply { font = JBUI.Fonts.smallFont(); foreground = JBColor.GRAY })
+                    if (leafLabel != null) {
+                        add(JBLabel("  ·  ").apply { font = JBUI.Fonts.smallFont(); foreground = JBColor.GRAY })
+                        add(HyperlinkLabel(leafLabel).apply { addHyperlinkListener { onLeafClick?.invoke() } })
+                    }
+                }
+                // Header: identity on the left, the log level pinned to the right and tinted by severity.
+                val header = JBPanel<Nothing>(BorderLayout()).apply {
+                    isOpaque = false
+                    add(left, BorderLayout.WEST)
+                    chunk.level?.takeIf { it.isNotBlank() }?.let { level ->
+                        add(JBLabel(level).apply {
+                            font = JBUI.Fonts.smallFont()
+                            foreground = levelColor(level)
+                            border = JBUI.Borders.empty(3, 8, 2, 8)
+                        }, BorderLayout.EAST)
+                    }
+                }
+                // A language message gets that language's highlighting (ANSI dropped); a format-less message keeps its
+                // ANSI colors over a plain-text viewer — and only those (mergeableEditor) fold into one canvas.
+                val mergeableEditor: EditorEx?
+                val body: JComponent
+                if (fileType != null) {
+                    body = previewCard(fileType, plain) ?: editorCard(fileType, plain, null).first
+                    mergeableEditor = null
+                } else {
+                    val (component, editor) = editorCard(PlainTextFileType.INSTANCE, plain, segments)
+                    body = component
+                    mergeableEditor = editor
+                }
+                val wrapper = JBPanel<Nothing>(BorderLayout()).apply {
+                    border = JBUI.Borders.customLine(JBColor.border(), 1)
+                    add(header, BorderLayout.NORTH)
+                    add(withFloatingActions(body, mergeableEditor, plain), BorderLayout.CENTER)
+                }
+                return wrapper to mergeableEditor
+            }
+
+            // A right-aligned floating action bar laid over the message body (for now a single Copy button — the
+            // embedded viewer copies via Cmd+C but its right-click popup can't). Hidden until the card is hovered, then
+            // faded in, so it never sits on top of the text when you aren't reaching for it.
+            private fun withFloatingActions(body: JComponent, editor: EditorEx?, staticText: String): JComponent {
+                val copy = InplaceButton(IconButton("Copy", AllIcons.Actions.Copy)) {
+                    // Read the editor live so a merged (appended-to) card copies its full current text, not just the first message.
+                    val text = editor?.takeUnless { it.isDisposed }?.document?.text ?: staticText
+                    CopyPasteManager.getInstance().setContents(StringSelection(text))
+                }.apply { cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) }
+                val actions = object : JBPanel<Nothing>(FlowLayout(FlowLayout.RIGHT, 0, 0)) {
+                    var alpha = 0f
+                    init {
+                        isOpaque = false
+                        isVisible = false
+                        add(copy)
+                    }
+
+                    override fun paint(g: Graphics) {
+                        val g2 = g.create() as Graphics2D
+                        try {
+                            g2.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha.coerceIn(0f, 1f))
+                            super.paint(g2)
+                        } finally {
+                            g2.dispose()
+                        }
+                    }
+                }
+                val layered = object : JBLayeredPane() {
+                    init {
+                        isOpaque = false
+                        add(body, JLayeredPane.DEFAULT_LAYER as Any)
+                        add(actions, JLayeredPane.PALETTE_LAYER as Any)
+                    }
+
+                    override fun getPreferredSize(): Dimension = body.preferredSize
+
+                    override fun doLayout() {
+                        body.setBounds(0, 0, width, height)
+                        val size = actions.preferredSize
+                        actions.setBounds(width - size.width - JBUI.scale(8), JBUI.scale(6), size.width, size.height)
+                    }
+                }
+
+                var fade: javax.swing.Timer? = null
+                fun fadeTo(target: Float) {
+                    if (target > 0f) actions.isVisible = true
+                    fade?.stop()
+                    fade = javax.swing.Timer(16, null).apply {
+                        addActionListener {
+                            val delta = if (actions.alpha < target) FADE_STEP else -FADE_STEP
+                            actions.alpha = (actions.alpha + delta).coerceIn(0f, 1f)
+                            actions.repaint()
+                            if (kotlin.math.abs(actions.alpha - target) <= FADE_STEP) {
+                                actions.alpha = target
+                                actions.repaint()
+                                if (target == 0f) actions.isVisible = false
+                                (it.source as javax.swing.Timer).stop()
+                            }
+                        }
+                        start()
+                    }
+                }
+
+                object : com.intellij.ui.hover.HoverListener() {
+                    override fun mouseEntered(component: Component, x: Int, y: Int) = fadeTo(1f)
+                    override fun mouseMoved(component: Component, x: Int, y: Int) = Unit
+                    override fun mouseExited(component: Component) = fadeTo(0f)
+                }.addTo(layered)
+
+                return layered
+            }
+
+            // For a type whose own editor ships a preview (Markdown), embed that real editor — source + rendered
+            // preview with the platform's layout toggle — instead of a plain source viewer. Returns null for types
+            // without such an editor (the caller then uses the source viewer).
+            private fun previewCard(fileType: FileType, text: String): JComponent? {
+                // Gate cheaply by type so we never build a heavy editor just to learn the type has no preview, then
+                // confirm by contract (the editor must actually be a TextEditorWithPreview) rather than provider FQN.
+                if (!fileType.name.equals("Markdown", ignoreCase = true)) return null
+                val ext = fileType.defaultExtension.ifBlank { "txt" }
+                val vFile = LightVirtualFile("testo-message-$index.$ext", fileType, text).apply { isWritable = false }
+                val providers = runCatching { FileEditorProviderManager.getInstance().getProviderList(project, vFile) }
+                    .getOrNull().orEmpty()
+                // Pick the provider that actually yields a preview editor (not just the first registered one).
+                val previewEditor = providers.firstNotNullOfOrNull { provider ->
+                    val fileEditor = runCatching { provider.createEditor(project, vFile) }.getOrNull()
+                    when (fileEditor) {
+                        is TextEditorWithPreview -> { fileEditors += provider to fileEditor; fileEditor }
+                        null -> null
+                        else -> { runCatching { provider.disposeEditor(fileEditor) }; null }
+                    }
+                } ?: return null
+                previewEditor.setLayout(TextEditorWithPreview.Layout.SHOW_EDITOR_AND_PREVIEW)
+                val fileEditor: FileEditor = previewEditor
+                return object : JBPanel<Nothing>(BorderLayout()) {
+                    init {
+                        isOpaque = false
+                        add(fileEditor.component, BorderLayout.CENTER)
+                    }
+
+                    // The preview's height is HTML-driven and unknown up front; give the card a fixed, roomy height.
+                    override fun getPreferredSize(): Dimension =
+                        Dimension(super.getPreferredSize().width, JBUI.scale(260))
+                }
+            }
+
+            // A real viewer editor (not EditorTextField, which restricts the popup so Copy is greyed out): read-only,
+            // but with working selection/copy, a lexer highlighter, line numbers and folding.
+            private fun editorCard(fileType: FileType, text: String, ansiSegments: List<AnsiSegment>?): Pair<JComponent, EditorEx> {
+                val ext = fileType.defaultExtension.ifBlank { "txt" }
+                val vFile = LightVirtualFile("testo-message-$index.$ext", fileType, text)
+                val document = FileDocumentManager.getInstance().getDocument(vFile)
+                    ?: EditorFactory.getInstance().createDocument(text)
+                val editor = EditorFactory.getInstance().createViewer(document, project) as EditorEx
+                editors += editor
+                editor.highlighter = EditorHighlighterFactory.getInstance().createEditorHighlighter(project, vFile)
+                editor.setVerticalScrollbarVisible(false)
+                // Keep the horizontal scrollbar (as-needed) so long lines can be scrolled — the card itself never
+                // grows wider than the channel tab, and soft wraps are off.
+                editor.setHorizontalScrollbarVisible(true)
+                editor.setBorder(JBUI.Borders.empty(2, 0))
+                editor.settings.apply {
+                    isLineNumbersShown = true
+                    isFoldingOutlineShown = true
+                    isLineMarkerAreaShown = false
+                    isIndentGuidesShown = false
+                    isUseSoftWraps = false
+                    isCaretRowShown = false
+                    isVirtualSpace = false
+                    isAdditionalPageAtBottom = false
+                    isRightMarginShown = false
+                    additionalLinesCount = 0
+                    additionalColumnsCount = 0
+                }
+                ansiSegments?.let { applyAnsi(editor, it) }
+                // Folding commits the PSI (a write); defer off the construction path to a non-modal invokeLater. Hook up
+                // clickable file:line links here too (the console path got these from message filters).
+                ApplicationManager.getApplication().invokeLater(
+                    {
+                        if (!editor.isDisposed) {
+                            runCatching { CodeFoldingManager.getInstance(project).buildInitialFoldings(editor) }
+                            attachHyperlinks(editor)
+                        }
+                    },
+                    ModalityState.nonModal(),
+                )
+                val wrapper = object : JBPanel<Nothing>(BorderLayout()) {
+                    init {
+                        isOpaque = false
+                        add(editor.component, BorderLayout.CENTER)
+                    }
+
+                    // Grow to fit every line; the outer scroll pane handles vertical overflow. Reserve room for the
+                    // horizontal scrollbar when it's showing so it doesn't cover the last line.
+                    override fun getPreferredSize(): Dimension {
+                        val lines = editor.document.lineCount.coerceAtLeast(1)
+                        var height = editor.lineHeight * lines + JBUI.scale(8)
+                        editor.scrollPane.horizontalScrollBar?.takeIf { it.isVisible }?.let { height += it.preferredSize.height }
+                        return Dimension(super.getPreferredSize().width, height)
+                    }
+                }
+                return wrapper to editor
+            }
+
+            // Append a format-less message to an existing card's editor (the "one canvas" merge) and tint its ANSI run.
+            private fun appendToEditor(editor: EditorEx, plain: String, segments: List<AnsiSegment>) {
+                val document = editor.document
+                val base = document.textLength
+                WriteCommandAction.runWriteCommandAction(project) { document.insertString(base, "\n$plain") }
+                applyAnsi(editor, segments, base + 1)
+            }
+
+            private fun applyAnsi(editor: EditorEx, segments: List<AnsiSegment>, base: Int = 0) {
+                var offset = base
+                val max = editor.document.textLength
+                for (segment in segments) {
+                    val end = (offset + segment.text.length).coerceAtMost(max)
+                    if (segment.attributes != null && offset < end) {
+                        editor.markupModel.addRangeHighlighter(
+                            offset, end, HighlighterLayer.SYNTAX, segment.attributes, HighlighterTargetArea.EXACT_RANGE,
+                        )
+                    }
+                    offset = end
+                }
+            }
+
+            // Same filters the console path attached (PhpBacktraceFileFilter + ConsoleFilterProvider defaults), applied
+            // to the embedded viewer so file:line references in stack traces / failure details stay clickable.
+            private fun attachHyperlinks(editor: EditorEx) {
+                val filters = buildList<Filter> {
+                    add(PhpBacktraceFileFilter(project))
+                    for (provider in ConsoleFilterProvider.FILTER_PROVIDERS.extensionList) {
+                        runCatching { provider.getDefaultFilters(project) }.getOrNull()?.let { addAll(it) }
+                    }
+                }
+                runCatching {
+                    EditorHyperlinkSupport.get(editor)
+                        .highlightHyperlinks(CompositeFilter(project, filters), 0, editor.document.lineCount)
+                }
+            }
+        }
+
+        private class AnsiSegment(val text: String, val attributes: TextAttributes?)
+
+        // Splits ANSI-coloured text into the plain string plus per-run color attributes (null for the default color).
+        private fun decodeAnsi(raw: String): Pair<String, List<AnsiSegment>> {
+            val plain = StringBuilder()
+            val segments = mutableListOf<AnsiSegment>()
+            AnsiEscapeDecoder().escapeText(raw, ProcessOutputTypes.STDOUT) { text, key ->
+                val attributes = if (key === ProcessOutputTypes.STDOUT) null
+                else ConsoleViewContentType.getConsoleViewType(key).attributes
+                segments += AnsiSegment(text, attributes)
+                plain.append(text)
+            }
+            return plain.toString() to segments
+        }
+
         private fun selectInTree(viewer: TestResultsViewer, leaf: SMTestProxy) {
             val properties = console.properties
             if (leaf.isPassed && TestConsoleProperties.HIDE_PASSED_TESTS.value(properties)) {
@@ -303,15 +804,7 @@ object TestoChannelsUi {
             }
         }
 
-        private fun fullName(leaf: SMTestProxy): String {
-            val fqn = leaf.locationUrl
-                ?.substringAfter("://", "")
-                ?.substringAfter("::", "")
-                ?.takeIf { it.isNotBlank() }
-                ?: return leaf.presentableName
-            val method = fqn.substringAfterLast("::")
-            return if (leaf.presentableName == method) fqn else "$fqn:${leaf.presentableName}"
-        }
+        private fun fullName(leaf: SMTestProxy): String = testoDisplayName(leaf.locationUrl, leaf.presentableName)
 
         private fun keyOf(leaf: SMTestProxy): String? = store.keyFor(leaf.name)
 
@@ -377,7 +870,7 @@ object TestoChannelsUi {
             }
         }
 
-        private fun ensureInstalled(): JBTabbedPane? {
+        private fun ensureInstalled(): JBEditorTabs? {
             tabs?.let { return it }
             val original = myConsoleField.get(console.resultsViewer) as? JComponent ?: run {
                 thisLogger().warn("Testo channels disabled: TestResultsPanel.myConsole is not a JComponent")
@@ -390,12 +883,11 @@ object TestoChannelsUi {
             }
 
             holder.remove(original)
-            val tabbed = JBTabbedPane()
-            // JBTabbedPane wraps every tab's content in PANEL_SMALL_INSETS; null disables that so the console sits
-            // flush like the stock one instead of gaining a padding border.
-            tabbed.tabComponentInsets = null
-            tabbed.addTab(OUTPUT_TAB, AllIcons.Debugger.Console, original)
-            holder.add(tabbed, BorderLayout.CENTER)
+            // The editor's own tabs widget: one row that scrolls and shows a "hidden tabs" dropdown when the channels
+            // don't fit, instead of wrapping to extra rows like JBTabbedPane.
+            val tabbed = JBEditorTabs(project, this)
+            addComponentTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, original)
+            holder.add(tabbed.component, BorderLayout.CENTER)
             holder.revalidate()
             holder.repaint()
             tabs = tabbed
@@ -406,6 +898,10 @@ object TestoChannelsUi {
         companion object {
             private const val ALL_TAB = "All"
             private const val OUTPUT_TAB = "Output"
+            private const val FADE_STEP = 0.18f
+
+            // Each message is a full editor; cap how many we materialize so a chatty channel can't spawn thousands.
+            private const val MAX_CARDS = 300
 
             private val BASE_ICONS = listOf(
                 AllIcons.General.Filter,

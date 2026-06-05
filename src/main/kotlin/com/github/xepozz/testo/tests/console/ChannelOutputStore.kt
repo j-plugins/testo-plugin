@@ -8,7 +8,8 @@ package com.github.xepozz.testo.tests.console
  * order without extra synchronization.
  */
 class ChannelOutputStore {
-    data class Chunk(val text: String, val level: String?)
+    // channel is carried on the "all" stream too, so the aggregated All tab can pick a per-message language.
+    data class Chunk(val text: String, val level: String?, val channel: String? = null)
 
     private class LiveBuffer {
         private val chunks = mutableListOf<Chunk>()
@@ -67,8 +68,8 @@ class ChannelOutputStore {
         }
     }
 
-    fun appendAll(testKey: String, text: String, level: String?) {
-        synchronized(lock) { allByTest.getOrPut(testKey) { LiveBuffer() }.append(Chunk(text, level)) }
+    fun appendAll(testKey: String, text: String, level: String?, channel: String? = null) {
+        synchronized(lock) { allByTest.getOrPut(testKey) { LiveBuffer() }.append(Chunk(text, level, channel)) }
     }
 
     fun appendOutput(testKey: String, text: String, level: String?) {
