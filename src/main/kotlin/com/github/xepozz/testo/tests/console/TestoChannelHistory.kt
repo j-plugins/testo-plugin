@@ -83,6 +83,15 @@ internal object TestoChannelHistory {
                 // Pass the root so install() renders the whole imported tree's aggregate immediately, independent of the
                 // async JTree selection (which is often still null at this instant).
                 TestoChannelsUi.install(console, store, levelFilter, project, console, root)
+                // If "Show history" was clicked on a specific test, select its node so the user lands on that test.
+                val targetUrl = (console.properties as? TestoImportedConsoleProperties)?.targetUrl
+                if (targetUrl != null && root != null) {
+                    val match = findByLocationUrl(root, targetUrl)
+                    val form = console.resultsViewer as? SMTestRunnerResultsForm
+                    if (match != null && form != null) {
+                        ApplicationManager.getApplication().invokeLater { form.selectAndNotify(match) }
+                    }
+                }
                 return
             }
             lastCount = count
@@ -102,6 +111,20 @@ internal object TestoChannelHistory {
             action(child)
             forEachDescendant(child, action)
         }
+    }
+
+    // Find the node for a clicked test. Prefer an exact locationUrl match; fall back to a node whose url starts with the
+    // target (a data-provider method whose datasets carry a " with data set #N" suffix), so selecting it shows the
+    // method's aggregate.
+    private fun findByLocationUrl(root: SMTestProxy, url: String): SMTestProxy? {
+        var prefixMatch: SMTestProxy? = null
+        var result: SMTestProxy? = null
+        forEachDescendant(root) { proxy ->
+            val loc = proxy.locationUrl
+            if (loc == url) result = result ?: proxy
+            else if (prefixMatch == null && loc != null && loc.startsWith(url)) prefixMatch = proxy
+        }
+        return result ?: prefixMatch
     }
 
     /** Encodes the test's full "all" stream (and the icon/color of every channel it used) for [SMTestProxy.setMetainfo]. */

@@ -71,9 +71,10 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
     private fun historyHint(url: String): String? = "Show history"
 
     override fun handleClick(editor: Editor, element: PsiElement, event: MouseEvent?) {
-        openLatestHistory(element.project)
-        // TODO(follow-up): after the imported tree is built, select the specific test node via
-        //  TestResultsViewer.selectAndNotify matching SMTestProxy.getLocationUrl() == the test url.
+        val function = element as? Function ?: return openLatestHistory(element.project)
+        val url = TestoTestRunLineMarkerProvider.getLocationHint(function)
+        // Open the most recent run that actually contains this test (not just the globally latest) and select its node.
+        com.github.xepozz.testo.tests.console.openTestoHistoryForTest(element.project, url)
     }
 
     /**

@@ -34,10 +34,10 @@ import javax.swing.Icon
  * import. We reconstruct the same import, but build the console on a subclass that re-delegates `createImportActions`,
  * so an imported-history tab carries the exact toolbar a live run does.
  */
-internal fun openTestoHistory(project: Project, file: VirtualFile) {
+internal fun openTestoHistory(project: Project, file: VirtualFile, targetUrl: String? = null) {
     try {
         val executor = DefaultRunExecutor.getRunExecutorInstance()
-        val profile = TestoImportRunProfile(file, project, executor)
+        val profile = TestoImportRunProfile(file, project, executor, targetUrl)
         ExecutionEnvironmentBuilder.create(project, executor, profile)
             .executor(executor)
             .target(profile.target)
@@ -45,6 +45,29 @@ internal fun openTestoHistory(project: Project, file: VirtualFile) {
     } catch (e: Exception) {
         Logger.getInstance("com.github.xepozz.testo.tests.console.TestoHistoryImport")
             .warn("Testo: failed to import test history ${file.path}", e)
+    }
+}
+
+/**
+ * "Show history" for one test: open the most recent saved run that actually contains [url] (so clicking a test doesn't
+ * land on an unrelated latest run), and once imported, select that test's node. Falls back to the newest run overall.
+ * Scans files off the EDT (the largest history XML is sizeable), then imports on the EDT.
+ */
+internal fun openTestoHistoryForTest(project: Project, url: String) {
+    com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread {
+        val root = com.intellij.execution.TestStateStorage.getTestHistoryRoot(project)
+        val files = com.intellij.execution.testframework.sm.TestHistoryConfiguration.getInstance(project).files
+            .map { File(root, it) }
+            .filter { it.exists() }
+            .sortedByDescending { it.lastModified() }
+        val target = files.firstOrNull { f -> runCatching { f.readText().contains(url) }.getOrDefault(false) }
+            ?: files.firstOrNull()
+            ?: return@executeOnPooledThread
+        com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+            val vf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target)
+                ?: return@invokeLater
+            openTestoHistory(project, vf, url)
+        }
     }
 }
 
@@ -58,6 +81,7 @@ internal class TestoImportRunProfile(
     file: VirtualFile,
     project: Project,
     private val executor: Executor,
+    private val targetUrl: String? = null,
 ) : RunProfile {
     private val inner = AbstractImportTestsAction.ImportRunProfile(file, project, executor)
     private val ioFile = VfsUtilCore.virtualToIoFile(file)
@@ -73,7 +97,7 @@ internal class TestoImportRunProfile(
         val config = inner.initialConfiguration
         if (!imported && config is SMRunnerConsolePropertiesProvider) {
             imported = true
-            return TestoImportedRunnableState(config as RunConfiguration, ioFile)
+            return TestoImportedRunnableState(config as RunConfiguration, ioFile, targetUrl)
         }
         // Re-run from an imported tab (second invocation): run the original configuration's tests, not a re-import.
         return config?.getState(executor, environment) ?: inner.getState(executor, environment)
@@ -87,13 +111,14 @@ internal class TestoImportRunProfile(
 private class TestoImportedRunnableState(
     private val initialConfig: RunConfiguration,
     private val file: File,
+    private val targetUrl: String?,
 ) : RunProfileState {
     override fun execute(executor: Executor, runner: ProgramRunner<*>): ExecutionResult {
         val handler = NopProcessHandler()
         val delegate = (initialConfig as SMRunnerConsolePropertiesProvider)
             .createTestConsoleProperties(DefaultRunExecutor.getRunExecutorInstance()) as TestoConsoleProperties
         val props = TestoImportedConsoleProperties(
-            delegate, file, handler, initialConfig.project, initialConfig, delegate.testFrameworkName, executor,
+            delegate, file, handler, initialConfig.project, initialConfig, delegate.testFrameworkName, executor, targetUrl,
         )
         Disposer.register(props, delegate)
 
@@ -120,6 +145,8 @@ internal class TestoImportedConsoleProperties(
     config: RunConfiguration,
     frameworkName: String,
     executor: Executor,
+    // The locationUrl of the test the "Show history" lens was clicked on, so installForImport can select its node.
+    val targetUrl: String? = null,
 ) : ImportedTestConsoleProperties(delegate, file, handler, project, config, frameworkName, executor) {
     override fun createImportActions(): Array<AnAction> = delegate.createImportActions()
 }
