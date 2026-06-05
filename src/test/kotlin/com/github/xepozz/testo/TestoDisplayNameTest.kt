@@ -63,7 +63,7 @@ class TestoDisplayNameTest {
     @Test
     fun datasetDropsWithDataSetSuffixAndUsesItsPresentableName() {
         assertEquals(
-            "\\Tests\\Sandbox\\Self\\AssertTest::dataProvider:Dataset #0:0 [0]",
+            "\\Tests\\Sandbox\\Self\\AssertTest::dataProvider with data set #0:0",
             testoDisplayName(
                 "php_qn://path/to/AssertTest.php::\\Tests\\Sandbox\\Self\\AssertTest::dataProvider with data set #0",
                 "Dataset #0:0 [0]",
@@ -78,10 +78,10 @@ class TestoDisplayNameTest {
         val displayed = rows.mapIndexed { i, name -> testoDisplayName("$base$i", name) }
         assertEquals(
             listOf(
-                "\\Tests\\Sandbox\\Self\\AssertTest::dataProvider:Dataset #0:0 [0]",
-                "\\Tests\\Sandbox\\Self\\AssertTest::dataProvider:Dataset #0:1 [1]",
-                "\\Tests\\Sandbox\\Self\\AssertTest::dataProvider:Dataset #1:0 [0]",
-                "\\Tests\\Sandbox\\Self\\AssertTest::dataProvider:Dataset #2:0 [name]",
+                "\\Tests\\Sandbox\\Self\\AssertTest::dataProvider with data set #0:0",
+                "\\Tests\\Sandbox\\Self\\AssertTest::dataProvider with data set #0:1",
+                "\\Tests\\Sandbox\\Self\\AssertTest::dataProvider with data set #1:0",
+                "\\Tests\\Sandbox\\Self\\AssertTest::dataProvider with data set #2:0",
             ),
             displayed,
         )
@@ -92,7 +92,7 @@ class TestoDisplayNameTest {
     @Test
     fun datasetWithBracketedValueContainingDigitsIsPreserved() {
         assertEquals(
-            "\\Tests\\Sandbox\\Self\\AssertTest::dataProvider:Dataset #0:8 [Any warrior can change the world.]",
+            "\\Tests\\Sandbox\\Self\\AssertTest::dataProvider with data set #0:8",
             testoDisplayName(
                 "php_qn://path/to/AssertTest.php::\\Tests\\Sandbox\\Self\\AssertTest::dataProvider with data set #8",
                 "Dataset #0:8 [Any warrior can change the world.]",

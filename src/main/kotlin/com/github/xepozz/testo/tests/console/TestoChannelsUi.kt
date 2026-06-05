@@ -87,15 +87,23 @@ import javax.swing.Scrollable
 //  - a dataset:                 php_qn://file::\Class::method with data set #N (presentable "Dataset #0:0 [0]")
 //                               -> \Class::method:Dataset #0:0 [0]  (Testo's " with data set #N" suffix is dropped in
 //                                  favour of the dataset's own presentable name, which already carries the index/value)
+private val DATASET_INDEX_SUFFIX = Regex("(:\\d+)+$")
+
 internal fun testoDisplayName(locationUrl: String?, presentableName: String): String {
     val raw = locationUrl
         ?.substringAfter("://", "")
         ?.substringAfter("::", "")
         ?.takeIf { it.isNotBlank() }
         ?: return presentableName
-    val fqn = raw.substringBefore(" with data set")
+    // Reduce the location to the bare method FQN by dropping Testo's two dataset markers — the " with data set #N"
+    // suffix and the numeric "method:0[:0]" index — so we can re-render the dataset uniformly below.
+    val fqn = raw.substringBefore(" with data set").replace(DATASET_INDEX_SUFFIX, "")
     val method = fqn.substringAfterLast("::").substringAfterLast('\\')
-    return if (presentableName == method) fqn else "$fqn:$presentableName"
+    if (presentableName == method) return fqn
+    // A dataset's presentable name is "Dataset #<index> [<value>]"; show it as "<method> with data set #<index>"
+    // (Testo's wording), dropping the bracketed value. Non-dataset names fall back to "<method>:<name>".
+    val datasetIndex = presentableName.substringAfter("Dataset #", "").substringBefore(" [").trim()
+    return if (datasetIndex.isNotEmpty()) "$fqn with data set #$datasetIndex" else "$fqn:$presentableName"
 }
 
 object TestoChannelsUi {

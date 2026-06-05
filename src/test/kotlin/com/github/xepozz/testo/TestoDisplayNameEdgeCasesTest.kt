@@ -59,8 +59,21 @@ class TestoDisplayNameEdgeCasesTest {
     @Test
     fun datasetSuffixOnRootNamespaceMethodKeepsLabel() {
         assertEquals(
-            "\\C::m:Dataset #1:2 [x]",
+            "\\C::m with data set #1:2",
             testoDisplayName("php_qn://path/C.php::\\C::m with data set #3", "Dataset #1:2 [x]"),
+        )
+    }
+
+    @Test
+    fun numericIndexLocationRendersAsWithDataSetDroppingTheBracketedValue() {
+        // The clearPhpDoc case: location uses the "method:0" index form (not " with data set #N"), and the bracketed
+        // value is dropped — so "clearPhpDoc:0" + "Dataset #0 [0]" -> "...clearPhpDoc with data set #0".
+        assertEquals(
+            "\\Testo\\Core\\Definition\\TestDefinition::clearPhpDoc with data set #0",
+            testoDisplayName(
+                "php_qn://path/TestDefinition.php::\\Testo\\Core\\Definition\\TestDefinition::clearPhpDoc:0",
+                "Dataset #0 [0]",
+            ),
         )
     }
 }
