@@ -21,7 +21,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.WriteIntentReadAction
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.EditorCustomElementRenderer
 import com.intellij.openapi.editor.EditorFactory
@@ -749,7 +749,7 @@ object TestoChannelsUi {
                 if (!fileType.name.equals("Markdown", ignoreCase = true)) return null
                 // Built on the EDT from a tree-selection event, which doesn't hold read access by default; provider
                 // createEditor reads the document, so wrap in a read action.
-                return WriteIntentReadAction.compute<JComponent?, RuntimeException> {
+                return ReadAction.compute<JComponent?, RuntimeException> {
                     val ext = fileType.defaultExtension.ifBlank { "txt" }
                     val vFile = LightVirtualFile("testo-message-$index.$ext", fileType, text).apply { isWritable = false }
                     val providers = runCatching { FileEditorProviderManager.getInstance().getProviderList(project, vFile) }
@@ -783,7 +783,7 @@ object TestoChannelsUi {
             private fun editorCard(fileType: FileType, text: String, ansiSegments: List<AnsiSegment>?): Pair<JComponent, EditorEx> =
                 // Built on the EDT from a tree-selection event, which (since the platform 2024+ threading model) does NOT
                 // hold read access by default — getDocument/editor creation read the model, so wrap in a read action.
-                WriteIntentReadAction.compute<Pair<JComponent, EditorEx>, RuntimeException> {
+                ReadAction.compute<Pair<JComponent, EditorEx>, RuntimeException> {
                 val ext = fileType.defaultExtension.ifBlank { "txt" }
                 val vFile = LightVirtualFile("testo-message-$index.$ext", fileType, text)
                 val document = FileDocumentManager.getInstance().getDocument(vFile)
