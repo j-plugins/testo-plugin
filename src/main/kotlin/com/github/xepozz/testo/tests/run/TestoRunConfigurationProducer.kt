@@ -60,7 +60,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
 ) {
     override fun isEnabled(project: Project) = TestoUtil.isEnabled(project)
 
-    override fun setupConfiguration(
+    public override fun setupConfiguration(
         testRunnerSettings: PhpTestRunnerSettings,
         element: PsiElement,
         virtualFile: VirtualFile
@@ -86,7 +86,18 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             val function = element.owner as? Function ?: return null
             setupConfiguration(testRunnerSettings, function, element.containingFile.virtualFile) ?: return null
             val index = PsiUtil.getAttributeOrder(element, function)
-            if (index == -1) return null
+
+            // `#[Test]` is runnable but NOT numbered (it has no attribute group), so
+            // getAttributeOrder returns -1. In that case run the method as a plain test
+            // (no `:index` suffix, no data-provider/dataset indices) instead of bailing out.
+            // Numbered attributes (DataProvider/DataSet/.../TestInline/Bench) keep the `:index` suffix.
+            if (index == -1) {
+                testRunnerSettings.dataProviderIndex = -1
+                testRunnerSettings.dataSetIndex = -1
+                testRunnerSettings.testoType = resolveTestoType(element)
+
+                return element
+            }
 
             testRunnerSettings.methodName += ":$index"
             testRunnerSettings.dataProviderIndex = index
