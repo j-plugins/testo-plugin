@@ -13,7 +13,6 @@ import com.intellij.execution.configurations.RunProfile
 import com.intellij.execution.configurations.WrappingRunConfiguration
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.ExecutionEnvironmentBuilder
-import com.intellij.execution.runners.FakeRerunAction
 import com.intellij.execution.runners.ProgramRunner
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
@@ -113,8 +112,22 @@ class TestoRerunWithCoverageAction : TestoRerunWithExecutorAction(
     hideWhenCurrent = true,
 )
 
-// Subclasses the platform rerun so the main button inherits its per-executor icon and "rerun current environment" restart.
-class TestoRerunCurrentAction : FakeRerunAction()
+// The split button's main action: reruns the current tab's environment with its own executor. Mirrors the platform
+// "Rerun" (per-executor icon + restart-current) through public API, so it needs no internal FakeRerunAction.
+class TestoRerunCurrentAction : AnAction(), DumbAware {
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+
+    override fun update(e: AnActionEvent) {
+        val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT)
+        e.presentation.isEnabledAndVisible = environment != null
+        if (environment != null) e.presentation.icon = environment.executor.icon ?: AllIcons.Actions.Restart
+    }
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT) ?: return
+        ExecutionManager.getInstance(environment.project).restartRunProfile(environment)
+    }
+}
 
 class TestoRerunSplitButtonAction : SplitButtonAction(buildExecutorGroup()) {
     private val mainAction = TestoRerunCurrentAction()
@@ -156,13 +169,28 @@ class TestoRerunSplitButtonAction : SplitButtonAction(buildExecutorGroup()) {
 }
 
 // Overrides the platform "Rerun": in SPLIT_BUTTON mode it steps aside for Testo tabs (the split button takes over);
-// otherwise it behaves exactly like the platform action.
-class TestoAwareRerunAction : FakeRerunAction() {
+// otherwise it reruns the current environment, the same restart the platform action performs — done through public
+// API (restartRunProfile) so it carries no dependency on the internal FakeRerunAction.
+class TestoAwareRerunAction : AnAction(), DumbAware {
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+
     override fun update(e: AnActionEvent) {
-        super.update(e)
         val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT)
-        if (environment?.isTestoRunTab() == true && TestoRerunStyleSettings.style == TestoRerunStyle.SPLIT_BUTTON) {
+        if (environment == null) {
             e.presentation.isEnabledAndVisible = false
+            return
         }
+        // Step aside for the split button on Testo tabs in split-button mode.
+        if (environment.isTestoRunTab() && TestoRerunStyleSettings.style == TestoRerunStyle.SPLIT_BUTTON) {
+            e.presentation.isEnabledAndVisible = false
+            return
+        }
+        e.presentation.isEnabledAndVisible = true
+        e.presentation.icon = environment.executor.icon ?: AllIcons.Actions.Restart
+    }
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT) ?: return
+        ExecutionManager.getInstance(environment.project).restartRunProfile(environment)
     }
 }
