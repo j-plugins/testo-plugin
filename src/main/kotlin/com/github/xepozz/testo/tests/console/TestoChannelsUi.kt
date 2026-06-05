@@ -455,6 +455,8 @@ object TestoChannelsUi {
                 border = JBUI.Borders.customLine(JBColor.border(), 0, 0, 1, 0)
             }
             private var stickyOffsetY = 0
+            private var stickyX = 0
+            private var stickyWidth = 0
             private var stickyIdx = -1
             private val cardEntries = mutableListOf<CardEntry>()
 
@@ -468,7 +470,7 @@ object TestoChannelsUi {
 
                 override fun doLayout() {
                     scroll.setBounds(0, 0, width, height)
-                    sticky.setBounds(0, stickyOffsetY, width, sticky.preferredSize.height)
+                    sticky.setBounds(stickyX, stickyOffsetY, if (stickyWidth > 0) stickyWidth else width, sticky.preferredSize.height)
                 }
             }
 
@@ -638,8 +640,13 @@ object TestoChannelsUi {
                 val stickyHeight = sticky.preferredSize.height
                 val next = cardEntries.getOrNull(topIdx + 1)
                 stickyOffsetY = if (next != null) (next.panel.y - y - stickyHeight).coerceAtMost(0) else 0
+                // Align the overlay exactly over the card (the list's border + the card's own border shift it right),
+                // so the pinned header doesn't drift sideways from where the real header sat.
+                val panel = cardEntries[topIdx].panel
+                stickyX = panel.x + panel.insets.left
+                stickyWidth = (panel.width - panel.insets.left - panel.insets.right).coerceAtLeast(0)
                 // Position immediately (don't wait for an async revalidate/doLayout) and force a repaint of the overlay.
-                sticky.setBounds(0, stickyOffsetY, component.width, stickyHeight)
+                sticky.setBounds(stickyX, stickyOffsetY, stickyWidth, stickyHeight)
                 sticky.isVisible = true
                 component.repaint()
             }
