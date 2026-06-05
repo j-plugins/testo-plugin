@@ -74,6 +74,7 @@ import java.lang.reflect.Field
 import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JLayeredPane
+import javax.swing.JViewport
 import javax.swing.Scrollable
 
 // The label shown for a test in aggregated channel output (the per-test header / hyperlink). Pure string logic, kept
@@ -438,7 +439,12 @@ object TestoChannelsUi {
                 override fun getScrollableTracksViewportHeight() = false
             }.apply { border = JBUI.Borders.empty(4) }
 
-            private val scroll = JBScrollPane(list).apply { border = JBUI.Borders.empty() }
+            private val scroll = JBScrollPane(list).apply {
+                border = JBUI.Borders.empty()
+                // No blit-copy scrolling: it leaves the sticky overlay un-repainted (it "disappears" until something
+                // forces a full repaint). SIMPLE mode repaints the viewport each scroll so the overlay stays drawn.
+                viewport.scrollMode = JViewport.SIMPLE_SCROLL_MODE
+            }
 
             // Sticky card header: the header of the message currently at the top stays pinned (like the editor's sticky
             // lines), pushed up as the next card's header arrives. Overlaid so it takes no layout space.
@@ -468,6 +474,10 @@ object TestoChannelsUi {
 
             init {
                 scroll.viewport.addChangeListener { updateSticky() }
+                // Cards stream in (the list grows) without a viewport move — refresh the pinned header then too.
+                list.addComponentListener(object : java.awt.event.ComponentAdapter() {
+                    override fun componentResized(e: java.awt.event.ComponentEvent) = updateSticky()
+                })
             }
 
             private var index = 0
@@ -615,7 +625,6 @@ object TestoChannelsUi {
                     if (sticky.isVisible) {
                         sticky.isVisible = false
                         stickyIdx = -1
-                        component.revalidate()
                         component.repaint()
                     }
                     return
@@ -624,12 +633,14 @@ object TestoChannelsUi {
                     stickyIdx = topIdx
                     sticky.removeAll()
                     sticky.add(cardEntries[topIdx].buildHeader(), BorderLayout.CENTER)
+                    sticky.validate()
                 }
                 val stickyHeight = sticky.preferredSize.height
                 val next = cardEntries.getOrNull(topIdx + 1)
                 stickyOffsetY = if (next != null) (next.panel.y - y - stickyHeight).coerceAtMost(0) else 0
+                // Position immediately (don't wait for an async revalidate/doLayout) and force a repaint of the overlay.
+                sticky.setBounds(0, stickyOffsetY, component.width, stickyHeight)
                 sticky.isVisible = true
-                component.doLayout()
                 component.repaint()
             }
 
