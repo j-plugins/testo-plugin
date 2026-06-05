@@ -58,20 +58,18 @@ internal object TestoChannelHistory {
 
     /**
      * Wire an imported-history console: once the replayed tree is fully built, decode every proxy's metainfo into the
-     * store and install the channel UI. Called when the augmenter sees an `ImportedTestConsoleProperties` console.
+     * store and install the channel UI. Called when the augmenter sees a `TestoImportRunProfile` run tab.
      *
      * We poll instead of subscribing to `SMTRunnerEventsListener`: the augmenter only hands us the console after
      * `processStarted`, by which point a small import may have already replayed and fired (and missed) its events,
      * leaving the channels empty even though the tree shows. Polling for a stable node count is immune to that race and
      * never double-decodes (a single pass over the finished tree).
      */
-    fun installForImport(project: Project, console: SMTRunnerConsoleView) {
-        // When we drive the import (TestoImportedConsoleProperties), reuse its delegate's store + level filter so the
-        // toolbar log-level filter and the channel UI share one state. The platform import path (clock dropdown) has no
-        // delegate, so fall back to fresh ones.
-        val delegate = (console.properties as? TestoImportedConsoleProperties)?.delegate
-        val store = delegate?.channelStore ?: ChannelOutputStore()
-        val levelFilter = delegate?.levelFilter ?: LogLevelFilter()
+    fun installForImport(project: Project, console: SMTRunnerConsoleView, targetUrl: String?) {
+        // The platform builds the imported console, so there is no shared delegate state. Rebuild the channels from the
+        // metainfo the run stored into each proxy, into a fresh store + level filter.
+        val store = ChannelOutputStore()
+        val levelFilter = LogLevelFilter()
         val alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, console)
         var lastCount = -1
         fun poll(attempt: Int) {
@@ -84,7 +82,6 @@ internal object TestoChannelHistory {
                 // async JTree selection (which is often still null at this instant).
                 TestoChannelsUi.install(console, store, levelFilter, project, console, root)
                 // If "Show history" was clicked on a specific test, select its node so the user lands on that test.
-                val targetUrl = (console.properties as? TestoImportedConsoleProperties)?.targetUrl
                 if (targetUrl != null && root != null) {
                     val match = findByLocationUrl(root, targetUrl)
                     val form = console.resultsViewer as? SMTestRunnerResultsForm

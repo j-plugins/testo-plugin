@@ -6,7 +6,6 @@ import com.intellij.execution.ExecutorRegistry
 import com.intellij.execution.process.OSProcessHandler
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.runners.ExecutionEnvironment
-import com.intellij.execution.testframework.sm.runner.history.ImportedTestConsoleProperties
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.execution.ui.RunContentManager
@@ -21,13 +20,18 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
         ApplicationManager.getApplication().invokeLater {
             val descriptor = findDescriptor(executorId, handler) ?: return@invokeLater
             val console = descriptor.executionConsole as? SMTRunnerConsoleView ?: return@invokeLater
-            when (val props = console.properties) {
+            val props = console.properties
+            val importProfile = env.runProfile as? TestoImportRunProfile
+            when {
                 // Live run: build the channel UI and start stamping per-test channel output onto proxy metainfo.
-                is TestoConsoleProperties -> installChannels(project, console, props, handler)
-                // Imported history: the platform forces its own console+converter, so our converter never runs; rebuild
-                // the channels from the metainfo we stored at export time.
-                is ImportedTestConsoleProperties -> TestoChannelHistory.installForImport(project, console)
-                else -> {}
+                props is TestoConsoleProperties -> installChannels(project, console, props, handler)
+                // Our "Show history" lens import: detected by our own run profile (no dependency on the internal
+                // ImportedTestConsoleProperties), carrying the clicked test's url so its node gets pre-selected.
+                importProfile != null -> TestoChannelHistory.installForImport(project, console, importProfile.targetUrl)
+                // Platform "Import Test Results" (the history clock dropdown) of a Testo run: an imported console with no
+                // Testo run profile. Recognized by class name so we keep no compile-time tie to the internal
+                // ImportedTestConsoleProperties; rebuild channels from metainfo just the same (no clicked test to select).
+                isImportedConsole(props) -> TestoChannelHistory.installForImport(project, console, null)
             }
         }
     }
@@ -46,6 +50,17 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
         }
     }
 
+    // True when the console's properties are (a subclass of) the platform's imported-history properties, matched by FQN
+    // so this carries no bytecode reference to the @ApiStatus.Internal class.
+    private fun isImportedConsole(props: Any?): Boolean {
+        var c: Class<*>? = props?.javaClass
+        while (c != null) {
+            if (c.name == IMPORTED_CONSOLE_PROPERTIES_FQN) return true
+            c = c.superclass
+        }
+        return false
+    }
+
     private fun findDescriptor(executorId: String, handler: ProcessHandler): RunContentDescriptor? {
         val manager = RunContentManager.getInstance(project)
         ExecutorRegistry.getInstance().getExecutorById(executorId)?.let { executor ->
@@ -55,6 +70,9 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
     }
 
     companion object {
+        private const val IMPORTED_CONSOLE_PROPERTIES_FQN =
+            "com.intellij.execution.testframework.sm.runner.history.ImportedTestConsoleProperties"
+
         // Single entry point for wiring the channel tabs, shared by the run-path listener above and the debug runner
         // (which installs them directly because its descriptor isn't registered when processStarted fires). The
         // channelsInstalled flag keeps a second caller for the same console from installing twice.

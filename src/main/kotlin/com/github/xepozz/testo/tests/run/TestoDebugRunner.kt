@@ -1,7 +1,6 @@
 package com.github.xepozz.testo.tests.run
 
 import com.github.xepozz.testo.tests.TestoConsoleProperties
-import com.github.xepozz.testo.tests.actions.TestoRerunFailedTestsAction
 import com.github.xepozz.testo.tests.console.TestoConsoleAugmenter
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.configurations.PtyCommandLine
@@ -9,18 +8,15 @@ import com.intellij.execution.configurations.RunProfileState
 import com.intellij.execution.configurations.WrappingRunConfiguration
 import com.intellij.execution.process.ProcessTerminatedListener
 import com.intellij.execution.runners.ExecutionEnvironment
-import com.intellij.execution.testframework.autotest.ToggleAutoTestAction
 import com.intellij.execution.testframework.sm.SMTestRunnerConnectionUtil
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.ui.RunContentDescriptor
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.util.SmartList
 import com.intellij.xdebugger.XDebugProcess
 import com.intellij.xdebugger.XDebugProcessStarter
 import com.intellij.xdebugger.XDebugSession
 import com.intellij.xdebugger.XDebuggerManager
-import com.intellij.xdebugger.impl.XDebugSessionImpl
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.config.PhpProjectConfigurationFacade
 import com.jetbrains.php.config.commandLine.PhpCommandSettingsBuilder
@@ -89,21 +85,9 @@ class TestoDebugRunner : PhpTestDebugRunner<TestoRunConfiguration>(TestoRunConfi
                     onSessionStart(session, debugServer, sessionId, connectionsManager, project, interpreter, processHandler)
                     val driver = debugExtension.debugDriver
 
-                    val rerunAction = TestoRerunFailedTestsAction(console, properties)
-                    rerunAction.setModelProvider { console.resultsViewer }
-
-                    // Bring the run-tab split Rerun (Run/Debug/Coverage) into the debug session: it is registered on
-                    // RunTab.TopToolbar, which the debug tab does not use, so hand it to the session's restart actions
-                    // alongside our rerun-failed + auto-test. (The log-level filter lives on the console's own toolbar
-                    // via TestoConsoleProperties, so it needs no wiring here.)
-                    val actionManager = ActionManager.getInstance()
-                    val restartActions = buildList {
-                        actionManager.getAction("Testo.RerunSplit")?.let { add(it) }
-                        add(rerunAction)
-                        add(ToggleAutoTestAction())
-                    }
-                    (session as XDebugSessionImpl).addRestartActions(*restartActions.toTypedArray())
-
+                    // The rerun-failed action rides the SM test console's own toolbar (added by the framework from our
+                    // TestoConsoleProperties), so the debug session needs no extra restart-action wiring here. Pushing
+                    // them onto the session toolbar would require the internal XDebugSessionImpl.addRestartActions.
                     return PhpDebugProcessFactory.forPhpTests(
                         session,
                         sessionId,
