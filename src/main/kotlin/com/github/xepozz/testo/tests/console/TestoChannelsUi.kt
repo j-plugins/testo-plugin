@@ -111,6 +111,9 @@ object TestoChannelsUi {
         levelFilter: LogLevelFilter,
         project: Project,
         parent: Disposable,
+        // Imports pass the root proxy to render the whole tree deterministically; a live run leaves this null and uses
+        // whatever is selected (nothing yet at startup).
+        initialSelection: SMTestProxy? = null,
     ) {
         val field = myConsoleField
         if (field == null) {
@@ -123,11 +126,14 @@ object TestoChannelsUi {
         viewer.addEventsListener(controller)
         // addEventsListener only forwards FUTURE tree-selection changes (it installs a TreeSelectionListener and never
         // replays the current selection). A live run selects nodes after we attach, so that's fine — but an imported
-        // console is already populated and a node is already selected by the time the augmenter hands it to us, so the
-        // channel view would stay empty until the user clicks. Render the current selection now; SMTestRunnerResultsForm
-        // is both the TestResultsViewer and the TestFrameworkRunningModel onSelected needs.
+        // console is already populated by the time the augmenter hands it to us, so the channel view would stay empty
+        // until the user clicks. Render now. For imports we pass the root explicitly rather than reading
+        // treeView.selectedTest, because the tree selection is applied asynchronously (AsyncTreeModel) and is commonly
+        // still null at this instant. SMTestRunnerResultsForm is both the TestResultsViewer and the model onSelected
+        // needs. invokeLater lets the holder swap in ensureInstalled() settle first.
         (viewer as? SMTestRunnerResultsForm)?.let { form ->
-            controller.onSelected(form.treeView?.selectedTest as? SMTestProxy, form, form)
+            val proxy = initialSelection ?: (form.treeView?.selectedTest as? SMTestProxy)
+            ApplicationManager.getApplication().invokeLater { controller.onSelected(proxy, form, form) }
         }
     }
 

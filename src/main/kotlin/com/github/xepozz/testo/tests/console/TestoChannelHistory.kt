@@ -80,8 +80,9 @@ internal object TestoChannelHistory {
             // Install once the tree has stopped growing (stable, non-empty), or give up after ~10s and show what we have.
             if ((count > 0 && count == lastCount) || attempt >= 200) {
                 root?.let { forEachDescendant(it) { proxy -> decode(store, levelFilter, proxy) } }
-                // install() renders the already-selected node itself, so the imported view is populated immediately.
-                TestoChannelsUi.install(console, store, levelFilter, project, console)
+                // Pass the root so install() renders the whole imported tree's aggregate immediately, independent of the
+                // async JTree selection (which is often still null at this instant).
+                TestoChannelsUi.install(console, store, levelFilter, project, console, root)
                 return
             }
             lastCount = count
