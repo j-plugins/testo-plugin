@@ -7,7 +7,7 @@ import com.intellij.util.indexing.FileBasedIndex
 import com.jetbrains.php.PhpIndex
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.Method
-import com.jetbrains.rd.util.printlnError
+import com.intellij.openapi.diagnostic.thisLogger
 
 object TestoDataProviderUtils {
     fun isDataProvider(function: Function): Boolean {
@@ -51,7 +51,7 @@ object TestoDataProviderUtils {
         val indexByName = mapping.indexOfFirst { it.second == dataProvider.name }
         if (indexByName != -1) return indexByName
 
-        printlnError("Could not find data provider usage for ${dataProvider.name} (${dataProvider.fqn}) in ${test.name} (${test.fqn})")
+        thisLogger().debug("Could not find data provider usage for ${dataProvider.name} (${dataProvider.fqn}) in ${test.name} (${test.fqn})")
         return -1
     }
 }

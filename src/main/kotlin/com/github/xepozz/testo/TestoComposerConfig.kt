@@ -15,9 +15,6 @@ class TestoComposerConfig : PhpTestFrameworkComposerConfig(TestoFrameworkType.IN
 
     override fun getConfigurationType() = TestoRunConfigurationType.INSTANCE
 
-    override fun findConfigurationFile(project: Project, composerConfig: VirtualFile?): VirtualFile? {
-        return super.findConfigurationFile(project, composerConfig)
-    }
     override fun updateConfigurations(project: Project, configFile: VirtualFile?, composerConfig: VirtualFile?) {
         val testFrameworkSettingsManager = PhpTestFrameworkSettingsManager.getInstance(project)
         if (testFrameworkSettingsManager.getConfigurations(TestoFrameworkType.INSTANCE).isNotEmpty()) {

@@ -18,7 +18,7 @@ import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
 import com.jetbrains.php.lang.psi.stubs.indexes.expectedArguments.PhpExpectedFunctionArgument
 import com.jetbrains.php.lang.psi.stubs.indexes.expectedArguments.PhpExpectedFunctionScalarArgument
-import com.jetbrains.rd.util.printlnError
+import com.intellij.openapi.diagnostic.thisLogger
 import java.io.DataInput
 import java.io.DataOutput
 import java.io.IOException
@@ -140,7 +140,7 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
                     }
 
                     else -> {
-                        printlnError("Unknown data provider type: $attributeValue")
+                        thisLogger().debug("Unknown data provider type: $attributeValue")
 //                        result.add(
 //                            Pair.create(targetFQN, attributeValue)
 //                        )

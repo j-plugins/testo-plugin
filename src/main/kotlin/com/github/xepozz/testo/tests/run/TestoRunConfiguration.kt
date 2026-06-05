@@ -118,8 +118,9 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     override fun createTestConsoleProperties(executor: Executor): SMTRunnerConsoleProperties {
         val manager = PhpRemoteInterpreterManager.getInstance()
 
-        val pathProcessor = when (this.interpreter?.isRemote) {
-            true -> manager?.createPathMapper(this.project, interpreter!!.phpSdkAdditionalData)
+        val interpreter = this.interpreter
+        val pathProcessor = when {
+            interpreter?.isRemote == true -> manager?.createPathMapper(this.project, interpreter.phpSdkAdditionalData)
             else -> null
         } ?: PhpCommandLinePathProcessor.LOCAL
 
