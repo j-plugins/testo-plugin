@@ -70,16 +70,4 @@ class TestoConsoleProperties(
             com.github.xepozz.testo.tests.console.TestoLogLevelFilterAction(levelFilter),
             *(super.createImportActions() ?: emptyArray()),
         )
-
-    // Promote Expand All / Collapse All onto the test toolbar; they bind to the TreeExpander it already supplies.
-    override fun appendAdditionalActions(
-        actionGroup: com.intellij.openapi.actionSystem.DefaultActionGroup,
-        parent: javax.swing.JComponent,
-        target: TestConsoleProperties,
-    ) {
-        super.appendAdditionalActions(actionGroup, parent, target)
-        val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
-        listOfNotNull(actionManager.getAction("ExpandAll"), actionManager.getAction("CollapseAll"))
-            .forEach(actionGroup::add)
-    }
 }
