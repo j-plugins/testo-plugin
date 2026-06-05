@@ -60,10 +60,20 @@ internal fun openTestoHistoryForTest(project: Project, url: String) {
             .map { File(root, it) }
             .filter { it.exists() }
             .sortedByDescending { it.lastModified() }
+        // Only the run that actually contains this test — do NOT fall back to an unrelated latest run (a saved run that
+        // included the test may have been pruned out of the 10-file history; the lens still shows because the last
+        // status survives in TestStateStorage).
         val target = files.firstOrNull { f -> runCatching { f.readText().contains(url) }.getOrDefault(false) }
-            ?: files.firstOrNull()
-            ?: return@executeOnPooledThread
         com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
+            if (target == null) {
+                com.intellij.notification.NotificationGroupManager.getInstance().getNotificationGroup("Testo")
+                    ?.createNotification(
+                        "No saved run history contains this test yet — run it to record one.",
+                        com.intellij.notification.NotificationType.INFORMATION,
+                    )
+                    ?.notify(project)
+                return@invokeLater
+            }
             val vf = com.intellij.openapi.vfs.LocalFileSystem.getInstance().refreshAndFindFileByIoFile(target)
                 ?: return@invokeLater
             openTestoHistory(project, vf, url)
