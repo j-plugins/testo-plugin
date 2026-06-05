@@ -13,6 +13,7 @@ import com.intellij.execution.testframework.TestConsoleProperties
 import com.intellij.execution.testframework.TestFrameworkRunningModel
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
+import com.intellij.execution.testframework.sm.runner.ui.SMTestRunnerResultsForm
 import com.intellij.execution.testframework.sm.runner.ui.TestResultsViewer
 import com.intellij.codeInsight.folding.CodeFoldingManager
 import com.intellij.execution.ui.ConsoleViewContentType
@@ -118,7 +119,16 @@ object TestoChannelsUi {
         }
         val controller = ChannelTabsController(project, store, levelFilter, console, field)
         Disposer.register(parent, controller)
-        console.resultsViewer.addEventsListener(controller)
+        val viewer = console.resultsViewer
+        viewer.addEventsListener(controller)
+        // addEventsListener only forwards FUTURE tree-selection changes (it installs a TreeSelectionListener and never
+        // replays the current selection). A live run selects nodes after we attach, so that's fine — but an imported
+        // console is already populated and a node is already selected by the time the augmenter hands it to us, so the
+        // channel view would stay empty until the user clicks. Render the current selection now; SMTestRunnerResultsForm
+        // is both the TestResultsViewer and the TestFrameworkRunningModel onSelected needs.
+        (viewer as? SMTestRunnerResultsForm)?.let { form ->
+            controller.onSelected(form.treeView?.selectedTest as? SMTestProxy, form, form)
+        }
     }
 
     private class ChannelTabsController(

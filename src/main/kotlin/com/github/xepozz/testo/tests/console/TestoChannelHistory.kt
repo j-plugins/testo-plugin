@@ -80,15 +80,8 @@ internal object TestoChannelHistory {
             // Install once the tree has stopped growing (stable, non-empty), or give up after ~10s and show what we have.
             if ((count > 0 && count == lastCount) || attempt >= 200) {
                 root?.let { forEachDescendant(it) { proxy -> decode(store, levelFilter, proxy) } }
+                // install() renders the already-selected node itself, so the imported view is populated immediately.
                 TestoChannelsUi.install(console, store, levelFilter, project, console)
-                // The import already made its initial tree selection before our UI listener existed, so the channel
-                // view missed it and shows empty until the user clicks a node. Re-fire the selection so the aggregate
-                // renders immediately, matching a live run's default.
-                val form = console.resultsViewer as? SMTestRunnerResultsForm
-                val selected = form?.treeView?.selectedTest ?: root
-                if (form != null && selected != null) {
-                    ApplicationManager.getApplication().invokeLater { form.selectAndNotify(selected) }
-                }
                 return
             }
             lastCount = count
