@@ -12,7 +12,6 @@ import com.intellij.codeInsight.hints.InlayHintsUtils
 import com.intellij.codeInsight.hints.codeVision.CodeVisionProviderBase
 import com.intellij.execution.TestStateStorage
 import com.intellij.execution.testframework.sm.TestHistoryConfiguration
-import com.intellij.execution.testframework.sm.runner.history.actions.AbstractImportTestsAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
@@ -116,8 +115,8 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
          *
          * Mirrors [com.intellij.execution.testframework.sm.runner.history.actions.ImportTestsGroup]:
          * resolve every recorded history file under the project history root, keep the existing
-         * ones, and import the most recently modified XML. [AbstractImportTestsAction.doImport]
-         * recreates the run configuration from the XML and opens the SM test tree tab.
+         * ones, and import the most recently modified XML. openTestoHistory recreates the run
+         * configuration from the XML and opens the SM test tree tab (on our own console properties).
          */
         fun openLatestHistory(project: Project) {
             val historyRoot = TestStateStorage.getTestHistoryRoot(project)
@@ -128,7 +127,8 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
                 ?: return // No history yet — getHint already hid the lens, so this is just defensive.
 
             val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(latest) ?: return
-            AbstractImportTestsAction.doImport(project, virtualFile, null)
+            // Build the imported console on our own properties so its toolbar matches a live run (see openTestoHistory).
+            com.github.xepozz.testo.tests.console.openTestoHistory(project, virtualFile)
         }
     }
 }

@@ -65,7 +65,7 @@ class TestoConsoleProperties(
     // appendAdditionalActions, which the platform routes into the gear submenu) puts it among the primary actions at
     // construction time — so it survives the snapshot that RunTab merges into the run tab's toolbar, and it shows in
     // the standalone debug console toolbar too.
-    override fun createImportActions(): Array<com.intellij.openapi.actionSystem.AnAction> =
+    public override fun createImportActions(): Array<com.intellij.openapi.actionSystem.AnAction> =
         arrayOf(
             com.github.xepozz.testo.tests.console.TestoLogLevelFilterAction(levelFilter),
             *(super.createImportActions() ?: emptyArray()),

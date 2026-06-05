@@ -8,6 +8,7 @@ import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.testframework.sm.runner.ui.SMTestRunnerResultsForm
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.util.Alarm
 
 /**
  * Channel output survives a run only in memory ([ChannelOutputStore]); the IDE's test-history XML keeps just the plain
@@ -56,50 +57,50 @@ internal object TestoChannelHistory {
     }
 
     /**
-     * Wire an imported-history console: as each test is replayed, decode its metainfo into a fresh store; once the tree
-     * is complete, install the channel UI. Called when the augmenter sees an `ImportedTestConsoleProperties` console.
+     * Wire an imported-history console: once the replayed tree is fully built, decode every proxy's metainfo into the
+     * store and install the channel UI. Called when the augmenter sees an `ImportedTestConsoleProperties` console.
+     *
+     * We poll instead of subscribing to `SMTRunnerEventsListener`: the augmenter only hands us the console after
+     * `processStarted`, by which point a small import may have already replayed and fired (and missed) its events,
+     * leaving the channels empty even though the tree shows. Polling for a stable node count is immune to that race and
+     * never double-decodes (a single pass over the finished tree).
      */
     fun installForImport(project: Project, console: SMTRunnerConsoleView) {
-        val store = ChannelOutputStore()
-        val levelFilter = LogLevelFilter()
-        val connection = project.messageBus.connect(console)
-        var root: SMTestProxy? = null
-        // Guard against installing twice — the event path and the already-finished fallback below can both fire.
-        val installed = booleanArrayOf(false)
-        fun install() {
-            if (installed[0]) return
-            installed[0] = true
-            ApplicationManager.getApplication().invokeLater {
+        // When we drive the import (TestoImportedConsoleProperties), reuse its delegate's store + level filter so the
+        // toolbar log-level filter and the channel UI share one state. The platform import path (clock dropdown) has no
+        // delegate, so fall back to fresh ones.
+        val delegate = (console.properties as? TestoImportedConsoleProperties)?.delegate
+        val store = delegate?.channelStore ?: ChannelOutputStore()
+        val levelFilter = delegate?.levelFilter ?: LogLevelFilter()
+        val alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, console)
+        var lastCount = -1
+        fun poll(attempt: Int) {
+            val root = (console.resultsViewer as? SMTestRunnerResultsForm)?.testsRootNode
+            val count = root?.let { countDescendants(it) } ?: 0
+            // Install once the tree has stopped growing (stable, non-empty), or give up after ~10s and show what we have.
+            if ((count > 0 && count == lastCount) || attempt >= 200) {
+                root?.let { forEachDescendant(it) { proxy -> decode(store, levelFilter, proxy) } }
                 TestoChannelsUi.install(console, store, levelFilter, project, console)
+                // The import already made its initial tree selection before our UI listener existed, so the channel
+                // view missed it and shows empty until the user clicks a node. Re-fire the selection so the aggregate
+                // renders immediately, matching a live run's default.
+                val form = console.resultsViewer as? SMTestRunnerResultsForm
+                val selected = form?.treeView?.selectedTest ?: root
+                if (form != null && selected != null) {
+                    ApplicationManager.getApplication().invokeLater { form.selectAndNotify(selected) }
+                }
+                return
             }
+            lastCount = count
+            alarm.addRequest({ poll(attempt + 1) }, 50)
         }
-        connection.subscribe(
-            com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener.TEST_STATUS,
-            object : SMTRunnerEventsAdapter() {
-                override fun onTestingStarted(testsRoot: SMRootTestProxy) {
-                    root = testsRoot
-                }
+        alarm.addRequest({ poll(0) }, 0)
+    }
 
-                override fun onTestFinished(test: SMTestProxy) {
-                    if (root != null && !isUnder(root!!, test)) return
-                    decode(store, levelFilter, test)
-                }
-
-                override fun onTestingFinished(testsRoot: SMRootTestProxy) {
-                    if (root != null && testsRoot !== root) return
-                    install()
-                }
-            },
-        )
-        // Imports parse near-instantly, so the events above can fire before this subscription is wired. If the tree is
-        // already built by the next EDT cycle, decode it directly instead of waiting for events that already passed.
-        ApplicationManager.getApplication().invokeLater {
-            if (installed[0]) return@invokeLater
-            val builtRoot = (console.resultsViewer as? SMTestRunnerResultsForm)?.testsRootNode ?: return@invokeLater
-            if (builtRoot.children.isEmpty()) return@invokeLater
-            forEachDescendant(builtRoot) { decode(store, levelFilter, it) }
-            install()
-        }
+    private fun countDescendants(node: SMTestProxy): Int {
+        var n = 0
+        for (child in node.children) n += 1 + countDescendants(child)
+        return n
     }
 
     private fun forEachDescendant(node: SMTestProxy, action: (SMTestProxy) -> Unit) {
