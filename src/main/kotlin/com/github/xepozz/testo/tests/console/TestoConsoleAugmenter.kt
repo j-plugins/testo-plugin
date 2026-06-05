@@ -10,8 +10,10 @@ import com.intellij.execution.testframework.sm.runner.history.ImportedTestConsol
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.execution.ui.RunContentManager
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.util.concurrency.EdtScheduledExecutorService
 import com.intellij.util.text.DateFormatUtil
 
 // The console is built by the PHP test framework, so processStarted is the first point we can reach it.
@@ -28,6 +30,21 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
                 is ImportedTestConsoleProperties -> TestoChannelHistory.installForImport(project, console)
                 else -> {}
             }
+        }
+    }
+
+    override fun processTerminated(executorId: String, env: ExecutionEnvironment, handler: ProcessHandler, exitCode: Int) {
+        ApplicationManager.getApplication().invokeLater {
+            val descriptor = findDescriptor(executorId, handler) ?: return@invokeLater
+            val console = descriptor.executionConsole as? SMTRunnerConsoleView ?: return@invokeLater
+            if (console.properties !is TestoConsoleProperties) return@invokeLater
+            // The run's history XML is written on a background task after the process ends, and nothing else nudges the
+            // editor's daemon — so the "Show history" lens (gated on the history index) wouldn't appear for the tests
+            // that just ran. Restart the daemon a couple of times across the save window; once it sees the new file the
+            // index rebuilds and re-triggers the daemon itself.
+            val refresh = Runnable { if (!project.isDisposed) DaemonCodeAnalyzer.getInstance(project).restart() }
+            EdtScheduledExecutorService.getInstance().schedule(refresh, 1500, java.util.concurrent.TimeUnit.MILLISECONDS)
+            EdtScheduledExecutorService.getInstance().schedule(refresh, 4000, java.util.concurrent.TimeUnit.MILLISECONDS)
         }
     }
 
