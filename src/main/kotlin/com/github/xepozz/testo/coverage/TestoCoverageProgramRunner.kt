@@ -21,7 +21,13 @@ open class TestoCoverageProgramRunner : PhpCoverageRunner() {
     override fun canRun(executorId: String, profile: RunProfile) =
         executorId == EXECUTOR_ID && profile is TestoRunConfiguration
 
-    override fun createCoverageArguments(targetCoverage: String?) = mutableListOf("--coverage")
+    // Pass the IDE-managed report path to the CLI (mirrors PhpUnit's createCoverageArguments) so Testo writes the Clover
+    // XML exactly where the IDE reads it back. `targetCoverage` is the remote-mapped path derived from
+    // CoverageEnabledConfiguration.getCoverageFilePath() by PhpCoverageRunner. Testo exposes `--coverage-clover=<file>`
+    // (Symfony Console, VALUE_REQUIRED). Fall back to the bare `--coverage` when no path is provided.
+    override fun createCoverageArguments(targetCoverage: String?) =
+        if (targetCoverage.isNullOrEmpty()) mutableListOf("--coverage")
+        else mutableListOf("--coverage-clover=$targetCoverage")
 
     override fun getRunnerId(): String = RUNNER_ID
 

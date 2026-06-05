@@ -17,19 +17,16 @@ class TestoCoverageEnabledConfiguration(
 ) : CoverageEnabledConfiguration(configuration, CoverageRunner.getInstance(PhpUnitCoverageRunner::class.java)) {
     override fun coverageFileNameSeparator(): String = "@"
 
-    // Testo writes the Clover report to a path hardcoded inside the project's `testo.php`
-    // (see `new CloverReport(__DIR__ . '/runtime/clover.xml')`). Until Testo exposes a
-    // `--coverage-clover=<path>` CLI flag, we mirror that convention so the IDE reads
-    // coverage from the same place Testo writes it.
-    override fun getCoverageFilePath(): String =
-        configuration.project.basePath?.let { "$it/runtime/clover.xml" } ?: super.getCoverageFilePath()!!
+    // The report path is left to the platform default (CoverageEnabledConfiguration.createCoverageFile()), an
+    // IDE-managed path under <system>/coverage/<project>@<config>.xml — same convention as the PhpUnit/Codeception
+    // engines. We pass that path to Testo via `--coverage-clover=<path>` (see TestoCoverageProgramRunner), so the tool
+    // writes the Clover report exactly where the IDE reads it back, instead of a fixed runtime/ dir inside the project.
 }
 
 /**
- * The Clover report lives inside the project (runtime/clover.xml), not under [com.intellij.openapi.application.PathManager.getSystemPath].
- * The platform's default [CoverageSuite.deleteCachedCoverageData] stays silent only for files under the system dir;
- * for a project file it pops a "Delete file '…' on disk?" confirmation on every rerun. The report is regenerated each
- * run, so we don't delete it — which also removes the prompt.
+ * The report path is IDE-managed (under [com.intellij.openapi.application.PathManager.getSystemPath]), so the platform's
+ * default delete-on-disk confirmation never fires. We still skip deletion: the report is regenerated each run at the
+ * same path, so there is nothing to clean up.
  */
 class TestoCoverageSuite(
     name: String,
