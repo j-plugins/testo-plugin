@@ -10,7 +10,6 @@ import com.intellij.psi.PsiFile
 import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.phpunit.PhpUnitTestDescriptor
 import java.util.*
-import kotlin.math.min
 
 class TestoGenerateTestMethodAction : TestoGenerateMethodActionBase("Testo Test Method") {
     override fun isValidForFile(project: Project, editor: Editor, file: PsiFile) = file.isTestoFile()
@@ -32,7 +31,9 @@ class TestoGenerateTestMethodAction : TestoGenerateMethodActionBase("Testo Test 
         while (true) {
             val index = methodText.indexOf("\${CAPITALIZED_NAME}", from)
             if (index < 0) {
-                methodTemplate.addTextSegment(methodText.substring(min(from, methodText.length - 1)))
+                // Emit only the remaining tail. The old min(from, length-1) re-emitted the final char when the
+                // placeholder ended the template, and threw StringIndexOutOfBounds on empty input.
+                if (from < methodText.length) methodTemplate.addTextSegment(methodText.substring(from))
                 return
             }
 
