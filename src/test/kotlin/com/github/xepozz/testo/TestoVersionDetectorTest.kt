@@ -24,8 +24,13 @@ class TestoVersionDetectorTest : TestCase() {
     }
 
     fun testParse_noPrefix() {
-        // "substringAfter" returns original string if delimiter not found
-        assertEquals("SomeOtherOutput", TestoVersionDetector.parse("SomeOtherOutput"))
+        // Output without the "Testo " prefix is not a version and must be rejected (previously it leaked through).
+        try {
+            TestoVersionDetector.parse("SomeOtherOutput")
+            fail("Expected ExecutionException for non-Testo output")
+        } catch (_: ExecutionException) {
+            // expected
+        }
     }
 
     fun testGetVersionOptions() {

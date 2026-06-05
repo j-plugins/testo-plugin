@@ -2,6 +2,7 @@ package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.configurations.RunProfile
+import com.intellij.execution.configurations.RuntimeConfigurationError
 import com.intellij.execution.configurations.RunProfileState
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
@@ -75,7 +76,7 @@ open class TestoCoverageProgramRunner : PhpCoverageRunner() {
                 .createXdebugConfigurations()
 
             CoverageEngine.PCOV -> listOf(PhpConfigurationOption("pcov.enabled", 1))
-            else -> throw IllegalArgumentException("Unsupported coverage engine $coverageEngine.")
+            else -> throw RuntimeConfigurationError("Unsupported Testo coverage engine: $coverageEngine.")
         }
         command.addConfigurationOptions(options)
         setAdditionalMapping(localCoverage, targetCoverage, command)

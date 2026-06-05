@@ -18,7 +18,9 @@ class TestoRunConfigurationType :
         TestoRunConfiguration(project, this)
 
     companion object Companion {
-        val ID = TestoRunConfiguration::class.java.simpleName
+        // Pinned literal (was ::class.simpleName): a future class rename must not silently change the
+        // persisted run-configuration type id and break users' saved configs.
+        const val ID = "TestoRunConfiguration"
 
         val INSTANCE
             get() = findConfigurationType(TestoRunConfigurationType::class.java)

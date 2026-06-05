@@ -10,7 +10,7 @@ object TestoVersionDetector : PhpTestFrameworkVersionDetector<String>() {
     public override fun getVersionOptions() = arrayOf("--version", "--no-ansi")
 
     public override fun parse(s: String): String {
-        val version = s.substringAfter("Testo ")
+        val version = s.substringAfter("Testo ", "")  // "" on miss so non-Testo output is rejected below
         if (version.isEmpty()) {
             throw ExecutionException(TestoBundle.message("testo.version.error"))
         }
