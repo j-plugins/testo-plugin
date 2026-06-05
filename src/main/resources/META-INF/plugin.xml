@@ -31,6 +31,9 @@
         <iconProvider
                 implementation="com.github.xepozz.testo.ui.TestoIconProvider"/>
 
+        <codeInsight.daemonBoundCodeVisionProvider
+                implementationClass="com.github.xepozz.testo.ui.TestoHistoryCodeVisionProvider"/>
+
         <!--        <notificationGroup-->
         <!--                id="Testo"-->
         <!--                displayType="TOOL_WINDOW"-->
