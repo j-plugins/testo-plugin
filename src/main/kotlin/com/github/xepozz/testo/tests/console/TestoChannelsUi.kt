@@ -57,6 +57,7 @@ import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.ui.tabs.TabInfo
 import com.intellij.ui.tabs.impl.JBEditorTabs
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import java.awt.AlphaComposite
 import java.awt.BorderLayout
 import java.awt.Color
@@ -448,7 +449,37 @@ object TestoChannelsUi {
                 override fun getScrollableTracksViewportHeight() = false
             }.apply { border = JBUI.Borders.empty(4) }
 
-            val component: JComponent = JBScrollPane(list).apply { border = JBUI.Borders.empty() }
+            private val scroll = JBScrollPane(list).apply { border = JBUI.Borders.empty() }
+
+            // Sticky card header: the header of the message currently at the top stays pinned (like the editor's sticky
+            // lines), pushed up as the next card's header arrives. Overlaid so it takes no layout space.
+            private val sticky = JBPanel<Nothing>(BorderLayout()).apply {
+                isVisible = false
+                isOpaque = true
+                background = UIUtil.getPanelBackground()
+                border = JBUI.Borders.customLine(JBColor.border(), 0, 0, 1, 0)
+            }
+            private var stickyOffsetY = 0
+            private var stickyIdx = -1
+            private val cardEntries = mutableListOf<CardEntry>()
+
+            val component: JComponent = object : JBLayeredPane() {
+                init {
+                    add(scroll, JLayeredPane.DEFAULT_LAYER as Any)
+                    add(sticky, JLayeredPane.PALETTE_LAYER as Any)
+                }
+
+                override fun getPreferredSize(): Dimension = scroll.preferredSize
+
+                override fun doLayout() {
+                    scroll.setBounds(0, 0, width, height)
+                    sticky.setBounds(0, stickyOffsetY, width, sticky.preferredSize.height)
+                }
+            }
+
+            init {
+                scroll.viewport.addChangeListener { updateSticky() }
+            }
 
             private var index = 0
             private var released = false
@@ -534,29 +565,6 @@ object TestoChannelsUi {
                 plain: String,
                 segments: List<AnsiSegment>,
             ): Pair<JComponent, EditorEx?> {
-                // Left: #N · channel, then (in aggregate tabs) the test name as a link that re-selects it in the tree.
-                val left = JBPanel<Nothing>(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
-                    isOpaque = false
-                    border = JBUI.Borders.empty(3, 6, 2, 6)
-                    val idText = buildString { append('#').append(n); chunk.channel?.let { append("  ·  ").append(it) } }
-                    add(JBLabel(idText).apply { font = JBUI.Fonts.smallFont(); foreground = JBColor.GRAY })
-                    if (leafLabel != null) {
-                        add(JBLabel("  ·  ").apply { font = JBUI.Fonts.smallFont(); foreground = JBColor.GRAY })
-                        add(HyperlinkLabel(leafLabel).apply { addHyperlinkListener { onLeafClick?.invoke() } })
-                    }
-                }
-                // Header: identity on the left, the log level pinned to the right and tinted by severity.
-                val header = JBPanel<Nothing>(BorderLayout()).apply {
-                    isOpaque = false
-                    add(left, BorderLayout.WEST)
-                    chunk.level?.takeIf { it.isNotBlank() }?.let { level ->
-                        add(JBLabel(level).apply {
-                            font = JBUI.Fonts.smallFont()
-                            foreground = levelColor(level)
-                            border = JBUI.Borders.empty(3, 8, 2, 8)
-                        }, BorderLayout.EAST)
-                    }
-                }
                 // A language message gets that language's highlighting (ANSI dropped); a format-less message keeps its
                 // ANSI colors over a plain-text viewer — and only those (mergeableEditor) fold into one canvas.
                 val mergeableEditor: EditorEx?
@@ -571,10 +579,69 @@ object TestoChannelsUi {
                 }
                 val wrapper = JBPanel<Nothing>(BorderLayout()).apply {
                     border = JBUI.Borders.customLine(JBColor.border(), 1)
-                    add(header, BorderLayout.NORTH)
+                    add(buildHeader(n, chunk, leafLabel, onLeafClick), BorderLayout.NORTH)
                     add(withFloatingActions(body, mergeableEditor, plain), BorderLayout.CENTER)
                 }
+                // Register for the sticky overlay (rebuild the header on demand so its hyperlink/level stay live).
+                cardEntries += CardEntry(wrapper) { buildHeader(n, chunk, leafLabel, onLeafClick) }
                 return wrapper to mergeableEditor
+            }
+
+            // Header: #N · channel on the left, (in aggregate tabs) the test name as a tree-navigating link, and the log
+            // level pinned to the right tinted by severity. Rebuilt fresh for both the card and the sticky overlay.
+            private fun buildHeader(
+                n: Int,
+                chunk: ChannelOutputStore.Chunk,
+                leafLabel: String?,
+                onLeafClick: (() -> Unit)?,
+            ): JComponent {
+                val left = JBPanel<Nothing>(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+                    isOpaque = false
+                    border = JBUI.Borders.empty(3, 6, 2, 6)
+                    val idText = buildString { append('#').append(n); chunk.channel?.let { append("  ·  ").append(it) } }
+                    add(JBLabel(idText).apply { font = JBUI.Fonts.smallFont(); foreground = JBColor.GRAY })
+                    if (leafLabel != null) {
+                        add(JBLabel("  ·  ").apply { font = JBUI.Fonts.smallFont(); foreground = JBColor.GRAY })
+                        add(HyperlinkLabel(leafLabel).apply { addHyperlinkListener { onLeafClick?.invoke() } })
+                    }
+                }
+                return JBPanel<Nothing>(BorderLayout()).apply {
+                    isOpaque = false
+                    add(left, BorderLayout.WEST)
+                    chunk.level?.takeIf { it.isNotBlank() }?.let { level ->
+                        add(JBLabel(level).apply {
+                            font = JBUI.Fonts.smallFont()
+                            foreground = levelColor(level)
+                            border = JBUI.Borders.empty(3, 8, 2, 8)
+                        }, BorderLayout.EAST)
+                    }
+                }
+            }
+
+            // Recompute the pinned header on scroll: which card is at the top, and how far the next one has pushed it.
+            private fun updateSticky() {
+                val y = scroll.viewport.viewPosition.y
+                val topIdx = cardEntries.indexOfLast { it.panel.y <= y }
+                if (topIdx < 0 || y <= cardEntries[topIdx].panel.y) {
+                    if (sticky.isVisible) {
+                        sticky.isVisible = false
+                        stickyIdx = -1
+                        component.revalidate()
+                        component.repaint()
+                    }
+                    return
+                }
+                if (topIdx != stickyIdx) {
+                    stickyIdx = topIdx
+                    sticky.removeAll()
+                    sticky.add(cardEntries[topIdx].buildHeader(), BorderLayout.CENTER)
+                }
+                val stickyHeight = sticky.preferredSize.height
+                val next = cardEntries.getOrNull(topIdx + 1)
+                stickyOffsetY = if (next != null) (next.panel.y - y - stickyHeight).coerceAtMost(0) else 0
+                sticky.isVisible = true
+                component.doLayout()
+                component.repaint()
             }
 
             // A right-aligned floating action bar laid over the message body (for now a single Copy button — the
@@ -780,6 +847,9 @@ object TestoChannelsUi {
         }
 
         private class AnsiSegment(val text: String, val attributes: TextAttributes?)
+
+        // A rendered message card plus a factory that rebuilds its header (for the sticky overlay copy).
+        private class CardEntry(val panel: JComponent, val buildHeader: () -> JComponent)
 
         // Splits ANSI-coloured text into the plain string plus per-run color attributes (null for the default color).
         private fun decodeAnsi(raw: String): Pair<String, List<AnsiSegment>> {
