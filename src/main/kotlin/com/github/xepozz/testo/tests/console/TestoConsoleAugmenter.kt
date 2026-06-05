@@ -6,6 +6,7 @@ import com.intellij.execution.ExecutorRegistry
 import com.intellij.execution.process.OSProcessHandler
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.runners.ExecutionEnvironment
+import com.intellij.execution.testframework.sm.runner.history.ImportedTestConsoleProperties
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.execution.ui.RunContentManager
@@ -19,8 +20,14 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
         ApplicationManager.getApplication().invokeLater {
             val descriptor = findDescriptor(executorId, handler) ?: return@invokeLater
             val console = descriptor.executionConsole as? SMTRunnerConsoleView ?: return@invokeLater
-            val props = console.properties as? TestoConsoleProperties ?: return@invokeLater
-            installChannels(project, console, props, handler)
+            when (val props = console.properties) {
+                // Live run: build the channel UI and start stamping per-test channel output onto proxy metainfo.
+                is TestoConsoleProperties -> installChannels(project, console, props, handler)
+                // Imported history: the platform forces its own console+converter, so our converter never runs; rebuild
+                // the channels from the metainfo we stored at export time.
+                is ImportedTestConsoleProperties -> TestoChannelHistory.installForImport(project, console)
+                else -> {}
+            }
         }
     }
 
@@ -46,6 +53,8 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             props.channelsInstalled = true
             captureHeader(props, handler)
             TestoChannelsUi.install(console, props.channelStore, props.levelFilter, project, console)
+            // Persist each test's channel output into proxy metainfo so an imported-history run can rebuild the tabs.
+            TestoChannelHistory.subscribeMetainfoWriter(project, console, props.channelStore)
         }
 
         // Stored on the channel store rather than printed: SM rewrites the platform console per test selection,
