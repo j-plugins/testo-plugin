@@ -54,8 +54,9 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
     override fun getHint(element: PsiElement, file: PsiFile): String? {
         val function = element as? Function ?: return null
         val url = TestoTestRunLineMarkerProvider.getLocationHint(function)
-        // Only show the lens when there is a prior run result for this test.
-        if (TestStateStorage.getInstance(file.project).getState(url) == null) return null
+        // Show the lens only when a saved run actually contains this test. (The last status survives in
+        // TestStateStorage even after the run XML is pruned, so storage alone would show a lens that opens nothing.)
+        if (!com.github.xepozz.testo.tests.console.TestoHistoryIndex.contains(file.project, url)) return null
         return historyHint(url)
     }
 
