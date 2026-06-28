@@ -38,9 +38,24 @@ class ChannelOutputStore {
 
     private var headerChunks: List<Chunk> = emptyList()
     private val locationByName = HashMap<String, String>()
+    private val descriptionByKey = HashMap<String, String>()
 
     fun rememberLocation(name: String, location: String) {
         synchronized(lock) { locationByName[name] = location }
+    }
+
+    /**
+     * The test's description, as emitted by the runner in the `metainfo` attribute of `testStarted` (computed at
+     * runtime by Testo's pipeline, so it cannot be derived from PHPDoc in the IDE). Keyed exactly like the output
+     * streams — through [keyFor] — so the channel UI looks it up with the same key it uses for everything else. Call
+     * [rememberLocation] first so the key resolves to the location hint rather than the bare name.
+     */
+    fun rememberDescription(name: String, description: String) {
+        synchronized(lock) { descriptionByKey[locationByName[name] ?: name] = description }
+    }
+
+    fun descriptionFor(testKey: String): String? {
+        synchronized(lock) { return descriptionByKey[testKey] }
     }
 
     /**
@@ -134,6 +149,7 @@ class ChannelOutputStore {
             iconByChannel.clear()
             colorByChannel.clear()
             locationByName.clear()
+            descriptionByKey.clear()
         }
     }
 }

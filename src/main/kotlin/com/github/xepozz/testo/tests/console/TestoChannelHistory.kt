@@ -28,7 +28,15 @@ internal object TestoChannelHistory {
 
     // Short field names keep the serialized metainfo (an XML attribute) compact. Nulls are omitted by Gson on write and
     // arrive as null on read, so a non-Testo metainfo string deserializes to v=0 and is ignored.
-    private data class Wire(val v: Int = 0, val c: List<WChunk> = emptyList(), val m: Map<String, WMeta> = emptyMap())
+    // d: the test's description (metainfo from testStarted). Carried alongside the channel output because the platform
+    // plumbs the testStarted `metainfo` attribute into SMTestProxy.metainfo, which we then overwrite with this blob —
+    // so the description has to ride inside it to survive export/import. Null/absent on tests without a description.
+    private data class Wire(
+        val v: Int = 0,
+        val c: List<WChunk> = emptyList(),
+        val m: Map<String, WMeta> = emptyMap(),
+        val d: String? = null,
+    )
     private data class WChunk(val t: String = "", val l: String? = null, val ch: String? = null)
     private data class WMeta(val i: String? = null, val co: String? = null)
 
@@ -127,13 +135,18 @@ internal object TestoChannelHistory {
         return result ?: prefixMatch
     }
 
-    /** Encodes the test's full "all" stream (and the icon/color of every channel it used) for [SMTestProxy.setMetainfo]. */
+    /**
+     * Encodes the test's full "all" stream (and the icon/color of every channel it used) plus its description for
+     * [SMTestProxy.setMetainfo]. Returns null only when there is nothing to keep (no output and no description) —
+     * otherwise a description-only test still round-trips, instead of losing its description to the encode.
+     */
     private fun encode(store: ChannelOutputStore, key: String): String? {
         val chunks = store.allFor(key)
-        if (chunks.isEmpty()) return null
+        val description = store.descriptionFor(key)
+        if (chunks.isEmpty() && description == null) return null
         val channels = chunks.mapNotNullTo(LinkedHashSet()) { it.channel }
         val meta = channels.associateWith { WMeta(store.channelIcon(it), store.channelColor(it)) }
-        val wire = Wire(VERSION, chunks.map { WChunk(it.text, it.level, it.channel) }, meta)
+        val wire = Wire(VERSION, chunks.map { WChunk(it.text, it.level, it.channel) }, meta, description)
         return gson.toJson(wire)
     }
 
@@ -145,6 +158,8 @@ internal object TestoChannelHistory {
         // Key the same way the channel UI looks tests up: keyFor(name) -> locationUrl once remembered.
         val key = proxy.locationUrl ?: proxy.name
         store.rememberLocation(proxy.name, key)
+        // rememberLocation ran first, so this keys the description by the same location the UI looks it up with.
+        wire.d?.let { store.rememberDescription(proxy.name, it) }
         wire.m.forEach { (channel, m) ->
             m.i?.let { store.setChannelIcon(channel, it) }
             m.co?.let { store.setChannelColor(channel, it) }

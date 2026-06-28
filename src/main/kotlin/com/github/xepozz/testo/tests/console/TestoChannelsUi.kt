@@ -231,11 +231,14 @@ object TestoChannelsUi {
 
             val key = keyOf(selected)
             val header = store.header()
-            // All: highlighted cards (per-message language). Header chunks first, then the live "all" stream replays
-            // and keeps appending, so a streaming test's messages show up as they arrive.
-            if (key != null || header.isNotEmpty()) {
+            val description = key?.let { store.descriptionFor(it) }
+            // All: highlighted cards (per-message language). Header chunks first, then the test's description (the
+            // runner-supplied metainfo, when present), then the live "all" stream replays and keeps appending, so a
+            // streaming test's messages show up as they arrive.
+            if (key != null || header.isNotEmpty() || description != null) {
                 val allCards = newCards(null)
                 header.forEach { allCards.add(it) }
+                description?.let { allCards.add(ChannelOutputStore.Chunk(it, null, DESCRIPTION_CHANNEL)) }
                 if (key != null) subscriptions += store.attachAll(key) { allCards.add(it) }
                 addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
             }
@@ -1075,6 +1078,9 @@ object TestoChannelsUi {
         companion object {
             private const val ALL_TAB = "All"
             private const val OUTPUT_TAB = "Output"
+            // Labels the description card in the "All" tab (shows as "#N · description" in the card header); it has no
+            // file-type suffix, so it renders as a plain card rather than a syntax-highlighted one.
+            private const val DESCRIPTION_CHANNEL = "description"
             private const val FADE_STEP = 0.18f
 
             // Each message is a full editor; cap how many we materialize so a chatty channel can't spawn thousands.

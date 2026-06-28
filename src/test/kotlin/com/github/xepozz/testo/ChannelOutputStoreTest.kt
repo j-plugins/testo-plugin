@@ -242,6 +242,47 @@ class ChannelOutputStoreTest {
     }
 
     @Test
+    fun descriptionIsKeyedByLocationLikeOutputStreams() {
+        // rememberLocation first, then rememberDescription -> the description is found under keyFor(name), exactly the
+        // key the channel UI uses to look up output for the same test.
+        val store = ChannelOutputStore()
+        store.rememberLocation("renders", "php_qn://WidgetTest.php::\\WidgetTest::renders")
+        store.rememberDescription("renders", "Verifies the widget renders correctly.")
+
+        assertEquals("Verifies the widget renders correctly.", store.descriptionFor(store.keyFor("renders")))
+    }
+
+    @Test
+    fun descriptionFallsBackToNameWhenNoLocationRemembered() {
+        val store = ChannelOutputStore()
+        store.rememberDescription("renders", "desc")
+        assertEquals("desc", store.descriptionFor(store.keyFor("renders")))
+    }
+
+    @Test
+    fun descriptionSupportsMultiline() {
+        val store = ChannelOutputStore()
+        store.rememberLocation("renders", "loc")
+        store.rememberDescription("renders", "line one\nline two")
+        assertEquals("line one\nline two", store.descriptionFor("loc"))
+    }
+
+    @Test
+    fun missingDescriptionIsNull() {
+        val store = ChannelOutputStore()
+        assertNull(store.descriptionFor("nope"))
+    }
+
+    @Test
+    fun clearResetsDescriptions() {
+        val store = ChannelOutputStore()
+        store.rememberLocation("renders", "loc")
+        store.rememberDescription("renders", "desc")
+        store.clear()
+        assertNull(store.descriptionFor("loc"))
+    }
+
+    @Test
     fun producerAndLookupKeysAgreeViaSharedKeyFor() {
         // The bug was that output was stored under the location key while the view subscribed by a name/locationUrl
         // that lagged. Both sides now derive the key from the same keyFor(name), so a subscriber finds the output.

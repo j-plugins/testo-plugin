@@ -19,7 +19,12 @@ class TestoOutputToGeneralEventsConverter(
             TEST_STARTED -> {
                 val name = attrs["name"]
                 val location = attrs["locationHint"]
+                // rememberLocation first so the description is keyed by the same location hint as the output streams.
                 if (name != null && location != null) store.rememberLocation(name, location)
+                // The test's description (computed at runtime by Testo); absent when there is none. The service-message
+                // parser already unescaped TeamCity sequences (|n etc.), so the value is the final, ready-to-show text.
+                val metainfo = attrs[METAINFO]?.takeIf { it.isNotEmpty() }
+                if (name != null && metainfo != null) store.rememberDescription(name, metainfo)
             }
 
             TEST_STD_OUT, TEST_STD_ERR -> {
@@ -62,6 +67,7 @@ class TestoOutputToGeneralEventsConverter(
 
     companion object {
         private const val TEST_STARTED = "testStarted"
+        private const val METAINFO = "metainfo"
         private const val TEST_STD_OUT = "testStdOut"
         private const val TEST_STD_ERR = "testStdErr"
         private const val TEST_FAILED = "testFailed"
