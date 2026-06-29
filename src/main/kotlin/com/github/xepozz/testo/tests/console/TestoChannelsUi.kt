@@ -204,10 +204,13 @@ object TestoChannelsUi {
             if (!selected.isLeaf) {
                 val leaves = selected.allTests.filter { it !== selected && it.isLeaf }
 
-                // All: syntax-highlighted cards, language picked per message from its own channel.
+                // All: syntax-highlighted cards, language picked per message from its own channel. Each leaf's
+                // description (when present) leads its output, so the suite view shows descriptions too.
                 val allCards = newCards(null)
                 store.header().forEach { allCards.add(it) }
-                addCardsAggregate(allCards, viewer, leaves) { key, sink -> store.attachAll(key, sink) }
+                addCardsAggregate(allCards, viewer, leaves, includeDescriptions = true) { key, sink ->
+                    store.attachAll(key, sink)
+                }
                 addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
 
                 addAggregateTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, viewer, leaves, attach = store::attachOutput)
@@ -235,7 +238,7 @@ object TestoChannelsUi {
             // All: highlighted cards (per-message language). Header chunks first, then the test's description (the
             // runner-supplied metainfo, when present), then the live "all" stream replays and keeps appending, so a
             // streaming test's messages show up as they arrive.
-            if (key != null || header.isNotEmpty() || description != null) {
+            if (key != null || header.isNotEmpty()) {
                 val allCards = newCards(null)
                 header.forEach { allCards.add(it) }
                 description?.let { allCards.add(ChannelOutputStore.Chunk(it, null, DESCRIPTION_CHANNEL)) }
@@ -330,9 +333,11 @@ object TestoChannelsUi {
             cards: MessageCards,
             viewer: TestResultsViewer,
             leaves: List<SMTestProxy>,
+            // Only the "All" aggregate leads each leaf with its description; channel tabs show channel output alone.
+            includeDescriptions: Boolean = false,
             attach: (String, (ChannelOutputStore.Chunk) -> Unit) -> (() -> Unit),
         ) {
-            val aggregate = CardsAggregate(cards, viewer, attach)
+            val aggregate = CardsAggregate(cards, viewer, includeDescriptions, attach)
             leaves.forEach { aggregate.addLeaf(it) }
             activeAggregates += aggregate
         }
@@ -454,6 +459,7 @@ object TestoChannelsUi {
         private inner class CardsAggregate(
             private val cards: MessageCards,
             private val viewer: TestResultsViewer,
+            private val includeDescriptions: Boolean,
             private val attach: (String, (ChannelOutputStore.Chunk) -> Unit) -> (() -> Unit),
         ) : LeafStream {
             private val attached = HashSet<String>()
@@ -461,6 +467,15 @@ object TestoChannelsUi {
             override fun addLeaf(leaf: SMTestProxy) {
                 val key = keyOf(leaf) ?: return
                 if (!attached.add(key)) return
+                // Emit the description card before attaching the stream so it leads this leaf's output (and shows even
+                // for a leaf with no output); attach then replays this leaf's chunks right after, keeping them grouped.
+                if (includeDescriptions) {
+                    store.descriptionFor(key)?.let { desc ->
+                        cards.add(ChannelOutputStore.Chunk(desc, null, DESCRIPTION_CHANNEL), fullName(leaf)) {
+                            selectInTree(viewer, leaf)
+                        }
+                    }
+                }
                 subscriptions += attach(key) { chunk -> cards.add(chunk, fullName(leaf)) { selectInTree(viewer, leaf) } }
             }
         }

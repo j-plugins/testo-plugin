@@ -23,7 +23,7 @@ class TestoOutputToGeneralEventsConverter(
                 if (name != null && location != null) store.rememberLocation(name, location)
                 // The test's description (computed at runtime by Testo); absent when there is none. The service-message
                 // parser already unescaped TeamCity sequences (|n etc.), so the value is the final, ready-to-show text.
-                val metainfo = attrs[METAINFO]?.takeIf { it.isNotEmpty() }
+                val metainfo = attrs[METAINFO]?.takeIf { it.isNotBlank() }
                 if (name != null && metainfo != null) store.rememberDescription(name, metainfo)
             }
 
