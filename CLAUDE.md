@@ -2,226 +2,423 @@
 
 ## Project Overview
 
-IntelliJ IDEA / PhpStorm plugin for **Testo** — a PHP testing framework.
-Provides full IDE integration: test discovery, run configurations, code generation, inspections, and navigation.
+IntelliJ IDEA Ultimate / PhpStorm plugin for **Testo** — a PHP testing framework.
+Provides full IDE integration: test discovery, run/debug/coverage configurations, a channel-aware test console,
+run history, code generation, inspections, and navigation.
 
 - **Plugin ID:** `com.github.xepozz.testo`
 - **Plugin Name:** Testo PHP
 - **Author:** Dmitrii Derepko (@xepozz)
 - **Repository:** https://github.com/j-plugins/testo-plugin
-- **Marketplace:** JetBrains Marketplace
+- **Marketplace:** https://plugins.jetbrains.com/plugin/28842-testo
+- **Testo itself:** https://github.com/testo/testo (composer package `testo/testo`, binary `bin/testo`)
 
 ## Tech Stack
 
-| Component            | Version / Value           |
-|----------------------|---------------------------|
-| Language             | Kotlin 2.3.0              |
-| JVM Toolchain        | Java 21                   |
-| IntelliJ Platform    | 2025.2.6.2 (IU — Ultimate)  |
-| Min platform build   | 252 (2025.2.x)            |
-| Build system         | Gradle 9.3.0              |
-| IntelliJ Plugin SDK  | `org.jetbrains.intellij.platform` 2.11.0 |
-| Changelog plugin     | `org.jetbrains.changelog` 2.5.0 |
-| Code quality         | Qodana 2025.3.1           |
-| Coverage             | Kover 0.9.4               |
-| Test framework       | JUnit 4.13.2, OpenTest4J 1.3.0 |
+Single source of truth: `gradle/libs.versions.toml` (plugins/libs) + `gradle.properties` (platform, plugin version).
+Dependabot bumps these regularly — read the files rather than trusting this table if something looks off.
+
+| Component            | Version / Value                          |
+|----------------------|------------------------------------------|
+| Language             | Kotlin 2.4.0                             |
+| JVM Toolchain        | Java 21                                  |
+| IntelliJ Platform    | 2025.2 (IU — IDEA Ultimate)              |
+| Min platform build   | 252 (2025.2.x), no `untilBuild`          |
+| Plugin version       | `2026.3.0` (`pluginVersion`)             |
+| Build system         | Gradle wrapper 9.6.0                     |
+| IntelliJ Plugin SDK  | `org.jetbrains.intellij.platform` 2.18.0 |
+| Changelog plugin     | `org.jetbrains.changelog` 2.5.0          |
+| Code quality         | Qodana 2026.2.0                          |
+| Coverage             | Kover 0.9.9 (XML report on `check`)      |
+| Test framework       | JUnit 4.13.2, OpenTest4J 1.3.0           |
+
+`platformPlugins` (marketplace deps, pinned to 252.x builds): `com.jetbrains.php`, `phpstorm-remote-interpreter`,
+`php.codeception`, `php.behat`, `gherkin`, `hackathon.indices.viewer`, `xepozz.ide.introspector`.
+`platformBundledModules`: `intellij.platform.coverage`, `intellij.spellchecker`.
+
+> Note: `gradleVersion` in `gradle.properties` (9.5.0) lags the wrapper (9.6.0) — the property only feeds the
+> `wrapper` task, so running `./gradlew wrapper` would downgrade it. Bump the property when syncing.
 
 ## Build & Run Commands
 
 ```bash
-# Build the plugin
-./gradlew buildPlugin
-
-# Run tests
-./gradlew check
-
-# Run IDE with plugin loaded (for manual testing)
-./gradlew runIde
-
-# Verify plugin compatibility
-./gradlew verifyPlugin
-
-# Run UI tests (requires robot-server)
-./gradlew runIdeForUiTests
+./gradlew buildPlugin      # build the distributable ZIP
+./gradlew check            # tests + Kover XML coverage report
+./gradlew test             # tests only
+./gradlew runIde           # sandbox IDE with the plugin (autoReload disabled)
+./gradlew verifyPlugin     # plugin structure + compatibility (recommended IDEs)
+./gradlew runIdeForUiTests # sandbox IDE with robot-server on port 8082
 ```
+
+Ready-made IDE run configurations live in `.run/`: *Run Plugin*, *Run Tests*, *Run Verifications*.
 
 ## Project Structure
 
 ```
 src/main/kotlin/com/github/xepozz/testo/
-├── TestoBundle.kt              # i18n message bundle
-├── TestoClasses.kt             # FQN constants for Testo PHP classes/attributes
-├── TestoContext.kt             # Live template context
-├── TestoIcons.kt               # Icon definitions
-├── TestoUtil.kt                # Project-level Testo availability check
-├── TestoComposerConfig.kt      # Composer package detection
-├── mixin.kt                    # PSI extension functions (isTestoMethod, isTestoClass, etc.)
-├── PsiUtil.kt                  # General PSI utilities
-├── ExitStatementsVisitor.kt    # PHP exit statement analysis
-├── SpellcheckingDictionaryProvider.kt
+├── TestoBundle.kt                  # i18n message bundle (messages/TestoBundle.properties)
+├── TestoClasses.kt                 # FQN constants for Testo PHP classes/attributes + group arrays
+├── TestoContext.kt                 # live template context ("Testo", inside a Testo class body)
+├── TestoIcons.kt                   # icons, incl. LayeredIcon variants for file/class/function
+├── TestoUtil.kt                    # isEnabled(project): a Testo framework configuration exists
+├── TestoComposerConfig.kt          # auto-configures the framework from composer (testo/testo → bin/testo)
+├── mixin.kt                        # PSI extensions: isTestoMethod/Class/File/Bench/Function/…
+├── SpellcheckingDictionaryProvider.kt  # testo.dic
 │
-├── actions/                    # Code generation actions
+├── util/
+│   ├── PsiUtil.kt                  # MEANINGFUL_ATTRIBUTES, ATTRIBUTE_GROUPS, attribute/yield ordering
+│   └── ExitStatementsVisitor.kt    # indexes yield/return statements inside a data provider
+│
+├── actions/                        # Generate menu
 │   ├── TestoGenerateTestMethodAction.kt
 │   └── TestoGenerateMethodActionBase.kt
 │
-├── index/                      # File-based index for data providers
-│   ├── TestoDataProvidersIndex.kt
-│   └── TestoDataProviderUtils.kt
+├── coverage/                       # optional, enabled via META-INF/coverage.xml
+│   ├── TestoCoverageEngine.kt      # PhpUnitCoverageEngine subclass + suite/enabled-configuration
+│   └── TestoCoverageProgramRunner.kt  # --coverage-clover=<IDE-managed path>, Xdebug/PCOV toggling
 │
-├── references/                 # Reference resolution & implicit usage
-│   └── TestFunctionImplicitUsageProvider.kt
+├── index/
+│   ├── TestoDataProvidersIndex.kt  # FileBasedIndex: provider name → {class, method, providerFqn}
+│   └── TestoDataProviderUtils.kt   # isDataProvider / findDataProviderUsages / usage index
 │
-├── tests/                      # Core test framework integration
-│   ├── TestoFrameworkType.kt       # PhpTestFrameworkType implementation
-│   ├── TestoTestDescriptor.kt     # Test class/method discovery
-│   ├── TestoTestLocator.kt        # Stack trace → source navigation
-│   ├── TestoTestRunLineMarkerProvider.kt  # Gutter run icons
-│   ├── TestoStackTraceParser.kt   # Test output parsing
-│   ├── TestoConsoleProperties.kt  # Console configuration
-│   ├── TestoVersionDetector.kt    # Testo version detection
+├── references/
+│   └── TestFunctionImplicitUsageProvider.kt  # tests/classes are never "unused"
+│
+├── tests/
+│   ├── TestoFrameworkType.kt       # PhpTestFrameworkType (ID "Testo", SCHEMA "php_qn")
+│   ├── TestoTestDescriptor.kt      # test class naming (*Test / *TestBase), findTests
+│   ├── TestoTestCreateInfo.kt      # "Create New Test" info (template "Testo Test")
+│   ├── TestoTestLocator.kt         # locationHint → PSI (file / class / method / function)
+│   ├── TestoTestRunLineMarkerProvider.kt      # gutter icons + canonical locationHint builders
+│   ├── TestoTestRunLineMarkerProviderInfo.kt  # Info.shouldReplace = true (wins over PhpStorm's)
+│   ├── TestoStackTraceParser.kt    # failed line/text extraction from a PHP backtrace
+│   ├── TestoConsoleProperties.kt   # console wiring: converter, locator, id-based tree, toolbar
+│   ├── TestoVersionDetector.kt     # `--version --no-ansi` → "Testo <version>"
 │   │
-│   ├── actions/                # Test-specific actions
-│   │   ├── TestoNewTestFromClassAction.kt
-│   │   ├── TestoTestActionProvider.kt
-│   │   ├── TestoRerunFailedTestsAction.kt
-│   │   └── TestoRunCommandAction.kt
+│   ├── actions/
+│   │   ├── TestoNewTestFromClassAction.kt   # PHP | New | Testo Test
+│   │   ├── TestoRerunFailedTestsAction.kt   # failed leaves → explicit --filter list
+│   │   ├── TestoRerunWithExecutorAction.kt  # rerun in Run/Debug/Coverage + split button
+│   │   ├── TestoRerunStyle.kt               # MIRROR_AWARE vs SPLIT_BUTTON toolbar styles
+│   │   └── TestoRunCommandAction.kt         # "Run Testo <command>" (Run Anything)
+│   │
+│   ├── console/                    # the channel console subsystem (largest area)
+│   │   ├── TestoOutputToGeneralEventsConverter.kt  # reads channel/level/icon/color off SM messages
+│   │   ├── ChannelOutputStore.kt   # per-test live buffers: all / output / per-channel
+│   │   ├── ChannelIcons.kt         # channel name or icon= hint → platform icon
+│   │   ├── LogLevelFilter.kt       # persisted display-time log-level filter
+│   │   ├── TestoLogLevelFilterAction.kt     # toolbar dropdown for the filter
+│   │   ├── TestoChannelsUi.kt      # the tabbed channel view (~1150 lines) + testoDisplayName()
+│   │   ├── TestoConsoleAugmenter.kt         # ExecutionListener that installs the channel tabs
+│   │   ├── TestoChannelHistory.kt  # channel output ⇄ SMTestProxy.metainfo (survives history export)
+│   │   ├── TestoHistoryImport.kt   # "Show history": import a saved run onto our own console properties
+│   │   ├── TestoHistoryIndex.kt    # which locationUrls exist in saved history XMLs (+ lens refresh)
+│   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
+│   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
 │   │
 │   ├── inspections/
-│   │   └── TestoInspectionSuppressor.kt
+│   │   └── TestoInspectionSuppressor.kt     # silences PhpUnhandledExceptionInspection for AssertionException
 │   │
-│   ├── overrides/              # UI customization
+│   ├── overrides/
+│   │   └── PhpRunInheritorsListCellRenderer.kt   # chooser popup renderer
 │   │
-│   ├── run/                    # Run configuration subsystem
-│   │   ├── TestoRunConfigurationType.kt
-│   │   ├── TestoRunConfiguration.kt
+│   ├── run/
+│   │   ├── TestoRunConfigurationType.kt     # id pinned to "TestoRunConfiguration"
 │   │   ├── TestoRunConfigurationFactory.kt
-│   │   ├── TestoRunConfigurationProducer.kt  # Context-based config creation
-│   │   ├── TestoRunConfigurationHandler.kt
-│   │   ├── TestoRunConfigurationSettings.kt
-│   │   ├── TestoRunTestConfigurationEditor.kt
+│   │   ├── TestoRunConfiguration.kt         # builds the command line, console, rerun action
+│   │   ├── TestoRunConfigurationHandler.kt  # maps scope/settings → CLI flags
+│   │   ├── TestoRunConfigurationSettings.kt # persistence; default options "-q -n --teamcity"
+│   │   ├── TestoRunnerSettings.kt           # Testo-specific persisted fields + transient rerunFilters
+│   │   ├── TestoRunConfigurationProducer.kt # context → configuration (~615 lines, the trickiest file)
+│   │   ├── TestoTestRunConfigurationEditor.kt  # "Testo Options" panel wrapping the PHP editor
 │   │   ├── TestoTestRunnerSettingsValidator.kt
 │   │   ├── TestoTestMethodFinder.kt
-│   │   ├── TestoRunnerSettings.kt
-│   │   └── TestoDebugRunner.kt
+│   │   └── TestoDebugRunner.kt              # debug session + channel tabs + rerun buttons
 │   │
 │   └── runAnything/
-│       └── TestoRunAnythingProvider.kt
+│       └── TestoRunAnythingProvider.kt      # "testo <command>" in Run Anything
 │
-└── ui/                         # UI components
-    ├── TestoIconProvider.kt
-    ├── TestoStackTraceConsoleFolding.kt
-    └── PhpRunInheritorsListCellRenderer.kt
+└── ui/
+    ├── TestoIconProvider.kt                 # Testo-marked icons for PHP test files
+    ├── TestoHistoryCodeVisionProvider.kt    # "Show history" lens above each test
+    └── TestoStackTraceConsoleFolding.kt     # folds `[internal function]` frame runs
 
 src/main/resources/
-├── META-INF/plugin.xml         # Plugin descriptor (extensions, actions)
-├── fileTemplates/              # New file templates (Testo Test.php.ft)
-├── icons/                      # SVG icons (light + dark variants)
-├── liveTemplates/Testo.xml     # Live templates: `test`, `data`
-├── messages/TestoBundle.properties  # i18n strings
-└── testo.dic                   # Spellchecker dictionary
+├── META-INF/plugin.xml         # main descriptor
+├── META-INF/coverage.xml       # optional descriptor, loaded with com.intellij.modules.coverage
+├── META-INF/pluginIcon*.svg
+├── fileTemplates/internal/     # "Testo Test.php.ft" (+ .html description)
+├── fileTemplates/code/         # "Testo Test Method" template used by TestoTestCreateInfo
+├── icons/testo, icons/php      # SVG with _dark variants
+├── liveTemplates/Testo.xml     # `test`, `data`, `bench`
+├── messages/TestoBundle.properties
+└── testo.dic                   # spellchecker dictionary
 
-src/test/                       # Unit tests (JUnit 4 + BasePlatformTestCase)
+src/test/kotlin/…               # ~30 JUnit 4 test classes (see "Testing")
+src/test/testData/mixin, rename # PHP fixtures for PSI-backed tests
 ```
 
 ## Architecture
 
-### Plugin Extension Points
+### Extension points registered in `plugin.xml`
 
-The plugin registers extensions in `plugin.xml` under two namespaces:
+`com.intellij` namespace: `fileType` (maps the `testo`/`testo.php`/`testo.bat` binaries onto PHP),
+`runLineMarkerContributor` (order="first"), `configurationType`, `runConfigurationProducer`,
+`runAnything.executionProvider`, `programRunner` (debug), `implicitUsageProvider`, `iconProvider`,
+`codeInsight.daemonBoundCodeVisionProvider`, `notificationGroup` (id `Testo`), `internalFileTemplate`,
+`defaultLiveTemplates` + `liveTemplateContext`, two `console.folding`s, `fileBasedIndex`,
+`spellchecker.bundledDictionaryProvider`, `lang.inspectionSuppressor`.
 
-- **`com.intellij`** — standard IntelliJ extensions: `fileType`, `runLineMarkerContributor`, `configurationType`, `runConfigurationProducer`, `programRunner`, `implicitUsageProvider`, `iconProvider`, `fileBasedIndex`, `console.folding`, `lang.inspectionSuppressor`, `testActionProvider`, live templates, etc.
-- **`com.jetbrains.php`** — PHP-specific: `testFrameworkType` (TestoFrameworkType), `composerConfigClient` (TestoComposerConfig).
+`com.jetbrains.php` namespace: `testFrameworkType` (`TestoFrameworkType`), `composerConfigClient`
+(`TestoComposerConfig`).
 
-### Required Plugin Dependencies
+`META-INF/coverage.xml` (optional, `com.intellij.modules.coverage`) adds `coverageEngine` + the coverage
+`programRunner`.
 
-- `com.intellij.modules.platform` — IntelliJ Platform core
-- `com.jetbrains.php` — PHP language support (makes this plugin work in PhpStorm / IDEA Ultimate with PHP plugin)
+`projectListeners`: `TestoConsoleAugmenter` on `ExecutionListener` — the only hook where the PHP-built test console
+can be reached to install the channel tabs.
 
-### Testo PHP Framework — Supported Attributes
+Actions: the Generate-menu entry, the rerun trio + split button on `RunTab.TopToolbar`, an `overrides="true"`
+replacement for the platform `Rerun`, and a `Tools | Testo` menu (channel-icon preview + rerun-style toggles).
 
-The plugin recognizes PHP attributes defined in `TestoClasses.kt`. Constants are grouped into arrays for reuse across the codebase:
+### Dependencies
 
-| Group (array)              | Attributes (FQN)                                                                  |
-|----------------------------|-----------------------------------------------------------------------------------|
-| `TEST_ATTRIBUTES`          | `\Testo\Test`, `\Testo\Inline\TestInline`                                        |
-| `TEST_INLINE_ATTRIBUTES`  | `\Testo\Inline\TestInline`                                                        |
-| `DATA_ATTRIBUTES`          | `\Testo\Data\DataProvider`, `\Testo\Data\DataSet`, `\Testo\Data\DataUnion`, `\Testo\Data\DataCross`, `\Testo\Data\DataZip` |
-| `BENCH_ATTRIBUTES`         | `\Testo\Bench`                                                                    |
+`com.intellij.modules.platform`, `com.jetbrains.php` (hard), `com.intellij.modules.coverage` (optional).
+Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP support.
 
-Other constants: `ASSERT` (`\Testo\Assert`), `EXPECT` (`\Testo\Expect`), `ASSERTION_EXCEPTION`.
+### The Testo CLI contract
 
-These arrays are spread into `RUNNABLE_ATTRIBUTES` (line markers) and `MEANINGFUL_ATTRIBUTES` (PsiUtil) — adding a new attribute to the group array automatically propagates it everywhere.
+`TestoRunConfigurationHandler` + `TestoRunConfiguration.createCommand` produce:
 
-### Attribute Group Numbering
-
-Attributes on a function/method are numbered **within their own group**, not globally. Each group has independent 0-based indexing. The groups are defined in `PsiUtil.ATTRIBUTE_GROUPS`:
-
-| Group             | Source array              | Used for                                      |
-|-------------------|---------------------------|-----------------------------------------------|
-| data              | `DATA_ATTRIBUTES`         | Data providers, numbered together             |
-| inline            | `TEST_INLINE_ATTRIBUTES`  | Inline test cases (`#[TestInline]`)           |
-| bench             | `BENCH_ATTRIBUTES`        | Benchmark data (`#[Bench]`)                   |
-
-`#[Test]` is **not numbered** — it is runnable (in `RUNNABLE_ATTRIBUTES`) but has no index. It runs the test with `--type=test`.
-
-Example for a function `foo` with multiple attributes:
 ```
-#[Test]                 → runnable, no index (--type=test)
-#[DataProvider(...)]    → type=test, foo:0
-#[DataSet([...])]       → type=test, foo:1
-#[DataZip(...)]         → type=test, foo:2
-#[DataCross(...)]       → type=test, foo:3
-#[TestInline(...)]      → type=inline, foo:0
-#[TestInline(...)]      → type=inline, foo:1
-#[TestInline(...)]      → type=inline, foo:2
-#[Bench(...)]           → type=bench, foo:0
-#[Bench(...)]           → type=bench, foo:1
+<executablePath> <command> [testRunnerOptions] [runner flags] [--config <file>] [scope flags]
 ```
 
-`RUNNABLE_ATTRIBUTES` (used for gutter line markers) contains `TEST_ATTRIBUTES + BENCH_ATTRIBUTES + DATA_ATTRIBUTES`.
+- `command` — the subcommand, default `run` (editable in the editor's combo box).
+- `testRunnerOptions` default to **`-q -n --teamcity`** (`TestoRunConfigurationSettings.createDefault`).
+  The `--teamcity` flag is what makes Testo emit the SM service messages this plugin parses.
+- Runner flags from `TestoRunnerSettings` (only emitted when non-empty / > 0): `--type`, `--suite`, `--group`,
+  `--exclude-group`, `--repeat`, `--parallel`, plus one `--filter <selector>` per entry in `rerunFilters`.
+  `group`/`excludeGroup` are single persisted strings holding comma-separated names; the handler splits them into one
+  flag per name (Testo ORs repeated `--group`s, and a `!name` prefix excludes).
+- `--config <file>` when an alternative configuration file is set (`getConfigFileOption()`).
+- Scope flags: `Type` → `--suite <type>`; `Directory`/`File` → `--path <relative path>`;
+  `Method` → `--path <file> --filter <method> [--data-provider <name>]`; `ConfigurationFile` → nothing
+  (the config file argument alone drives the run).
+- Coverage adds `--coverage-clover=<IDE-managed path>` (or bare `--coverage` if no path), plus Xdebug or PCOV
+  INI options depending on `coverageEngine`.
+- Working directory is always `project.basePath`.
 
-### Test Detection Logic (mixin.kt)
+`methodName` is an encoded selector, not just a name:
 
-A PHP element is recognized as a Testo test when:
-- **Method:** public + name starts with `test`, OR has any `TEST_ATTRIBUTES`
-- **Function:** has any `TEST_ATTRIBUTES` (standalone test functions)
-- **Benchmark:** has any `BENCH_ATTRIBUTES`
-- **Class:** name ends with `Test` or `TestBase`, OR contains test/bench methods
-- **File:** filename matches test class pattern, OR contains test classes/functions/benchmarks
+| Form                        | Meaning                                                        |
+|-----------------------------|----------------------------------------------------------------|
+| `foo`                       | plain test method/function                                     |
+| `foo:2`                     | attribute #2 within its group (data / inline / bench)          |
+| `foo:1:3`                   | data-provider #1, dataset (yield/return) #3                    |
+| `foo#provider`              | `parseMethodName` splits this into `--filter foo --data-provider provider` |
 
-### Key Subsystems
+### Location hints (`php_qn://` URLs)
 
-1. **Run Configuration** (`tests/run/`) — creates and manages run/debug configurations for Testo tests. `TestoRunConfigurationProducer` is the largest file (~527 lines) handling context-based config creation for methods, classes, files, data providers, and datasets.
+`TestoTestRunLineMarkerProvider.Companion` owns the canonical format; `TestoTestLocator` parses it back.
+Everything that needs to identify a test (line markers, code vision, history index, rerun filters, channel
+storage keys) goes through these:
 
-2. **Line Markers** (`TestoTestRunLineMarkerProvider`) — adds green play buttons in the gutter next to test methods, classes, and data providers.
+```
+php_qn://<file>                                    # a Testo config file
+php_qn://<file>::\Ns\ClassName                     # class
+php_qn://<file>::\Ns\ClassName::method             # method
+php_qn://<file>::\Ns\functionName                  # standalone test function
+… + "#<index>"                                     # inline test / numbered attribute / dataset yield
+… + " with data set #N"                            # emitted by Testo for dataset nodes
+```
 
-3. **Data Provider Index** (`index/TestoDataProvidersIndex`) — file-based index that maps test methods to their data providers for quick lookup across the project.
+Paths are deployment-aware (`getFilePathDeploymentAware`) so remote interpreters map correctly.
+`TestoRerunFailedTestsAction.locationUrlToFilter` reduces such a URL back to `\Fqn::method`.
 
-4. **Code Generation** — "Create Test from Class" action and "Generate Test Method" action integrated into IDE menus.
+### Testo attributes (`TestoClasses.kt`)
 
-5. **Stack Trace Navigation** (`TestoTestLocator`) — click-to-navigate from test output to source code.
+| Group (array)            | Attributes (FQN)                                                                                       |
+|--------------------------|--------------------------------------------------------------------------------------------------------|
+| `TEST_ATTRIBUTES`        | `\Testo\Test`, `\Testo\Inline\TestInline`                                                              |
+| `TEST_INLINE_ATTRIBUTES` | `\Testo\Inline\TestInline`                                                                             |
+| `DATA_ATTRIBUTES`        | `\Testo\Data\DataProvider`, `DataSet`, `DataUnion`, `DataCross`, `DataZip`                              |
+| `BENCH_ATTRIBUTES`       | `\Testo\Bench`                                                                                         |
+| `TEST_CASE_ATTRIBUTES`   | `\Testo\Bridge\Rector\Testing\TestRectorFixtures`                                                       |
+
+`TEST_CASE_ATTRIBUTES` are **class-level** attributes that make the class a case without making its methods tests — the
+framework synthesizes the tests (a Rector rule's fixtures become data sets of one probe test). Never put such an
+attribute in `TEST_ATTRIBUTES`: that array drives `isPublicMethodOfTestoMarkedClass`, which would turn `refactor()` and
+friends into tests.
+
+`\Testo\Filter\Group` (`TestoClasses.FILTER_GROUP`) is deliberately in no array: it is not a test attribute, it selects
+tests. It has its own branch in the line-marker provider and in the producer, and running it emits `--group=<name>`
+only — no path, no name filter, no `--type`.
+
+Other constants: `ASSERT`, `EXPECT`, `ASSERTION_EXCEPTION`, and the config classes
+`\Testo\Application\Config\ApplicationConfig` / `SuiteConfig` (used to make `testo.php` runnable and to pick up
+suite names from `new SuiteConfig('name')`).
+
+The group arrays are spread into `RUNNABLE_ATTRIBUTES` (line markers) and `PsiUtil.MEANINGFUL_ATTRIBUTES` —
+adding an attribute to a group array propagates it everywhere.
+
+### Attribute group numbering
+
+Attributes are numbered **within their own group** (independent 0-based indexes), per `PsiUtil.ATTRIBUTE_GROUPS`:
+`DATA_ATTRIBUTES`, `TEST_INLINE_ATTRIBUTES`, `BENCH_ATTRIBUTES`. `#[Test]` belongs to no group, so
+`getAttributeOrder` returns `-1` — the producer treats that as "run the whole test, no `:index` suffix". The same is
+true of `#[TestRectorFixtures]`: the whole case runs.
+
+```
+#[Test]                  → runnable, no index          (--type=test)
+#[DataProvider(...)]     → foo:0                       (--type=test)
+#[DataSet([...])]        → foo:1                       (--type=test)
+#[DataZip(...)]          → foo:2                       (--type=test)
+#[DataCross(...)]        → foo:3                       (--type=test)
+#[TestInline(...)]       → foo:0, foo:1, …             (--type=inline)
+#[Bench(...)]            → foo:0, foo:1, …             (--type=bench)
+#[TestRectorFixtures]    → runnable on the class       (--type=rector-fixture, run through the file)
+#[Group('db')]           → not a test; runs the group  (--group=db, no other filter)
+```
+
+**Where the run starts decides the type.** A class-level attribute runs its class narrowed to the attribute's own type
+(`#[Test]` → `--type=test`, `#[TestRectorFixtures]` → `--type=rector-fixture`); running the class itself is untyped, so
+it keeps everything the class holds (a `#[Test]` class typed as `test` would drop its `#[Bench]` methods). This is why
+`findTestElement` accepts an attribute whose owner is a Testo class instead of letting it fall back to the class.
+
+`--type` values are the constants in `TestoRunConfigurationProducer.Companion`: `test`, `inline`, `bench`,
+`rector-fixture` (the last one mirrors `RectorFixtureInterceptor::TYPE` in the Testo bridge).
+
+### Test detection (`mixin.kt`)
+
+- **Method** — has any `TEST_ATTRIBUTES`, OR is public and starts with `test`, OR is a public non-abstract,
+  non-magic method of a class that itself carries a test attribute.
+- **Function** — has any `TEST_ATTRIBUTES` (standalone test functions are first-class in Testo).
+- **Bench** — method with any `BENCH_ATTRIBUTES`.
+- **Data-provider-like** — public static method, or any standalone function; whether it *is* a provider is
+  answered by `TestoDataProvidersIndex` (`TestoDataProviderUtils.isDataProvider`).
+- **Class** — name ends with `Test`/`TestBase`, OR has a test attribute, OR is a case class (`isTestoCaseClass()`:
+  carries a `TEST_CASE_ATTRIBUTES` attribute), OR owns test/bench methods.
+- **File** — filename looks like a test class, else (smart mode only) it contains a Testo class, a test function,
+  a bench, or a `new ApplicationConfig(...)`. Guarded against excluded/ignored/out-of-content files and wraps PSI
+  work in try/catch (rethrowing `ProcessCanceledException`).
+
+### Key subsystems
+
+1. **Run / debug / coverage** (`tests/run/`, `coverage/`). The producer turns any of these into a configuration:
+   a `PhpAttribute`, a `PhpYield` inside a provider, a `Function`, a `PhpClass` (via its file), a `PhpFile`,
+   a directory, `new ApplicationConfig(...)` and `new SuiteConfig('x')`. It shows a chooser popup for abstract
+   test classes (subclasses) and for a provider used by several tests. `shouldReplace` returns `false` so it
+   never fights other PHP producers.
+
+2. **Channel console** (`tests/console/`). Testo tags `testStdOut`/`testStdErr` messages with `channel`, `level`,
+   `icon` and `color`; the converter records them into `ChannelOutputStore`, and `TestoChannelsUi` renders a tabbed
+   view (All + one tab per channel) in place of the platform console, with syntax highlighting, hyperlinks,
+   copy buttons, log-level filtering and per-channel icons/colors.
+
+3. **Run history** — three cooperating pieces: `TestoChannelHistory` round-trips channel output through
+   `SMTestProxy.metainfo` (the only per-test datum the platform's history XML preserves), `TestoHistoryIndex` knows
+   which tests appear in saved history files, and `TestoHistoryCodeVisionProvider` shows a clickable
+   *Show history* lens that imports the newest run containing that specific test and selects its node.
+
+4. **Rerun toolbar** — two user-selectable styles (`Tools | Testo`): `MIRROR_AWARE` (three executor-pinned buttons
+   that hide whichever duplicates the platform Rerun) and `SPLIT_BUTTON` (default; one split button, platform Rerun
+   steps aside). `TestoRerunFailedTestsAction` rebuilds a failed-only run as an explicit list of `--filter`s.
+
+5. **Line markers** (`TestoTestRunLineMarkerProvider`) — gutter run icons on test methods/functions/classes,
+   runnable attributes, config files, and each `yield`/`return` inside a data provider.
+
+6. **Data provider index** (`index/`) — file-based index keyed by provider name, resolving both
+   `#[DataProvider('name')]` and `#[DataProvider([Class::class, 'name'])]` (incl. `self::`/`static::`).
+   Scoped to the project *test* scope on lookup.
+
+7. **Code generation** — file template + `TestoTestCreateInfo` for *Create New Test*, `Generate | Test Method`,
+   and live templates `test` / `data` / `bench`.
+
+8. **Navigation & output cleanup** — `TestoTestLocator` (click a node → source), `TestoStackTraceParser`
+   (failed line + text), two console foldings, and `PhpBacktraceFileFilter` for hyperlinks in raw output.
+
+## Implementation notes & gotchas
+
+Non-obvious constraints already paid for in blood — read before touching the relevant area.
+
+- **The test tree is id-based.** `TestoConsoleProperties.isIdBasedTestTree() = true`, so the platform uses
+  `GeneralIdBasedToSMTRunnerEventsConvertor` and the tree comes from Testo's `nodeId`/`parentNodeId`. Testo runs
+  tests concurrently (fibers/event loop), so message *order* cannot be trusted — the name-based convertor nested a
+  second `#[DataSet]` batch inside the first and never closed nodes.
+- **Channel storage keys go through `ChannelOutputStore.keyFor(name)`** (the `locationHint` remembered on
+  `testStarted`, falling back to the name). Deriving keys from `SMTestProxy.locationUrl` breaks, because the
+  platform resolves that lazily.
+- **`TestoChannelsUi` reaches `TestResultsPanel.myConsole` by reflection** — there is no public accessor. It
+  degrades gracefully (logs a warning, no channel tabs) if the field disappears.
+- **`TestoHistoryIndex.refreshLens` uses the internal `ModificationStampUtil`** to force code-vision recomputation
+  after a run; a test run never touches PHP source, so neither `DaemonCodeAnalyzer.restart()` nor
+  `invalidateProvider` alone re-runs `getHint`. Wrapped in `runCatching`.
+- **Imported history needs our own console properties.** `ImportedTestConsoleProperties` does not delegate
+  `createImportActions`, so `TestoHistoryImport` reconstructs the import on `TestoImportedConsoleProperties`
+  to keep the log-level filter button. Import wiring polls for a stable node count instead of subscribing —
+  a small import can finish replaying before the augmenter hands us the console.
+- **The log-level filter is added via `createImportActions`, not `appendAdditionalActions`** — the latter is routed
+  into the gear submenu and would not survive the RunTab toolbar snapshot.
+- **`ConsoleFolding` instances are shared across consoles** and get no per-console reset; both foldings track
+  state in a `ThreadLocal` and clear it on the first non-frame line.
+- **Debug installs channel tabs itself** (`TestoDebugRunner`): the augmenter's descriptor lookup misses debug
+  sessions. `TestoConsoleProperties.channelsInstalled` guards against a double install. The debug session also
+  gets the `Testo.RerunSplit` action handed to it explicitly, since it does not use `RunTab.TopToolbar`.
+- **`rerunFilters` is `@Transient`** — it lives only on the throwaway clone a "rerun failed" launch creates, and
+  that clone's scope is reset to `ConfigurationFile` so no scope flag narrows the filters away.
+- **`TestoRunConfigurationType.ID` is a pinned literal**, not `::class.simpleName`: renaming the class must not
+  invalidate users' saved run configurations.
+- **`TestoDataProvidersIndex.getVersion()`** must be bumped whenever indexing logic or the attribute FQN changes,
+  or stale on-disk indexes silently stay empty.
+- **The run-configuration editor calls the parent editor's `resetEditorFrom`/`applyEditorTo` reflectively**
+  (they are not public on `PhpTestRunConfigurationEditor`) and swallows `ReadOnlyModificationException`.
+- **`TestoFrameworkType.getComposerPackageNames()` currently returns `arrayOf("php")`**, not `testo/testo` —
+  deliberate (the commented-out line records the intent); changing it affects framework auto-detection.
+- **`TestoTestRunLineMarkerProviderInfo.shouldReplace = true`** so Testo's gutter icon wins over PhpStorm's
+  PHPUnit contributor for the same element.
+
+## Testing
+
+JUnit 4, two flavours — prefer the first when the logic allows it:
+
+- **Plain unit tests** (no IDE fixture): pure string/logic helpers — `testoDisplayName`, location-URL → filter,
+  attribute ordering, display names, folding placeholders, bundle keys, runner settings, coverage arguments,
+  channel icons, channel store.
+- **`BasePlatformTestCase`** (7 classes: `MixinPsiTest`, `TestoLineMarkerPsiTest`,
+  `TestoRunConfigurationProducerPsiTest`, `TestoTestLocatorTest`, `ExitStatementsVisitorTest`,
+  `PhpBacktraceFileFilterTest`, `MyPluginTest`) — anything that needs PSI or the PHP plugin.
+  Fixtures live in `src/test/testData/`.
+
+When adding behaviour, pull the pure logic into a top-level function (as `testoDisplayName` was) so it can be
+tested without the platform fixture.
 
 ## Constraints & Important Notes
 
-- **Platform:** IntelliJ IDEA Ultimate or PhpStorm only (requires `com.jetbrains.php` plugin)
+- **Platform:** IntelliJ IDEA Ultimate or PhpStorm only (`com.jetbrains.php` is a hard dependency)
 - **Min IDE version:** 2025.2 (build 252+)
-- **Kotlin stdlib is NOT bundled** (`kotlin.stdlib.default.dependency = false`) — uses the one shipped with IntelliJ
+- **Kotlin stdlib is NOT bundled** (`kotlin.stdlib.default.dependency = false`) — uses the IDE's own
 - **Gradle Configuration Cache** and **Build Cache** are enabled
-- **Code and comments language:** English
-- **Plugin description** is extracted from `README.md` between `<!-- Plugin description -->` markers during build
-- **Signing & publishing** require environment variables: `CERTIFICATE_CHAIN`, `PRIVATE_KEY`, `PRIVATE_KEY_PASSWORD`, `PUBLISH_TOKEN`
+- **Code and comments language:** English. Comments should explain *why* (platform quirks, race conditions),
+  matching the density already present in `tests/console/` and `tests/actions/`.
+- **Plugin description** is extracted from `README.md` between `<!-- Plugin description -->` markers at build
+  time — the build fails if the markers go missing
+- **Release channel** is derived from the pre-release label in `pluginVersion` (e.g. `-alpha.3` → `alpha`)
+- **Signing & publishing** need `CERTIFICATE_CHAIN`, `PRIVATE_KEY`, `PRIVATE_KEY_PASSWORD`, `PUBLISH_TOKEN`
 
 ## CI/CD
 
-- **build.yml** (on push to main / PRs): build → test (with Kover coverage → Codecov) → Qodana inspections → plugin verification → draft release
-- **release.yml** (on GitHub release): publish to JetBrains Marketplace, update changelog
-- **run-ui-tests.yml** (manual): UI tests on Ubuntu, Windows, macOS via robot-server
+- **build.yml** (push to `main`, all PRs): `buildPlugin` → `check` (Kover XML → Codecov) → Qodana →
+  `verifyPlugin` → release draft. Runs on `ubuntu-latest`, Java 21 (Zulu), free-disk-space step first.
+- **release.yml** (on GitHub release): publish to JetBrains Marketplace, patch the changelog, open a PR back.
+- **run-ui-tests.yml** (manual): UI tests on Ubuntu / Windows / macOS via robot-server.
 
 ## Conventions
 
-- All source code is in Kotlin
-- Package root: `com.github.xepozz.testo`
-- i18n strings go in `messages/TestoBundle.properties`, accessed via `TestoBundle`
-- Icons follow IntelliJ conventions: SVG with `_dark` suffix variant
-- New extension points must be registered in `plugin.xml`
+- All source in Kotlin; package root `com.github.xepozz.testo`
+- i18n strings in `messages/TestoBundle.properties`, accessed via `TestoBundle`
+- Icons follow IntelliJ conventions: SVG with a `_dark` variant
+- New extension points must be registered in `plugin.xml` (coverage-only ones in `coverage.xml`)
 - Version follows SemVer; `pluginVersion` in `gradle.properties` is the single source of truth
+- Notable user-visible changes go into `CHANGELOG.md` under `## [Unreleased]` (Keep a Changelog format) —
+  the release workflow consumes that section
