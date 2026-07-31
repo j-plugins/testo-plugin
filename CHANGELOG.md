@@ -11,6 +11,7 @@
   running the class itself stays untyped and keeps everything the class holds.
 - Gutter run icon on `#[\Testo\Filter\Group]`: runs every test of that group with `--group=<name>` and nothing else —
   no path or name filter is added. A variadic `#[Group('db', 'slow')]` emits one `--group` flag per name.
-- The Group / Exclude group fields of the run configuration accept several comma-separated names.
+- The Group / Exclude group fields of the run configuration accept several comma-separated names; a literal comma
+  inside a group name is escaped as `\,`.
 
 - Initial scaffold created from [IntelliJ Platform Plugin Template](https://github.com/JetBrains/intellij-platform-plugin-template)

@@ -198,6 +198,37 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertEquals(listOf("db", "slow"), TestoRunConfigurationHandler.INSTANCE.splitNames(" db , slow "))
     }
 
+    fun testSplitNames_escapedCommaStaysInsideTheName() {
+        assertEquals(listOf("a,b", "c"), TestoRunConfigurationHandler.INSTANCE.splitNames("a\\,b,c"))
+    }
+
+    fun testSplitNames_backslashWithoutCommaIsLiteral() {
+        assertEquals(listOf("a\\b"), TestoRunConfigurationHandler.INSTANCE.splitNames("a\\b"))
+    }
+
+    // ---- joinNames ----
+
+    fun testJoinNames_escapesLiteralCommas() {
+        assertEquals("a\\,b,c", TestoRunConfigurationHandler.INSTANCE.joinNames(listOf("a,b", "c")))
+    }
+
+    fun testJoinNames_roundTripsThroughSplitNames() {
+        val names = listOf("a,b", "plain", "x\\y")
+        val handler = TestoRunConfigurationHandler.INSTANCE
+        assertEquals(names, handler.splitNames(handler.joinNames(names)))
+    }
+
+    fun testPrepareArguments_groupNameWithEscapedCommaIsOneFlag() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.group = "a\\,b"
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        // `#[Group('a,b')]` is a single group whose name contains a comma — it must stay one `--group` flag.
+        assertEquals(listOf<String?>("--group", "a,b"), arguments)
+    }
+
     fun testPrepareArguments_withExcludeGroup() {
         val settings = TestoRunConfigurationSettings()
         settings.runnerSettings.excludeGroup = "slow"

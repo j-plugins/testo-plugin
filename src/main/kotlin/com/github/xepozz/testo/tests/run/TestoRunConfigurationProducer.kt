@@ -91,7 +91,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             // A group run is deliberately unscoped: `--group=<name>` alone, so every test of the group runs no matter
             // where it lives. ConfigurationFile scope is what keeps the path/filter flags out of the command line.
             testRunnerSettings.scope = PhpTestRunnerSettings.Scope.ConfigurationFile
-            testRunnerSettings.group = groups.joinToString(GROUP_SEPARATOR)
+            testRunnerSettings.group = TestoRunConfigurationHandler.INSTANCE.joinNames(groups)
             testRunnerSettings.testoType = ""
             testRunnerSettings.dataProviderIndex = -1
             testRunnerSettings.dataSetIndex = -1
@@ -208,7 +208,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             val groups = extractGroupNames(element)
             return groups.isNotEmpty()
                 && testoSettings.scope == PhpTestRunnerSettings.Scope.ConfigurationFile
-                && testoSettings.group == groups.joinToString(GROUP_SEPARATOR)
+                && testoSettings.group == TestoRunConfigurationHandler.INSTANCE.joinNames(groups)
         }
         if (element is PhpAttribute && element.owner is PhpClass) {
             // Mirrors the setup branch: a class-level attribute configures the class, so compare as a class would.
@@ -630,9 +630,6 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
 
         /** The type the Rector bridge synthesizes for a rule's fixture case (`RectorFixtureInterceptor::TYPE`). */
         const val RECTOR_FIXTURE_TYPE = "rector-fixture"
-
-        /** Joins several group names into the single persisted `group` field; split back apart per `--group` flag. */
-        const val GROUP_SEPARATOR = ","
 
         fun resolveTestoType(element: PsiElement): String = when {
             element is PhpAttribute -> resolveTestoTypeFromAttribute(element)
