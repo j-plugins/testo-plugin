@@ -203,6 +203,38 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
         assertEquals("Running the class itself must stay untyped", "", settings.testoType)
     }
 
+    fun testIsConfigurationFromContext_typedAndUntypedClassRunsAreDifferentContexts() {
+        val attribute = attributeByFqn(
+            """<?php
+            #[\Testo\Test]
+            class FooTest {
+                public function it_works(): void {}
+                #[\Testo\Bench]
+                public function bench_it(): void {}
+            }
+            """.trimIndent(),
+            TestoClasses.TEST
+        )
+        val phpClass = attribute.owner as PhpClass
+
+        val typed = TestoRunnerSettings()
+        producer.setupConfiguration(typed, attribute, attribute.containingFile.virtualFile)
+        val untyped = TestoRunnerSettings()
+        producer.setupConfiguration(untyped, phpClass, attribute.containingFile.virtualFile)
+
+        assertTrue(producer.isConfigurationFromContext(typed, attribute))
+        assertTrue(producer.isConfigurationFromContext(untyped, phpClass))
+        // Reusing across contexts is what silently loses (or force-keeps) the --type narrowing.
+        assertFalse(
+            "An untyped class configuration is not the attribute's context",
+            producer.isConfigurationFromContext(untyped, attribute),
+        )
+        assertFalse(
+            "A typed attribute configuration is not the class's context",
+            producer.isConfigurationFromContext(typed, phpClass),
+        )
+    }
+
     fun testSetupConfiguration_testAttributeOnClass_runsTheClassWithTestType() {
         val attribute = attributeByFqn(
             """<?php

@@ -378,6 +378,10 @@ Non-obvious constraints already paid for in blood — read before touching the r
   deliberate (the commented-out line records the intent); changing it affects framework auto-detection.
 - **`TestoTestRunLineMarkerProviderInfo.shouldReplace = true`** so Testo's gutter icon wins over PhpStorm's
   PHPUnit contributor for the same element.
+- **`TestoRunConfiguration.checkConfiguration` swallows one exact platform error.** A group-only run (scope
+  `ConfigurationFile`, no config file, non-empty `group`) trips the platform's "Configuration file is not
+  specified" `RuntimeConfigurationError`, though Testo needs no config file. The error is matched by message
+  text (`PhpBundle`), so a platform rewording fails closed — the validation error merely comes back.
 
 ## Testing
 

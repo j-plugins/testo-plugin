@@ -187,7 +187,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         return result
     }
 
-    override fun isConfigurationFromContext(
+    public override fun isConfigurationFromContext(
         testRunnerSettings: PhpTestRunnerSettings,
         element: PsiElement
     ): Boolean {
@@ -211,15 +211,14 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 && testoSettings.group == TestoRunConfigurationHandler.INSTANCE.joinNames(groups)
         }
         if (element is PhpAttribute && element.owner is PhpClass) {
-            // Mirrors the setup branch: a class-level attribute configures the class, so compare as a class would.
-            return isConfigurationFromContext(testRunnerSettings, element.owner as PhpClass)
+            // Mirrors the setup branch: the attribute runs its class narrowed to the attribute's own type, so only
+            // a configuration of exactly that type is "this context" — an untyped one belongs to the class itself.
+            return isClassConfigurationFromContext(testRunnerSettings, element.owner as PhpClass, resolveTestoType(element))
         }
         if (element is PhpClass) {
-            return when {
-                testRunnerSettings.scope != PhpTestRunnerSettings.Scope.File -> false
-                testRunnerSettings.filePath != element.containingFile.virtualFile.path -> false
-                else -> true
-            }
+            // Running the class itself is untyped; a typed configuration was produced from a class-level attribute
+            // and must not be reused here — it would keep narrowing the run after the user asked for the whole class.
+            return isClassConfigurationFromContext(testRunnerSettings, element, "")
         }
         if (element is Function) {
             val usages = TestoDataProviderUtils.findDataProviderUsages(element)
@@ -230,6 +229,14 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         }
         return super.isConfigurationFromContext(testRunnerSettings, element)
     }
+
+    private fun isClassConfigurationFromContext(
+        testRunnerSettings: PhpTestRunnerSettings,
+        phpClass: PhpClass,
+        testoType: String,
+    ): Boolean = testRunnerSettings.scope == PhpTestRunnerSettings.Scope.File
+        && testRunnerSettings.filePath == phpClass.containingFile.virtualFile.path
+        && (testRunnerSettings as? TestoRunnerSettings)?.testoType == testoType
 
     override fun getWorkingDirectory(element: PsiElement): VirtualFile? {
         if (element is PsiDirectory) {
@@ -255,9 +262,17 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             val psiElement = location.psiElement
             val element = findTestElement(psiElement, getWorkingDirectory(psiElement))
 
-            if (element is PhpClass) {
+            // A class-level attribute is the class run in disguise (narrowed by type), so it must go through the
+            // same abstract-class inheritor chooser as the class itself. `#[Group]` stays out — a group run does
+            // not need a concrete class at all.
+            val classTarget = when {
+                element is PhpClass -> element
+                element is PhpAttribute && element.fqn != TestoClasses.FILTER_GROUP -> element.owner as? PhpClass
+                else -> null
+            }
+            if (classTarget != null) {
                 if (tryRunAbstract(
-                        element,
+                        classTarget,
                         context.dataContext,
                         testRunnerSettings,
                         startRunnable,
