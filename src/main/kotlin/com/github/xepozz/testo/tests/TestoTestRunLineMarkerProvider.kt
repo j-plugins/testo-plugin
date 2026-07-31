@@ -60,6 +60,12 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 
             element is ClassReference && element.parent is PhpAttribute -> {
                 val attribute = element.parent as PhpAttribute
+                // `#[Group]` marks membership, it is not a test on its own: running it means running every test of
+                // that group (`--group=<name>`). The hint points at the annotated element only so the gutter icon can
+                // show its last state; a group on something unrecognized falls back to the file.
+                if (attribute.fqn == TestoClasses.FILTER_GROUP) {
+                    return getLocationInfo(attribute.owner) ?: getLocationHint(attribute.containingFile)
+                }
                 if (attribute.fqn !in RUNNABLE_ATTRIBUTES) return null
 
                 val attributesOwner = attribute.owner as PhpAttributesOwner
@@ -99,6 +105,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
             *TestoClasses.TEST_ATTRIBUTES,
             *TestoClasses.BENCH_ATTRIBUTES,
             *TestoClasses.DATA_ATTRIBUTES,
+            *TestoClasses.TEST_CASE_ATTRIBUTES,
         )
 
         fun getLocationHint(element: Function) = when (element) {
@@ -142,7 +149,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
             }
         }
 
-        private fun getLocationInfo(element: PsiElement) = when (element) {
+        private fun getLocationInfo(element: PsiElement?) = when (element) {
             is Function if element.isTestoExecutable() -> getLocationHint(element)
             is PhpClass if element.isTestoClass() -> getLocationHint(element)
             is Function if TestoDataProviderUtils.isDataProvider(element) -> getDataProviderLocationHint(element)

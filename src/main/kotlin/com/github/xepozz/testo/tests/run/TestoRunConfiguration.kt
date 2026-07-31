@@ -46,7 +46,20 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     override fun createMethodFieldCompletionProvider(editor: PhpTestRunnerConfigurationEditor) =
         createMethodFileCompletionProvider(project, editor, { it.isTestoExecutable() })
 
-    override fun suggestedName() = super.suggestedName() as String
+    override fun suggestedName(): String {
+        val runner = testoSettings.runnerSettings
+        // A group run has no file/method to name itself after (it is deliberately unscoped), and the platform's name
+        // for an unscoped configuration would be empty — name it after the groups instead.
+        if (runner.scope == PhpTestRunnerSettings.Scope.ConfigurationFile && runner.group.isNotEmpty()) {
+            val groups = myHandler.splitNames(runner.group)
+            if (groups.isNotEmpty()) {
+                val quoted = groups.joinToString(", ") { "'$it'" }
+                return if (groups.size == 1) "Group $quoted" else "Groups $quoted"
+            }
+        }
+
+        return super.suggestedName() as String
+    }
 
     override fun createSettings() = TestoRunConfigurationSettings()
 

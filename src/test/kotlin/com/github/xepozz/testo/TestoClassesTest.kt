@@ -26,6 +26,19 @@ class TestoClassesTest {
         assertEquals("\\Testo\\Assert", TestoClasses.ASSERT)
         assertEquals("\\Testo\\Assert\\State\\Assertion\\AssertionException", TestoClasses.ASSERTION_EXCEPTION)
         assertEquals("\\Testo\\Expect", TestoClasses.EXPECT)
+        assertEquals("\\Testo\\Bridge\\Rector\\Testing\\TestRectorFixtures", TestoClasses.RECTOR_TEST_FIXTURES)
+        assertEquals("\\Testo\\Filter\\Group", TestoClasses.FILTER_GROUP)
+    }
+
+    @Test
+    fun testCaseAttributes() {
+        val attrs = TestoClasses.TEST_CASE_ATTRIBUTES
+        assertEquals(1, attrs.size)
+        assertTrue(attrs.contains(TestoClasses.RECTOR_TEST_FIXTURES))
+        assertFalse(
+            "A case attribute must not double as a test attribute — that would make the class's own methods tests",
+            TestoClasses.TEST_ATTRIBUTES.contains(TestoClasses.RECTOR_TEST_FIXTURES)
+        )
     }
 
     @Test
@@ -67,9 +80,13 @@ class TestoClassesTest {
         val data = TestoClasses.DATA_ATTRIBUTES.toSet()
         val test = TestoClasses.TEST_ATTRIBUTES.toSet()
         val bench = TestoClasses.BENCH_ATTRIBUTES.toSet()
+        val case = TestoClasses.TEST_CASE_ATTRIBUTES.toSet()
         assertTrue(data.intersect(test).isEmpty())
         assertTrue(data.intersect(bench).isEmpty())
         assertTrue(test.intersect(bench).isEmpty())
+        assertTrue(case.intersect(data).isEmpty())
+        assertTrue(case.intersect(test).isEmpty())
+        assertTrue(case.intersect(bench).isEmpty())
     }
 
     @Test
@@ -79,6 +96,7 @@ class TestoClassesTest {
             TestoClasses.TEST_INLINE_ATTRIBUTES,
             TestoClasses.DATA_ATTRIBUTES,
             TestoClasses.BENCH_ATTRIBUTES,
+            TestoClasses.TEST_CASE_ATTRIBUTES,
         )) {
             assertEquals(arr.size, arr.toSet().size)
         }

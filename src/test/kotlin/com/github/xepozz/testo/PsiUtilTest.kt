@@ -17,12 +17,16 @@ class PsiUtilTest : TestCase() {
         for (attr in TestoClasses.BENCH_ATTRIBUTES) {
             assertTrue("Missing bench attribute: $attr", meaningful.contains(attr))
         }
+        for (attr in TestoClasses.TEST_CASE_ATTRIBUTES) {
+            assertTrue("Missing test case attribute: $attr", meaningful.contains(attr))
+        }
     }
 
     fun testMeaningfulAttributes_totalCount() {
         val expected = TestoClasses.DATA_ATTRIBUTES.size +
                 TestoClasses.TEST_ATTRIBUTES.size +
-                TestoClasses.BENCH_ATTRIBUTES.size
+                TestoClasses.BENCH_ATTRIBUTES.size +
+                TestoClasses.TEST_CASE_ATTRIBUTES.size
         assertEquals(expected, PsiUtil.MEANINGFUL_ATTRIBUTES.size)
     }
 
@@ -71,6 +75,16 @@ class PsiUtilTest : TestCase() {
     fun testGetAttributeGroup_testHasNoGroup() {
         val group = PsiUtil.getAttributeGroup(TestoClasses.TEST)
         assertNull("Test attribute is not numbered, just runnable", group)
+    }
+
+    fun testGetAttributeGroup_rectorFixturesHasNoGroup() {
+        val group = PsiUtil.getAttributeGroup(TestoClasses.RECTOR_TEST_FIXTURES)
+        assertNull("A class-level case attribute runs the whole case, so it is not numbered", group)
+    }
+
+    fun testGetAttributeGroup_filterGroupHasNoGroup() {
+        val group = PsiUtil.getAttributeGroup(TestoClasses.FILTER_GROUP)
+        assertNull("#[Group] selects by group name, it is not a numbered test attribute", group)
     }
 
     fun testGetAttributeGroup_nullReturnsNull() {

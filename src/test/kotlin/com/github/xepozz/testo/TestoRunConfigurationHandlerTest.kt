@@ -135,6 +135,69 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertEquals("fast", arguments[1])
     }
 
+    fun testPrepareArguments_withTwoGroups_oneFlagEach() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.group = "db,slow"
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        assertEquals(4, arguments.size)
+        assertEquals("--group", arguments[0])
+        assertEquals("db", arguments[1])
+        assertEquals("--group", arguments[2])
+        assertEquals("slow", arguments[3])
+    }
+
+    fun testPrepareArguments_groupsAreTrimmedAndBlanksDropped() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.group = " db , , slow "
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        assertEquals(listOf<String?>("--group", "db", "--group", "slow"), arguments)
+    }
+
+    fun testPrepareArguments_excludedGroupWithBangIsPassedThrough() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.group = "!slow"
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        // Testo itself understands the `!` exclusion prefix; the plugin must not mangle it.
+        assertEquals(listOf<String?>("--group", "!slow"), arguments)
+    }
+
+    fun testPrepareArguments_withTwoExcludeGroups() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.excludeGroup = "slow,flaky"
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        assertEquals(listOf<String?>("--exclude-group", "slow", "--exclude-group", "flaky"), arguments)
+    }
+
+    // ---- splitNames ----
+
+    fun testSplitNames_empty() {
+        assertTrue(TestoRunConfigurationHandler.INSTANCE.splitNames("").isEmpty())
+    }
+
+    fun testSplitNames_blanksOnly() {
+        assertTrue(TestoRunConfigurationHandler.INSTANCE.splitNames(" , , ").isEmpty())
+    }
+
+    fun testSplitNames_single() {
+        assertEquals(listOf("db"), TestoRunConfigurationHandler.INSTANCE.splitNames("db"))
+    }
+
+    fun testSplitNames_several() {
+        assertEquals(listOf("db", "slow"), TestoRunConfigurationHandler.INSTANCE.splitNames(" db , slow "))
+    }
+
     fun testPrepareArguments_withExcludeGroup() {
         val settings = TestoRunConfigurationSettings()
         settings.runnerSettings.excludeGroup = "slow"
