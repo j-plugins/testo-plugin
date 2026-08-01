@@ -61,10 +61,6 @@ class TestoConsoleProperties(
 
     override fun isPrintTestingStartedTime() = true
 
-    // Take the tree from the nodeId/parentNodeId that Testo puts on every service message, rather than from the order
-    // the messages arrive in. Testo runs tests concurrently (fibers, an event loop), so two nodes are open at once,
-    // and the name-based convertor nests whatever opened last inside whatever sits on its stack: a second #[DataSet]
-    // batch lands under the first instead of beside it, and neither node ever closes.
     override fun isIdBasedTestTree() = true
 
     // The log-level filter belongs on the test results toolbar's visible row. Adding it here (rather than via
