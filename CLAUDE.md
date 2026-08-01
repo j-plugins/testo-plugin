@@ -117,7 +117,8 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
 │   │
 │   ├── inspections/
-│   │   └── TestoInspectionSuppressor.kt     # silences PhpUnhandledExceptionInspection for AssertionException
+│   │   ├── TestoInspectionSuppressor.kt     # silences PhpUnhandledExceptionInspection for AssertionException
+│   │   └── TestoGroupNameInspection.kt      # warns on unusable #[Group] names (blank, !-prefixed, comma, none)
 │   │
 │   ├── overrides/
 │   │   └── PhpRunInheritorsListCellRenderer.kt   # chooser popup renderer
@@ -167,7 +168,7 @@ src/test/testData/mixin, rename # PHP fixtures for PSI-backed tests
 `runAnything.executionProvider`, `programRunner` (debug), `implicitUsageProvider`, `iconProvider`,
 `codeInsight.daemonBoundCodeVisionProvider`, `notificationGroup` (id `Testo`), `internalFileTemplate`,
 `defaultLiveTemplates` + `liveTemplateContext`, two `console.folding`s, `fileBasedIndex`,
-`spellchecker.bundledDictionaryProvider`, `lang.inspectionSuppressor`.
+`spellchecker.bundledDictionaryProvider`, `lang.inspectionSuppressor`, `localInspection` (`TestoGroupName`).
 
 `com.jetbrains.php` namespace: `testFrameworkType` (`TestoFrameworkType`), `composerConfigClient`
 (`TestoComposerConfig`).

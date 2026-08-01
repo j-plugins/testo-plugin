@@ -13,5 +13,7 @@
   no path or name filter is added. A variadic `#[Group('db', 'slow')]` emits one `--group` flag per name.
 - The Group / Exclude group fields of the run configuration accept several comma-separated names; a literal comma
   inside a group name is escaped as `\,`.
+- Inspection: suspicious `#[Group]` names are highlighted — blank or whitespace-padded, `!`-prefixed (the CLI reads
+  that as an exclusion), containing a comma, or no names at all.
 
 - Initial scaffold created from [IntelliJ Platform Plugin Template](https://github.com/JetBrains/intellij-platform-plugin-template)
