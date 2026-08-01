@@ -99,8 +99,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         }
         if (element is PhpAttribute && element.owner is PhpClass) {
             // A class-level attribute (`#[Test]`, `#[TestRectorFixtures]`) runs the class it sits on, narrowed to the
-            // kind of case the attribute declares. Running the class itself (the branch below) stays untyped, so it
-            // keeps everything the class holds — that difference is the whole point of running from the attribute.
+            // kind of case the attribute declares. Running the class itself stays untyped and keeps everything the
+            // class holds — that difference is the whole point of running from the attribute.
             val phpClass = element.owner as PhpClass
             if (!phpClass.isTestoClass()) return null
             setupConfiguration(testRunnerSettings, phpClass, element.containingFile.virtualFile) ?: return null
@@ -211,8 +211,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 && testoSettings.group == TestoRunConfigurationHandler.INSTANCE.joinNames(groups)
         }
         if (element is PhpAttribute && element.owner is PhpClass) {
-            // Mirrors the setup branch: the attribute runs its class narrowed to the attribute's own type, so only
-            // a configuration of exactly that type is "this context" — an untyped one belongs to the class itself.
+            // A class-level attribute configures its class narrowed to the attribute's own type, so only a
+            // configuration of exactly that type is "this context" — an untyped one belongs to the class itself.
             return isClassConfigurationFromContext(testRunnerSettings, element.owner as PhpClass, resolveTestoType(element))
         }
         if (element is PhpClass) {
@@ -377,8 +377,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     private fun findTestElement(target: PsiElement?): PsiElement? = when (target) {
         is ClassReference -> target.takeIf { it.parent is NewExpression && (it.fqn == TestoClasses.APPLICATION_CONFIG || it.fqn == TestoClasses.SUITE_CONFIG) }
         // `#[Group]` is runnable wherever it sits: it selects by group, not by location. Any other attribute needs a
-        // runnable owner — a test/bench/provider function, or a Testo class (the attribute then runs that class,
-        // narrowed to its own type; without this the context would fall back to the class and lose the type).
+        // runnable owner — a test/bench/provider function, or a Testo class. A class-level attribute is the context
+        // itself, never a shortcut to its class: the attribute run carries its own type, the class run is untyped.
         is PhpAttribute -> target.takeIf {
             if (it.fqn == TestoClasses.FILTER_GROUP) return@takeIf true
             val owner = it.owner ?: return@takeIf false
