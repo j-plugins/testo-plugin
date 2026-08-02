@@ -130,39 +130,13 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
     }
 
     /**
-     * Splits a comma-separated option value into individual names, dropping blanks. A comma is a separator; a name
-     * that itself contains one carries it escaped as `\,` (see [joinNames]). Any other backslash stays literal, so a
-     * name ending in a backslash cannot be followed by another name — an acceptable loss for a one-character escape.
+     * Splits a comma-separated option value into individual names, dropping blanks. The comma is the separator, so a
+     * name cannot contain one — `TestoGroupNameInspection` warns about such names at the source.
      */
-    fun splitNames(value: String): List<String> {
-        val names = mutableListOf<String>()
-        val current = StringBuilder()
-        var i = 0
-        while (i < value.length) {
-            val c = value[i]
-            when {
-                c == '\\' && i + 1 < value.length && value[i + 1] == ',' -> {
-                    current.append(',')
-                    i++
-                }
-
-                c == ',' -> {
-                    names.add(current.toString())
-                    current.clear()
-                }
-
-                else -> current.append(c)
-            }
-            i++
-        }
-        names.add(current.toString())
-        return names
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-    }
-
-    /** The inverse of [splitNames]: joins names into the single persisted field, escaping literal commas as `\,`. */
-    fun joinNames(names: List<String>): String = names.joinToString(",") { it.replace(",", "\\,") }
+    fun splitNames(value: String): List<String> = value
+        .split(',')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
 
     data class ParsedMethodName(
         val method: String,

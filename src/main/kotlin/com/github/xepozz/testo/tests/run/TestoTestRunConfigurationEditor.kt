@@ -69,7 +69,7 @@ class TestoTestRunConfigurationEditor(
                     .align(AlignX.FILL)
             }
                 .layout(RowLayout.PARENT_GRID)
-                .rowComment("--group=<name> (comma-separated for several; prefix a name with ! to exclude; escape a literal comma as \\,)")
+                .rowComment("--group=<name> (comma-separated for several; prefix a name with ! to exclude)")
 
             row {
                 label("Exclude group")
@@ -78,7 +78,7 @@ class TestoTestRunConfigurationEditor(
                     .align(AlignX.FILL)
             }
                 .layout(RowLayout.PARENT_GRID)
-                .rowComment("--exclude-group=<name> (comma-separated for several; escape a literal comma as \\,)")
+                .rowComment("--exclude-group=<name> (comma-separated for several)")
 
             row {
                 label("Repeat")

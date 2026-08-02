@@ -324,27 +324,6 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
         assertEquals("Both names are kept, one --group flag each", "db,slow", settings.group)
     }
 
-    fun testSetupConfiguration_groupNameWithComma_isEscapedInThePersistedField() {
-        val attribute = attributeByFqn(
-            """<?php
-            namespace App;
-            class OrderTest {
-                #[\Testo\Test]
-                #[\Testo\Filter\Group('a,b')]
-                public function persistsOrder(): void {}
-            }
-            """.trimIndent(),
-            TestoClasses.FILTER_GROUP
-        )
-
-        val settings = TestoRunnerSettings()
-        producer.setupConfiguration(settings, attribute, attribute.containingFile.virtualFile)
-
-        // 'a,b' is ONE group whose name contains a comma; the persisted comma-joined field escapes it so the
-        // handler splits it back into a single `--group` flag.
-        assertEquals("a\\,b", settings.group)
-    }
-
     fun testSetupConfiguration_groupAttributeWithoutArguments_producesNothing() {
         val attribute = attributeByFqn(
             """<?php

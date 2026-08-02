@@ -201,8 +201,8 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
 - Runner flags from `TestoRunnerSettings` (only emitted when non-empty / > 0): `--type`, `--suite`, `--group`,
   `--exclude-group`, `--repeat`, `--parallel`, plus one `--filter <selector>` per entry in `rerunFilters`.
   `group`/`excludeGroup` are single persisted strings holding comma-separated names; the handler splits them into one
-  flag per name (Testo ORs repeated `--group`s, and a `!name` prefix excludes; a literal comma in a name is escaped
-  as `\,` — `splitNames`/`joinNames` are inverses).
+  flag per name (Testo ORs repeated `--group`s, and a `!name` prefix excludes). The comma is the separator, so a group
+  name cannot contain one — `TestoGroupNameInspection` warns about such names at the source.
 - `--config <file>` when an alternative configuration file is set (`getConfigFileOption()`).
 - Scope flags: `Type` → `--suite <type>`; `Directory`/`File` → `--path <relative path>`;
   `Method` → `--path <file> --filter <method> [--data-provider <name>]`; `ConfigurationFile` → nothing
