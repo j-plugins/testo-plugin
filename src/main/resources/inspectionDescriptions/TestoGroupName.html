@@ -1,0 +1,14 @@
+<html>
+<body>
+Reports <code>#[Group]</code> names that the Testo toolchain cannot select cleanly:
+<ul>
+    <li>an attribute without names — it selects nothing;</li>
+    <li>a blank name, or a name padded with whitespace (the run configuration field trims names);</li>
+    <li>a name starting with <code>!</code> — the command line reads it as an exclusion, so such a group
+        cannot be selected with <code>--group</code>;</li>
+    <li>a name containing a comma — the separator of the run configuration's comma-separated
+        <em>Group</em> field, so such a name would be split into two.</li>
+</ul>
+Names built from constants or expressions are not checked.
+</body>
+</html>

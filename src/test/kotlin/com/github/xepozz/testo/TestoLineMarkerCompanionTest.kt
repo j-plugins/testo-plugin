@@ -26,10 +26,26 @@ class TestoLineMarkerCompanionTest : TestCase() {
         }
     }
 
+    fun testRunnableAttributes_containsTestCaseAttributes() {
+        val runnable = TestoTestRunLineMarkerProvider.RUNNABLE_ATTRIBUTES.toSet()
+        for (attr in TestoClasses.TEST_CASE_ATTRIBUTES) {
+            assertTrue("Missing test case attribute: $attr", runnable.contains(attr))
+        }
+    }
+
+    fun testRunnableAttributes_doesNotContainFilterGroup() {
+        val runnable = TestoTestRunLineMarkerProvider.RUNNABLE_ATTRIBUTES.toSet()
+        assertFalse(
+            "#[Group] gets its own marker branch and must not be treated as a test attribute",
+            runnable.contains(TestoClasses.FILTER_GROUP)
+        )
+    }
+
     fun testRunnableAttributes_totalCount() {
         val expected = TestoClasses.TEST_ATTRIBUTES.size +
                 TestoClasses.BENCH_ATTRIBUTES.size +
-                TestoClasses.DATA_ATTRIBUTES.size
+                TestoClasses.DATA_ATTRIBUTES.size +
+                TestoClasses.TEST_CASE_ATTRIBUTES.size
         assertEquals(expected, TestoTestRunLineMarkerProvider.RUNNABLE_ATTRIBUTES.size)
     }
 }

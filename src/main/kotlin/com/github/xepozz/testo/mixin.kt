@@ -56,7 +56,18 @@ fun PhpAttributesOwner.hasAnyAttribute(vararg fqn: String) = attributes.any { it
 fun PsiElement.isTestoClass() = when (this) {
     is PhpClass -> TestoTestDescriptor.isTestClassName(name)
             || hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
+            || isTestoCaseClass()
             || ownMethods.any { it.isTestoMethod() || it.isTestoBench() }
+    else -> false
+}
+
+/**
+ * A class that a class-level attribute turns into a test case on its own (currently `#[TestRectorFixtures]`). The tests
+ * of such a case are synthesized by the framework, so — unlike a class carrying `#[Test]` — its own public methods must
+ * not be treated as tests.
+ */
+fun PsiElement.isTestoCaseClass() = when (this) {
+    is PhpClass -> hasAnyAttribute(*TestoClasses.TEST_CASE_ATTRIBUTES)
     else -> false
 }
 

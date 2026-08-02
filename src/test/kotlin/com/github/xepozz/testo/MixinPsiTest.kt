@@ -330,6 +330,60 @@ class MixinPsiTest : BasePlatformTestCase() {
         assertFalse("Public method in non-Testo class should not be runnable", method.isTestoMethod())
     }
 
+    // ---- Class-level case attribute #[TestRectorFixtures] ----
+
+    fun testIsTestoClass_classWithRectorFixturesAttribute() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php
+            namespace App;
+            #[\Testo\Bridge\Rector\Testing\TestRectorFixtures('SomeRector')]
+            final class SomeRector { public function refactor(): void {} }"""
+        )
+        val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
+        assertTrue("A rule with #[TestRectorFixtures] is a Testo case class", phpClass.isTestoClass())
+        assertTrue(phpClass.isTestoCaseClass())
+    }
+
+    fun testIsTestoMethod_publicMethodOfRectorFixturesClassIsNotATest() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php
+            #[\Testo\Bridge\Rector\Testing\TestRectorFixtures('SomeRector')]
+            final class SomeRector {
+                public function getRuleDefinition(): void {}
+                public function refactor(): void {}
+            }"""
+        )
+        val methods = PsiTreeUtil.findChildrenOfType(psiFile, Method::class.java)
+        assertEquals(2, methods.size)
+        for (method in methods) {
+            assertFalse(
+                "The rule's own methods are not tests — the fixtures are (method '${method.name}')",
+                method.isTestoMethod()
+            )
+        }
+    }
+
+    fun testIsTestoCaseClass_plainTestClassIsNotACaseClass() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php class UserTest { public function testSomething(): void {} }"""
+        )
+        val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
+        assertFalse("Only a class-level case attribute makes a case class", phpClass.isTestoCaseClass())
+    }
+
+    fun testIsTestoFile_rectorRuleWithFixturesAttribute() {
+        val psiFile = myFixture.configureByText(
+            "SomeRector.php",
+            """<?php
+            #[\Testo\Bridge\Rector\Testing\TestRectorFixtures('SomeRector')]
+            final class SomeRector { public function refactor(): void {} }"""
+        )
+        assertTrue("A rule declaring fixtures is a Testo file", psiFile.isTestoFile())
+    }
+
     fun testIsTestoMethod_benchMethodInClassWithTestAttribute() {
         val psiFile = myFixture.configureByText(
             PhpFileType.INSTANCE,

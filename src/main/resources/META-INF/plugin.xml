@@ -77,6 +77,16 @@
         <lang.inspectionSuppressor
                 language="PHP"
                 implementationClass="com.github.xepozz.testo.tests.inspections.TestoInspectionSuppressor"/>
+        <localInspection
+                language="PHP"
+                shortName="TestoGroupName"
+                bundle="messages.TestoBundle"
+                key="inspection.group.display.name"
+                groupBundle="messages.TestoBundle"
+                groupKey="inspection.group"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="com.github.xepozz.testo.tests.inspections.TestoGroupNameInspection"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.jetbrains.php">
