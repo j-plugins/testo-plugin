@@ -271,7 +271,7 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
         val result = producer.setupConfiguration(settings, attribute, attribute.containingFile.virtualFile)
 
         assertNotNull("#[Group] must produce a run configuration", result)
-        assertEquals("db", settings.group)
+        assertEquals(listOf("db"), settings.groups)
         assertEquals(
             "A group run must not be narrowed to a file or method",
             Scope.ConfigurationFile,
@@ -300,7 +300,7 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
         val result = producer.setupConfiguration(settings, attribute, attribute.containingFile.virtualFile)
 
         assertNotNull("#[Group] on a class must produce a run configuration", result)
-        assertEquals("integration", settings.group)
+        assertEquals(listOf("integration"), settings.groups)
         assertEquals(Scope.ConfigurationFile, settings.scope)
         assertTrue("A group on a class must not fall back to running that class", settings.filePath.isNullOrEmpty())
     }
@@ -321,7 +321,7 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
         val settings = TestoRunnerSettings()
         producer.setupConfiguration(settings, attribute, attribute.containingFile.virtualFile)
 
-        assertEquals("Both names are kept, one --group flag each", "db,slow", settings.group)
+        assertEquals("Both names are kept, one --group flag each", listOf("db", "slow"), settings.groups)
     }
 
     fun testSetupConfiguration_groupAttributeWithoutArguments_producesNothing() {

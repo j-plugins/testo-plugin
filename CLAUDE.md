@@ -201,8 +201,8 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
 - Runner flags from `TestoRunnerSettings` (only emitted when non-empty / > 0): `--type`, `--suite`, `--group`,
   `--exclude-group`, `--repeat`, `--parallel`, plus one `--filter <selector>` per entry in `rerunFilters`.
   `group`/`excludeGroup` are single persisted strings holding comma-separated names; the handler splits them into one
-  flag per name (Testo ORs repeated `--group`s, and a `!name` prefix excludes). The comma is the separator, so a group
-  name cannot contain one — `TestoGroupNameInspection` warns about such names at the source.
+  flag per name (Testo ORs repeated `--group`s, and a `!name` prefix excludes). `groups`/`excludeGroups` are
+  persisted **lists** (`@XCollection`), so a name is opaque — whatever `#[Group]` spells reaches the CLI untouched.
 - `--config <file>` when an alternative configuration file is set (`getConfigFileOption()`).
 - Scope flags: `Type` → `--suite <type>`; `Directory`/`File` → `--path <relative path>`;
   `Method` → `--path <file> --filter <method> [--data-provider <name>]`; `ConfigurationFile` → nothing
@@ -367,6 +367,11 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **Debug installs channel tabs itself** (`TestoDebugRunner`): the augmenter's descriptor lookup misses debug
   sessions. `TestoConsoleProperties.channelsInstalled` guards against a double install. The debug session also
   gets the `Testo.RerunSplit` action handed to it explicitly, since it does not use `RunTab.TopToolbar`.
+- **Group names are a list in the model, a comma-separated string only in the editor.** `TestoRunnerSettings`
+  persists `groups`/`excludeGroups` via `@XCollection`; the comma lives in the editor's text field (`parseNames`/
+  `formatNames`) and in the pre-list persisted form. `migrateLegacyNames` folds an old `group="a,b"` attribute into
+  the list and clears it, and `TestoRunConfigurationSettings.getTestoRunnerSettings` calls it — that is the first
+  point after deserialization every reader goes through. `TestoRunnerSettingsSerializationTest` pins the XML shape.
 - **`rerunFilters` is `@Transient`** — it lives only on the throwaway clone a "rerun failed" launch creates, and
   that clone's scope is reset to `ConfigurationFile` so no scope flag narrows the filters away.
 - **`TestoRunConfigurationType.ID` is a pinned literal**, not `::class.simpleName`: renaming the class must not

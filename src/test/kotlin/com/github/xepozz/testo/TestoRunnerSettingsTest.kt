@@ -13,8 +13,8 @@ class TestoRunnerSettingsTest : TestCase() {
         assertFalse(settings.parallelTestingEnabled)
         assertEquals("run", settings.command)
         assertEquals("", settings.suite)
-        assertEquals("", settings.group)
-        assertEquals("", settings.excludeGroup)
+        assertTrue(settings.groups.isEmpty())
+        assertTrue(settings.excludeGroups.isEmpty())
         assertEquals(0, settings.repeat)
         assertEquals(0, settings.parallel)
         assertEquals("", settings.testoType)
@@ -28,19 +28,20 @@ class TestoRunnerSettingsTest : TestCase() {
             parallelTestingEnabled = true,
             command = "list",
             suite = "unit",
-            group = "fast",
-            excludeGroup = "slow",
             repeat = 3,
             parallel = 4,
             testoType = "bench",
-        )
+        ).apply {
+            groups = mutableListOf("fast")
+            excludeGroups = mutableListOf("slow")
+        }
         assertEquals(3, settings.dataProviderIndex)
         assertEquals(5, settings.dataSetIndex)
         assertTrue(settings.parallelTestingEnabled)
         assertEquals("list", settings.command)
         assertEquals("unit", settings.suite)
-        assertEquals("fast", settings.group)
-        assertEquals("slow", settings.excludeGroup)
+        assertEquals(listOf("fast"), settings.groups)
+        assertEquals(listOf("slow"), settings.excludeGroups)
         assertEquals(3, settings.repeat)
         assertEquals(4, settings.parallel)
         assertEquals("bench", settings.testoType)
@@ -71,8 +72,8 @@ class TestoRunnerSettingsTest : TestCase() {
         assertFalse(result.parallelTestingEnabled)
         assertEquals("run", result.command)
         assertEquals("", result.suite)
-        assertEquals("", result.group)
-        assertEquals("", result.excludeGroup)
+        assertTrue(result.groups.isEmpty())
+        assertTrue(result.excludeGroups.isEmpty())
         assertEquals(0, result.repeat)
         assertEquals(0, result.parallel)
         assertEquals("", result.testoType)
@@ -85,12 +86,12 @@ class TestoRunnerSettingsTest : TestCase() {
             parallelTestingEnabled = true,
             command = "debug",
             suite = "integration",
-            group = "database",
-            excludeGroup = "slow",
             repeat = 5,
             parallel = 8,
             testoType = "inline",
         )
+        source.groups = mutableListOf("database")
+        source.excludeGroups = mutableListOf("slow")
         source.scope = PhpTestRunnerSettings.Scope.Method
         source.filePath = "/test.php"
         source.methodName = "testIt"
@@ -108,8 +109,8 @@ class TestoRunnerSettingsTest : TestCase() {
         assertTrue(result.parallelTestingEnabled)
         assertEquals("debug", result.command)
         assertEquals("integration", result.suite)
-        assertEquals("database", result.group)
-        assertEquals("slow", result.excludeGroup)
+        assertEquals(listOf("database"), result.groups)
+        assertEquals(listOf("slow"), result.excludeGroups)
         assertEquals(5, result.repeat)
         assertEquals(8, result.parallel)
         assertEquals("inline", result.testoType)

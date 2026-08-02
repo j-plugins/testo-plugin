@@ -40,13 +40,13 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
             arguments.add("--suite")
             arguments.add(runner.suite)
         }
-        // Testo takes `--group`/`--exclude-group` repeatedly (OR logic), so a comma-separated field becomes one flag
-        // per name — that is how a `#[Group('db', 'slow')]` run reaches the CLI.
-        for (group in splitNames(runner.group)) {
+        // Testo takes `--group`/`--exclude-group` repeatedly (OR logic), one name per flag — that is how a
+        // `#[Group('db', 'slow')]` run reaches the CLI.
+        for (group in runner.groups) {
             arguments.add("--group")
             arguments.add(group)
         }
-        for (group in splitNames(runner.excludeGroup)) {
+        for (group in runner.excludeGroups) {
             arguments.add("--exclude-group")
             arguments.add(group)
         }
@@ -128,15 +128,6 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
             }
         }
     }
-
-    /**
-     * Splits a comma-separated option value into individual names, dropping blanks. The comma is the separator, so a
-     * name cannot contain one — `TestoGroupNameInspection` warns about such names at the source.
-     */
-    fun splitNames(value: String): List<String> = value
-        .split(',')
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
 
     data class ParsedMethodName(
         val method: String,

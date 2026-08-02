@@ -125,7 +125,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_withGroup() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.group = "fast"
+        settings.runnerSettings.groups = mutableListOf("fast")
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
@@ -137,7 +137,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_withTwoGroups_oneFlagEach() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.group = "db,slow"
+        settings.runnerSettings.groups = mutableListOf("db", "slow")
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
@@ -149,19 +149,20 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertEquals("slow", arguments[3])
     }
 
-    fun testPrepareArguments_groupsAreTrimmedAndBlanksDropped() {
+    fun testPrepareArguments_groupNameIsPassedThroughVerbatim() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.group = " db , , slow "
+        settings.runnerSettings.groups = mutableListOf("a,b")
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        assertEquals(listOf<String?>("--group", "db", "--group", "slow"), arguments)
+        // A name is opaque to the plugin: the list holds whatever #[Group] spelled, commas included.
+        assertEquals(listOf<String?>("--group", "a,b"), arguments)
     }
 
     fun testPrepareArguments_excludedGroupWithBangIsPassedThrough() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.group = "!slow"
+        settings.runnerSettings.groups = mutableListOf("!slow")
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
@@ -172,7 +173,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_withTwoExcludeGroups() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.excludeGroup = "slow,flaky"
+        settings.runnerSettings.excludeGroups = mutableListOf("slow", "flaky")
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
@@ -180,27 +181,9 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertEquals(listOf<String?>("--exclude-group", "slow", "--exclude-group", "flaky"), arguments)
     }
 
-    // ---- splitNames ----
-
-    fun testSplitNames_empty() {
-        assertTrue(TestoRunConfigurationHandler.INSTANCE.splitNames("").isEmpty())
-    }
-
-    fun testSplitNames_blanksOnly() {
-        assertTrue(TestoRunConfigurationHandler.INSTANCE.splitNames(" , , ").isEmpty())
-    }
-
-    fun testSplitNames_single() {
-        assertEquals(listOf("db"), TestoRunConfigurationHandler.INSTANCE.splitNames("db"))
-    }
-
-    fun testSplitNames_several() {
-        assertEquals(listOf("db", "slow"), TestoRunConfigurationHandler.INSTANCE.splitNames(" db , slow "))
-    }
-
     fun testPrepareArguments_withExcludeGroup() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.excludeGroup = "slow"
+        settings.runnerSettings.excludeGroups = mutableListOf("slow")
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
@@ -249,8 +232,8 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         val settings = TestoRunConfigurationSettings()
         settings.runnerSettings.testoType = "bench"
         settings.runnerSettings.suite = "integration"
-        settings.runnerSettings.group = "db"
-        settings.runnerSettings.excludeGroup = "slow"
+        settings.runnerSettings.groups = mutableListOf("db")
+        settings.runnerSettings.excludeGroups = mutableListOf("slow")
         settings.runnerSettings.repeat = 2
         settings.runnerSettings.parallel = 4
         val arguments = mutableListOf<String?>()
@@ -311,7 +294,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_rerunFiltersCombinedWithGroup() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.group = "fast"
+        settings.runnerSettings.groups = mutableListOf("fast")
         settings.runnerSettings.rerunFilters = listOf("\\Foo\\Bar::baz")
         val arguments = mutableListOf<String?>()
 
@@ -329,7 +312,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         val settings = TestoRunConfigurationSettings()
         settings.runnerSettings.testoType = "bench"
         settings.runnerSettings.suite = "unit"
-        settings.runnerSettings.group = "fast"
+        settings.runnerSettings.groups = mutableListOf("fast")
         settings.runnerSettings.parallel = 2
         val arguments = mutableListOf<String?>()
 

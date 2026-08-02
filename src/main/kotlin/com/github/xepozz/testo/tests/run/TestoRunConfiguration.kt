@@ -53,7 +53,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         // point at a config file (ApplicationConfig/SuiteConfig runs) keeps the platform's file-based name even if a
         // group was typed into it later.
         if (isGroupOnlyRun()) {
-            val groups = myHandler.splitNames(testoSettings.runnerSettings.group)
+            val groups = testoSettings.runnerSettings.groups
             val quoted = groups.joinToString(", ") { "'$it'" }
             return if (groups.size == 1) "Group $quoted" else "Groups $quoted"
         }
@@ -79,7 +79,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         val runner = testoSettings.runnerSettings
         return runner.scope == PhpTestRunnerSettings.Scope.ConfigurationFile
                 && !runner.isUseAlternativeConfigurationFile
-                && myHandler.splitNames(runner.group).isNotEmpty()
+                && runner.groups.isNotEmpty()
     }
 
     private fun missingConfigurationFileMessage() = PhpBundle.message(
