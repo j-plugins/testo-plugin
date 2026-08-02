@@ -61,6 +61,8 @@ class TestoConsoleProperties(
 
     override fun isPrintTestingStartedTime() = true
 
+    override fun isIdBasedTestTree() = true
+
     // The log-level filter belongs on the test results toolbar's visible row. Adding it here (rather than via
     // appendAdditionalActions, which the platform routes into the gear submenu) puts it among the primary actions at
     // construction time — so it survives the snapshot that RunTab merges into the run tab's toolbar, and it shows in
