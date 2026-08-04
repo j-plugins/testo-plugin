@@ -4,11 +4,6 @@
 
 ## [Unreleased]
 
-### Added
-
-- Support for IntelliJ IDEA / PhpStorm 2026.2, where PHP moved its coverage classes to `com.intellij.php.coverage`.
-  The plugin now ships as two builds — 2025.2–2026.1 and 2026.2+ — and the Marketplace serves each IDE the matching one.
-
 ## [2026.3.1] - 2026-08-04
 
 ### Added
