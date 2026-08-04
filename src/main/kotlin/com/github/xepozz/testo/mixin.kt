@@ -37,10 +37,14 @@ fun PsiElement.isTestoMethod() = when (this) {
     else -> false
 }
 
+// A public static method is a data provider (see isTestoDataProviderLike), and a #[Bench] method is a benchmark — both
+// live in test-marked classes without being tests themselves, and running either as `--type=test` would be wrong.
 private fun Method.isPublicMethodOfTestoMarkedClass() = when {
     !modifier.isPublic -> false
     modifier.isAbstract -> false
+    modifier.isStatic -> false
     name.startsWith("__") -> false
+    isTestoBench() -> false
     else -> containingClass?.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES) == true
 }
 

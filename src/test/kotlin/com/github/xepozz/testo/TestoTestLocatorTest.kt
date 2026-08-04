@@ -36,7 +36,7 @@ class TestoTestLocatorTest : BasePlatformTestCase() {
 
     fun testGetLocationInfo_emptyString() {
         val info = locator.getLocationInfo("")
-        assertNotNull("Empty string should still produce a result (single part)", info)
+        assertNull("Empty link has no parts left after dropping the trailing empty one", info)
     }
 
     fun testGetLocationInfo_tooManyParts() {

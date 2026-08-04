@@ -8,7 +8,6 @@ import com.intellij.execution.runners.ExecutionEnvironment
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
 import com.jetbrains.php.config.interpreters.PhpInterpreter
 import com.jetbrains.php.debug.xdebug.options.XdebugConfigurationOptionsManager
-import com.jetbrains.php.phpunit.coverage.PhpCoverageRunner
 import com.jetbrains.php.phpunit.coverage.PhpUnitCoverageEngine.CoverageEngine
 import com.jetbrains.php.run.PhpConfigurationOption
 import com.jetbrains.php.run.PhpRunConfigurationHolder

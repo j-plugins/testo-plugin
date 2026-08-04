@@ -30,6 +30,10 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    # One artifact per PHP coverage API — see the `phpApi` comment in gradle.properties.
+    strategy:
+      matrix:
+        phpApi: [ 252, 262 ]
     steps:
 
       # Free GitHub Actions Environment Disk Space
@@ -56,7 +60,7 @@ jobs:
 
       # Build plugin
       - name: Build plugin
-        run: ./gradlew buildPlugin
+        run: ./gradlew buildPlugin -PphpApi=${{ matrix.phpApi }}
 
       # Prepare plugin archive content for creating artifact
       - name: Prepare Plugin Artifact
@@ -169,6 +173,9 @@ jobs:
     name: Verify plugin
     needs: [ build ]
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        phpApi: [ 252, 262 ]
     steps:
 
       # Free GitHub Actions Environment Disk Space
@@ -197,14 +204,14 @@ jobs:
 
       # Run Verify Plugin task and IntelliJ Plugin Verifier tool
       - name: Run Plugin Verification tasks
-        run: ./gradlew verifyPlugin
+        run: ./gradlew verifyPlugin -PphpApi=${{ matrix.phpApi }}
 
       # Collect Plugin Verifier Result
       - name: Collect Plugin Verifier Result
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
-          name: pluginVerifier-result
+          name: pluginVerifier-result-${{ matrix.phpApi }}
           path: ${{ github.workspace }}/build/reports/pluginVerifier
 
   # Prepare a draft release for GitHub Releases page for the manual verification

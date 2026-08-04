@@ -11,11 +11,24 @@ plugins {
 }
 
 group = providers.gradleProperty("pluginGroup").get()
-version = providers.gradleProperty("pluginVersion").get()
+
+// Which PHP coverage API to build against — see the `phpApi` comment in gradle.properties.
+val phpApi = providers.gradleProperty("phpApi").get()
+
+// The Marketplace keys uploads by version and rejects a second one carrying a version it already has, so the two
+// variants cannot both be "2026.3.1". The target API becomes a fourth component: it keeps each variant unique, sorts
+// above the plain version so existing installs still see an update, and — unlike a `-252` suffix — is not a SemVer
+// pre-release, so `channels` below (which reads the bare pluginVersion) still resolves to the default channel.
+val artifactVersion = providers.gradleProperty("pluginVersion").map { "$it.$phpApi" }
+
+version = artifactVersion.get()
+
+fun apiProperty(name: String) = providers.gradleProperty("$name.$phpApi")
 
 // Set the JVM language level used to build the project.
 kotlin {
     jvmToolchain(21)
+    sourceSets["main"].kotlin.srcDir("src/php$phpApi/kotlin")
 }
 
 // Configure project's dependencies
@@ -35,16 +48,16 @@ dependencies {
 
     // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {
-        create(providers.gradleProperty("platformType"), providers.gradleProperty("platformVersion"))
+        create(providers.gradleProperty("platformType"), apiProperty("platformVersion"))
 
         // Plugin Dependencies. Uses `platformBundledPlugins` property from the gradle.properties file for bundled IntelliJ Platform plugins.
         bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
 
         // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file for plugin from JetBrains Marketplace.
-        plugins(providers.gradleProperty("platformPlugins").map { it.split(',') })
+        plugins(apiProperty("platformPlugins").map { it.split(',') })
 
         // Module Dependencies. Uses `platformBundledModules` property from the gradle.properties file for bundled IntelliJ Platform modules.
-        bundledModules(providers.gradleProperty("platformBundledModules").map { it.split(',') })
+        bundledModules(apiProperty("platformBundledModules").map { it.split(',') })
 
         testFramework(TestFrameworkType.Platform)
     }
@@ -54,7 +67,7 @@ dependencies {
 intellijPlatform {
     pluginConfiguration {
         name = providers.gradleProperty("pluginName")
-        version = providers.gradleProperty("pluginVersion")
+        version = artifactVersion
 
         // Extract the <!-- Plugin description --> section from README.md and provide for the plugin's manifest
         description = providers.fileContents(layout.projectDirectory.file("README.md")).asText.map {
@@ -70,7 +83,8 @@ intellijPlatform {
         }
 
         ideaVersion {
-            sinceBuild = providers.gradleProperty("pluginSinceBuild")
+            sinceBuild = apiProperty("pluginSinceBuild")
+            untilBuild = apiProperty("pluginUntilBuild").map { it.trim() }.filter { it.isNotEmpty() }
         }
     }
 
@@ -134,4 +148,25 @@ intellijPlatformTesting {
             }
         }
     }
+}
+
+// A Gradle build resolves exactly one IntelliJ Platform, so one invocation can only ever build one variant. Make
+// `publishPlugin` still release everything by re-entering Gradle once per remaining API; `phpApiSingle` marks those
+// nested invocations so they do not fan out again.
+if (!providers.gradleProperty("phpApiSingle").isPresent) {
+    val gradlew = if (System.getProperty("os.name").startsWith("Windows")) "gradlew.bat" else "./gradlew"
+    val otherVariants = providers.gradleProperty("phpApis").get()
+        .split(',')
+        .map { it.trim() }
+        .filter { it != phpApi }
+        .map { api ->
+            tasks.register<Exec>("publishPluginFor$api") {
+                group = "intellij platform"
+                description = "Builds and publishes the $api variant in a nested Gradle invocation."
+                workingDir = rootDir
+                commandLine(gradlew, "publishPlugin", "-PphpApi=$api", "-PphpApiSingle=true", "--console=plain")
+            }
+        }
+
+    tasks.named("publishPlugin") { dependsOn(otherVariants) }
 }
