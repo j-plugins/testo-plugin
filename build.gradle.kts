@@ -11,10 +11,17 @@ plugins {
 }
 
 group = providers.gradleProperty("pluginGroup").get()
-version = providers.gradleProperty("pluginVersion").get()
 
 // Which PHP coverage API to build against — see the `phpApi` comment in gradle.properties.
 val phpApi = providers.gradleProperty("phpApi").get()
+
+// The Marketplace keys uploads by version and rejects a second one carrying a version it already has, so the two
+// variants cannot both be "2026.3.1". The target API becomes a fourth component: it keeps each variant unique, sorts
+// above the plain version so existing installs still see an update, and — unlike a `-252` suffix — is not a SemVer
+// pre-release, so `channels` below (which reads the bare pluginVersion) still resolves to the default channel.
+val artifactVersion = providers.gradleProperty("pluginVersion").map { "$it.$phpApi" }
+
+version = artifactVersion.get()
 
 fun apiProperty(name: String) = providers.gradleProperty("$name.$phpApi")
 
@@ -60,7 +67,7 @@ dependencies {
 intellijPlatform {
     pluginConfiguration {
         name = providers.gradleProperty("pluginName")
-        version = providers.gradleProperty("pluginVersion")
+        version = artifactVersion
 
         // Extract the <!-- Plugin description --> section from README.md and provide for the plugin's manifest
         description = providers.fileContents(layout.projectDirectory.file("README.md")).asText.map {
@@ -119,10 +126,6 @@ tasks {
     }
     runIde {
         autoReload = false
-    }
-    // Both variants carry the same pluginVersion, so without a classifier the second build would overwrite the first.
-    buildPlugin {
-        archiveClassifier = phpApi
     }
 }
 

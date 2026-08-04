@@ -55,8 +55,12 @@ The only source difference is `src/php252/kotlin` vs `src/php262/kotlin`, each h
 is current. `src/main/kotlin/.../coverage/` imports none of them — the aliases live in its own package. The enum
 `PhpUnitCoverageEngine.CoverageEngine` did **not** move and is still imported directly from `com.jetbrains.php`.
 
-`buildPlugin` gets `archiveClassifier = phpApi` so the two zips coexist. CI builds and verifies both via a matrix;
-`release.yml` runs `publishPlugin` once per variant and the Marketplace serves each IDE the matching build.
+Each variant is published as `<pluginVersion>.<phpApi>` (e.g. `2026.3.1.252` / `2026.3.1.262`). The Marketplace keys
+uploads by version and rejects a second upload carrying a version it already has, so the two builds *must not* share
+`pluginVersion`. The API goes in as a fourth component rather than a `-252` suffix: it sorts above the bare version
+(existing installs still see an update) and is not a SemVer pre-release, so `channels` — which reads the bare
+`pluginVersion` — still resolves to the default channel. CI builds and verifies both via a matrix; `release.yml` runs
+`publishPlugin` once per variant and the Marketplace serves each IDE the build matching its since/until range.
 
 > Note: `gradleVersion` in `gradle.properties` (9.5.0) lags the wrapper (9.6.0) — the property only feeds the
 > `wrapper` task, so running `./gradlew wrapper` would downgrade it. Bump the property when syncing.
