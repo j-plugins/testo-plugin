@@ -10,6 +10,7 @@ import com.intellij.execution.Executor
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ParametersList
 import com.intellij.execution.configurations.RunConfiguration
+import com.intellij.execution.configurations.RuntimeConfigurationError
 import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
 import com.intellij.execution.ui.ConsoleView
 import com.intellij.openapi.options.SettingsEditor
@@ -46,7 +47,45 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     override fun createMethodFieldCompletionProvider(editor: PhpTestRunnerConfigurationEditor) =
         createMethodFileCompletionProvider(project, editor, { it.isTestoExecutable() })
 
-    override fun suggestedName() = super.suggestedName() as String
+    override fun suggestedName(): String {
+        // A group run has no file/method to name itself after (it is deliberately unscoped), and the platform's name
+        // for an unscoped configuration would be empty — name it after the groups instead. A configuration that DOES
+        // point at a config file (ApplicationConfig/SuiteConfig runs) keeps the platform's file-based name even if a
+        // group was typed into it later.
+        if (isGroupOnlyRun()) {
+            val groups = testoSettings.runnerSettings.groups
+            val quoted = groups.joinToString(", ") { "'$it'" }
+            return if (groups.size == 1) "Group $quoted" else "Groups $quoted"
+        }
+
+        return super.suggestedName() as String
+    }
+
+    override fun checkConfiguration() {
+        try {
+            super.checkConfiguration()
+        } catch (e: RuntimeConfigurationError) {
+            // A group-only run borrows the ConfigurationFile scope to keep path/filter flags off the command line,
+            // but the platform then demands a configuration file. Testo needs none — it falls back to ./testo.php
+            // in the working directory — so swallow exactly that error, matched by message. If the platform ever
+            // rewords it this fails closed (the validation error simply comes back). The executable-path check the
+            // platform would have run after this throw resurfaces as a clear ExecutionException in createCommand.
+            if (!isGroupOnlyRun() || e.message != missingConfigurationFileMessage()) throw e
+        }
+    }
+
+    /** Scope ConfigurationFile without an actual config file, selecting by group only: `--group=<name>` and nothing else. */
+    private fun isGroupOnlyRun(): Boolean {
+        val runner = testoSettings.runnerSettings
+        return runner.scope == PhpTestRunnerSettings.Scope.ConfigurationFile
+                && !runner.isUseAlternativeConfigurationFile
+                && runner.groups.isNotEmpty()
+    }
+
+    private fun missingConfigurationFileMessage() = PhpBundle.message(
+        "validation.value.is.not.specified.or.invalid.press.fix.project.configuration",
+        "Configuration file",
+    )
 
     override fun createSettings() = TestoRunConfigurationSettings()
 

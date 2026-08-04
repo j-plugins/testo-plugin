@@ -69,7 +69,7 @@ class TestoTestRunConfigurationEditor(
                     .align(AlignX.FILL)
             }
                 .layout(RowLayout.PARENT_GRID)
-                .rowComment("--group=<name>")
+                .rowComment("--group=<name> (comma-separated for several; prefix a name with ! to exclude)")
 
             row {
                 label("Exclude group")
@@ -78,7 +78,7 @@ class TestoTestRunConfigurationEditor(
                     .align(AlignX.FILL)
             }
                 .layout(RowLayout.PARENT_GRID)
-                .rowComment("--exclude-group=<name>")
+                .rowComment("--exclude-group=<name> (comma-separated for several)")
 
             row {
                 label("Repeat")
@@ -128,8 +128,8 @@ class TestoTestRunConfigurationEditor(
         val runner = configuration.testoSettings.runnerSettings
         return commandField.selectedItem != runner.command
                 || suiteField.text != runner.suite
-                || groupField.text != runner.group
-                || excludeGroupField.text != runner.excludeGroup
+                || TestoRunnerSettings.parseNames(groupField.text) != runner.groups
+                || TestoRunnerSettings.parseNames(excludeGroupField.text) != runner.excludeGroups
                 || (repeatField.value as Int) != runner.repeat
                 || (parallelField.value as Int) != runner.parallel
                 || coverageEngineField.selectedItem != runner.coverageEngine
@@ -140,8 +140,8 @@ class TestoTestRunConfigurationEditor(
         val runnerSettings = testoRunConfiguration.testoSettings.runnerSettings
         commandField.selectedItem = runnerSettings.command
         suiteField.text = runnerSettings.suite
-        groupField.text = runnerSettings.group
-        excludeGroupField.text = runnerSettings.excludeGroup
+        groupField.text = TestoRunnerSettings.formatNames(runnerSettings.groups)
+        excludeGroupField.text = TestoRunnerSettings.formatNames(runnerSettings.excludeGroups)
         repeatField.value = runnerSettings.repeat
         parallelField.value = runnerSettings.parallel
         coverageEngineField.selectedItem = runnerSettings.coverageEngine
@@ -168,8 +168,10 @@ class TestoTestRunConfigurationEditor(
         val runnerSettings = testoRunConfiguration.testoSettings.runnerSettings
         runnerSettings.command = commandField.selectedItem as? String ?: "run"
         runnerSettings.suite = suiteField.text
-        runnerSettings.group = groupField.text
-        runnerSettings.excludeGroup = excludeGroupField.text
+        // A single text field cannot hold a list, so the comma is the editor's own separator: names are parsed here
+        // and the model below this line never sees one.
+        runnerSettings.groups = TestoRunnerSettings.parseNames(groupField.text).toMutableList()
+        runnerSettings.excludeGroups = TestoRunnerSettings.parseNames(excludeGroupField.text).toMutableList()
         runnerSettings.repeat = repeatField.value as? Int ?: 0
         runnerSettings.parallel = parallelField.value as? Int ?: 0
         runnerSettings.coverageEngine = coverageEngineField.selectedItem as? CoverageEngine ?: CoverageEngine.XDEBUG

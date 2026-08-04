@@ -21,6 +21,9 @@ class TestoRunConfigurationSettings : PhpTestRunConfigurationSettings() {
     fun getTestoRunnerSettings(): TestoRunnerSettings {
         val settings = super.getRunnerSettings()
         if (settings is TestoRunnerSettings) {
+            // Deserialization writes the fields directly, so this is the first place that sees a configuration saved
+            // in the pre-list format; folding it here keeps every reader (handler, producer, editor) list-only.
+            settings.migrateLegacyNames()
             return settings
         }
 

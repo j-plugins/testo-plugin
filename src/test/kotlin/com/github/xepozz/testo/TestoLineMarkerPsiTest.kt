@@ -1,10 +1,13 @@
 package com.github.xepozz.testo
 
 import com.github.xepozz.testo.tests.TestoTestRunLineMarkerProvider
+import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jetbrains.php.lang.PhpFileType
+import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.Method
+import com.jetbrains.php.lang.psi.elements.PhpAttribute
 import com.jetbrains.php.lang.psi.elements.PhpClass
 
 class TestoLineMarkerPsiTest : BasePlatformTestCase() {
@@ -64,6 +67,42 @@ class TestoLineMarkerPsiTest : BasePlatformTestCase() {
         val hint = TestoTestRunLineMarkerProvider.getInlineTestLocationHint(method, 0)
 
         assertTrue("Inline hint should contain index", hint.endsWith("#0"))
+    }
+
+    fun testGetInfo_groupAttributeWithoutNamesHasNoGutterIcon() {
+        val leaf = groupAttributeNameLeaf(
+            """<?php
+            class OrderTest {
+                #[\Testo\Test]
+                #[\Testo\Filter\Group]
+                public function persistsOrder(): void {}
+            }"""
+        )
+
+        // The producer refuses an empty group, so an icon here would offer a run that does nothing.
+        assertNull(TestoTestRunLineMarkerProvider().getInfo(leaf))
+    }
+
+    fun testGetInfo_groupAttributeWithNameHasGutterIcon() {
+        val leaf = groupAttributeNameLeaf(
+            """<?php
+            class OrderTest {
+                #[\Testo\Test]
+                #[\Testo\Filter\Group('db')]
+                public function persistsOrder(): void {}
+            }"""
+        )
+
+        assertNotNull(TestoTestRunLineMarkerProvider().getInfo(leaf))
+    }
+
+    /** The identifier leaf of the `Group` class reference inside the `#[\Testo\Filter\Group(...)]` attribute. */
+    private fun groupAttributeNameLeaf(text: String): PsiElement {
+        val psiFile = myFixture.configureByText(PhpFileType.INSTANCE, text)
+        val attribute = PsiTreeUtil.findChildrenOfType(psiFile, PhpAttribute::class.java)
+            .first { it.fqn == TestoClasses.FILTER_GROUP }
+        val reference = PsiTreeUtil.findChildOfType(attribute, ClassReference::class.java)!!
+        return reference.lastChild
     }
 
     fun testGetInlineTestLocationHint_withDifferentIndex() {

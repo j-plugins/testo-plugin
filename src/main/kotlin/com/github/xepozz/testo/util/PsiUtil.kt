@@ -11,6 +11,7 @@ object PsiUtil {
         *TestoClasses.DATA_ATTRIBUTES,
         *TestoClasses.TEST_ATTRIBUTES,
         *TestoClasses.BENCH_ATTRIBUTES,
+        *TestoClasses.TEST_CASE_ATTRIBUTES,
     )
 
     val ATTRIBUTE_GROUPS: Array<Array<String>> = arrayOf(

@@ -40,13 +40,15 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
             arguments.add("--suite")
             arguments.add(runner.suite)
         }
-        if (runner.group.isNotEmpty()) {
+        // Testo takes `--group`/`--exclude-group` repeatedly (OR logic), one name per flag — that is how a
+        // `#[Group('db', 'slow')]` run reaches the CLI.
+        for (group in runner.groups) {
             arguments.add("--group")
-            arguments.add(runner.group)
+            arguments.add(group)
         }
-        if (runner.excludeGroup.isNotEmpty()) {
+        for (group in runner.excludeGroups) {
             arguments.add("--exclude-group")
-            arguments.add(runner.excludeGroup)
+            arguments.add(group)
         }
         if (runner.repeat > 0) {
             arguments.add("--repeat")

@@ -23,6 +23,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Condition
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
@@ -44,6 +45,7 @@ import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.lang.psi.elements.PhpNamedElement
 import com.jetbrains.php.lang.psi.elements.StringLiteralExpression
 import com.jetbrains.php.lang.psi.elements.PhpYield
+import com.jetbrains.php.lang.psi.stubs.indexes.expectedArguments.PhpExpectedFunctionScalarArgument
 import com.jetbrains.php.phpunit.PhpMethodLocation
 import com.jetbrains.php.phpunit.PhpUnitRuntimeConfigurationProducer
 import com.jetbrains.php.phpunit.PhpUnitUtil
@@ -80,6 +82,29 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             testRunnerSettings.isUseAlternativeConfigurationFile = true
             testRunnerSettings.configurationFilePath = virtualFile.path
             testRunnerSettings.suite = suiteName
+            return element
+        }
+        if (element is PhpAttribute && element.fqn == TestoClasses.FILTER_GROUP) {
+            val groups = extractGroupNames(element)
+            if (groups.isEmpty()) return null
+
+            // A group run is deliberately unscoped: `--group=<name>` alone, so every test of the group runs no matter
+            // where it lives. ConfigurationFile scope is what keeps the path/filter flags out of the command line.
+            testRunnerSettings.scope = PhpTestRunnerSettings.Scope.ConfigurationFile
+            testRunnerSettings.groups = groups.toMutableList()
+            testRunnerSettings.testoType = ""
+            testRunnerSettings.dataProviderIndex = -1
+            testRunnerSettings.dataSetIndex = -1
+            return element
+        }
+        if (element is PhpAttribute && element.owner is PhpClass) {
+            // A class-level attribute (`#[Test]`, `#[TestRectorFixtures]`) runs the class it sits on, narrowed to the
+            // kind of case the attribute declares. Running the class itself stays untyped and keeps everything the
+            // class holds — that difference is the whole point of running from the attribute.
+            val phpClass = element.owner as PhpClass
+            if (!phpClass.isTestoClass()) return null
+            setupConfiguration(testRunnerSettings, phpClass, element.containingFile.virtualFile) ?: return null
+            testRunnerSettings.testoType = resolveTestoType(element)
             return element
         }
         if (element is PhpAttribute) {
@@ -135,6 +160,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
              */
             val psiFile = element.containingFile
 
+            // Deliberately untyped: running a class runs everything it holds. `--type=test` here would hide its
+            // `#[Bench]` methods — narrowing by type is what running from an attribute is for.
             super.setupConfiguration(testRunnerSettings, psiFile, psiFile.virtualFile)
             return element
         }
@@ -160,7 +187,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         return result
     }
 
-    override fun isConfigurationFromContext(
+    public override fun isConfigurationFromContext(
         testRunnerSettings: PhpTestRunnerSettings,
         element: PsiElement
     ): Boolean {
@@ -176,12 +203,22 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 && testoSettings.configurationFilePath == element.containingFile.virtualFile.path
                 && testoSettings.suite == suiteName
         }
+        if (element is PhpAttribute && element.fqn == TestoClasses.FILTER_GROUP) {
+            val testoSettings = testRunnerSettings as? TestoRunnerSettings ?: return false
+            val groups = extractGroupNames(element)
+            return groups.isNotEmpty()
+                && testoSettings.scope == PhpTestRunnerSettings.Scope.ConfigurationFile
+                && testoSettings.groups == groups
+        }
+        if (element is PhpAttribute && element.owner is PhpClass) {
+            // A class-level attribute configures its class narrowed to the attribute's own type, so only a
+            // configuration of exactly that type is "this context" — an untyped one belongs to the class itself.
+            return isClassConfigurationFromContext(testRunnerSettings, element.owner as PhpClass, resolveTestoType(element))
+        }
         if (element is PhpClass) {
-            return when {
-                testRunnerSettings.scope != PhpTestRunnerSettings.Scope.File -> false
-                testRunnerSettings.filePath != element.containingFile.virtualFile.path -> false
-                else -> true
-            }
+            // Running the class itself is untyped; a typed configuration was produced from a class-level attribute
+            // and must not be reused here — it would keep narrowing the run after the user asked for the whole class.
+            return isClassConfigurationFromContext(testRunnerSettings, element, "")
         }
         if (element is Function) {
             val usages = TestoDataProviderUtils.findDataProviderUsages(element)
@@ -192,6 +229,14 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         }
         return super.isConfigurationFromContext(testRunnerSettings, element)
     }
+
+    private fun isClassConfigurationFromContext(
+        testRunnerSettings: PhpTestRunnerSettings,
+        phpClass: PhpClass,
+        testoType: String,
+    ): Boolean = testRunnerSettings.scope == PhpTestRunnerSettings.Scope.File
+        && testRunnerSettings.filePath == phpClass.containingFile.virtualFile.path
+        && (testRunnerSettings as? TestoRunnerSettings)?.testoType == testoType
 
     override fun getWorkingDirectory(element: PsiElement): VirtualFile? {
         if (element is PsiDirectory) {
@@ -217,9 +262,17 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             val psiElement = location.psiElement
             val element = findTestElement(psiElement, getWorkingDirectory(psiElement))
 
-            if (element is PhpClass) {
+            // A class-level attribute is the class run in disguise (narrowed by type), so it must go through the
+            // same abstract-class inheritor chooser as the class itself. `#[Group]` stays out — a group run does
+            // not need a concrete class at all.
+            val classTarget = when {
+                element is PhpClass -> element
+                element is PhpAttribute && element.fqn != TestoClasses.FILTER_GROUP -> element.owner as? PhpClass
+                else -> null
+            }
+            if (classTarget != null) {
                 if (tryRunAbstract(
-                        element,
+                        classTarget,
                         context.dataContext,
                         testRunnerSettings,
                         startRunnable,
@@ -323,7 +376,14 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
 
     private fun findTestElement(target: PsiElement?): PsiElement? = when (target) {
         is ClassReference -> target.takeIf { it.parent is NewExpression && (it.fqn == TestoClasses.APPLICATION_CONFIG || it.fqn == TestoClasses.SUITE_CONFIG) }
-        is PhpAttribute -> target.takeIf { it.owner.isTestoExecutable() || it.owner.isTestoDataProviderLike() }
+        // `#[Group]` is runnable wherever it sits: it selects by group, not by location. Any other attribute needs a
+        // runnable owner — a test/bench/provider function, or a Testo class. A class-level attribute is the context
+        // itself, never a shortcut to its class: the attribute run carries its own type, the class run is untyped.
+        is PhpAttribute -> target.takeIf {
+            if (it.fqn == TestoClasses.FILTER_GROUP) return@takeIf true
+            val owner = it.owner ?: return@takeIf false
+            owner.isTestoExecutable() || owner.isTestoDataProviderLike() || owner.isTestoClass()
+        }
         is Function -> target.takeIf { it.isTestoExecutable() || it.isTestoDataProviderLike() }
         is PhpClass -> target.takeIf { it.isTestoClass() }
         is PhpFile -> target.takeIf { it.isTestoFile() }
@@ -583,6 +643,9 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         const val INLINE_TYPE = "inline"
         const val BENCH_TYPE = "bench"
 
+        /** The type the Rector bridge synthesizes for a rule's fixture case (`RectorFixtureInterceptor::TYPE`). */
+        const val RECTOR_FIXTURE_TYPE = "rector-fixture"
+
         fun resolveTestoType(element: PsiElement): String = when {
             element is PhpAttribute -> resolveTestoTypeFromAttribute(element)
             element.isTestoBench() -> BENCH_TYPE
@@ -597,10 +660,22 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 in TestoClasses.BENCH_ATTRIBUTES -> BENCH_TYPE
                 TestoClasses.TEST_INLINE -> INLINE_TYPE
                 TestoClasses.TEST -> TEST_TYPE
+                TestoClasses.RECTOR_TEST_FIXTURES -> RECTOR_FIXTURE_TYPE
                 in TestoClasses.DATA_ATTRIBUTES -> TEST_TYPE
                 else -> ""
             }
         }
+
+        /**
+         * The group names of a `#[Group('db', 'slow')]` attribute, in source order. Read through the expected-argument
+         * API (the same one [com.github.xepozz.testo.index.TestoDataProvidersIndex] uses) so it also works on stubs;
+         * non-literal arguments (constants, concatenations) cannot be resolved here and are skipped.
+         */
+        fun extractGroupNames(attribute: PhpAttribute): List<String> = attribute.arguments
+            .mapNotNull { it.argument as? PhpExpectedFunctionScalarArgument }
+            .filter { it.isStringLiteral }
+            .map { StringUtil.unquoteString(it.value) }
+            .filter { it.isNotBlank() }
 
         val METHOD = Condition<PsiElement> {
             it.isTestoExecutable() || (it is Method && TestoDataProviderUtils.isDataProvider(it))

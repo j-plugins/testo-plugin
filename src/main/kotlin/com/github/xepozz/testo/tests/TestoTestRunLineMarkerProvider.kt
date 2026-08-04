@@ -6,6 +6,7 @@ import com.github.xepozz.testo.isTestoClass
 import com.github.xepozz.testo.isTestoDataProviderLike
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.tests.TestoTestRunLineMarkerProvider.Companion.getLocationHint
+import com.github.xepozz.testo.tests.run.TestoRunConfigurationProducer
 import com.github.xepozz.testo.util.PsiUtil
 import com.intellij.execution.lineMarker.ExecutorAction
 import com.intellij.execution.lineMarker.RunLineMarkerContributor
@@ -60,6 +61,14 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
 
             element is ClassReference && element.parent is PhpAttribute -> {
                 val attribute = element.parent as PhpAttribute
+                // `#[Group]` marks membership, it is not a test on its own: running it means running every test of
+                // that group (`--group=<name>`). The hint points at the annotated element only so the gutter icon can
+                // show its last state; a group on something unrecognized falls back to the file. No resolvable names —
+                // no icon: the producer would refuse such a context and the icon would offer a run that does nothing.
+                if (attribute.fqn == TestoClasses.FILTER_GROUP) {
+                    if (TestoRunConfigurationProducer.extractGroupNames(attribute).isEmpty()) return null
+                    return getLocationInfo(attribute.owner) ?: getLocationHint(attribute.containingFile)
+                }
                 if (attribute.fqn !in RUNNABLE_ATTRIBUTES) return null
 
                 val attributesOwner = attribute.owner as PhpAttributesOwner
@@ -99,6 +108,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
             *TestoClasses.TEST_ATTRIBUTES,
             *TestoClasses.BENCH_ATTRIBUTES,
             *TestoClasses.DATA_ATTRIBUTES,
+            *TestoClasses.TEST_CASE_ATTRIBUTES,
         )
 
         fun getLocationHint(element: Function) = when (element) {
@@ -142,7 +152,7 @@ class TestoTestRunLineMarkerProvider : RunLineMarkerContributor() {
             }
         }
 
-        private fun getLocationInfo(element: PsiElement) = when (element) {
+        private fun getLocationInfo(element: PsiElement?) = when (element) {
             is Function if element.isTestoExecutable() -> getLocationHint(element)
             is PhpClass if element.isTestoClass() -> getLocationHint(element)
             is Function if TestoDataProviderUtils.isDataProvider(element) -> getDataProviderLocationHint(element)
