@@ -50,8 +50,11 @@ internal object TestoHistoryIndex {
                 files.forEach { f ->
                     runCatching { locationUrl.findAll(f.readText()).forEach { urls.add(it.groupValues[1]) } }
                 }
-                cache[key] = Snapshot(stamp, urls)
-                refreshLens(project)
+                // Only restart the daemon when the lenses would actually change. A rebuild also runs on the very first
+                // lookup and whenever a history file's timestamp moves without its contents mattering; restarting then
+                // interrupts an in-flight highlighting pass for nothing.
+                val previous = cache.put(key, Snapshot(stamp, urls))?.urls ?: emptySet()
+                if (previous != urls) refreshLens(project)
             } finally {
                 building.remove(key)
             }

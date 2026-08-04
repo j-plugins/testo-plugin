@@ -3,7 +3,16 @@
 # testo-plugin Changelog
 
 ## [Unreleased]
+
 ### Added
+
+- Support for IntelliJ IDEA / PhpStorm 2026.2, where PHP moved its coverage classes to `com.intellij.php.coverage`.
+  The plugin now ships as two builds — 2025.2–2026.1 and 2026.2+ — and the Marketplace serves each IDE the matching one.
+
+## [2026.3.1] - 2026-08-04
+
+### Added
+
 - Rector rules carrying `#[\Testo\Bridge\Rector\Testing\TestRectorFixtures]` are recognized as test cases: gutter run
   icon, test-file icon, no "unused" warnings, and a run from the attribute that narrows to `--type=rector-fixture`.
   The rule's own public methods stay ordinary methods — only its fixtures are tests.
@@ -16,9 +25,12 @@
   on load.
 - Inspection: suspicious `#[Group]` names are highlighted — blank or whitespace-padded, `!`-prefixed (the CLI reads
   that as an exclusion), containing a comma, or no names at all.
-
 - Initial scaffold created from [IntelliJ Platform Plugin Template](https://github.com/JetBrains/intellij-platform-plugin-template)
 
 ### Fixed
+
 - Concurrent tests no longer nest inside one another in the test tree: the tree is built from the `nodeId`/`parentNodeId`
   Testo reports rather than from the order messages arrive in.
+
+[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.3.1...HEAD
+[2026.3.1]: https://github.com/j-plugins/testo-plugin/commits/v2026.3.1

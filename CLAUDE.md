@@ -22,9 +22,9 @@ Dependabot bumps these regularly — read the files rather than trusting this ta
 |----------------------|------------------------------------------|
 | Language             | Kotlin 2.4.0                             |
 | JVM Toolchain        | Java 21                                  |
-| IntelliJ Platform    | 2025.2 (IU — IDEA Ultimate)              |
-| Min platform build   | 252 (2025.2.x), no `untilBuild`          |
-| Plugin version       | `2026.3.0` (`pluginVersion`)             |
+| IntelliJ Platform    | 2025.2 / 2026.2 (IU — IDEA Ultimate)     |
+| Build range          | 252–261.* and 262+ (two artifacts)       |
+| Plugin version       | `2026.3.1` (`pluginVersion`)             |
 | Build system         | Gradle wrapper 9.6.0                     |
 | IntelliJ Plugin SDK  | `org.jetbrains.intellij.platform` 2.18.0 |
 | Changelog plugin     | `org.jetbrains.changelog` 2.5.0          |
@@ -32,9 +32,31 @@ Dependabot bumps these regularly — read the files rather than trusting this ta
 | Coverage             | Kover 0.9.9 (XML report on `check`)      |
 | Test framework       | JUnit 4.13.2, OpenTest4J 1.3.0           |
 
-`platformPlugins` (marketplace deps, pinned to 252.x builds): `com.jetbrains.php`, `phpstorm-remote-interpreter`,
-`php.codeception`, `php.behat`, `gherkin`, `hackathon.indices.viewer`, `xepozz.ide.introspector`.
-`platformBundledModules`: `intellij.platform.coverage`, `intellij.spellchecker`.
+`platformPlugins` (marketplace deps, pinned to builds matching the target platform): `com.jetbrains.php`,
+`phpstorm-remote-interpreter`, `php.codeception`, `php.behat`, `gherkin`, `xepozz.ide.introspector`
+(+ `hackathon.indices.viewer` on 252 only — it has no 262 build).
+`platformBundledModules`: `intellij.platform.coverage`, `intellij.spellchecker` (+ `intellij.platform.smRunner`,
+`intellij.platform.testRunner` on 262, which split them out of the monolith).
+
+### Two build variants (`phpApi`)
+
+PHP moved its coverage classes from `com.jetbrains.php.phpunit.coverage` to `com.intellij.php.coverage` in 2026.2, and
+no single artifact can reference both (`<idea-version>` inside an optional descriptor is ignored, and there is no module
+that exists only on ≤261 to gate on). So every platform-dependent property in `gradle.properties` is declared twice with
+an API suffix and selected by `phpApi`:
+
+```bash
+./gradlew buildPlugin                # 262: platform 2026.2, since 262, no untilBuild
+./gradlew buildPlugin -PphpApi=252   # 252: platform 2025.2, since 252, until 261.*
+```
+
+The only source difference is `src/php252/kotlin` vs `src/php262/kotlin`, each holding one file of `typealias`es
+(`PhpCoverageRunner`, `PhpCoverageSuite`, `PhpUnitCoverageEngine`, `PhpUnitCoverageRunner`) pointing at whichever package
+is current. `src/main/kotlin/.../coverage/` imports none of them — the aliases live in its own package. The enum
+`PhpUnitCoverageEngine.CoverageEngine` did **not** move and is still imported directly from `com.jetbrains.php`.
+
+`buildPlugin` gets `archiveClassifier = phpApi` so the two zips coexist. CI builds and verifies both via a matrix;
+`release.yml` runs `publishPlugin` once per variant and the Marketplace serves each IDE the matching build.
 
 > Note: `gradleVersion` in `gradle.properties` (9.5.0) lags the wrapper (9.6.0) — the property only feeds the
 > `wrapper` task, so running `./gradlew wrapper` would downgrade it. Bump the property when syncing.
@@ -407,7 +429,7 @@ tested without the platform fixture.
 ## Constraints & Important Notes
 
 - **Platform:** IntelliJ IDEA Ultimate or PhpStorm only (`com.jetbrains.php` is a hard dependency)
-- **Min IDE version:** 2025.2 (build 252+)
+- **Min IDE version:** 2025.2 (build 252+), shipped as two artifacts — see "Two build variants (`phpApi`)"
 - **Kotlin stdlib is NOT bundled** (`kotlin.stdlib.default.dependency = false`) — uses the IDE's own
 - **Gradle Configuration Cache** and **Build Cache** are enabled
 - **Code and comments language:** English. Comments should explain *why* (platform quirks, race conditions),

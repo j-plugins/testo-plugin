@@ -13,9 +13,15 @@ plugins {
 group = providers.gradleProperty("pluginGroup").get()
 version = providers.gradleProperty("pluginVersion").get()
 
+// Which PHP coverage API to build against — see the `phpApi` comment in gradle.properties.
+val phpApi = providers.gradleProperty("phpApi").get()
+
+fun apiProperty(name: String) = providers.gradleProperty("$name.$phpApi")
+
 // Set the JVM language level used to build the project.
 kotlin {
     jvmToolchain(21)
+    sourceSets["main"].kotlin.srcDir("src/php$phpApi/kotlin")
 }
 
 // Configure project's dependencies
@@ -35,16 +41,16 @@ dependencies {
 
     // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {
-        create(providers.gradleProperty("platformType"), providers.gradleProperty("platformVersion"))
+        create(providers.gradleProperty("platformType"), apiProperty("platformVersion"))
 
         // Plugin Dependencies. Uses `platformBundledPlugins` property from the gradle.properties file for bundled IntelliJ Platform plugins.
         bundledPlugins(providers.gradleProperty("platformBundledPlugins").map { it.split(',') })
 
         // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file for plugin from JetBrains Marketplace.
-        plugins(providers.gradleProperty("platformPlugins").map { it.split(',') })
+        plugins(apiProperty("platformPlugins").map { it.split(',') })
 
         // Module Dependencies. Uses `platformBundledModules` property from the gradle.properties file for bundled IntelliJ Platform modules.
-        bundledModules(providers.gradleProperty("platformBundledModules").map { it.split(',') })
+        bundledModules(apiProperty("platformBundledModules").map { it.split(',') })
 
         testFramework(TestFrameworkType.Platform)
     }
@@ -70,7 +76,8 @@ intellijPlatform {
         }
 
         ideaVersion {
-            sinceBuild = providers.gradleProperty("pluginSinceBuild")
+            sinceBuild = apiProperty("pluginSinceBuild")
+            untilBuild = apiProperty("pluginUntilBuild").map { it.trim() }.filter { it.isNotEmpty() }
         }
     }
 
@@ -112,6 +119,10 @@ tasks {
     }
     runIde {
         autoReload = false
+    }
+    // Both variants carry the same pluginVersion, so without a classifier the second build would overwrite the first.
+    buildPlugin {
+        archiveClassifier = phpApi
     }
 }
 
