@@ -59,8 +59,12 @@ Each variant is published as `<pluginVersion>.<phpApi>` (e.g. `2026.3.1.252` / `
 uploads by version and rejects a second upload carrying a version it already has, so the two builds *must not* share
 `pluginVersion`. The API goes in as a fourth component rather than a `-252` suffix: it sorts above the bare version
 (existing installs still see an update) and is not a SemVer pre-release, so `channels` — which reads the bare
-`pluginVersion` — still resolves to the default channel. CI builds and verifies both via a matrix; `release.yml` runs
-`publishPlugin` once per variant and the Marketplace serves each IDE the build matching its since/until range.
+`pluginVersion` — still resolves to the default channel.
+
+`publishPlugin` releases **every** variant listed in `phpApis`: since one Gradle build resolves exactly one platform,
+it re-enters Gradle (`Exec` on the wrapper) once per remaining API, passing `-PphpApiSingle=true` so the nested run does
+not fan out again. `./gradlew publishPlugin` is therefore the whole release; `release.yml` just calls it. CI builds and
+verifies both variants via a matrix, and the Marketplace serves each IDE the build matching its since/until range.
 
 > Note: `gradleVersion` in `gradle.properties` (9.5.0) lags the wrapper (9.6.0) — the property only feeds the
 > `wrapper` task, so running `./gradlew wrapper` would downgrade it. Bump the property when syncing.

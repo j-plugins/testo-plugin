@@ -149,3 +149,24 @@ intellijPlatformTesting {
         }
     }
 }
+
+// A Gradle build resolves exactly one IntelliJ Platform, so one invocation can only ever build one variant. Make
+// `publishPlugin` still release everything by re-entering Gradle once per remaining API; `phpApiSingle` marks those
+// nested invocations so they do not fan out again.
+if (!providers.gradleProperty("phpApiSingle").isPresent) {
+    val gradlew = if (System.getProperty("os.name").startsWith("Windows")) "gradlew.bat" else "./gradlew"
+    val otherVariants = providers.gradleProperty("phpApis").get()
+        .split(',')
+        .map { it.trim() }
+        .filter { it != phpApi }
+        .map { api ->
+            tasks.register<Exec>("publishPluginFor$api") {
+                group = "intellij platform"
+                description = "Builds and publishes the $api variant in a nested Gradle invocation."
+                workingDir = rootDir
+                commandLine(gradlew, "publishPlugin", "-PphpApi=$api", "-PphpApiSingle=true", "--console=plain")
+            }
+        }
+
+    tasks.named("publishPlugin") { dependsOn(otherVariants) }
+}
