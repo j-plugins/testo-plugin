@@ -147,6 +147,8 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoTestStatus.kt      # the 8 cases of Testo\Core\Value\Status: wire name, icon, label
 │   │   ├── TestoStatusStore.kt     # per-test status/assertions + the tally the toolbar summary renders
 │   │   ├── TestoRunTimings.kt      # start/first test/last test/finish marks + summed test durations
+│   │   ├── TestoRunTarget.kt       # a node's own rerun recipe: hint → --filter selector, testSuite/testType
+│   │   ├── TestoTargetStore.kt     # rerun targets of the current run, keyed by location hint
 │   │   ├── TestoProgressAction.kt  # right-aligned toolbar summary: ring, fraction, status counters, elapsed
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
@@ -398,8 +400,11 @@ Non-obvious constraints already paid for in blood — read before touching the r
   covered), and the converter then stops forwarding messages and notifies once. The version in that notification is
   scraped from Testo's banner line, which survives `-q`.
 - **Channel storage keys go through `ChannelOutputStore.keyFor(name)`** (the `locationHint` remembered on
-  `testStarted`, falling back to the name). Deriving keys from `SMTestProxy.locationUrl` breaks, because the
-  platform resolves that lazily.
+  `testStarted`, falling back to the name). On the converter side keys must come from the message attributes — the
+  proxy for a node may not exist yet while its output streams in, so `SMTestProxy.locationUrl` is not available
+  there. Reading it later is fine: the id-based convertor sets it when it builds the proxy, and that click-time read
+  is exactly how `TestoTargetStore` keys the rerun targets. Names alone do not identify a node (every data provider
+  opens a `Dataset #0 [0]`), which is why that store keys by the hint itself.
 - **`TestoChannelsUi` reaches `TestResultsPanel.myConsole` by reflection** — there is no public accessor. It
   degrades gracefully (logs a warning, no channel tabs) if the field disappears.
 - **`TestoHistoryIndex.refreshLens` uses the internal `ModificationStampUtil`** to force code-vision recomputation

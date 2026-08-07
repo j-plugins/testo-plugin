@@ -118,6 +118,10 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         val element = context.psiLocation?.let { findTestElement(it, getWorkingDirectory(it)) }
         if (element is PhpClass) return isClassConfigurationFromContext(settings, element, target.type.orEmpty())
 
+        // A free test function falls through untyped: its element-based check never compares testoType, so once
+        // Testo starts sending `testType` a typed function configuration could be confused with an untyped one —
+        // the mirror of the class problem solved above. Latent until then: a function node without the attributes
+        // has an empty target and never reaches this method at all.
         return super.isConfigurationFromContext(configuration, context)
     }
 

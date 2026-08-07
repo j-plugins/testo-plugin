@@ -80,6 +80,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         console: SMTRunnerConsoleView,
         store: TestoStatusStore,
         clock: TestoRunTimings,
+        targets: TestoTargetStore,
         handler: ProcessHandler?,
     ) {
         val viewer = console.resultsViewer
@@ -96,6 +97,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                 // reported for this very run, since it reads the stream well before the platform gets here.
                 if (clock.isFinished()) {
                     store.clear()
+                    targets.clear()
                     clock.clear()
                     clock.noteStart()
                     exitCode.set(null)
