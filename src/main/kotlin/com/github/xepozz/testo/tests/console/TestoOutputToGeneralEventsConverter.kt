@@ -63,7 +63,7 @@ class TestoOutputToGeneralEventsConverter(
                     if (location != null) store.rememberLocation(name, location)
                     val metainfo = attrs["metainfo"]
                     if (!metainfo.isNullOrBlank()) store.setDescription(store.keyFor(name), metainfo)
-                    targetStore.note(name, TestoRunTarget(location, attrs["testSuite"], attrs["testType"]))
+                    targetStore.note(TestoRunTarget(location, attrs["testSuite"], attrs["testType"]))
                 }
             }
 

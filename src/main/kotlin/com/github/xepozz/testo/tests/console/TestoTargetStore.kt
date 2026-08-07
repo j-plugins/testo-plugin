@@ -3,24 +3,33 @@ package com.github.xepozz.testo.tests.console
 /**
  * The [TestoRunTarget] of every node of the current run, recorded as its `testStarted` / `testSuiteStarted` arrives.
  *
- * Keyed exactly like [ChannelOutputStore] and [TestoStatusStore] — through [ChannelOutputStore.keyFor] — so the
- * converter (which writes) and the run-configuration producer (which reads a selected tree node) agree on the same
- * node without ever touching `SMTestProxy.locationUrl`, which the platform resolves lazily.
+ * Keyed by the location hint itself, unlike [ChannelOutputStore] and [TestoStatusStore], which key by name because
+ * the messages they follow (`testStdOut`, `testFinished`) carry nothing else. Names are not unique: every data
+ * provider in a run opens a `Dataset #0 [0]`, and a name-keyed target sends a right-click on one of them off to
+ * rerun another class's data set. The hint is unique per node, both sides have it — the converter off the message,
+ * the producer off `SMTestProxy.getLocationUrl()`, which the id-based convertor sets when it builds the proxy — so
+ * nothing has to be translated.
+ *
+ * A node announced without a hint is not stored. It could not be rerun anyway: with no location the platform runs no
+ * run-configuration producer at all, so there is nothing to hand a target to.
  */
-class TestoTargetStore(private val channels: ChannelOutputStore) {
+class TestoTargetStore {
     private val lock = Any()
-    private val byKey = HashMap<String, TestoRunTarget>()
+    private val byLocation = HashMap<String, TestoRunTarget>()
 
-    /** @param name the `name` attribute of the message that opened the node. */
-    fun note(name: String, target: TestoRunTarget) {
+    fun note(target: TestoRunTarget) {
+        val hint = target.locationHint?.takeIf { it.isNotBlank() } ?: return
         if (target.isEmpty) return
-        synchronized(lock) { byKey[channels.keyFor(name)] = target }
+        synchronized(lock) { byLocation[hint] = target }
     }
 
-    /** @param name the name of the tree node, which is the same `name` the message that opened it carried. */
-    fun targetFor(name: String): TestoRunTarget? = synchronized(lock) { byKey[channels.keyFor(name)] }
+    /** @param locationUrl the `locationUrl` of the tree node, i.e. the `locationHint` its message carried. */
+    fun targetFor(locationUrl: String?): TestoRunTarget? {
+        if (locationUrl == null) return null
+        synchronized(lock) { return byLocation[locationUrl] }
+    }
 
     fun clear() {
-        synchronized(lock) { byKey.clear() }
+        synchronized(lock) { byLocation.clear() }
     }
 }

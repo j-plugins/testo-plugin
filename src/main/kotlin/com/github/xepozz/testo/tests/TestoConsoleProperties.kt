@@ -40,7 +40,7 @@ class TestoConsoleProperties(
 
     val runTimings = TestoRunTimings()
 
-    val targetStore = TestoTargetStore(channelStore)
+    val targetStore = TestoTargetStore()
 
     val progressAction = TestoProgressAction()
 

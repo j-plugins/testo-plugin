@@ -100,17 +100,25 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     ): Boolean {
         // A configuration built from source can look like "this context" to the element-based check while missing the
         // very selector the node was announced with — reusing it would silently run the whole file instead of the one
-        // data set. When the context is a tree node, only a configuration that spells the node out counts.
+        // data set. When the context is a tree node, only a configuration that spells the node out counts, and
+        // nothing beyond it: a class node and a method node of the same class agree on suite and type, so matching
+        // on those alone would hand the class the method's configuration.
         val target = treeTarget(context) ?: return super.isConfigurationFromContext(configuration, context)
         val settings = configuration.testoSettings.getTestoRunnerSettings()
 
-        val filter = target.methodFilter
-        if (filter != null &&
-            (settings.scope != PhpTestRunnerSettings.Scope.Method || settings.methodName != filter)
-        ) return false
-        if (!target.suite.isNullOrBlank() && settings.suite != target.suite) return false
-        if (!target.type.isNullOrBlank() && settings.testoType != target.type) return false
-        return true
+        if (settings.suite != target.suite.orEmpty()) return false
+        if (settings.testoType != target.type.orEmpty()) return false
+
+        target.methodFilter?.let {
+            return settings.scope == PhpTestRunnerSettings.Scope.Method && settings.methodName == it
+        }
+
+        // No selector: the node is a case, and the element-based check knows how to compare one — except that it
+        // expects an untyped class run, while this node's own type is what the configuration was given.
+        val element = context.psiLocation?.let { findTestElement(it, getWorkingDirectory(it)) }
+        if (element is PhpClass) return isClassConfigurationFromContext(settings, element, target.type.orEmpty())
+
+        return super.isConfigurationFromContext(configuration, context)
     }
 
     /**
@@ -119,6 +127,9 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
      * Both keys are filled eagerly by `TestTreeView.uiDataSnapshot`, so they are in the snapshot the context carries
      * and reading them costs nothing. The model is what ties the node back to the run it belongs to — the store is
      * per-run, and a stale target from another console would rerun the wrong thing.
+     *
+     * The node is identified by its `locationUrl`, which is the `locationHint` its message carried, verbatim: the
+     * name would not do, since every data provider in a run opens a `Dataset #0 [0]` of its own.
      */
     private fun treeTarget(context: ConfigurationContext): TestoRunTarget? {
         val dataContext = context.dataContext
@@ -126,7 +137,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         val model = dataContext.getData(TestTreeView.MODEL_DATA_KEY) ?: return null
         val properties = model.properties as? TestoConsoleProperties ?: return null
 
-        return properties.targetStore.targetFor(proxy.name)
+        return properties.targetStore.targetFor(proxy.locationUrl)
     }
 
     private fun applyTreeTarget(settings: TestoRunnerSettings, target: TestoRunTarget) {

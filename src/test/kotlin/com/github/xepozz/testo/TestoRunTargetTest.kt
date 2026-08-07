@@ -1,6 +1,5 @@
 package com.github.xepozz.testo
 
-import com.github.xepozz.testo.tests.console.ChannelOutputStore
 import com.github.xepozz.testo.tests.console.TestoRunTarget
 import com.github.xepozz.testo.tests.console.TestoTargetStore
 import org.junit.Assert.assertEquals
@@ -75,27 +74,34 @@ class TestoRunTargetTest {
     }
 
     @Test
-    fun targetsAreKeyedByLocationHintLikeChannelOutput() {
-        val channels = ChannelOutputStore()
-        val store = TestoTargetStore(channels)
+    fun nodesOfTheSameNameKeepTheirOwnTargets() {
+        val store = TestoTargetStore()
+        // Every data provider of a run opens a `Dataset #0 [0]`; only the hint tells one from another.
+        val first = hint("\\Ns\\A::it:0:0")
+        val second = hint("\\Ns\\B::it:0:0")
+        store.note(TestoRunTarget(first))
+        store.note(TestoRunTarget(second))
 
-        // Two nodes of the same name in different classes: the hint recorded on testStarted tells them apart.
-        val first = hint("\\Ns\\A::it")
-        channels.rememberLocation("it", first)
-        store.note("it", TestoRunTarget(first))
+        assertEquals("\\Ns\\A::it:0:0", store.targetFor(first)?.methodFilter)
+        assertEquals("\\Ns\\B::it:0:0", store.targetFor(second)?.methodFilter)
+    }
 
-        val second = hint("\\Ns\\B::it")
-        channels.rememberLocation("it", second)
-        store.note("it", TestoRunTarget(second))
+    @Test
+    fun aNodeWithoutAHintIsNotWorthRemembering() {
+        val store = TestoTargetStore()
+        // A run-level suite: no location, so the platform runs no producer for it and there is nothing to hand over.
+        store.note(TestoRunTarget(null, suite = "sandbox"))
 
-        assertEquals("\\Ns\\B::it", store.targetFor("it")?.methodFilter)
+        assertNull(store.targetFor(null))
+        assertNull(store.targetFor(""))
     }
 
     @Test
     fun anEmptyTargetIsNotWorthRemembering() {
-        val store = TestoTargetStore(ChannelOutputStore())
-        store.note("Unit", TestoRunTarget())
+        val store = TestoTargetStore()
+        val caseHint = hint("\\Ns\\C")
+        store.note(TestoRunTarget(caseHint))
 
-        assertNull(store.targetFor("Unit"))
+        assertNull(store.targetFor(caseHint))
     }
 }
