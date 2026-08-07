@@ -883,7 +883,10 @@ object TestoChannelsUi {
                 val vFile = LightVirtualFile("testo-message-$index.$ext", fileType, text)
                 val document = FileDocumentManager.getInstance().getDocument(vFile)
                     ?: EditorFactory.getInstance().createDocument(text)
-                val editor = EditorFactory.getInstance().createViewer(document, project) as EditorEx
+                // Pass null project so the daemon analyser does not run inspections on channel editors — they are
+                // read-only output viewers and inspections cause severe lag when many tests are shown. Hyperlinks and
+                // syntax highlighting are wired separately (attachHyperlinks / EditorHighlighterFactory).
+                val editor = EditorFactory.getInstance().createViewer(document, null) as EditorEx
                 editors += editor
                 editor.highlighter = EditorHighlighterFactory.getInstance().createEditorHighlighter(project, vFile)
                 editor.setVerticalScrollbarVisible(false)
