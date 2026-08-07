@@ -18,8 +18,8 @@ import java.util.EnumMap
  *
  * The tally is kept incrementally rather than by walking the tree on a timer: the tree is mutated off the EDT while
  * the run streams in, so repeatedly iterating it from the UI is a race. [recountFrom] does walk it, but only once the
- * run is over — which is also what gives an imported history run its numbers, since a replay never reaches our
- * converter.
+ * run is over — replacing the running estimate with what the tree actually holds, including the tests a Stop left
+ * unfinished.
  */
 class TestoStatusStore(private val channels: ChannelOutputStore) {
     private class Entry(val status: TestoTestStatus, val reported: Boolean)
@@ -89,9 +89,13 @@ class TestoStatusStore(private val channels: ChannelOutputStore) {
         synchronized(lock) { started++ }
     }
 
-    /** The `count` of a `testCount` service message — the only number that makes the ring exact from the first tick. */
+    /**
+     * The `count` of a `testCount` service message — the only number that makes the ring exact from the first tick.
+     * Added, not assigned: Testo announces one `testCount` per suite, and the platform's own progress bar sums them
+     * the same way.
+     */
     fun noteDeclaredTotal(total: Int) {
-        synchronized(lock) { declaredTotal = total }
+        synchronized(lock) { declaredTotal += total }
     }
 
     /**

@@ -158,6 +158,16 @@ class TestoTestStatusTest {
     }
 
     @Test
+    fun declaredTotalsAccumulateAcrossSuites() {
+        val store = TestoStatusStore(ChannelOutputStore())
+        // Testo announces one testCount per suite; the divisor is their sum, as the platform's progress bar sums them.
+        store.noteDeclaredTotal(10)
+        store.noteDeclaredTotal(5)
+
+        assertEquals(15, store.totalHint())
+    }
+
+    @Test
     fun clearResetsTheTally() {
         val store = TestoStatusStore(ChannelOutputStore())
         store.note("a", TestoTestStatus.PASSED)

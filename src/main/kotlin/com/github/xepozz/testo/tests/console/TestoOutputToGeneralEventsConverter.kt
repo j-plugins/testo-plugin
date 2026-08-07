@@ -1,10 +1,10 @@
 package com.github.xepozz.testo.tests.console
 
 import com.github.xepozz.testo.TestoBundle
+import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.execution.testframework.TestConsoleProperties
 import com.intellij.execution.testframework.sm.runner.OutputToGeneralTestEventsConverter
 import com.intellij.notification.NotificationGroupManager
-import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.util.Key
 import jetbrains.buildServer.messages.serviceMessages.ServiceMessage
@@ -102,14 +102,16 @@ class TestoOutputToGeneralEventsConverter(
             }
         }
 
-        // Testo's own verdict (`status`, lower-case, on testFinished/testFailed) is finer than the passed / failed /
-        // ignored the platform can express, and `assertions` on testFinished is a number it has nowhere to put at all.
-        // Both are read wherever they turn up rather than pinned to one message name — and after the branch above, so
-        // `testStarted` has already registered the location the key comes from.
-        attrs["name"]?.let { name ->
-            TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.note(name, it) }
-            attrs["assertions"]?.toIntOrNull()?.let { statusStore.noteAssertions(name, it) }
-            noteStatusFromMessageKind(message.messageName, name)
+        // Testo's own verdict (`status`, lower-case) is finer than the passed / failed / ignored the platform can
+        // express, and `assertions` on testFinished is a number it has nowhere to put at all. Only the messages that
+        // close a *test* feed the tally: `testSuiteFinished` carries the same attribute with a suite's aggregated
+        // outcome, and reading it would count every suite, case and DataProvider batch as one more test.
+        if (message.messageName == TEST_FINISHED || message.messageName == TEST_FAILED || message.messageName == TEST_IGNORED) {
+            attrs["name"]?.let { name ->
+                TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.note(name, it) }
+                attrs["assertions"]?.toIntOrNull()?.let { statusStore.noteAssertions(name, it) }
+                noteStatusFromMessageKind(message.messageName, name)
+            }
         }
 
         // Where the testing phase ends. A test closes with testFinished whatever its status, so this mark is what
