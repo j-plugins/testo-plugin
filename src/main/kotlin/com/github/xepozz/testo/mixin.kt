@@ -15,6 +15,7 @@ import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
 import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.NewExpression
 import com.jetbrains.php.lang.psi.elements.PhpClass
+import com.jetbrains.php.PhpIndex
 
 private val LOG = Logger.getInstance("#com.github.xepozz.testo.mixin")
 
@@ -45,7 +46,29 @@ private fun Method.isPublicMethodOfTestoMarkedClass() = when {
     modifier.isStatic -> false
     name.startsWith("__") -> false
     isTestoBench() -> false
-    else -> containingClass?.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES) == true
+    else -> {
+        val cls = containingClass
+        when {
+            cls == null -> false
+            cls.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES) -> true
+            // Methods inherited by concrete test subclasses are tests too: an abstract base class without #[Test]
+            // itself may hold test methods that run in its concrete inheritors. Check subclasses only for abstract
+            // classes (the common case) to avoid an index lookup on every method.
+            cls.isAbstract -> hasTestoSubclass(cls)
+            else -> false
+        }
+    }
+}
+
+// True when at least one subclass of [cls] is a Testo test class. Avoids recursion into isTestoClass (which calls
+// isTestoMethod) by checking only the class-level markers — name pattern and attributes — not its methods.
+private fun hasTestoSubclass(cls: PhpClass): Boolean {
+    if (DumbService.isDumb(cls.project)) return false
+    return PhpIndex.getInstance(cls.project).getAllSubclasses(cls.fqn).any { sub ->
+        TestoTestDescriptor.isTestClassName(sub.name)
+            || sub.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
+            || sub.hasAnyAttribute(*TestoClasses.TEST_CASE_ATTRIBUTES)
+    }
 }
 
 fun PsiElement.isTestoDataProviderLike() = when (this) {
