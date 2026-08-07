@@ -144,6 +144,13 @@
             <action id="Testo.RerunStyle.Split"
                     class="com.github.xepozz.testo.tests.actions.TestoRerunStyleSplitAction"/>
         </group>
+        <action id="Testo.AddSkippedPath"
+                class="com.github.xepozz.testo.tests.actions.TestoAddSkippedPathAction"
+                text="Add File to Skipped Paths"
+                description="Open PHP Debug Skipped Paths settings to exclude this file from stepping">
+            <add-to-group group-id="XDebugger.Frames.TopToolbar" anchor="last"/>
+            <add-to-group group-id="XDebugger.Frames.Tree.Popup" anchor="last"/>
+        </action>
         <group id="TestoGenerateGroup">
             <action
                     id="TestoGenerateTestMethod"
