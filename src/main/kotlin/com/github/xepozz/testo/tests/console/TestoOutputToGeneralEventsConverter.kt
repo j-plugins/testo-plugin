@@ -53,6 +53,20 @@ class TestoOutputToGeneralEventsConverter(
                     }
                 }
             }
+
+            BUILD_PROBLEM -> {
+                val description = attrs["description"].orEmpty()
+                val identity = attrs["identity"].orEmpty()
+                val text = buildString {
+                    append("\n⚠ Build problem")
+                    if (identity.isNotBlank()) append(" [").append(identity).append("]")
+                    append(": ").append(description).append("\n")
+                }
+                // Surface the build problem in the root-level output so it is visible in the All and Output tabs
+                // even when no specific test is selected.
+                store.appendAll("", text, "stderr")
+                store.appendOutput("", text, "stderr")
+            }
         }
 
         super.processServiceMessage(message, visitor)
@@ -65,5 +79,6 @@ class TestoOutputToGeneralEventsConverter(
         private const val TEST_STD_OUT = "testStdOut"
         private const val TEST_STD_ERR = "testStdErr"
         private const val TEST_FAILED = "testFailed"
+        private const val BUILD_PROBLEM = "buildProblem"
     }
 }
