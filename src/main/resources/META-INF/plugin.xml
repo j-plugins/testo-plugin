@@ -79,7 +79,7 @@
                 implementationClass="com.github.xepozz.testo.tests.inspections.TestoInspectionSuppressor"/>
         <localInspection
                 language="PHP"
-                shortName="TestoGroupName"
+                shortName="TestoGroupNameInspection"
                 bundle="messages.TestoBundle"
                 key="inspection.group.display.name"
                 groupBundle="messages.TestoBundle"

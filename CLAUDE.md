@@ -198,7 +198,7 @@ src/test/testData/mixin, rename # PHP fixtures for PSI-backed tests
 `runAnything.executionProvider`, `programRunner` (debug), `implicitUsageProvider`, `iconProvider`,
 `codeInsight.daemonBoundCodeVisionProvider`, `notificationGroup` (id `Testo`), `internalFileTemplate`,
 `defaultLiveTemplates` + `liveTemplateContext`, two `console.folding`s, `fileBasedIndex`,
-`spellchecker.bundledDictionaryProvider`, `lang.inspectionSuppressor`, `localInspection` (`TestoGroupName`).
+`spellchecker.bundledDictionaryProvider`, `lang.inspectionSuppressor`, `localInspection` (`TestoGroupNameInspection`).
 
 `com.jetbrains.php` namespace: `testFrameworkType` (`TestoFrameworkType`), `composerConfigClient`
 (`TestoComposerConfig`).
