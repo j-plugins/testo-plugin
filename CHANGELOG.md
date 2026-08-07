@@ -22,8 +22,9 @@
   past the window they fitted into, and the hover states by how much rather than pretending the difference is
   framework overhead.
 - A problem Testo raises about the run itself rather than about a test — `##teamcity[buildProblem …]`, as an empty
-  run reports — now raises a notification, and its console line lands where the run's output is actually read
-  instead of under a test key nothing looks up. Reported once per problem, keyed by the message's own `identity`.
+  run reports — is now visible instead of parsed and dropped: as a red line in Output, as a run-level notice in All,
+  and as a notification, since a run that executed nothing otherwise looks like a run that simply finished. Reported
+  once per problem, keyed by the message's own `identity`.
 
 ### Fixed
 

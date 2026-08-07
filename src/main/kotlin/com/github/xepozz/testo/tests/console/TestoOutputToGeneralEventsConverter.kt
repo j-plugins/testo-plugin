@@ -4,6 +4,7 @@ import com.github.xepozz.testo.TestoBundle
 import com.intellij.execution.testframework.TestConsoleProperties
 import com.intellij.execution.testframework.sm.runner.OutputToGeneralTestEventsConverter
 import com.intellij.notification.NotificationGroupManager
+import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.util.Key
 import jetbrains.buildServer.messages.serviceMessages.ServiceMessage
@@ -135,10 +136,16 @@ class TestoOutputToGeneralEventsConverter(
      * A problem Testo raises about the run as a whole — an empty run, a bootstrap that failed — rather than about any
      * one test.
      *
-     * It goes two places, because neither alone is enough. The console line puts it where the run's output is read,
-     * as a run-level notice rather than under a test: it belongs to none, and the key it used to be filed under
-     * ("") is one no view ever looks up, so it was written and never shown. The notification is what makes it
-     * noticeable at all when the tree is empty and there is nothing to click.
+     * The raw `##teamcity[buildProblem …]` line never reaches the console on its own: the platform prints a line only
+     * when it fails to parse as a service message, and this one parses. So all three surfaces below are ours to
+     * write, and the problem needs all three, because which of them the user is looking at depends on the run:
+     *
+     *  - **Output** gets it as uncaptured stderr, which is the only way in when the tree is empty. That is exactly
+     *    the `testo.noTests` case: nothing to select, so the channel tabs never build and Output is the platform's
+     *    own console. Going out as stderr also colours it red for free.
+     *  - **All** gets it as a run-level notice. It belongs to no test, and the key it used to be filed under ("") is
+     *    one no view ever looks up — it was written and never shown.
+     *  - **A notification**, because a run that executed nothing otherwise looks like a run that simply finished.
      *
      * Reported once per problem. TeamCity's `identity` exists precisely to deduplicate a problem raised more than
      * once; a Testo that sends none falls back to the text.
@@ -148,19 +155,18 @@ class TestoOutputToGeneralEventsConverter(
         if (text.isBlank()) return
         if (!reportedProblems.add(identity.ifBlank { description })) return
 
-        store.appendNotice(
-            ChannelOutputStore.Chunk(
-                buildString {
-                    append("\n⚠ Build problem")
-                    if (identity.isNotBlank()) append(" [").append(identity).append("]")
-                    append(": ").append(description).append("\n")
-                },
-                "stderr",
-            )
-        )
+        val line = buildString {
+            append("\n⚠ Build problem")
+            if (identity.isNotBlank()) append(" [").append(identity).append("]")
+            append(": ").append(description).append("\n")
+        }
+        fireOnUncapturedOutput(line, ProcessOutputTypes.STDERR)
+        store.appendNotice(ChannelOutputStore.Chunk(line, "stderr"))
 
+        // No title: the group pops over the Run tool window, so the run it belongs to is already obvious, and
+        // Testo's own wording ("No tests were executed") says everything a heading would have to repeat.
         NotificationGroupManager.getInstance().getNotificationGroup("Testo")
-            ?.createNotification(TestoBundle.message("notification.build.problem.title"), text, NotificationType.ERROR)
+            ?.createNotification(text, NotificationType.ERROR)
             ?.notify(consoleProperties.project)
     }
 
