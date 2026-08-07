@@ -26,8 +26,17 @@
   and as a notification, since a run that executed nothing otherwise looks like a run that simply finished. Reported
   once per problem, keyed by the message's own `identity`.
 
+- A node of the results tree can be announced with `testSuite` and `testType`, and rerunning it from the tree keeps
+  them: `--suite` and `--type` are added to the command the way the node itself was narrowed. Optional, so a Testo
+  that sends neither runs exactly as before.
+- A test's `metainfo` — its PHPDoc summary — shows as the tooltip of its node in the results tree.
+
 ### Fixed
 
+- Rerunning a data set from the results tree runs that data set again, not its whole file. The location hint Testo
+  sends spells out the selector (`\Ns\Calculator::med:3:0`), but the PSI it resolves to cannot: a data set has no
+  method of its own to find, so it landed on its class. The selector now goes to `--filter` verbatim, class and all,
+  which also stops a bare method name from matching a namesake elsewhere in the same file.
 - A Testo older than 0.10.39 no longer floods the IDE with internal errors. Such a build sends its service messages
   without the node ids the test tree is built from, and every one of them was answered with a logged error; the run
   now stops at the first such message and says what to update instead.

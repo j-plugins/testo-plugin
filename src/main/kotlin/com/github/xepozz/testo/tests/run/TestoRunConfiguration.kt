@@ -16,6 +16,7 @@ import com.intellij.execution.ui.ConsoleView
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.util.PathUtil
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
@@ -48,38 +49,73 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         createMethodFileCompletionProvider(project, editor, { it.isTestoExecutable() })
 
     override fun suggestedName(): String {
-        // A group run has no file/method to name itself after (it is deliberately unscoped), and the platform's name
-        // for an unscoped configuration would be empty — name it after the groups instead. A configuration that DOES
-        // point at a config file (ApplicationConfig/SuiteConfig runs) keeps the platform's file-based name even if a
-        // group was typed into it later.
-        if (isGroupOnlyRun()) {
-            val groups = testoSettings.runnerSettings.groups
-            val quoted = groups.joinToString(", ") { "'$it'" }
-            return if (groups.size == 1) "Group $quoted" else "Groups $quoted"
+        // A filter-only run has no file/method to name itself after (it is deliberately unscoped), and the platform's
+        // name for an unscoped configuration would be empty — name it after whatever selects it instead. A
+        // configuration that DOES point at a config file (ApplicationConfig/SuiteConfig runs) keeps the platform's
+        // file-based name even if a group was typed into it later.
+        if (isFilterOnlyRun()) {
+            val runner = testoSettings.runnerSettings
+            val groups = runner.groups
+            if (groups.isNotEmpty()) {
+                val quoted = groups.joinToString(", ") { "'$it'" }
+                return if (groups.size == 1) "Group $quoted" else "Groups $quoted"
+            }
+            if (runner.suite.isNotEmpty()) return "Suite '${runner.suite}'"
+            if (runner.testoType.isNotEmpty()) return "Type '${runner.testoType}'"
+        }
+
+        // The platform names a method run `<file>::<method field>`, which for a qualified selector repeats the class
+        // the file name already implies: `Calculator.php::\Testo\Bench\Internal\Calculator::med:3:0`.
+        qualifiedMethodTail()?.let {
+            return "${PathUtil.getFileName(testoSettings.runnerSettings.filePath.orEmpty())}::$it"
         }
 
         return super.suggestedName() as String
+    }
+
+    override fun getActionName(): String? = qualifiedMethodTail() ?: super.getActionName()
+
+    /**
+     * The `med:3:0` of a `\Ns\Calculator::med:3:0` method field, or null when the field holds a plain method name.
+     *
+     * A run produced from a results-tree node puts the whole selector there — that is what Testo's `--filter` takes —
+     * and everything that shows the configuration to the user is better off with just its tail.
+     */
+    private fun qualifiedMethodTail(): String? {
+        val runner = testoSettings.runnerSettings
+        if (runner.scope != PhpTestRunnerSettings.Scope.Method) return null
+        val method = runner.methodName ?: return null
+
+        return method.substringAfterLast("::").takeIf { it != method && it.isNotEmpty() }
     }
 
     override fun checkConfiguration() {
         try {
             super.checkConfiguration()
         } catch (e: RuntimeConfigurationError) {
-            // A group-only run borrows the ConfigurationFile scope to keep path/filter flags off the command line,
+            // A filter-only run borrows the ConfigurationFile scope to keep path/filter flags off the command line,
             // but the platform then demands a configuration file. Testo needs none — it falls back to ./testo.php
             // in the working directory — so swallow exactly that error, matched by message. If the platform ever
             // rewords it this fails closed (the validation error simply comes back). The executable-path check the
             // platform would have run after this throw resurfaces as a clear ExecutionException in createCommand.
-            if (!isGroupOnlyRun() || e.message != missingConfigurationFileMessage()) throw e
+            if (!isFilterOnlyRun() || e.message != missingConfigurationFileMessage()) throw e
         }
     }
 
-    /** Scope ConfigurationFile without an actual config file, selecting by group only: `--group=<name>` and nothing else. */
-    private fun isGroupOnlyRun(): Boolean {
+    /**
+     * Scope ConfigurationFile without an actual config file: the run is selected by Testo's own filters alone —
+     * `--group`, `--suite`, `--type` or an explicit `--filter` list — and carries no path or method flag at all.
+     */
+    private fun isFilterOnlyRun(): Boolean {
         val runner = testoSettings.runnerSettings
-        return runner.scope == PhpTestRunnerSettings.Scope.ConfigurationFile
-                && !runner.isUseAlternativeConfigurationFile
-                && runner.groups.isNotEmpty()
+        if (runner.scope != PhpTestRunnerSettings.Scope.ConfigurationFile) return false
+        if (runner.isUseAlternativeConfigurationFile) return false
+
+        return runner.groups.isNotEmpty()
+                || runner.excludeGroups.isNotEmpty()
+                || runner.suite.isNotEmpty()
+                || runner.testoType.isNotEmpty()
+                || runner.rerunFilters.isNotEmpty()
     }
 
     private fun missingConfigurationFileMessage() = PhpBundle.message(

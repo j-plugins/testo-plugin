@@ -2,6 +2,7 @@ package com.github.xepozz.testo.tests.actions
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.tests.TestoFrameworkType
+import com.github.xepozz.testo.tests.console.TestoRunTarget
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.Executor
@@ -90,11 +91,6 @@ class TestoRerunFailedTestsAction(
         private val LOG = Logger.getInstance(TestoRerunFailedTestsAction::class.java)
 
         // `php_qn://<file>::\<Fqn>::<method>[ with data set #N]` -> `\Fqn::method` (a dataset reruns its whole method).
-        internal fun locationUrlToFilter(locationUrl: String): String? =
-            locationUrl
-                .substringBefore(" with data set")
-                .substringAfter("://")
-                .substringAfter("::", "")
-                .ifEmpty { null }
+        internal fun locationUrlToFilter(locationUrl: String): String? = TestoRunTarget.filterOf(locationUrl)
     }
 }

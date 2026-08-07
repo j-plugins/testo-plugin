@@ -17,6 +17,7 @@ class TestoOutputToGeneralEventsConverter(
     private val levelFilter: LogLevelFilter,
     private val statusStore: TestoStatusStore,
     private val timings: TestoRunTimings,
+    private val targetStore: TestoTargetStore,
 ) : OutputToGeneralTestEventsConverter(testFrameworkName, consoleProperties) {
 
     /** Version off the banner, kept only to name it in the too-old notification. */
@@ -49,15 +50,20 @@ class TestoOutputToGeneralEventsConverter(
         when (message.messageName) {
             TEST_COUNT -> attrs["count"]?.toIntOrNull()?.let { statusStore.noteDeclaredTotal(it) }
 
-            TEST_STARTED -> {
-                statusStore.noteStarted()
-                timings.noteTestStarted()
+            // A suite message opens a node the same way a test message does — a run suite, a case, or the batch node
+            // of a DataProvider test — and carries the same optional narrowing attributes, so both are recorded.
+            TEST_STARTED, TEST_SUITE_STARTED -> {
+                if (message.messageName == TEST_STARTED) {
+                    statusStore.noteStarted()
+                    timings.noteTestStarted()
+                }
                 val name = attrs["name"]
                 val location = attrs["locationHint"]
-                if (name != null && location != null) store.rememberLocation(name, location)
-                val metainfo = attrs["metainfo"]
-                if (name != null && !metainfo.isNullOrBlank()) {
-                    store.setDescription(store.keyFor(name), metainfo)
+                if (name != null) {
+                    if (location != null) store.rememberLocation(name, location)
+                    val metainfo = attrs["metainfo"]
+                    if (!metainfo.isNullOrBlank()) store.setDescription(store.keyFor(name), metainfo)
+                    targetStore.note(name, TestoRunTarget(location, attrs["testSuite"], attrs["testType"]))
                 }
             }
 
@@ -193,6 +199,7 @@ class TestoOutputToGeneralEventsConverter(
     companion object {
         private const val TEST_COUNT = "testCount"
         private const val TEST_STARTED = "testStarted"
+        private const val TEST_SUITE_STARTED = "testSuiteStarted"
         private const val TEST_FINISHED = "testFinished"
         private const val TEST_STD_OUT = "testStdOut"
         private const val TEST_STD_ERR = "testStdErr"
