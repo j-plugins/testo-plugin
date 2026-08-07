@@ -11,8 +11,8 @@
   the check or the cross still chosen by whatever its tests managed to report — the finished/total count, one counter
   per Testo status, and the elapsed time. Each counter names what it counts — `1234/2000 total`, `42 flaky`. Statuses come from the `status` attribute
   of Testo's service messages, so all eight cases of `Testo\Core\Value\Status` — including risky, flaky, cancelled
-  and aborted — are told apart; a Testo that sends no such attribute still gets the platform's
-  passed / failed / skipped reading.
+  and aborted — are told apart. A Testo too old to send that attribute still gets counters, from the three outcomes
+  TeamCity has always carried: `testFailed`, `testIgnored` and a plain `testFinished`.
 - Every counter in that summary filters the test tree: click one to see only tests with that status, click it again
   or click the total on the left to bring the whole tree back. Hovering the total shows how many assertions the run
   made, off the `assertions` attribute of `testFinished`.

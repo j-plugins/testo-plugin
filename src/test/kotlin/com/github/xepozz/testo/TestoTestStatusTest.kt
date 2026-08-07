@@ -88,6 +88,50 @@ class TestoTestStatusTest {
     }
 
     @Test
+    fun anOldTestoStillGetsTheThreeStatusesTeamcityCarries() {
+        val store = TestoStatusStore(ChannelOutputStore())
+        // No `status` anywhere: the message that closes each test is all there is to go on.
+        store.noteInferred("passed", TestoTestStatus.PASSED, onlyIfAbsent = true)     // testFinished
+
+        store.noteInferred("failed", TestoTestStatus.FAILED, onlyIfAbsent = false)    // testFailed
+        store.noteInferred("failed", TestoTestStatus.PASSED, onlyIfAbsent = true)     // …then testFinished
+
+        store.noteInferred("skipped", TestoTestStatus.SKIPPED, onlyIfAbsent = false)  // testIgnored
+        store.noteInferred("skipped", TestoTestStatus.PASSED, onlyIfAbsent = true)    // …then testFinished
+
+        assertEquals(
+            mapOf(TestoTestStatus.PASSED to 1, TestoTestStatus.FAILED to 1, TestoTestStatus.SKIPPED to 1),
+            store.counts(),
+        )
+    }
+
+    @Test
+    fun aReportedStatusOutranksAnInferredOneWhicheverArrivesFirst() {
+        val early = TestoStatusStore(ChannelOutputStore())
+        // testFailed with no status, then testFinished carrying status='error'.
+        early.noteInferred("a", TestoTestStatus.FAILED, onlyIfAbsent = false)
+        early.note("a", TestoTestStatus.ERROR)
+        assertEquals(mapOf(TestoTestStatus.ERROR to 1), early.counts())
+
+        val late = TestoStatusStore(ChannelOutputStore())
+        // testFailed carrying status='aborted', then a bare testFinished that must not coarsen it back.
+        late.note("a", TestoTestStatus.ABORTED)
+        late.noteInferred("a", TestoTestStatus.FAILED, onlyIfAbsent = false)
+        late.noteInferred("a", TestoTestStatus.PASSED, onlyIfAbsent = true)
+        assertEquals(mapOf(TestoTestStatus.ABORTED to 1), late.counts())
+    }
+
+    @Test
+    fun aRiskyTestIsCountedAsPassedWhenTestoCannotSayOtherwise() {
+        val store = TestoStatusStore(ChannelOutputStore())
+        // An old Testo announces risky only as a warning on stdout and then finishes the test normally.
+        store.noteInferred("a", TestoTestStatus.PASSED, onlyIfAbsent = true)
+
+        assertEquals(mapOf(TestoTestStatus.PASSED to 1), store.counts())
+        assertEquals(1, store.finishedCount())
+    }
+
+    @Test
     fun assertionsAreSummedPerTestAndReplacedOnRestatement() {
         val store = TestoStatusStore(ChannelOutputStore())
         assertNull("no assertion attribute seen yet", store.assertionCount())

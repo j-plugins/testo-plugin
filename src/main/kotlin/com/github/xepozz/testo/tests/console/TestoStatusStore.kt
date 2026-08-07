@@ -11,36 +11,60 @@ import java.util.EnumMap
  * on `testStarted` — so the converter (which writes) and the widget (which reads a tree node) agree on the same test
  * without ever touching `SMTestProxy.locationUrl`.
  *
+ * A Testo too old to send `status` is not left without counters: [noteInferred] derives one from the message that
+ * closed the test, which is the same three the TeamCity protocol has always had — `testFailed`, `testIgnored` and a
+ * plain `testFinished`. A reported status always wins over an inferred one whichever arrives first, so a run that
+ * does send `status` never has its verdict coarsened by the fallback.
+ *
  * The tally is kept incrementally rather than by walking the tree on a timer: the tree is mutated off the EDT while
  * the run streams in, so repeatedly iterating it from the UI is a race. [recountFrom] does walk it, but only once the
  * run is over — which is also what gives an imported history run its numbers, since a replay never reaches our
  * converter.
  */
 class TestoStatusStore(private val channels: ChannelOutputStore) {
+    private class Entry(val status: TestoTestStatus, val reported: Boolean)
+
     private val lock = Any()
-    private val byKey = HashMap<String, TestoTestStatus>()
+    private val byKey = HashMap<String, Entry>()
     private val counts = EnumMap<TestoTestStatus, Int>(TestoTestStatus::class.java)
     private val assertionsByKey = HashMap<String, Int>()
     private var started = 0
     private var declaredTotal = 0
 
-    /** @param name the `name` attribute of the service message the status came with. */
-    fun note(name: String, status: TestoTestStatus) {
+    /**
+     * Testo's own verdict, off the `status` attribute.
+     *
+     * @param name the `name` attribute of the service message the status came with.
+     */
+    fun note(name: String, status: TestoTestStatus) = put(name, status, reported = true, onlyIfAbsent = false)
+
+    /**
+     * The verdict read off the kind of message that closed the test, for a Testo that sends no `status`.
+     *
+     * @param onlyIfAbsent for the guess that a bare `testFinished` means the test passed — true only until the test
+     *        has said otherwise, since `testFailed` and `testIgnored` come first and `testFinished` follows them.
+     */
+    fun noteInferred(name: String, status: TestoTestStatus, onlyIfAbsent: Boolean) =
+        put(name, status, reported = false, onlyIfAbsent = onlyIfAbsent)
+
+    private fun put(name: String, status: TestoTestStatus, reported: Boolean, onlyIfAbsent: Boolean) {
         synchronized(lock) {
             val key = channels.keyFor(name)
-            val previous = byKey.put(key, status)
-            if (previous == status) return
+            val previous = byKey[key]
+            if (previous != null && (onlyIfAbsent || (previous.reported && !reported))) return
+            byKey[key] = Entry(status, reported)
+            if (previous?.status == status) return
             // Drop a counter that runs out instead of leaving a zero behind — the widget reads the map as "what to show".
-            previous?.let { counts.computeIfPresent(it) { _, n -> (n - 1).takeIf { left -> left > 0 } } }
+            previous?.let { counts.computeIfPresent(it.status) { _, n -> (n - 1).takeIf { left -> left > 0 } } }
             counts.merge(status, 1, Int::plus)
         }
     }
 
-    /** Reported status of the node, or the platform's coarse reading of it when Testo sent none. */
+    /** Known status of the node, or the platform's coarse reading of it when nothing was recorded for it. */
     fun statusOf(proxy: SMTestProxy): TestoTestStatus? {
         if (proxy.isInProgress) return null
-        val reported = synchronized(lock) { byKey[channels.keyFor(proxy.name)] }
-        return reported ?: TestoTestStatus.fromProxy(proxy)
+        val known = synchronized(lock) { byKey[channels.keyFor(proxy.name)] }
+        return known?.status ?: TestoTestStatus.fromProxy(proxy)
     }
 
     fun counts(): Map<TestoTestStatus, Int> = synchronized(lock) { EnumMap(counts) }

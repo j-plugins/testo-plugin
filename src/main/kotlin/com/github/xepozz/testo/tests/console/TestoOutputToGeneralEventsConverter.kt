@@ -109,6 +109,7 @@ class TestoOutputToGeneralEventsConverter(
         attrs["name"]?.let { name ->
             TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.note(name, it) }
             attrs["assertions"]?.toIntOrNull()?.let { statusStore.noteAssertions(name, it) }
+            noteStatusFromMessageKind(message.messageName, name)
         }
 
         // Where the testing phase ends. A test closes with testFinished whatever its status, so this mark is what
@@ -118,6 +119,21 @@ class TestoOutputToGeneralEventsConverter(
         }
 
         super.processServiceMessage(message, visitor)
+    }
+
+    /**
+     * The coarse verdict a Testo too old to send `status` still conveys: TeamCity has always had exactly three
+     * outcomes, and which message closes the test is what picks between them.
+     *
+     * `testFinished` follows `testFailed` and `testIgnored` rather than replacing them, so the pass it implies only
+     * counts while the test has said nothing else. Anything reported through `status` outranks all of this — the
+     * store keeps the two apart, so a newer Testo is never coarsened by the guess.
+     */
+    private fun noteStatusFromMessageKind(messageName: String, name: String) = when (messageName) {
+        TEST_FAILED -> statusStore.noteInferred(name, TestoTestStatus.FAILED, onlyIfAbsent = false)
+        TEST_IGNORED -> statusStore.noteInferred(name, TestoTestStatus.SKIPPED, onlyIfAbsent = false)
+        TEST_FINISHED -> statusStore.noteInferred(name, TestoTestStatus.PASSED, onlyIfAbsent = true)
+        else -> Unit
     }
 
     private fun keyFor(name: String?): String? = name?.let { store.keyFor(it) }
@@ -141,6 +157,7 @@ class TestoOutputToGeneralEventsConverter(
         private const val TEST_STD_OUT = "testStdOut"
         private const val TEST_STD_ERR = "testStdErr"
         private const val TEST_FAILED = "testFailed"
+        private const val TEST_IGNORED = "testIgnored"
         private const val BUILD_PROBLEM = "buildProblem"
     }
 }
