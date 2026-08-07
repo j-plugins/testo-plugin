@@ -145,7 +145,8 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoHistoryImport.kt   # "Show history": import a saved run onto our own console properties
 │   │   ├── TestoHistoryIndex.kt    # which locationUrls exist in saved history XMLs (+ lens refresh)
 │   │   ├── TestoTestStatus.kt      # the 8 cases of Testo\Core\Value\Status: wire name, icon, label
-│   │   ├── TestoStatusStore.kt     # per-test status + the tally the toolbar summary renders
+│   │   ├── TestoStatusStore.kt     # per-test status/assertions + the tally the toolbar summary renders
+│   │   ├── TestoRunTimings.kt      # start/first test/last test/finish marks + summed test durations
 │   │   ├── TestoProgressAction.kt  # right-aligned toolbar summary: ring, fraction, status counters, elapsed
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
@@ -356,7 +357,10 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
 3. **Toolbar run summary** (`TestoProgressAction`) — a progress ring, the finished/total count, a counter per Testo
    status and the elapsed time, pushed past every other button by `RightAlignedToolbarAction`. Statuses come from the
    `status` attribute of the service messages and assertion counts from `assertions` (`TestoStatusStore`, keyed like
-   `ChannelOutputStore`); each counter narrows the tree through `SMTestRunnerResultsForm.setFilter`.
+   `ChannelOutputStore`); each counter narrows the tree through `SMTestRunnerResultsForm.setFilter`. `TestoRunTimings`
+   splits the run into startup / tests / teardown for the clock's hover and sums the `duration` attributes beside
+   them — concurrent tests make that sum exceed the window they ran in, which is reported as a parallelism factor
+   rather than mistaken for overhead.
 
 4. **Run history** — three cooperating pieces: `TestoChannelHistory` round-trips channel output through
    `SMTestProxy.metainfo` (the only per-test datum the platform's history XML preserves), `TestoHistoryIndex` knows

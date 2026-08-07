@@ -34,7 +34,6 @@ import java.awt.event.MouseEvent
 import java.awt.geom.Arc2D
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.BoxLayout
 import javax.swing.Icon
@@ -58,11 +57,10 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
     /** Exit code of the run, once it has one — the verdict icon prefers it over what the tree says. */
     private val exitCode = AtomicReference<Int?>(null)
 
-    // The wall clock is kept here rather than read off SMTestRunnerResultsForm: its getStartTime/getEndTime (and
-    // getTotalTestCount, whose job TestoStatusStore.totalHint does) are only public from 2026.2 on, and this plugin
-    // still ships a 252 build.
-    private val startedAt = AtomicLong(0)
-    private val finishedAt = AtomicLong(0)
+    // The clock lives in TestoRunTimings rather than being read off SMTestRunnerResultsForm: its getStartTime and
+    // getEndTime (and getTotalTestCount, whose job TestoStatusStore.totalHint does) are only public from 2026.2 on,
+    // this plugin still ships a 252 build — and the form knows nothing of the phases the hover breaks the run into.
+    private var timings: TestoRunTimings? = null
 
     /** Every component the toolbar has built for this action: a toolbar rebuild leaves the previous one behind. */
     private val panels = CopyOnWriteArrayList<ProgressPanel>()
@@ -84,19 +82,30 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
     override fun createCustomComponent(presentation: Presentation, place: String): JComponent =
         ProgressPanel().also { panels += it }
 
-    fun attachTo(console: SMTRunnerConsoleView, store: TestoStatusStore, handler: ProcessHandler?) {
+    fun attachTo(
+        console: SMTRunnerConsoleView,
+        store: TestoStatusStore,
+        clock: TestoRunTimings,
+        handler: ProcessHandler?,
+    ) {
         val viewer = console.resultsViewer
         resultsForm = viewer
         statusStore = store
+        timings = clock
         // Called from the augmenter's processStarted, so this is as close to the real start as the plugin can get.
-        startedAt.set(System.currentTimeMillis())
+        clock.noteStart()
 
         viewer.addEventsListener(object : TestResultsViewer.EventsListener {
             override fun onTestingStarted(viewer: TestResultsViewer) {
-                store.clear()
-                exitCode.set(null)
-                startedAt.set(System.currentTimeMillis())
-                finishedAt.set(0)
+                // A console can host a second session, and the platform resets its tree for one. Only then is
+                // wiping right: doing it on every announcement would throw away what the converter has already
+                // reported for this very run, since it reads the stream well before the platform gets here.
+                if (clock.isFinished()) {
+                    store.clear()
+                    clock.clear()
+                    clock.noteStart()
+                    exitCode.set(null)
+                }
                 // A narrowed tree must not survive into the next run: its statuses are gone with the store.
                 if (selected != null) ApplicationManager.getApplication().invokeLater { toggleFilter(null) }
             }
@@ -113,7 +122,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                 // The only safe moment to read the tree: nothing appends to it any more. It is also the only source of
                 // numbers for an imported history run, whose replay never passes through our converter.
                 runCatching { store.recountFrom(viewer.testsRootNode) }
-                finishedAt.compareAndSet(0, System.currentTimeMillis())
+                clock.noteFinish()
             }
         })
 
@@ -122,7 +131,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         handler?.addProcessListener(object : ProcessListener {
             override fun processTerminated(event: ProcessEvent) {
                 exitCode.set(event.exitCode)
-                finishedAt.compareAndSet(0, System.currentTimeMillis())
+                clock.noteFinish()
             }
         })
     }
@@ -185,24 +194,25 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         private fun tick() {
             val form = resultsForm ?: return
             val store = statusStore ?: return
+            val clock = timings ?: return
 
             val counts = store.counts()
             val finished = counts.values.sum()
             val total = store.totalHint()
             val assertions = store.assertionCount()
-            val done = finishedAt.get() > 0
-            val running = form.isRunning && !done
+            val spans = clock.snapshot()
+            val running = form.isRunning && !spans.finished
             // A finished tab keeps ticking (the toolbar may still rebuild it), but stops redrawing once settled.
-            val digest = "$finished/$total|$running|$counts|$assertions|$selected|$done|${exitCode.get()}"
+            val digest = "$finished/$total|$running|$counts|$assertions|$selected|$spans|${exitCode.get()}"
             if (!running && digest == painted) return
             painted = digest
 
-            progress.update(finished, total, assertions, running, if (done) verdict(counts) else null)
+            progress.update(finished, total, assertions, running, if (spans.finished) verdict(counts) else null)
             counters.forEach { it.update(counts[it.status] ?: 0, it.status == selected) }
-            elapsed.update(startedAt.get(), finishedAt.get().takeIf { it > 0 } ?: System.currentTimeMillis())
+            elapsed.update(spans)
 
             // Nothing reported and nothing running: give the width back to the buttons on the left.
-            isVisible = running || finished > 0 || done
+            isVisible = running || finished > 0 || spans.finished
             // Only a width change concerns the toolbar; the ring animating in place does not.
             val width = preferredSize.width
             if (width != laidOutWidth) {
@@ -370,21 +380,48 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         }
     }
 
-    /** Not a button — just the run's wall clock. */
+    /**
+     * Not a button — the run's wall clock, with the phase breakdown on the hover. The row shows only the total
+     * because that is the one figure that needs no explaining; the rest is worth reading, not worth the width.
+     */
     private inner class ElapsedCell : Cell() {
         init {
             icon = AllIcons.Vcs.History
             isVisible = false
             makeInert()
-            toolTipText = TestoBundle.message("testo.progress.elapsed.tooltip")
         }
 
         override fun onClick() = Unit
 
-        fun update(startTime: Long, endTime: Long) {
-            val elapsed = if (startTime <= 0) 0L else (endTime - startTime).coerceAtLeast(0)
-            isVisible = elapsed > 0
-            text = formatElapsed(elapsed)
+        fun update(spans: TestoRunTimings.Snapshot) {
+            isVisible = spans.totalMs > 0
+            text = formatElapsed(spans.totalMs)
+            retip(breakdown(spans))
+        }
+
+        private fun breakdown(spans: TestoRunTimings.Snapshot): String = buildString {
+            append("<html><table cellpadding='0' cellspacing='0'>")
+            row("testo.progress.elapsed.total", formatElapsed(spans.totalMs))
+            if (spans.startupMs > 0) row("testo.progress.elapsed.startup", formatElapsed(spans.startupMs))
+            if (spans.testsMs > 0) row("testo.progress.elapsed.tests", formatElapsed(spans.testsMs))
+            if (spans.summedTestsMs > 0) {
+                // The sum only means something next to the window it fitted into: with tests on fibers it runs well
+                // past the wall clock, and the ratio is the whole point of showing it.
+                val summed = formatElapsed(spans.summedTestsMs)
+                val factor = spans.parallelism
+                row(
+                    "testo.progress.elapsed.summed",
+                    if (factor == null || factor < 1.05) summed
+                    else TestoBundle.message("testo.progress.elapsed.parallel", summed, formatFactor(factor)),
+                )
+            }
+            if (spans.teardownMs > 0) row("testo.progress.elapsed.teardown", formatElapsed(spans.teardownMs))
+            append("</table></html>")
+        }
+
+        private fun StringBuilder.row(labelKey: String, value: String) {
+            append("<tr><td>").append(TestoBundle.message(labelKey)).append("&nbsp;&nbsp;</td>")
+            append("<td align='right'>").append(value).append("</td></tr>")
         }
     }
 
@@ -409,5 +446,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             ms < 60_000 -> String.format(Locale.ROOT, "%.2f sec", ms / 1000.0)
             else -> String.format(Locale.ROOT, "%d min %02d sec", ms / 60_000, ms % 60_000 / 1000)
         }
+
+        internal fun formatFactor(factor: Double): String = String.format(Locale.ROOT, "%.1f", factor)
     }
 }

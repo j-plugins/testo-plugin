@@ -15,6 +15,7 @@ class TestoOutputToGeneralEventsConverter(
     private val store: ChannelOutputStore,
     private val levelFilter: LogLevelFilter,
     private val statusStore: TestoStatusStore,
+    private val timings: TestoRunTimings,
 ) : OutputToGeneralTestEventsConverter(testFrameworkName, consoleProperties) {
 
     /** Version off the banner, kept only to name it in the too-old notification. */
@@ -46,6 +47,7 @@ class TestoOutputToGeneralEventsConverter(
 
             TEST_STARTED -> {
                 statusStore.noteStarted()
+                timings.noteTestStarted()
                 val name = attrs["name"]
                 val location = attrs["locationHint"]
                 if (name != null && location != null) store.rememberLocation(name, location)
@@ -109,6 +111,12 @@ class TestoOutputToGeneralEventsConverter(
             attrs["assertions"]?.toIntOrNull()?.let { statusStore.noteAssertions(name, it) }
         }
 
+        // Where the testing phase ends. A test closes with testFinished whatever its status, so this mark is what
+        // separates the run's post-processing from the tests, and `duration` is the test's own share of the clock.
+        if (message.messageName == TEST_FINISHED) {
+            attrs["name"]?.let { timings.noteTestFinished(store.keyFor(it), attrs["duration"]?.toLongOrNull()) }
+        }
+
         super.processServiceMessage(message, visitor)
     }
 
@@ -129,6 +137,7 @@ class TestoOutputToGeneralEventsConverter(
     companion object {
         private const val TEST_COUNT = "testCount"
         private const val TEST_STARTED = "testStarted"
+        private const val TEST_FINISHED = "testFinished"
         private const val TEST_STD_OUT = "testStdOut"
         private const val TEST_STD_ERR = "testStdErr"
         private const val TEST_FAILED = "testFailed"

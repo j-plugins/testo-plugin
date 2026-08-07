@@ -5,6 +5,7 @@ import com.github.xepozz.testo.tests.console.ChannelOutputStore
 import com.github.xepozz.testo.tests.console.LogLevelFilter
 import com.github.xepozz.testo.tests.console.TestoOutputToGeneralEventsConverter
 import com.github.xepozz.testo.tests.console.TestoProgressAction
+import com.github.xepozz.testo.tests.console.TestoRunTimings
 import com.github.xepozz.testo.tests.console.TestoStatusStore
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.Executor
@@ -36,6 +37,8 @@ class TestoConsoleProperties(
 
     val statusStore = TestoStatusStore(channelStore)
 
+    val runTimings = TestoRunTimings()
+
     val progressAction = TestoProgressAction()
 
     // Guards the channel-tab install: set once whoever wires the tabs first (the run-path ExecutionListener or the
@@ -46,7 +49,14 @@ class TestoConsoleProperties(
         testFrameworkName: String,
         consoleProperties: TestConsoleProperties,
     ): OutputToGeneralTestEventsConverter =
-        TestoOutputToGeneralEventsConverter(testFrameworkName, consoleProperties, channelStore, levelFilter, statusStore)
+        TestoOutputToGeneralEventsConverter(
+            testFrameworkName,
+            consoleProperties,
+            channelStore,
+            levelFilter,
+            statusStore,
+            runTimings,
+        )
 
     override fun getTestStackTraceParser(url: String, proxy: SMTestProxy, project: Project) =
         TestoStackTraceParser.parse(url, proxy.stacktrace, proxy.errorMessage, testLocator, project)

@@ -15,6 +15,11 @@
 - Every counter in that summary filters the test tree: click one to see only tests with that status, click it again
   or click the total on the left to bring the whole tree back. Hovering the total shows how many assertions the run
   made, off the `assertions` attribute of `testFinished`.
+- The clock shows the run from start to finish, and its hover breaks that down into what happened before the first
+  test, the tests themselves, and what happened after the last one — so the cost of bootstrapping and of merging
+  reports is visible separately. Beside them it sums the tests' own durations: with tests on fibers that sum runs
+  past the window they fitted into, and the hover states by how much rather than pretending the difference is
+  framework overhead.
 
 ### Fixed
 
