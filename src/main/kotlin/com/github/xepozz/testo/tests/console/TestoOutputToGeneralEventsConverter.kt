@@ -20,7 +20,6 @@ class TestoOutputToGeneralEventsConverter(
                 val name = attrs["name"]
                 val location = attrs["locationHint"]
                 if (name != null && location != null) store.rememberLocation(name, location)
-                // The test description (PHPDoc summary, possibly rewritten by interceptors) arrives as metainfo.
                 val metainfo = attrs["metainfo"]
                 if (name != null && !metainfo.isNullOrBlank()) {
                     store.setDescription(store.keyFor(name), metainfo)
@@ -67,8 +66,6 @@ class TestoOutputToGeneralEventsConverter(
                     if (identity.isNotBlank()) append(" [").append(identity).append("]")
                     append(": ").append(description).append("\n")
                 }
-                // Surface the build problem in the root-level output so it is visible in the All and Output tabs
-                // even when no specific test is selected.
                 store.appendAll("", text, "stderr")
                 store.appendOutput("", text, "stderr")
             }

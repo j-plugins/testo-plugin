@@ -51,17 +51,12 @@ private fun Method.isPublicMethodOfTestoMarkedClass() = when {
         when {
             cls == null -> false
             cls.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES) -> true
-            // Methods inherited by concrete test subclasses are tests too: an abstract base class without #[Test]
-            // itself may hold test methods that run in its concrete inheritors. Check subclasses only for abstract
-            // classes (the common case) to avoid an index lookup on every method.
             cls.isAbstract -> hasTestoSubclass(cls)
             else -> false
         }
     }
 }
 
-// True when at least one subclass of [cls] is a Testo test class. Avoids recursion into isTestoClass (which calls
-// isTestoMethod) by checking only the class-level markers — name pattern and attributes — not its methods.
 private fun hasTestoSubclass(cls: PhpClass): Boolean {
     if (DumbService.isDumb(cls.project)) return false
     return PhpIndex.getInstance(cls.project).getAllSubclasses(cls.fqn).any { sub ->

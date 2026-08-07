@@ -7,11 +7,6 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.ui.Messages
 
-/**
- * Debug-panel action: "Add File to Skipped Paths". When invoked from a stack frame or editor during a debug session,
- * opens the PHP | Debug | Skipped Paths settings page so the user can add the current file (e.g. Composer autoload
- * scripts) to the skip list. The file path is shown in a confirmation dialog first.
- */
 class TestoAddSkippedPathAction : AnAction(
     "Add File to Skipped Paths",
     "Open PHP Debug Skipped Paths settings to exclude this file from stepping",
@@ -38,8 +33,6 @@ class TestoAddSkippedPathAction : AnAction(
             Messages.getQuestionIcon(),
         )
         if (result == Messages.OK) {
-            // Open the PHP Debug settings page where the user can add the path to Skipped Paths.
-            // The configurable ID for PHP Debug is "reference.webide.settings.dialog.xdebug".
             ShowSettingsUtil.getInstance().showSettingsDialog(project, "PHP")
         }
     }

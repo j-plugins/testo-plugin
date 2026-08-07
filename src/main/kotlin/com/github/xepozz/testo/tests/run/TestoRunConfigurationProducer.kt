@@ -284,8 +284,6 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 }
             }
 
-            // A method in an abstract class whose concrete subclasses are test classes: route through the
-            // inheritor chooser so the user picks which subclass to run the inherited method on.
             if (element is Method && element.containingClass?.isAbstract == true) {
                 if (tryRunAbstract(
                         element,

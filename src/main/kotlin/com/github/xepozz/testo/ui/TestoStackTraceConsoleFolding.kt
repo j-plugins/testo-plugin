@@ -16,16 +16,13 @@ class TestoStackTraceConsoleFolding : ConsoleFolding() {
 
     override fun shouldFoldLine(project: Project, line: String): Boolean {
         if (!STACK_FRAME.containsMatchIn(line)) {
-            pastTestFrame.set(false) // any non-frame line ends the run
+            pastTestFrame.set(false)
             return false
         }
-        // Already past the test's own frame — fold everything that follows.
         if (pastTestFrame.get()) return true
-        // The test's own frame is an [internal function] calling the test method/function via -> or :: or a bare
-        // namespaced function. Show it (return false) but fold every subsequent frame.
         if (line.contains(INTERNAL_FUNCTION) && TEST_CALL.containsMatchIn(line)) {
             pastTestFrame.set(true)
-            return false // the test frame itself stays visible
+            return false
         }
         return false
     }
@@ -37,8 +34,6 @@ class TestoStackTraceConsoleFolding : ConsoleFolding() {
     private companion object {
         private const val INTERNAL_FUNCTION = "[internal function]:"
         private val STACK_FRAME = Regex("^#\\d+\\s")
-        // Matches a namespaced test call: Ns\Class->method(), Ns\Class::method(), or Ns\function().
-        // The backslash in the FQN distinguishes test code from engine internals like {closure}().
         private val TEST_CALL = Regex("""\w+\\\w+.*\(""")
     }
 }

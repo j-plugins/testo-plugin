@@ -1,6 +1,5 @@
 package com.github.xepozz.testo.tests.console
 
-import com.intellij.execution.testframework.AbstractTestProxy
 import com.intellij.execution.testframework.TestConsoleProperties
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
@@ -19,20 +18,13 @@ import java.util.concurrent.atomic.AtomicReference
 import javax.swing.JComponent
 import javax.swing.JPanel
 
-/**
- * A compact progress widget shown in the test results toolbar. Replaces the platform's horizontal progress bar with
- * a per-status summary like "🟢 5 passed 🔴 4 failed 🟡 2 risky". Each status segment is clickable and toggles
- * the corresponding test filter in the tree.
- */
 class TestoProgressAction : AnAction(), CustomComponentAction {
 
     private val state = AtomicReference(ProgressState())
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
-    override fun actionPerformed(e: AnActionEvent) {
-        // No-op: interaction is handled by the component's click listeners.
-    }
+    override fun actionPerformed(e: AnActionEvent) = Unit
 
     override fun update(e: AnActionEvent) {
         e.presentation.isEnabledAndVisible = true
@@ -42,7 +34,6 @@ class TestoProgressAction : AnAction(), CustomComponentAction {
         return ProgressPanel(state)
     }
 
-    /** Called by the converter/augmenter to wire this action to the console's test events. */
     fun attachTo(console: SMTRunnerConsoleView) {
         val viewer = console.resultsViewer
         viewer.addEventsListener(object : TestResultsViewer.EventsListener {
@@ -51,9 +42,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction {
                 refreshComponent()
             }
 
-            override fun onTestNodeAdded(viewer: TestResultsViewer, test: SMTestProxy) {
-                // Leaf count changes are picked up on finish; suite nodes are irrelevant.
-            }
+            override fun onTestNodeAdded(viewer: TestResultsViewer, test: SMTestProxy) {}
 
             override fun onTestingFinished(viewer: TestResultsViewer) {
                 recount(viewer)
@@ -64,8 +53,6 @@ class TestoProgressAction : AnAction(), CustomComponentAction {
                 viewer: TestResultsViewer,
                 model: com.intellij.execution.testframework.TestFrameworkRunningModel,
             ) {
-                // Recount on every selection change so the widget stays up to date during a live run (the platform
-                // fires onSelected when a running test finishes and the tree auto-selects the next failure).
                 recount(viewer)
             }
         })
@@ -82,7 +69,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction {
                 leaf.isIgnored -> ignored++
                 leaf.isInProgress -> running++
                 leaf.isPassed -> passed++
-                else -> passed++ // finished without explicit status
+                else -> passed++
             }
         }
         state.set(ProgressState(passed, failed, ignored, running, total))
@@ -91,14 +78,11 @@ class TestoProgressAction : AnAction(), CustomComponentAction {
 
     private fun refreshComponent() {
         ApplicationManager.getApplication().invokeLater {
-            // The custom component is rebuilt by the toolbar framework; force a presentation change to trigger it.
             templatePresentation.description = state.get().toString()
         }
     }
 
-    /** Installs a click filter on the console's test tree: clicking a status segment shows only tests of that status. */
     fun installClickFilters(console: SMTRunnerConsoleView) {
-        // The filter toggling is done inside ProgressPanel via TestConsoleProperties toggles.
         panelRef?.properties = console.properties
     }
 
@@ -125,8 +109,6 @@ class TestoProgressAction : AnAction(), CustomComponentAction {
             add(label)
             panelRef = this
             update()
-            // Poll for state changes (the action framework doesn't repaint custom components on presentation changes
-            // reliably, so a lightweight timer keeps the label fresh during a live run).
             val timer = javax.swing.Timer(500) { update() }
             timer.isRepeats = true
             timer.start()

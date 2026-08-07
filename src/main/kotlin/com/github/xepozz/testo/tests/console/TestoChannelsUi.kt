@@ -715,7 +715,6 @@ object TestoChannelsUi {
                             if (!description.isNullOrBlank()) toolTipText = description
                         })
                     }
-                    // Show the test description (from metainfo) as a dimmed label after the test name.
                     if (!description.isNullOrBlank()) {
                         add(JBLabel("  — $description").apply {
                             font = JBUI.Fonts.smallFont()
@@ -840,11 +839,7 @@ object TestoChannelsUi {
                 return layered
             }
 
-            // For a type whose own editor ships a preview (Markdown, HTML), embed that real editor — source + rendered
-            // preview with the platform's layout toggle — instead of a plain source viewer. Returns null for types
-            // without such an editor (the caller then uses the source viewer).
             private fun previewCard(fileType: FileType, text: String): JComponent? {
-                // HTML channels: render via JCEF browser if available, giving a true rendered preview.
                 if (fileType.name.equals("HTML", ignoreCase = true)) {
                     return htmlPreviewCard(text)
                 }
@@ -882,7 +877,6 @@ object TestoChannelsUi {
                 }
             }
 
-            // Renders HTML content in a Swing JEditorPane. Supports basic HTML/CSS rendering without requiring JCEF.
             private fun htmlPreviewCard(html: String): JComponent {
                 val pane = javax.swing.JEditorPane().apply {
                     contentType = "text/html"
@@ -890,7 +884,6 @@ object TestoChannelsUi {
                     isEditable = false
                     isOpaque = false
                     border = JBUI.Borders.empty(4)
-                    // Use the IDE's default font for a consistent look.
                     putClientProperty(javax.swing.JEditorPane.HONOR_DISPLAY_PROPERTIES, true)
                     font = UIUtil.getLabelFont()
                 }
@@ -923,9 +916,6 @@ object TestoChannelsUi {
                 val vFile = LightVirtualFile("testo-message-$index.$ext", fileType, text)
                 val document = FileDocumentManager.getInstance().getDocument(vFile)
                     ?: EditorFactory.getInstance().createDocument(text)
-                // Pass null project so the daemon analyser does not run inspections on channel editors — they are
-                // read-only output viewers and inspections cause severe lag when many tests are shown. Hyperlinks and
-                // syntax highlighting are wired separately (attachHyperlinks / EditorHighlighterFactory).
                 val editor = EditorFactory.getInstance().createViewer(document, null) as EditorEx
                 editors += editor
                 editor.highlighter = EditorHighlighterFactory.getInstance().createEditorHighlighter(project, vFile)
@@ -977,9 +967,6 @@ object TestoChannelsUi {
                 wrapper to editor
             }
 
-            // Append a format-less message to an existing card's editor (the "one canvas" merge) and tint its ANSI run.
-            // No separator is inserted between chunks: the streaming content is a continuous byte stream split into
-            // chunks only by the transport, so adding newlines would corrupt the output.
             private fun appendToEditor(editor: EditorEx, plain: String, segments: List<AnsiSegment>) {
                 val document = editor.document
                 val base = document.textLength
