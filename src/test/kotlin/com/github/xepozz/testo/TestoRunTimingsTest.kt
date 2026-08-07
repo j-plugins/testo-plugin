@@ -27,10 +27,10 @@ class TestoRunTimingsTest {
         assertEquals(1_600, spans.totalMs)
         assertEquals(400, spans.startupMs)   // start → first test
         assertEquals(700, spans.testsMs)     // first test → last test event
-        assertEquals(500, spans.teardownMs)  // last test event → end
+        assertEquals(500, spans.postProcessingMs)  // last test event → end
         assertEquals(550, spans.summedTestsMs)
         // The three wall-clock phases account for the whole run; the summed figure is not one of them.
-        assertEquals(spans.totalMs, spans.startupMs + spans.testsMs + spans.teardownMs)
+        assertEquals(spans.totalMs, spans.startupMs + spans.testsMs + spans.postProcessingMs)
     }
 
     @Test
@@ -74,7 +74,7 @@ class TestoRunTimingsTest {
     }
 
     @Test
-    fun aRunningRunCountsUpToNowAndOwesNoTeardown() {
+    fun aRunningRunCountsUpToNowAndOwesNoPostProcessing() {
         val timings = TestoRunTimings()
         timings.noteStart(at = 1_000)
         timings.noteTestStarted(at = 1_200)
@@ -86,7 +86,7 @@ class TestoRunTimingsTest {
         assertEquals(200, spans.startupMs)
         // Still running, so the window reaches now rather than stopping at the last test that happened to finish.
         assertEquals(1_800, spans.testsMs)
-        assertEquals(0, spans.teardownMs)
+        assertEquals(0, spans.postProcessingMs)
     }
 
     @Test
@@ -99,7 +99,7 @@ class TestoRunTimingsTest {
         assertEquals(900, spans.totalMs)
         assertEquals(0, spans.startupMs)
         assertEquals(0, spans.testsMs)
-        assertEquals(0, spans.teardownMs)
+        assertEquals(0, spans.postProcessingMs)
         assertNull(spans.parallelism)
     }
 

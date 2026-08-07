@@ -5,8 +5,8 @@ package com.github.xepozz.testo.tests.console
  *
  * Four marks are recorded — the process starting, the first `testStarted`, the last test event, and the run being
  * over — and the three spans between them add up to the total exactly, so the hover accounts for every millisecond
- * the toolbar shows. That is the only honest split available: the last mark is what separates report merging and
- * teardown from the testing itself, which no service message announces.
+ * the toolbar shows. That is the only honest split available: the last mark is what separates the run's
+ * post-processing from the testing itself, which no service message announces.
  *
  * The sum of the tests' own `duration` attributes is kept beside them, and deliberately *not* presented as a phase:
  * Testo runs tests concurrently, so two five-second tests on two fibers sum to ten seconds inside a five-second
@@ -26,8 +26,13 @@ class TestoRunTimings {
         val testsMs: Long,
         /** Sum of every test's own reported duration; above [testsMs] by however much ran in parallel. */
         val summedTestsMs: Long,
-        /** Last test event to the end: report merging and teardown. */
-        val teardownMs: Long,
+        /**
+         * Last test event to the end: merging reports and shutting down.
+         *
+         * Not called teardown, here or in the tooltip: fixture teardown runs inside a test and is therefore part of
+         * [testsMs], so the word would name the wrong span.
+         */
+        val postProcessingMs: Long,
         val finished: Boolean,
     ) {
         /** How many tests' worth of time fitted into the testing window, or `null` when there is nothing to compare. */
@@ -86,7 +91,7 @@ class TestoRunTimings {
             startupMs = if (firstTest == null) 0 else (firstTest - start).coerceAtLeast(0),
             testsMs = if (firstTest == null || testsEnd == null) 0 else (testsEnd - firstTest).coerceAtLeast(0),
             summedTestsMs = durationByKey.values.sum(),
-            teardownMs = if (finishedAt == null || lastTest == null) 0 else (end - lastTest).coerceAtLeast(0),
+            postProcessingMs = if (finishedAt == null || lastTest == null) 0 else (end - lastTest).coerceAtLeast(0),
             finished = finishedAt != null,
         )
     }

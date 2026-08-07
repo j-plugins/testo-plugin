@@ -475,7 +475,9 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                     else TestoBundle.message("testo.progress.elapsed.parallel", summed, formatFactor(factor)),
                 )
             }
-            if (spans.teardownMs > 0) row("testo.progress.elapsed.teardown", formatElapsed(spans.teardownMs))
+            if (spans.postProcessingMs > 0) {
+                row("testo.progress.elapsed.postprocessing", formatElapsed(spans.postProcessingMs))
+            }
             append("</table></html>")
         }
 

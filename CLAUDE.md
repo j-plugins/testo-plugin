@@ -358,7 +358,7 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
    status and the elapsed time, pushed past every other button by `RightAlignedToolbarAction`. Statuses come from the
    `status` attribute of the service messages and assertion counts from `assertions` (`TestoStatusStore`, keyed like
    `ChannelOutputStore`); each counter narrows the tree through `SMTestRunnerResultsForm.setFilter`. `TestoRunTimings`
-   splits the run into startup / tests / teardown for the clock's hover and sums the `duration` attributes beside
+   splits the run into startup / tests / post-processing for the clock's hover and sums the `duration` attributes beside
    them — concurrent tests make that sum exceed the window they ran in, which is reported as a parallelism factor
    rather than mistaken for overhead.
 
