@@ -25,13 +25,13 @@ class TestoStackTraceConsoleFoldingTest {
 
     private fun folding() = TestoStackTraceConsoleFolding()
 
-    // Sanity: folding starts at the first `[internal function]:` line and covers the frames after it.
+    // Sanity: the test's own FQN frame stays visible; frames AFTER it are folded.
     @Test
     fun foldsInternalStackTraceFrames() {
         val f = folding()
         assertFalse(f.shouldFoldLine(project, "#0 /app/src/Runner.php(48): Foo->bar()")) // before the marker
-        assertTrue(f.shouldFoldLine(project, "#1 [internal function]: Tests\\AssertTest->repeatFail()"))
-        assertTrue(f.shouldFoldLine(project, "#2 /app/src/Pipeline.php(110): Runner->{closure}()"))
+        assertFalse(f.shouldFoldLine(project, "#1 [internal function]: Tests\\AssertTest->repeatFail()")) // test's own frame — visible
+        assertTrue(f.shouldFoldLine(project, "#2 /app/src/Pipeline.php(110): Runner->{closure}()")) // after test frame — folded
     }
 
     // The first line of the message that PRECEDES the trace must not be folded.
@@ -70,11 +70,13 @@ class TestoStackTraceConsoleFoldingTest {
         )
     }
 
-    // Sanity: a blank line is supposed to end folding (the only reset the current code has).
+    // A blank line resets the fold state.
     @Test
     fun blankLineEndsFolding() {
         val f = folding()
-        assertTrue(f.shouldFoldLine(project, "#0 [internal function]: a()"))
+        // Trigger folding with a proper namespaced test call, then a subsequent frame is folded.
+        assertFalse(f.shouldFoldLine(project, "#0 [internal function]: Tests\\Ns\\MyTest->run()"))
+        assertTrue(f.shouldFoldLine(project, "#1 /app/src/Pipeline.php(10): Runner->run()"))
         assertFalse(f.shouldFoldLine(project, ""))
         assertFalse(f.shouldFoldLine(project, "after the blank line"))
     }

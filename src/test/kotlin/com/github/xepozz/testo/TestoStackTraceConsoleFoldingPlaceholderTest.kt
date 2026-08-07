@@ -39,8 +39,8 @@ class TestoStackTraceConsoleFoldingPlaceholderTest {
     @Test
     fun multiDigitFrameNumbersAreRecognizedAndFolded() {
         val f = folding()
-        // First the marker turns folding on, then a high-numbered frame must still fold.
-        assertTrue(f.shouldFoldLine(project, "#0 [internal function]: a()"))
+        // The test's own namespaced frame triggers folding; subsequent frames (even with high numbers) are folded.
+        assertFalse(f.shouldFoldLine(project, "#0 [internal function]: Tests\\Ns\\MyTest->run()"))
         assertTrue(f.shouldFoldLine(project, "#12 /app/src/Runner.php(48): Foo->bar()"))
         assertTrue(f.shouldFoldLine(project, "#137 /app/src/Pipeline.php(110): Runner->run()"))
     }
