@@ -938,11 +938,13 @@ object TestoChannelsUi {
             }
 
             // Append a format-less message to an existing card's editor (the "one canvas" merge) and tint its ANSI run.
+            // No separator is inserted between chunks: the streaming content is a continuous byte stream split into
+            // chunks only by the transport, so adding newlines would corrupt the output.
             private fun appendToEditor(editor: EditorEx, plain: String, segments: List<AnsiSegment>) {
                 val document = editor.document
                 val base = document.textLength
-                WriteCommandAction.runWriteCommandAction(project) { document.insertString(base, "\n$plain") }
-                applyAnsi(editor, segments, base + 1)
+                WriteCommandAction.runWriteCommandAction(project) { document.insertString(base, plain) }
+                applyAnsi(editor, segments, base)
             }
 
             private fun applyAnsi(editor: EditorEx, segments: List<AnsiSegment>, base: Int = 0) {
