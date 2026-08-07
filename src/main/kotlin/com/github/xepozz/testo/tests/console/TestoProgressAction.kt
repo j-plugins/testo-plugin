@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.tests.console
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.TestoIcons
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.process.ProcessListener
@@ -188,14 +189,15 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             val counts = store.counts()
             val finished = counts.values.sum()
             val total = store.totalHint()
+            val assertions = store.assertionCount()
             val done = finishedAt.get() > 0
             val running = form.isRunning && !done
             // A finished tab keeps ticking (the toolbar may still rebuild it), but stops redrawing once settled.
-            val digest = "$finished/$total|$running|$counts|$selected|$done|${exitCode.get()}"
+            val digest = "$finished/$total|$running|$counts|$assertions|$selected|$done|${exitCode.get()}"
             if (!running && digest == painted) return
             painted = digest
 
-            progress.update(finished, total, running, if (done) verdict(counts) else null)
+            progress.update(finished, total, assertions, running, if (done) verdict(counts) else null)
             counters.forEach { it.update(counts[it.status] ?: 0, it.status == selected) }
             elapsed.update(startedAt.get(), finishedAt.get().takeIf { it > 0 } ?: System.currentTimeMillis())
 
@@ -214,7 +216,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         private fun verdict(counts: Map<TestoTestStatus, Int>): Icon {
             val code = exitCode.get()
             val failed = if (code != null) code != 0 else counts.any { (status, n) -> status.isProblem && n > 0 }
-            return if (failed) TestoTestStatus.FAILED.icon else TestoTestStatus.PASSED.icon
+            return if (failed) TestoIcons.Status.FAILURE else TestoIcons.Status.SUCCESS
         }
 
         // The separator fencing the widget off from the buttons on its left.
@@ -260,6 +262,11 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         /** Set by subclasses that are not buttons. */
         protected fun makeInert() {
             cursor = Cursor.getDefaultCursor()
+        }
+
+        /** Swaps the tooltip only on a real change: `setToolTipText` re-registers with the ToolTipManager. */
+        protected fun retip(tip: String) {
+            if (tip != toolTipText) toolTipText = tip
         }
 
         override fun getPreferredSize(): Dimension {
@@ -311,17 +318,22 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         // Reserve the ring's slot even when a verdict icon has taken it, so the row does not shift on the last tick.
         override val leadingWidth: Int get() = maxOf(icon?.iconWidth ?: 0, RING)
 
-        init {
-            toolTipText = TestoBundle.message("testo.progress.reset.tooltip")
-        }
-
         override fun onClick() = toggleFilter(null)
 
-        fun update(finished: Int, total: Int, running: Boolean, verdict: Icon?) {
+        fun update(finished: Int, total: Int, assertions: Int?, running: Boolean, verdict: Icon?) {
             icon = verdict
             indeterminate = total <= 0
             fraction = if (total > 0) (finished.toDouble() / total).coerceIn(0.0, 1.0) else 0.0
-            text = if (total > 0) "$finished/$total" else finished.toString()
+            // Counts go in as strings: MessageFormat would otherwise group a plain Int into "1,234".
+            val done = finished.toString()
+            val all = total.toString()
+            text = if (total > 0) TestoBundle.message("testo.progress.total.fraction", done, all)
+            else TestoBundle.message("testo.progress.total", done)
+            // Assertions have nowhere to go in the row itself, so the hover is where Testo's count surfaces.
+            retip(
+                if (assertions == null) TestoBundle.message("testo.progress.total.tooltip", done, all)
+                else TestoBundle.message("testo.progress.total.tooltip.assertions", done, all, assertions.toString())
+            )
             if (running) spin = (spin + SPIN_STEP) % 360
         }
 
@@ -346,7 +358,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         init {
             icon = status.icon
             isVisible = false
-            toolTipText = TestoBundle.message("testo.progress.filter.tooltip", status.displayName)
+            toolTipText = TestoBundle.message("testo.progress.filter.tooltip", status.label)
         }
 
         override fun onClick() = toggleFilter(status)
@@ -354,7 +366,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         fun update(count: Int, isSelected: Boolean) {
             isVisible = count > 0
             active = isSelected
-            text = count.toString()
+            text = TestoBundle.message("testo.progress.counter", count.toString(), status.label)
         }
     }
 
@@ -389,7 +401,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
         private val SEPARATOR = JBColor.namedColor("Toolbar.separatorColor", JBColor(0xCDCDCD, 0x515151))
         private val RING_TRACK = JBColor.namedColor("ProgressBar.trackColor", JBColor(0xD5D5D5, 0x4E5157))
-        private val RING_PROGRESS = JBColor.namedColor("ProgressBar.progressColor", JBColor(0x1E82E6, 0x3592C4))
+        // Falls back to the JetBrains palette blue when the theme names no progress colour of its own.
+        private val RING_PROGRESS = JBColor.namedColor("ProgressBar.progressColor", JBColor(0x389FD6, 0x3592C4))
 
         internal fun formatElapsed(ms: Long): String = when {
             // Hundredths read as precision up to a minute and as noise past it, where whole seconds are enough.

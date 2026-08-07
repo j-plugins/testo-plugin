@@ -19,6 +19,8 @@ enum class TestoTestStatus(
     val icon: Icon,
     private val labelKey: String,
 ) {
+    // Labels are lower-case nouns: they read as a unit with the number in front of them ("42 flaky") and slot into
+    // the tooltip sentence unchanged ("Click to show only flaky tests").
     PASSED("passed", TestoIcons.Status.PASSED, "testo.status.passed"),
     FAILED("failed", TestoIcons.Status.FAILED, "testo.status.failed"),
     ERROR("error", TestoIcons.Status.ERROR, "testo.status.error"),
@@ -29,7 +31,7 @@ enum class TestoTestStatus(
     ABORTED("aborted", TestoIcons.Status.ABORTED, "testo.status.aborted"),
     ;
 
-    val displayName: String get() = TestoBundle.message(labelKey)
+    val label: String get() = TestoBundle.message(labelKey)
 
     /** A run is red when it holds any of these, mirroring `Status::isFailure()` plus the two abandoned outcomes. */
     val isProblem: Boolean get() = this == FAILED || this == ERROR || this == ABORTED

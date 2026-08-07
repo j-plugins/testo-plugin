@@ -5,7 +5,7 @@ import java.util.EnumMap
 
 /**
  * The Testo status of each test of the current run, as reported in the `status` attribute of its service messages,
- * plus the running tally the toolbar widget shows.
+ * plus the assertion counts and the running tally the toolbar widget shows.
  *
  * Keyed exactly like [ChannelOutputStore] — through [ChannelOutputStore.keyFor], i.e. by the location hint remembered
  * on `testStarted` — so the converter (which writes) and the widget (which reads a tree node) agree on the same test
@@ -20,6 +20,7 @@ class TestoStatusStore(private val channels: ChannelOutputStore) {
     private val lock = Any()
     private val byKey = HashMap<String, TestoTestStatus>()
     private val counts = EnumMap<TestoTestStatus, Int>(TestoTestStatus::class.java)
+    private val assertionsByKey = HashMap<String, Int>()
     private var started = 0
     private var declaredTotal = 0
 
@@ -45,6 +46,19 @@ class TestoStatusStore(private val channels: ChannelOutputStore) {
     fun counts(): Map<TestoTestStatus, Int> = synchronized(lock) { EnumMap(counts) }
 
     fun finishedCount(): Int = synchronized(lock) { counts.values.sum() }
+
+    /**
+     * How many assertions the test ran, off the `assertions` attribute of its `testFinished`. Stored per test rather
+     * than summed on arrival so a re-reported test replaces its own figure instead of doubling the total.
+     */
+    fun noteAssertions(name: String, assertions: Int) {
+        synchronized(lock) { assertionsByKey[channels.keyFor(name)] = assertions }
+    }
+
+    /** Assertions across the whole run, or `null` when this Testo reports none at all. */
+    fun assertionCount(): Int? = synchronized(lock) {
+        if (assertionsByKey.isEmpty()) null else assertionsByKey.values.sum()
+    }
 
     /** One more test has begun; what the progress ring divides by until a better number turns up. */
     fun noteStarted() {
@@ -83,6 +97,7 @@ class TestoStatusStore(private val channels: ChannelOutputStore) {
         synchronized(lock) {
             byKey.clear()
             counts.clear()
+            assertionsByKey.clear()
             started = 0
             declaredTotal = 0
         }

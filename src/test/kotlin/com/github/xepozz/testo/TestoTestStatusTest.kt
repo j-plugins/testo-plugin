@@ -34,10 +34,12 @@ class TestoTestStatusTest {
     }
 
     @Test
-    fun everyStatusHasAnIconAndALabel() {
+    fun everyStatusHasAnIconAndALowerCaseLabel() {
         for (status in TestoTestStatus.entries) {
             assertNotNull("no icon for ${status.wireName}", status.icon)
-            assertTrue("no label for ${status.wireName}", status.displayName.isNotBlank())
+            // "42 flaky" and "Click to show only flaky tests" both read the label as a plain noun.
+            assertEquals("label for ${status.wireName} must be lower-case", status.label.lowercase(), status.label)
+            assertTrue("no label for ${status.wireName}", status.label.isNotBlank())
         }
     }
 
@@ -86,6 +88,20 @@ class TestoTestStatusTest {
     }
 
     @Test
+    fun assertionsAreSummedPerTestAndReplacedOnRestatement() {
+        val store = TestoStatusStore(ChannelOutputStore())
+        assertNull("no assertion attribute seen yet", store.assertionCount())
+
+        store.noteAssertions("a", 3)
+        store.noteAssertions("b", 4)
+        assertEquals(7, store.assertionCount())
+
+        // The same test reporting again replaces its own figure instead of adding to it.
+        store.noteAssertions("a", 5)
+        assertEquals(9, store.assertionCount())
+    }
+
+    @Test
     fun totalFallsBackToStartedTestsUntilTestoAnnouncesOne() {
         val store = TestoStatusStore(ChannelOutputStore())
         assertEquals(0, store.totalHint())
@@ -101,11 +117,21 @@ class TestoTestStatusTest {
     fun clearResetsTheTally() {
         val store = TestoStatusStore(ChannelOutputStore())
         store.note("a", TestoTestStatus.PASSED)
+        store.noteAssertions("a", 2)
         store.clear()
 
         assertEquals(emptyMap<TestoTestStatus, Int>(), store.counts())
         assertEquals(0, store.finishedCount())
         assertEquals(0, store.totalHint())
+        assertNull(store.assertionCount())
+    }
+
+    @Test
+    fun countersReadAsNumberThenStatus() {
+        // The shapes the toolbar renders. Digits stay ungrouped — the counts go into MessageFormat as strings.
+        assertEquals("1234/2000 total", TestoBundle.message("testo.progress.total.fraction", "1234", "2000"))
+        assertEquals("1234 total", TestoBundle.message("testo.progress.total", "1234"))
+        assertEquals("42 flaky", TestoBundle.message("testo.progress.counter", "42", TestoTestStatus.FLAKY.label))
     }
 
     @Test

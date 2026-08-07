@@ -185,7 +185,7 @@ src/main/resources/
 ├── fileTemplates/internal/     # "Testo Test.php.ft" (+ .html description)
 ├── fileTemplates/code/         # "Testo Test Method" template used by TestoTestCreateInfo
 ├── icons/testo, icons/php      # SVG with _dark variants
-├── icons/status                # one per Testo status; 5 shapes, 3 of them reused in a second colour
+├── icons/status                # one per Testo status (5 shapes, 3 reused in a second colour) + success/failure
 ├── liveTemplates/Testo.xml     # `test`, `data`, `bench`
 ├── messages/TestoBundle.properties
 └── testo.dic                   # spellchecker dictionary
@@ -353,10 +353,10 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
    view (All + one tab per channel) in place of the platform console, with syntax highlighting, hyperlinks,
    copy buttons, log-level filtering and per-channel icons/colors.
 
-3. **Toolbar run summary** (`TestoProgressAction`) — a progress ring, the finished/total fraction, a counter per
-   Testo status and the elapsed time, pushed past every other button by `RightAlignedToolbarAction`. Statuses come
-   from the `status` attribute of the service messages (`TestoStatusStore`, keyed like `ChannelOutputStore`); each
-   counter narrows the tree through `SMTestRunnerResultsForm.setFilter`.
+3. **Toolbar run summary** (`TestoProgressAction`) — a progress ring, the finished/total count, a counter per Testo
+   status and the elapsed time, pushed past every other button by `RightAlignedToolbarAction`. Statuses come from the
+   `status` attribute of the service messages and assertion counts from `assertions` (`TestoStatusStore`, keyed like
+   `ChannelOutputStore`); each counter narrows the tree through `SMTestRunnerResultsForm.setFilter`.
 
 4. **Run history** — three cooperating pieces: `TestoChannelHistory` round-trips channel output through
    `SMTestProxy.metainfo` (the only per-test datum the platform's history XML preserves), `TestoHistoryIndex` knows

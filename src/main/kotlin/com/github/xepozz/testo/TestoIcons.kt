@@ -11,9 +11,18 @@ object TestoIcons {
     @JvmField
     val TESTO = IconLoader.getIcon("/icons/testo/icon.svg", this::class.java)
 
-    // One icon per Testo\Core\Value\Status case. Five shapes cover eight statuses: the check, the exclamation and
-    // the crossed-out circle each serve two statuses and are told apart by colour only.
+    // One icon per Testo\Core\Value\Status case, plus the pair the whole run is judged by. Five shapes cover the
+    // eight statuses: the check, the exclamation and the crossed-out circle each serve two and are told apart by
+    // colour only. Colours are the JetBrains palette (red DB5860/C75450, yellow EDA200/F0A732, green 59A869/499C54,
+    // grey 6E6E6E/AFB1B3), baked into the SVGs rather than tinted at runtime.
     object Status {
+        /** Verdict of the whole run — a bare check/cross, so it reads apart from the per-test circles beside it. */
+        @JvmField
+        val SUCCESS = IconLoader.getIcon("/icons/status/success.svg", this::class.java)
+
+        @JvmField
+        val FAILURE = IconLoader.getIcon("/icons/status/failure.svg", this::class.java)
+
         @JvmField
         val PASSED = IconLoader.getIcon("/icons/status/passed.svg", this::class.java)
 

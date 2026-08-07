@@ -100,11 +100,13 @@ class TestoOutputToGeneralEventsConverter(
             }
         }
 
-        // Testo's own verdict, finer than the passed / failed / ignored the platform can express. It rides on
-        // whichever message closes the node, so it is read wherever it turns up rather than pinned to one message
-        // name — and after the branch above, so `testStarted` has already registered the location the key comes from.
+        // Testo's own verdict (`status`, lower-case, on testFinished/testFailed) is finer than the passed / failed /
+        // ignored the platform can express, and `assertions` on testFinished is a number it has nowhere to put at all.
+        // Both are read wherever they turn up rather than pinned to one message name — and after the branch above, so
+        // `testStarted` has already registered the location the key comes from.
         attrs["name"]?.let { name ->
             TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.note(name, it) }
+            attrs["assertions"]?.toIntOrNull()?.let { statusStore.noteAssertions(name, it) }
         }
 
         super.processServiceMessage(message, visitor)
