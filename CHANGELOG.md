@@ -7,8 +7,9 @@
 ### Added
 
 - The test toolbar ends with a run summary: a progress ring that fills as tests finish and turns into a green check
-  or a red cross when the process exits, the finished/total count, one counter per Testo status, and the elapsed
-  time. Each counter names what it counts — `1234/2000 total`, `42 flaky`. Statuses come from the `status` attribute
+  or a red cross when the process exits — grey when the run was stopped before it could reach a verdict of its own,
+  the check or the cross still chosen by whatever its tests managed to report — the finished/total count, one counter
+  per Testo status, and the elapsed time. Each counter names what it counts — `1234/2000 total`, `42 flaky`. Statuses come from the `status` attribute
   of Testo's service messages, so all eight cases of `Testo\Core\Value\Status` — including risky, flaky, cancelled
   and aborted — are told apart; a Testo that sends no such attribute still gets the platform's
   passed / failed / skipped reading.

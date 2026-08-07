@@ -34,6 +34,7 @@ import java.awt.event.MouseEvent
 import java.awt.geom.Arc2D
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.Icon
 import javax.swing.JComponent
@@ -55,6 +56,9 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
     /** Exit code of the run, once it has one — the verdict icon prefers it over what the tree says. */
     private val exitCode = AtomicReference<Int?>(null)
+
+    /** Set when the process is about to be killed rather than left to exit: the user pressed Stop. */
+    private val stopped = AtomicBoolean(false)
 
     // The clock lives in TestoRunTimings rather than being read off SMTestRunnerResultsForm: its getStartTime and
     // getEndTime (and getTotalTestCount, whose job TestoStatusStore.totalHint does) are only public from 2026.2 on,
@@ -104,6 +108,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                     clock.clear()
                     clock.noteStart()
                     exitCode.set(null)
+                    stopped.set(false)
                 }
                 // A narrowed tree must not survive into the next run: its statuses are gone with the store.
                 if (selected != null) ApplicationManager.getApplication().invokeLater { toggleFilter(null) }
@@ -128,6 +133,10 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         // The verdict follows the process, not the tree: a run that dies before reporting anything is still red, and
         // a run killed mid-flight stops the clock even though onTestingFinished never came.
         handler?.addProcessListener(object : ProcessListener {
+            override fun processWillTerminate(event: ProcessEvent, willBeDestroyed: Boolean) {
+                if (willBeDestroyed) stopped.set(true)
+            }
+
             override fun processTerminated(event: ProcessEvent) {
                 exitCode.set(event.exitCode)
                 clock.noteFinish()
@@ -237,12 +246,14 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             val assertions = store.assertionCount()
             val spans = clock.snapshot()
             val running = form.isRunning && !spans.finished
+            val cancelled = wasCancelled(form)
             // A finished tab keeps ticking (the toolbar may still rebuild it), but stops redrawing once settled.
-            val digest = "$finished/$total|$running|$counts|$assertions|$selected|$spans|${exitCode.get()}"
+            val digest =
+                "$finished/$total|$running|$counts|$assertions|$selected|$spans|${exitCode.get()}|$cancelled"
             if (!running && digest == painted) return
             painted = digest
 
-            progress.update(finished, total, assertions, running, if (spans.finished) verdict(counts) else null)
+            progress.update(finished, total, assertions, running, if (spans.finished) verdict(counts, cancelled) else null)
             counters.forEach { it.update(counts[it.status] ?: 0, it.status == selected) }
             elapsed.update(spans)
 
@@ -258,11 +269,31 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             repaint()
         }
 
-        /** The icon that replaces the ring once the run is over. */
-        private fun verdict(counts: Map<TestoTestStatus, Int>): Icon {
-            val code = exitCode.get()
-            val failed = if (code != null) code != 0 else counts.any { (status, n) -> status.isProblem && n > 0 }
-            return if (failed) TestoIcons.Status.FAILURE else TestoIcons.Status.SUCCESS
+        /**
+         * Whether the run was cut short rather than allowed to end.
+         *
+         * Two signals, because neither covers the other. The platform terminates the root node when testing finishes
+         * with the tree still incomplete — a Stop mid-flight, or a process that died with tests open. Pressing Stop
+         * when everything happens to have reported leaves the tree complete, and only the kill flag catches that.
+         */
+        private fun wasCancelled(form: SMTestRunnerResultsForm): Boolean =
+            stopped.get() || runCatching { form.testsRootNode.isInterrupted }.getOrDefault(false)
+
+        /**
+         * The icon that replaces the ring once the run is over: green or red normally, grey when the run was
+         * cancelled — the tests that did report still decide between the check and the cross, the grey only says
+         * the run never got to a verdict of its own.
+         */
+        private fun verdict(counts: Map<TestoTestStatus, Int>, cancelled: Boolean): Icon {
+            val problems = counts.any { (status, n) -> status.isProblem && n > 0 }
+            // A killed process has no exit code worth reading, so a cancelled run is judged only by its tests.
+            val failed = if (cancelled) problems else exitCode.get()?.let { it != 0 } ?: problems
+            return when {
+                cancelled && failed -> TestoIcons.Status.FAILURE_CANCELLED
+                cancelled -> TestoIcons.Status.SUCCESS_CANCELLED
+                failed -> TestoIcons.Status.FAILURE
+                else -> TestoIcons.Status.SUCCESS
+            }
         }
 
         // The separator fencing the widget off from the buttons on its left.

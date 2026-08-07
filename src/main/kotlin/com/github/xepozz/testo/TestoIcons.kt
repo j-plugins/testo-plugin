@@ -23,6 +23,14 @@ object TestoIcons {
         @JvmField
         val FAILURE = IconLoader.getIcon("/icons/status/failure.svg", this::class.java)
 
+        // Grey pair for a run that was stopped before it could finish: the verdict is only about the tests that got
+        // to report, so it says the same thing in a colour that does not claim the run reached one.
+        @JvmField
+        val SUCCESS_CANCELLED = IconLoader.getIcon("/icons/status/successCancelled.svg", this::class.java)
+
+        @JvmField
+        val FAILURE_CANCELLED = IconLoader.getIcon("/icons/status/failureCancelled.svg", this::class.java)
+
         @JvmField
         val PASSED = IconLoader.getIcon("/icons/status/passed.svg", this::class.java)
 
