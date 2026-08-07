@@ -1,19 +1,44 @@
 package com.github.xepozz.testo.tests.console
 
+import com.github.xepozz.testo.TestoBundle
 import com.intellij.execution.testframework.TestConsoleProperties
 import com.intellij.execution.testframework.sm.runner.OutputToGeneralTestEventsConverter
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
+import com.intellij.openapi.util.Key
 import jetbrains.buildServer.messages.serviceMessages.ServiceMessage
 import jetbrains.buildServer.messages.serviceMessages.ServiceMessageVisitor
 
 class TestoOutputToGeneralEventsConverter(
     testFrameworkName: String,
-    consoleProperties: TestConsoleProperties,
+    private val consoleProperties: TestConsoleProperties,
     private val store: ChannelOutputStore,
     private val levelFilter: LogLevelFilter,
 ) : OutputToGeneralTestEventsConverter(testFrameworkName, consoleProperties) {
 
+    /** Version off the banner, kept only to name it in the too-old notification. */
+    private var runnerVersion: String? = null
+
+    /** Set once a message arrives without a `nodeId`: from then on nothing is handed to the platform convertor. */
+    private var legacyRunner = false
+
+    override fun process(text: String, outputType: Key<*>) {
+        if (runnerVersion == null) runnerVersion = TestoProtocolGate.parseVersion(text)
+        super.process(text, outputType)
+    }
+
     override fun processServiceMessage(message: ServiceMessage, visitor: ServiceMessageVisitor) {
         val attrs = message.attributes
+
+        // A Testo older than the id-based protocol sends every node message without a nodeId, and the platform
+        // convertor answers each one with a logged error — a run turns into hundreds of IDE internal errors. Say once
+        // what is wrong and stop feeding it: an empty tree beside a clear notification beats that.
+        if (legacyRunner) return
+        if (TestoProtocolGate.isLegacyMessage(message.messageName, attrs)) {
+            legacyRunner = true
+            notifyRunnerTooOld()
+            return
+        }
 
         when (message.messageName) {
             TEST_STARTED -> {
@@ -75,6 +100,18 @@ class TestoOutputToGeneralEventsConverter(
     }
 
     private fun keyFor(name: String?): String? = name?.let { store.keyFor(it) }
+
+    private fun notifyRunnerTooOld() {
+        val version = runnerVersion
+        val content = when (version) {
+            null -> TestoBundle.message("notification.runner.too.old.unknown", TestoProtocolGate.MINIMUM_VERSION)
+            else -> TestoBundle.message("notification.runner.too.old", version, TestoProtocolGate.MINIMUM_VERSION)
+        }
+
+        NotificationGroupManager.getInstance().getNotificationGroup("Testo")
+            ?.createNotification(TestoBundle.message("notification.runner.too.old.title"), content, NotificationType.WARNING)
+            ?.notify(consoleProperties.project)
+    }
 
     companion object {
         private const val TEST_STARTED = "testStarted"
