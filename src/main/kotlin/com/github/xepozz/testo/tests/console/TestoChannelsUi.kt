@@ -840,10 +840,14 @@ object TestoChannelsUi {
                 return layered
             }
 
-            // For a type whose own editor ships a preview (Markdown), embed that real editor — source + rendered
+            // For a type whose own editor ships a preview (Markdown, HTML), embed that real editor — source + rendered
             // preview with the platform's layout toggle — instead of a plain source viewer. Returns null for types
             // without such an editor (the caller then uses the source viewer).
             private fun previewCard(fileType: FileType, text: String): JComponent? {
+                // HTML channels: render via JCEF browser if available, giving a true rendered preview.
+                if (fileType.name.equals("HTML", ignoreCase = true)) {
+                    return htmlPreviewCard(text)
+                }
                 // Gate cheaply by type so we never build a heavy editor just to learn the type has no preview, then
                 // confirm by contract (the editor must actually be a TextEditorWithPreview) rather than provider FQN.
                 if (!fileType.name.equals("Markdown", ignoreCase = true)) return null
@@ -875,6 +879,29 @@ object TestoChannelsUi {
                         override fun getPreferredSize(): Dimension =
                             Dimension(super.getPreferredSize().width, JBUI.scale(260))
                     }
+                }
+            }
+
+            // Renders HTML content in a Swing JEditorPane. Supports basic HTML/CSS rendering without requiring JCEF.
+            private fun htmlPreviewCard(html: String): JComponent {
+                val pane = javax.swing.JEditorPane().apply {
+                    contentType = "text/html"
+                    text = html
+                    isEditable = false
+                    isOpaque = false
+                    border = JBUI.Borders.empty(4)
+                    // Use the IDE's default font for a consistent look.
+                    putClientProperty(javax.swing.JEditorPane.HONOR_DISPLAY_PROPERTIES, true)
+                    font = UIUtil.getLabelFont()
+                }
+                return object : JBPanel<Nothing>(BorderLayout()) {
+                    init {
+                        isOpaque = false
+                        add(JBScrollPane(pane).apply { border = JBUI.Borders.empty() }, BorderLayout.CENTER)
+                    }
+
+                    override fun getPreferredSize(): Dimension =
+                        Dimension(super.getPreferredSize().width, JBUI.scale(300))
                 }
             }
 
