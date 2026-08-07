@@ -125,8 +125,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction {
             if (s.failed > 0) parts += "🔴 ${s.failed}"
             if (s.ignored > 0) parts += "🟡 ${s.ignored}"
             if (s.running > 0) parts += "⏳ ${s.running}"
-            val fraction = "${s.passed + s.failed + s.ignored}/${s.total}"
-            label.text = "${parts.joinToString("  ")}  ($fraction)"
+            label.text = parts.joinToString("  ")
         }
     }
 }
