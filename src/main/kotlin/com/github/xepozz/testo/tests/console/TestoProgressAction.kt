@@ -34,7 +34,6 @@ import java.awt.event.MouseEvent
 import java.awt.geom.Arc2D
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.Icon
 import javax.swing.JComponent
@@ -56,9 +55,6 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
     /** Exit code of the run, once it has one — the verdict icon prefers it over what the tree says. */
     private val exitCode = AtomicReference<Int?>(null)
-
-    /** Set when the process is about to be killed rather than left to exit: the user pressed Stop. */
-    private val stopped = AtomicBoolean(false)
 
     // The clock lives in TestoRunTimings rather than being read off SMTestRunnerResultsForm: its getStartTime and
     // getEndTime (and getTotalTestCount, whose job TestoStatusStore.totalHint does) are only public from 2026.2 on,
@@ -108,7 +104,6 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                     clock.clear()
                     clock.noteStart()
                     exitCode.set(null)
-                    stopped.set(false)
                 }
                 // A narrowed tree must not survive into the next run: its statuses are gone with the store.
                 if (selected != null) ApplicationManager.getApplication().invokeLater { toggleFilter(null) }
@@ -133,10 +128,6 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         // The verdict follows the process, not the tree: a run that dies before reporting anything is still red, and
         // a run killed mid-flight stops the clock even though onTestingFinished never came.
         handler?.addProcessListener(object : ProcessListener {
-            override fun processWillTerminate(event: ProcessEvent, willBeDestroyed: Boolean) {
-                if (willBeDestroyed) stopped.set(true)
-            }
-
             override fun processTerminated(event: ProcessEvent) {
                 exitCode.set(event.exitCode)
                 clock.noteFinish()
@@ -270,14 +261,16 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         }
 
         /**
-         * Whether the run was cut short rather than allowed to end.
+         * Whether the run was cut short rather than allowed to end: the platform terminates the root node when
+         * testing finishes while the tree is still incomplete — a Stop mid-flight, or a process that died with tests
+         * open. Anything that ran to the end leaves the root finished instead.
          *
-         * Two signals, because neither covers the other. The platform terminates the root node when testing finishes
-         * with the tree still incomplete — a Stop mid-flight, or a process that died with tests open. Pressing Stop
-         * when everything happens to have reported leaves the tree complete, and only the kill flag catches that.
+         * Do not reach for `ProcessListener.processWillTerminate`'s `willBeDestroyed` here. It reads like "the
+         * process is being killed", but `ProcessHandler.notifyProcessTerminated` passes a hard-coded `true`, so it
+         * arrives set on every termination including an ordinary exit — which greyed out the verdict of every run.
          */
         private fun wasCancelled(form: SMTestRunnerResultsForm): Boolean =
-            stopped.get() || runCatching { form.testsRootNode.isInterrupted }.getOrDefault(false)
+            runCatching { form.testsRootNode.isInterrupted }.getOrDefault(false)
 
         /**
          * The icon that replaces the ring once the run is over: green or red normally, grey when the run was
