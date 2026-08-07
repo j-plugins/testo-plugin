@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- A Testo older than 0.10.39 no longer floods the IDE with internal errors. Such a build sends its service messages
+  without the node ids the test tree is built from, and every one of them was answered with a logged error; the run
+  now stops at the first such message and says what to update instead.
+
 ## [2026.3.1] - 2026-08-04
 
 ### Added

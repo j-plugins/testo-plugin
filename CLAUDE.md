@@ -134,6 +134,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │
 │   ├── console/                    # the channel console subsystem (largest area)
 │   │   ├── TestoOutputToGeneralEventsConverter.kt  # reads channel/level/icon/color off SM messages
+│   │   ├── TestoProtocolGate.kt    # nodeId-less messages ⇒ pre-0.10.39 Testo; banner → version
 │   │   ├── ChannelOutputStore.kt   # per-test live buffers: all / output / per-channel
 │   │   ├── ChannelIcons.kt         # channel name or icon= hint → platform icon
 │   │   ├── LogLevelFilter.kt       # persisted display-time log-level filter
@@ -378,6 +379,11 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `GeneralIdBasedToSMTRunnerEventsConvertor` and the tree comes from Testo's `nodeId`/`parentNodeId`. Testo runs
   tests concurrently (fibers/event loop), so message *order* cannot be trusted — the name-based convertor nested a
   second `#[DataSet]` batch inside the first and never closed nodes.
+- **That protocol starts at Testo 0.10.39** (`Teamcity\Formatter::placement()`). Older builds send the same messages
+  without ids, and the id-based convertor logs an error per message — a run became hundreds of IDE internal errors.
+  `TestoProtocolGate` detects it off the missing `nodeId` (not off a version comparison, so forks and nightlies are
+  covered), and the converter then stops forwarding messages and notifies once. The version in that notification is
+  scraped from Testo's banner line, which survives `-q`.
 - **Channel storage keys go through `ChannelOutputStore.keyFor(name)`** (the `locationHint` remembered on
   `testStarted`, falling back to the name). Deriving keys from `SMTestProxy.locationUrl` breaks, because the
   platform resolves that lazily.
