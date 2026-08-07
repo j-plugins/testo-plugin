@@ -33,7 +33,6 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.geom.Arc2D
 import java.util.Locale
-import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicReference
 import javax.swing.Icon
 import javax.swing.JComponent
@@ -61,9 +60,6 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
     // this plugin still ships a 252 build — and the form knows nothing of the phases the hover breaks the run into.
     private var timings: TestoRunTimings? = null
 
-    /** Every component the toolbar has built for this action: a toolbar rebuild leaves the previous one behind. */
-    private val panels = CopyOnWriteArrayList<ProgressPanel>()
-
     private var resultsForm: SMTestRunnerResultsForm? = null
     private var statusStore: TestoStatusStore? = null
 
@@ -78,8 +74,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         e.presentation.isEnabledAndVisible = true
     }
 
-    override fun createCustomComponent(presentation: Presentation, place: String): JComponent =
-        ProgressPanel().also { panels += it }
+    override fun createCustomComponent(presentation: Presentation, place: String): JComponent = ProgressPanel()
 
     fun attachTo(
         console: SMTRunnerConsoleView,
@@ -118,8 +113,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             ) = Unit
 
             override fun onTestingFinished(viewer: TestResultsViewer) {
-                // The only safe moment to read the tree: nothing appends to it any more. It is also the only source of
-                // numbers for an imported history run, whose replay never passes through our converter.
+                // The only safe moment to read the tree: nothing appends to it any more. This replaces the streamed
+                // estimate with what the tree actually holds, including the tests a Stop left unfinished.
                 runCatching { store.recountFrom(viewer.testsRootNode) }
                 clock.noteFinish()
             }
@@ -218,7 +213,6 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
         override fun removeNotify() {
             timer.stop()
-            panels.remove(this)
             super.removeNotify()
         }
 
