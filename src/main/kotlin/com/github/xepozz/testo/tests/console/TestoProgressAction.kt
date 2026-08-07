@@ -35,7 +35,6 @@ import java.awt.geom.Arc2D
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicReference
-import javax.swing.BoxLayout
 import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -168,12 +167,48 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
         init {
             isOpaque = false
-            layout = BoxLayout(this, BoxLayout.X_AXIS)
+            // Laid out by hand. A LayoutManager caches its size requirements until something invalidates it, and the
+            // cache is exactly what this panel cannot have: the row is re-measured on a timer, and asking a stale
+            // cache whether the width changed answers "no" forever — the counters then stay at the width they had
+            // when the first test finished and clip everything that grows past it.
+            layout = null
             border = JBUI.Borders.empty(0, 10, 0, 6)
             add(progress)
             counters.forEach { add(it) }
             add(elapsed)
             isVisible = false
+        }
+
+        /** Summed straight off the children, every time — see the note on [layout]. */
+        override fun getPreferredSize(): Dimension {
+            val insets = insets
+            var width = insets.left + insets.right
+            var height = 0
+            for (child in components) {
+                if (!child.isVisible) continue
+                val size = child.preferredSize
+                width += size.width
+                height = maxOf(height, size.height)
+            }
+            return Dimension(width, height + insets.top + insets.bottom)
+        }
+
+        // The row is a fixed set of labels: there is nothing to give up when space runs short, and nothing to do
+        // with more of it.
+        override fun getMinimumSize(): Dimension = preferredSize
+        override fun getMaximumSize(): Dimension = preferredSize
+
+        override fun doLayout() {
+            var x = insets.left
+            for (child in components) {
+                if (!child.isVisible) {
+                    child.setBounds(x, 0, 0, 0)
+                    continue
+                }
+                val size = child.preferredSize
+                child.setBounds(x, (height - size.height) / 2, size.width, size.height)
+                x += size.width
+            }
         }
 
         override fun addNotify() {
@@ -213,7 +248,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
             // Nothing reported and nothing running: give the width back to the buttons on the left.
             isVisible = running || finished > 0 || spans.finished
-            // Only a width change concerns the toolbar; the ring animating in place does not.
+            // Only a width change concerns the toolbar; the ring animating in place does not. The comparison is
+            // against a freshly summed preferred size, so a counter growing a digit really does reach the toolbar.
             val width = preferredSize.width
             if (width != laidOutWidth) {
                 laidOutWidth = width
@@ -419,9 +455,11 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             append("</table></html>")
         }
 
+        // <nobr> on both cells: the tooltip is laid out at whatever width Swing's HTML view first settles on, and
+        // without it "Before the first test" and "12.34 sec" each break across lines and the columns stop lining up.
         private fun StringBuilder.row(labelKey: String, value: String) {
-            append("<tr><td>").append(TestoBundle.message(labelKey)).append("&nbsp;&nbsp;</td>")
-            append("<td align='right'>").append(value).append("</td></tr>")
+            append("<tr><td><nobr>").append(TestoBundle.message(labelKey)).append("&nbsp;&nbsp;&nbsp;</nobr></td>")
+            append("<td align='right'><nobr>").append(value).append("</nobr></td></tr>")
         }
     }
 
