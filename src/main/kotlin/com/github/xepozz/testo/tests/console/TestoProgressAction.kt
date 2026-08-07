@@ -73,15 +73,16 @@ class TestoProgressAction : AnAction(), CustomComponentAction {
 
     private fun recount(viewer: TestResultsViewer) {
         val root = viewer.testsRootNode
-        val leaves = root.allTests.filter { it !== root && it.isLeaf }
+        val leaves = root.allTests.filter { it !== root && !it.isSuite }
         var passed = 0; var failed = 0; var ignored = 0; var running = 0; var total = 0
         for (leaf in leaves) {
             total++
             when {
-                leaf.isPassed -> passed++
                 leaf.isDefect -> failed++
                 leaf.isIgnored -> ignored++
                 leaf.isInProgress -> running++
+                leaf.isPassed -> passed++
+                else -> passed++ // finished without explicit status
             }
         }
         state.set(ProgressState(passed, failed, ignored, running, total))
