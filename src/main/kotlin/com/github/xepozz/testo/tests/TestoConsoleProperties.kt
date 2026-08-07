@@ -4,6 +4,7 @@ import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.tests.console.ChannelOutputStore
 import com.github.xepozz.testo.tests.console.LogLevelFilter
 import com.github.xepozz.testo.tests.console.TestoOutputToGeneralEventsConverter
+import com.github.xepozz.testo.tests.console.TestoProgressAction
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.Executor
 import com.intellij.execution.Location
@@ -31,6 +32,8 @@ class TestoConsoleProperties(
     val channelStore = ChannelOutputStore()
 
     val levelFilter = LogLevelFilter()
+
+    val progressAction = TestoProgressAction()
 
     // Guards the channel-tab install: set once whoever wires the tabs first (the run-path ExecutionListener or the
     // debug runner, which installs them directly), so the other side is a no-op instead of a double install.
@@ -70,6 +73,8 @@ class TestoConsoleProperties(
     public override fun createImportActions(): Array<com.intellij.openapi.actionSystem.AnAction> =
         arrayOf(
             com.github.xepozz.testo.tests.console.TestoLogLevelFilterAction(levelFilter),
+            com.intellij.openapi.actionSystem.Separator.getInstance(),
+            progressAction,
             *(super.createImportActions() ?: emptyArray()),
         )
 }

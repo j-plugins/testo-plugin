@@ -88,6 +88,28 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             TestoChannelsUi.install(console, props.channelStore, props.levelFilter, project, console)
             // Persist each test's channel output into proxy metainfo so an imported-history run can rebuild the tabs.
             TestoChannelHistory.subscribeMetainfoWriter(project, console, props.channelStore)
+            // Wire the compact progress widget and hide the platform's horizontal progress bar.
+            props.progressAction.attachTo(console)
+            props.progressAction.installClickFilters(console)
+            hideStatusLine(console)
+        }
+
+        // The platform's TestStatusLine (the horizontal red/green progress bar with "N tests passed") lives in
+        // TestResultsPanel.myStatusLine. Hide it so the channel tabs can take its space, and the compact progress
+        // widget in the toolbar replaces its function.
+        private fun hideStatusLine(console: SMTRunnerConsoleView) {
+            runCatching {
+                val field = Class.forName("com.intellij.execution.testframework.ui.TestResultsPanel")
+                    .getDeclaredField("myStatusLine")
+                    .apply { isAccessible = true }
+                val statusLine = field.get(console.resultsViewer) as? javax.swing.JComponent ?: return
+                // Hide the status line and its SameHeightPanel wrapper so the space is reclaimed.
+                statusLine.isVisible = false
+                statusLine.parent?.let { wrapper ->
+                    wrapper.isVisible = false
+                    wrapper.parent?.revalidate()
+                }
+            }
         }
 
         // Stored on the channel store rather than printed: SM rewrites the platform console per test selection,
