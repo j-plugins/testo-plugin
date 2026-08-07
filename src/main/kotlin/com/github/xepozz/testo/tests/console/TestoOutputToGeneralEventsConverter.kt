@@ -24,6 +24,9 @@ class TestoOutputToGeneralEventsConverter(
     /** Set once a message arrives without a `nodeId`: from then on nothing is handed to the platform convertor. */
     private var legacyRunner = false
 
+    /** Build problems already surfaced this run, keyed the way TeamCity means them to be deduplicated. */
+    private val reportedProblems = HashSet<String>()
+
     override fun process(text: String, outputType: Key<*>) {
         if (runnerVersion == null) runnerVersion = TestoProtocolGate.parseVersion(text)
         super.process(text, outputType)
@@ -89,17 +92,7 @@ class TestoOutputToGeneralEventsConverter(
                 }
             }
 
-            BUILD_PROBLEM -> {
-                val description = attrs["description"].orEmpty()
-                val identity = attrs["identity"].orEmpty()
-                val text = buildString {
-                    append("\n⚠ Build problem")
-                    if (identity.isNotBlank()) append(" [").append(identity).append("]")
-                    append(": ").append(description).append("\n")
-                }
-                store.appendAll("", text, "stderr")
-                store.appendOutput("", text, "stderr")
-            }
+            BUILD_PROBLEM -> reportBuildProblem(attrs["description"].orEmpty(), attrs["identity"].orEmpty())
         }
 
         // Testo's own verdict (`status`, lower-case, on testFinished/testFailed) is finer than the passed / failed /
@@ -137,6 +130,39 @@ class TestoOutputToGeneralEventsConverter(
     }
 
     private fun keyFor(name: String?): String? = name?.let { store.keyFor(it) }
+
+    /**
+     * A problem Testo raises about the run as a whole — an empty run, a bootstrap that failed — rather than about any
+     * one test.
+     *
+     * It goes two places, because neither alone is enough. The console line puts it where the run's output is read,
+     * as a run-level notice rather than under a test: it belongs to none, and the key it used to be filed under
+     * ("") is one no view ever looks up, so it was written and never shown. The notification is what makes it
+     * noticeable at all when the tree is empty and there is nothing to click.
+     *
+     * Reported once per problem. TeamCity's `identity` exists precisely to deduplicate a problem raised more than
+     * once; a Testo that sends none falls back to the text.
+     */
+    private fun reportBuildProblem(description: String, identity: String) {
+        val text = description.ifBlank { identity }
+        if (text.isBlank()) return
+        if (!reportedProblems.add(identity.ifBlank { description })) return
+
+        store.appendNotice(
+            ChannelOutputStore.Chunk(
+                buildString {
+                    append("\n⚠ Build problem")
+                    if (identity.isNotBlank()) append(" [").append(identity).append("]")
+                    append(": ").append(description).append("\n")
+                },
+                "stderr",
+            )
+        )
+
+        NotificationGroupManager.getInstance().getNotificationGroup("Testo")
+            ?.createNotification(TestoBundle.message("notification.build.problem.title"), text, NotificationType.ERROR)
+            ?.notify(consoleProperties.project)
+    }
 
     private fun notifyRunnerTooOld() {
         val version = runnerVersion
