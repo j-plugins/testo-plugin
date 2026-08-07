@@ -208,7 +208,7 @@ object TestoChannelsUi {
                 val allCards = newCards(null)
                 store.header().forEach { allCards.add(it) }
                 addCardsAggregate(allCards, viewer, leaves) { key, sink -> store.attachAll(key, sink) }
-                addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
+                val allTab = addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
 
                 addAggregateTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, viewer, leaves, attach = store::attachOutput)
 
@@ -226,6 +226,7 @@ object TestoChannelsUi {
                         cards.component
                     }
                 }
+                tabbed.select(allTab, false)
                 return
             }
 
@@ -237,7 +238,8 @@ object TestoChannelsUi {
                 val allCards = newCards(null)
                 header.forEach { allCards.add(it) }
                 if (key != null) subscriptions += store.attachAll(key) { allCards.add(it) }
-                addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
+                val allTab = addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
+                tabbed.select(allTab, false)
             }
             addComponentTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, platform)
             if (key != null) {
@@ -289,8 +291,10 @@ object TestoChannelsUi {
             if (view != null) addComponentTab(tabbed, title, icon, view.component)
         }
 
-        private fun addComponentTab(tabbed: JBEditorTabs, title: String, icon: Icon, component: JComponent) {
-            tabbed.addTab(TabInfo(component).setText(title).setIcon(icon))
+        private fun addComponentTab(tabbed: JBEditorTabs, title: String, icon: Icon, component: JComponent): TabInfo {
+            val info = TabInfo(component).setText(title).setIcon(icon)
+            tabbed.addTab(info)
+            return info
         }
 
         // Each card is a full editor, so building every channel tab up front (10+ tabs × up to MAX_CARDS editors) froze
