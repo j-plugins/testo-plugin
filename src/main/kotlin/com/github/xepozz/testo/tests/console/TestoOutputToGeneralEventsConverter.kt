@@ -93,7 +93,13 @@ class TestoOutputToGeneralEventsConverter(
                 }
             }
 
-            BUILD_PROBLEM -> reportBuildProblem(attrs["description"].orEmpty(), attrs["identity"].orEmpty())
+            BUILD_PROBLEM -> {
+                reportBuildProblem(attrs["description"].orEmpty(), attrs["identity"].orEmpty())
+                // Not forwarded. The SM runner's visitor knows a fixed list of message names and sends everything
+                // else to handleUnexpectedServiceMessage, which logs a problem and echoes the raw
+                // `##teamcity[buildProblem …]` line into the console — right under the readable one we just wrote.
+                return
+            }
         }
 
         // Testo's own verdict (`status`, lower-case, on testFinished/testFailed) is finer than the passed / failed /
@@ -136,9 +142,9 @@ class TestoOutputToGeneralEventsConverter(
      * A problem Testo raises about the run as a whole — an empty run, a bootstrap that failed — rather than about any
      * one test.
      *
-     * The raw `##teamcity[buildProblem …]` line never reaches the console on its own: the platform prints a line only
-     * when it fails to parse as a service message, and this one parses. So all three surfaces below are ours to
-     * write, and the problem needs all three, because which of them the user is looking at depends on the run:
+     * The message is consumed here rather than forwarded, so the raw line stays out of the console (see the branch
+     * that calls this). What the user sees instead is written to all three surfaces below, because which of them
+     * they are looking at depends on the run:
      *
      *  - **Output** gets it as uncaptured stderr, which is the only way in when the tree is empty. That is exactly
      *    the `testo.noTests` case: nothing to select, so the channel tabs never build and Output is the platform's
