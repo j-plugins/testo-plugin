@@ -29,7 +29,6 @@
 - A node of the results tree can be announced with `testSuite` and `testType`, and rerunning it from the tree keeps
   them: `--suite` and `--type` are added to the command the way the node itself was narrowed. Optional, so a Testo
   that sends neither runs exactly as before.
-- A test's `metainfo` — its PHPDoc summary — shows as the tooltip of its node in the results tree.
 
 ### Fixed
 

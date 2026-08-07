@@ -8,7 +8,6 @@ import com.github.xepozz.testo.tests.console.TestoProgressAction
 import com.github.xepozz.testo.tests.console.TestoRunTimings
 import com.github.xepozz.testo.tests.console.TestoStatusStore
 import com.github.xepozz.testo.tests.console.TestoTargetStore
-import com.github.xepozz.testo.tests.console.TestoTestTreeView
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.Executor
 import com.intellij.execution.Location
@@ -17,7 +16,6 @@ import com.intellij.execution.testframework.sm.SMCustomMessagesParsing
 import com.intellij.execution.testframework.sm.runner.OutputToGeneralTestEventsConverter
 import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
-import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerTestTreeViewProvider
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.pom.Navigatable
@@ -31,7 +29,7 @@ class TestoConsoleProperties(
     executor: Executor,
     val pathMapper: PhpPathMapper,
 ) : SMTRunnerConsoleProperties(config, TestoBundle.message("testo.local.run.display.name"), executor),
-    SMCustomMessagesParsing, SMTRunnerTestTreeViewProvider {
+    SMCustomMessagesParsing {
     val myTestLocator = TestoTestLocator(pathMapper)
 
     val channelStore = ChannelOutputStore()
@@ -63,10 +61,6 @@ class TestoConsoleProperties(
             runTimings,
             targetStore,
         )
-
-    // The `metainfo` of a test — its PHPDoc summary — as the tooltip of its node.
-    override fun createSMTRunnerTestTreeView() =
-        TestoTestTreeView { name -> channelStore.description(channelStore.keyFor(name)) }
 
     override fun getTestStackTraceParser(url: String, proxy: SMTestProxy, project: Project) =
         TestoStackTraceParser.parse(url, proxy.stacktrace, proxy.errorMessage, testLocator, project)
