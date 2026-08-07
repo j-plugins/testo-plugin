@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [2026.3.262] - 2026-08-07
+
 ### Fixed
 
 - A Testo older than 0.10.39 no longer floods the IDE with internal errors. Such a build sends its service messages
@@ -33,5 +35,6 @@
 - Concurrent tests no longer nest inside one another in the test tree: the tree is built from the `nodeId`/`parentNodeId`
   Testo reports rather than from the order messages arrive in.
 
-[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.3.1...HEAD
+[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.3.262...HEAD
+[2026.3.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.3.1...v2026.3.262
 [2026.3.1]: https://github.com/j-plugins/testo-plugin/commits/v2026.3.1
