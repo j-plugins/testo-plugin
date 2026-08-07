@@ -88,8 +88,7 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             TestoChannelsUi.install(console, props.channelStore, props.levelFilter, project, console)
             // Persist each test's channel output into proxy metainfo so an imported-history run can rebuild the tabs.
             TestoChannelHistory.subscribeMetainfoWriter(project, console, props.channelStore)
-            props.progressAction.attachTo(console)
-            props.progressAction.installClickFilters(console)
+            props.progressAction.attachTo(console, props.statusStore, handler)
             hideStatusLine(console)
         }
 

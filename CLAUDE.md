@@ -144,6 +144,9 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoChannelHistory.kt  # channel output ⇄ SMTestProxy.metainfo (survives history export)
 │   │   ├── TestoHistoryImport.kt   # "Show history": import a saved run onto our own console properties
 │   │   ├── TestoHistoryIndex.kt    # which locationUrls exist in saved history XMLs (+ lens refresh)
+│   │   ├── TestoTestStatus.kt      # the 8 cases of Testo\Core\Value\Status: wire name, icon, label
+│   │   ├── TestoStatusStore.kt     # per-test status + the tally the toolbar summary renders
+│   │   ├── TestoProgressAction.kt  # right-aligned toolbar summary: ring, fraction, status counters, elapsed
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
 │   │
@@ -182,6 +185,7 @@ src/main/resources/
 ├── fileTemplates/internal/     # "Testo Test.php.ft" (+ .html description)
 ├── fileTemplates/code/         # "Testo Test Method" template used by TestoTestCreateInfo
 ├── icons/testo, icons/php      # SVG with _dark variants
+├── icons/status                # one per Testo status; 5 shapes, 3 of them reused in a second colour
 ├── liveTemplates/Testo.xml     # `test`, `data`, `bench`
 ├── messages/TestoBundle.properties
 └── testo.dic                   # spellchecker dictionary
@@ -349,26 +353,31 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
    view (All + one tab per channel) in place of the platform console, with syntax highlighting, hyperlinks,
    copy buttons, log-level filtering and per-channel icons/colors.
 
-3. **Run history** — three cooperating pieces: `TestoChannelHistory` round-trips channel output through
+3. **Toolbar run summary** (`TestoProgressAction`) — a progress ring, the finished/total fraction, a counter per
+   Testo status and the elapsed time, pushed past every other button by `RightAlignedToolbarAction`. Statuses come
+   from the `status` attribute of the service messages (`TestoStatusStore`, keyed like `ChannelOutputStore`); each
+   counter narrows the tree through `SMTestRunnerResultsForm.setFilter`.
+
+4. **Run history** — three cooperating pieces: `TestoChannelHistory` round-trips channel output through
    `SMTestProxy.metainfo` (the only per-test datum the platform's history XML preserves), `TestoHistoryIndex` knows
    which tests appear in saved history files, and `TestoHistoryCodeVisionProvider` shows a clickable
    *Show history* lens that imports the newest run containing that specific test and selects its node.
 
-4. **Rerun toolbar** — two user-selectable styles (`Tools | Testo`): `MIRROR_AWARE` (three executor-pinned buttons
+5. **Rerun toolbar** — two user-selectable styles (`Tools | Testo`): `MIRROR_AWARE` (three executor-pinned buttons
    that hide whichever duplicates the platform Rerun) and `SPLIT_BUTTON` (default; one split button, platform Rerun
    steps aside). `TestoRerunFailedTestsAction` rebuilds a failed-only run as an explicit list of `--filter`s.
 
-5. **Line markers** (`TestoTestRunLineMarkerProvider`) — gutter run icons on test methods/functions/classes,
+6. **Line markers** (`TestoTestRunLineMarkerProvider`) — gutter run icons on test methods/functions/classes,
    runnable attributes, config files, and each `yield`/`return` inside a data provider.
 
-6. **Data provider index** (`index/`) — file-based index keyed by provider name, resolving both
+7. **Data provider index** (`index/`) — file-based index keyed by provider name, resolving both
    `#[DataProvider('name')]` and `#[DataProvider([Class::class, 'name'])]` (incl. `self::`/`static::`).
    Scoped to the project *test* scope on lookup.
 
-7. **Code generation** — file template + `TestoTestCreateInfo` for *Create New Test*, `Generate | Test Method`,
+8. **Code generation** — file template + `TestoTestCreateInfo` for *Create New Test*, `Generate | Test Method`,
    and live templates `test` / `data` / `bench`.
 
-8. **Navigation & output cleanup** — `TestoTestLocator` (click a node → source), `TestoStackTraceParser`
+9. **Navigation & output cleanup** — `TestoTestLocator` (click a node → source), `TestoStackTraceParser`
    (failed line + text), two console foldings, and `PhpBacktraceFileFilter` for hyperlinks in raw output.
 
 ## Implementation notes & gotchas

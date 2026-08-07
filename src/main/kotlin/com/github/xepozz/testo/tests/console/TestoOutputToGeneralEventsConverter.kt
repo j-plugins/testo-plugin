@@ -14,6 +14,7 @@ class TestoOutputToGeneralEventsConverter(
     private val consoleProperties: TestConsoleProperties,
     private val store: ChannelOutputStore,
     private val levelFilter: LogLevelFilter,
+    private val statusStore: TestoStatusStore,
 ) : OutputToGeneralTestEventsConverter(testFrameworkName, consoleProperties) {
 
     /** Version off the banner, kept only to name it in the too-old notification. */
@@ -41,7 +42,10 @@ class TestoOutputToGeneralEventsConverter(
         }
 
         when (message.messageName) {
+            TEST_COUNT -> attrs["count"]?.toIntOrNull()?.let { statusStore.noteDeclaredTotal(it) }
+
             TEST_STARTED -> {
+                statusStore.noteStarted()
                 val name = attrs["name"]
                 val location = attrs["locationHint"]
                 if (name != null && location != null) store.rememberLocation(name, location)
@@ -96,6 +100,13 @@ class TestoOutputToGeneralEventsConverter(
             }
         }
 
+        // Testo's own verdict, finer than the passed / failed / ignored the platform can express. It rides on
+        // whichever message closes the node, so it is read wherever it turns up rather than pinned to one message
+        // name — and after the branch above, so `testStarted` has already registered the location the key comes from.
+        attrs["name"]?.let { name ->
+            TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.note(name, it) }
+        }
+
         super.processServiceMessage(message, visitor)
     }
 
@@ -114,6 +125,7 @@ class TestoOutputToGeneralEventsConverter(
     }
 
     companion object {
+        private const val TEST_COUNT = "testCount"
         private const val TEST_STARTED = "testStarted"
         private const val TEST_STD_OUT = "testStdOut"
         private const val TEST_STD_ERR = "testStdErr"

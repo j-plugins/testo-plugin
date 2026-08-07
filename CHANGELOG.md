@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- The test toolbar ends with a run summary: a progress ring that fills as tests finish and turns into a green check
+  or a red cross when the process exits, the finished/total fraction, one counter per Testo status, and the elapsed
+  time. Statuses come from the `status` attribute of Testo's service messages, so all eight cases of
+  `Testo\Core\Value\Status` — including risky, flaky, cancelled and aborted — are told apart; a Testo that sends no
+  such attribute still gets the platform's passed / failed / skipped reading.
+- Every counter in that summary filters the test tree: click one to see only tests with that status, click it again
+  or click the fraction on the left to bring the whole tree back.
+
 ### Fixed
 
 - A Testo older than 0.10.39 no longer floods the IDE with internal errors. Such a build sends its service messages
