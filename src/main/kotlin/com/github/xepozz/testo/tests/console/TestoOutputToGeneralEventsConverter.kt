@@ -20,6 +20,11 @@ class TestoOutputToGeneralEventsConverter(
                 val name = attrs["name"]
                 val location = attrs["locationHint"]
                 if (name != null && location != null) store.rememberLocation(name, location)
+                // The test description (PHPDoc summary, possibly rewritten by interceptors) arrives as metainfo.
+                val metainfo = attrs["metainfo"]
+                if (name != null && !metainfo.isNullOrBlank()) {
+                    store.setDescription(store.keyFor(name), metainfo)
+                }
             }
 
             TEST_STD_OUT, TEST_STD_ERR -> {

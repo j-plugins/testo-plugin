@@ -38,9 +38,18 @@ class ChannelOutputStore {
 
     private var headerChunks: List<Chunk> = emptyList()
     private val locationByName = HashMap<String, String>()
+    private val descriptionByKey = HashMap<String, String>()
 
     fun rememberLocation(name: String, location: String) {
         synchronized(lock) { locationByName[name] = location }
+    }
+
+    fun setDescription(testKey: String, description: String) {
+        synchronized(lock) { descriptionByKey[testKey] = description }
+    }
+
+    fun description(testKey: String): String? {
+        synchronized(lock) { return descriptionByKey[testKey] }
     }
 
     /**

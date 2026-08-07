@@ -462,7 +462,8 @@ object TestoChannelsUi {
             override fun addLeaf(leaf: SMTestProxy) {
                 val key = keyOf(leaf) ?: return
                 if (!attached.add(key)) return
-                subscriptions += attach(key) { chunk -> cards.add(chunk, fullName(leaf)) { selectInTree(viewer, leaf) } }
+                val desc = store.description(key)
+                subscriptions += attach(key) { chunk -> cards.add(chunk, fullName(leaf), onLeafClick = { selectInTree(viewer, leaf) }, description = desc) }
             }
         }
 
@@ -610,7 +611,7 @@ object TestoChannelsUi {
             // Chunks arrive on the test-reader thread (replay happens on the EDT inside onSelected); hop to the EDT for
             // the Swing/editor mutation. invokeLater is FIFO, so message order is preserved. onLeafClick, when set,
             // makes the per-test name in the header navigate back to that test in the tree.
-            fun add(chunk: ChannelOutputStore.Chunk, leafLabel: String? = null, onLeafClick: (() -> Unit)? = null) {
+            fun add(chunk: ChannelOutputStore.Chunk, leafLabel: String? = null, onLeafClick: (() -> Unit)? = null, description: String? = null) {
                 if (released || !levelFilter.isVisible(chunk.level)) return
                 // Decode ANSI once: the plain text drives the blank check and the body; segments tint plain cards.
                 val (plain, segments) = decodeAnsi(chunk.text.trim('\n'))
@@ -643,7 +644,7 @@ object TestoChannelsUi {
                         }
                         return@Runnable
                     }
-                    val (component, editor) = card(++index, chunk, leafLabel, onLeafClick, fileType, plain, segments)
+                    val (component, editor) = card(++index, chunk, leafLabel, onLeafClick, description, fileType, plain, segments)
                     list.add(component)
                     lastMergeKey = mergeKey
                     lastEditor = if (mergeKey != null) editor else null
@@ -666,6 +667,7 @@ object TestoChannelsUi {
                 chunk: ChannelOutputStore.Chunk,
                 leafLabel: String?,
                 onLeafClick: (() -> Unit)?,
+                description: String?,
                 fileType: FileType?,
                 plain: String,
                 segments: List<AnsiSegment>,
@@ -684,11 +686,11 @@ object TestoChannelsUi {
                 }
                 val wrapper = JBPanel<Nothing>(BorderLayout()).apply {
                     border = JBUI.Borders.customLine(JBColor.border(), 1)
-                    add(buildHeader(n, chunk, leafLabel, onLeafClick), BorderLayout.NORTH)
+                    add(buildHeader(n, chunk, leafLabel, onLeafClick, description), BorderLayout.NORTH)
                     add(withFloatingActions(body, mergeableEditor, plain), BorderLayout.CENTER)
                 }
                 // Register for the sticky overlay (rebuild the header on demand so its hyperlink/level stay live).
-                cardEntries += CardEntry(wrapper) { buildHeader(n, chunk, leafLabel, onLeafClick) }
+                cardEntries += CardEntry(wrapper) { buildHeader(n, chunk, leafLabel, onLeafClick, description) }
                 return wrapper to mergeableEditor
             }
 
@@ -699,6 +701,7 @@ object TestoChannelsUi {
                 chunk: ChannelOutputStore.Chunk,
                 leafLabel: String?,
                 onLeafClick: (() -> Unit)?,
+                description: String? = null,
             ): JComponent {
                 val left = JBPanel<Nothing>(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
                     isOpaque = false
@@ -707,7 +710,17 @@ object TestoChannelsUi {
                     add(JBLabel(idText).apply { font = JBUI.Fonts.smallFont(); foreground = JBColor.GRAY })
                     if (leafLabel != null) {
                         add(JBLabel("  ·  ").apply { font = JBUI.Fonts.smallFont(); foreground = JBColor.GRAY })
-                        add(HyperlinkLabel(leafLabel).apply { addHyperlinkListener { onLeafClick?.invoke() } })
+                        add(HyperlinkLabel(leafLabel).apply {
+                            addHyperlinkListener { onLeafClick?.invoke() }
+                            if (!description.isNullOrBlank()) toolTipText = description
+                        })
+                    }
+                    // Show the test description (from metainfo) as a dimmed label after the test name.
+                    if (!description.isNullOrBlank()) {
+                        add(JBLabel("  — $description").apply {
+                            font = JBUI.Fonts.smallFont()
+                            foreground = JBColor.GRAY
+                        })
                     }
                 }
                 return JBPanel<Nothing>(BorderLayout()).apply {
