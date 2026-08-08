@@ -566,14 +566,19 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             if (spans.startupMs > 0) row("testo.progress.elapsed.startup", formatElapsed(spans.startupMs))
             if (spans.testsMs > 0) row("testo.progress.elapsed.tests", formatElapsed(spans.testsMs))
             if (spans.summedTestsMs > 0) {
-                row("testo.progress.elapsed.summed", formatElapsed(spans.summedTestsMs))
-                // The sum on its own reads as overhead; what it actually says is how much of it overlapped, so the
-                // ratio gets a line rather than a parenthetical. Stated as a floor: the window it is measured against
-                // also holds the work between tests, which no test's own duration counts, so the true figure is higher.
-                spans.parallelism?.takeIf { it >= BOOST_FLOOR }?.let { factor ->
+                val factor = spans.parallelism
+                // The sum is worth a line only where it parts with the window it fitted into: level with the wall
+                // clock it is the Tests figure printed twice. Above, the tests overlapped; below, the window holds
+                // work between tests that no test's own duration counts.
+                if (factor == null || factor >= BOOST_FLOOR || factor <= 1 / BOOST_FLOOR) {
+                    row("testo.progress.elapsed.summed", formatElapsed(spans.summedTestsMs))
+                }
+                // The overlap read as a ratio rather than as a difference the eye has to take: stated as a floor,
+                // since the work between tests inflates the window it is measured against.
+                factor?.takeIf { it >= BOOST_FLOOR }?.let {
                     row(
                         "testo.progress.elapsed.boost",
-                        TestoBundle.message("testo.progress.elapsed.boost.value", formatFactor(factor)),
+                        TestoBundle.message("testo.progress.elapsed.boost.value", formatFactor(it)),
                         emphasized = true,
                     )
                 }
@@ -619,8 +624,9 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
     companion object {
         private const val REFRESH_MS = 100
-        // Below this the overlap is within the noise of rounding two clocks against each other, and a run that simply
-        // went one test at a time should say nothing rather than claim a boost of one.
+        // How far the summed test time has to stand from the window it fitted into before either of them is worth
+        // saying. Within this band the two are the same figure read off two clocks, and a run that simply went one
+        // test at a time should say nothing rather than claim a boost of one.
         private const val BOOST_FLOOR = 1.05
         private const val SPIN_STEP = 12
         private const val SPIN_ARC = 90.0

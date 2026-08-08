@@ -28,10 +28,11 @@
   two cannot come to disagree.
 - The clock shows the run from start to finish, and its hover breaks that down into what happened before the first
   test, the tests themselves, and what happened after the last one — so the cost of bootstrapping and of merging
-  reports is visible separately. Beside them it sums the tests' own durations: with tests on fibers that sum runs
-  past the window they fitted into, and the difference is read as a concurrency boost on a line of its own rather
-  than pretended to be framework overhead. Stated as a floor — `≥2.1x` — because the window it is measured against
-  also holds the work between tests, which no test's own duration counts.
+  reports is visible separately. Beside them it sums the tests' own durations, but only where that sum parts with
+  the window they fitted into — level with it, it would be the same figure twice. With tests on fibers the sum runs
+  past that window, and the difference is read as a concurrency boost on a line of its own rather than pretended to
+  be framework overhead. Stated as a floor — `≥2.1x` — because the window it is measured against also holds the work
+  between tests, which no test's own duration counts.
 - A problem Testo raises about the run itself rather than about a test — `##teamcity[buildProblem …]`, as an empty
   run reports — is now visible instead of parsed and dropped: as a red line in Output, as a run-level notice in All,
   and as a notification, since a run that executed nothing otherwise looks like a run that simply finished. Reported
