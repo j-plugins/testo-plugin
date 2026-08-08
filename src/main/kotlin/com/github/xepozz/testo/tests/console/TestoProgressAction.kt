@@ -30,6 +30,7 @@ import com.intellij.util.ui.UIUtil
 import java.awt.BasicStroke
 import java.awt.Cursor
 import java.awt.Dimension
+import java.awt.Font
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.event.MouseAdapter
@@ -329,6 +330,17 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             super.removeNotify()
         }
 
+        // Zooming the IDE reaches every component through this call. The cells read the new font on their own, but a
+        // settled run draws nothing more on its own: the tick that would measure the row again is skipped while the
+        // digest is unchanged, so the widths have to be declared stale from here.
+        override fun updateUI() {
+            super.updateUI()
+            painted = null
+            laidOutWidth = -1
+            revalidate()
+            repaint()
+        }
+
         /** Everything the row shows, so a tick that would redraw the same pixels can be dropped. */
         private var painted: String? = null
         private var laidOutWidth = -1
@@ -392,9 +404,14 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         /** Width reserved before the text: the icon, or whatever a subclass paints in its place. */
         protected open val leadingWidth: Int get() = icon?.iconWidth ?: 0
 
+        // Asked for on every paint and every measurement rather than assigned once in the constructor. Zooming the IDE
+        // replaces the label font wholesale, and a font set on the component would outlive that: a raw JComponent has
+        // no UI delegate, so nothing reinstalls it, and the row would keep the size the toolbar had when it was built
+        // while every freshly created label around it grew.
+        override fun getFont(): Font = UIUtil.getLabelFont()
+
         init {
             isOpaque = false
-            font = UIUtil.getLabelFont()
             cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
             addMouseListener(object : MouseAdapter() {
                 override fun mouseEntered(e: MouseEvent) = repaintAs { hovered = true }
