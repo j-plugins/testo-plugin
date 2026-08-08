@@ -1,35 +1,34 @@
 package com.github.xepozz.testo.tests.console
 
+import com.intellij.execution.testframework.sm.runner.SMTestProxy
+
 /**
  * The [TestoRunTarget] of every node of the current run, recorded as its `testStarted` / `testSuiteStarted` arrives.
  *
- * Keyed by the location hint itself, unlike [ChannelOutputStore] and [TestoStatusStore], which key by name because
- * the messages they follow (`testStdOut`, `testFinished`) carry nothing else. Names are not unique: every data
- * provider in a run opens a `Dataset #0 [0]`, and a name-keyed target sends a right-click on one of them off to
- * rerun another class's data set. The hint is unique per node, both sides have it — the converter off the message,
- * the producer off `SMTestProxy.getLocationUrl()`, which the id-based convertor sets when it builds the proxy — so
- * nothing has to be translated.
+ * Keyed by `nodeId`, the only thing that identifies a node outright — see [TestoNodeIndex]. The location hint does
+ * not: it names code, and one method announced under two types answers with the same hint twice, which is exactly
+ * the case where the target differs, since the type is what goes into `--type`.
  *
- * A node announced without a hint is not stored. It could not be rerun anyway: with no location the platform runs no
- * run-configuration producer at all, so there is nothing to hand a target to.
+ * A node that narrows nothing is not stored — it has nothing to add to what the producer works out of the PSI.
  */
-class TestoTargetStore {
+class TestoTargetStore(private val nodes: TestoNodeIndex) {
     private val lock = Any()
-    private val byLocation = HashMap<String, TestoRunTarget>()
+    private val byNode = HashMap<String, TestoRunTarget>()
 
-    fun note(target: TestoRunTarget) {
-        val hint = target.locationHint?.takeIf { it.isNotBlank() } ?: return
+    /** @param nodeId the `nodeId` of the message that opened the node. */
+    fun note(nodeId: String?, target: TestoRunTarget) {
+        nodeId ?: return
         if (target.isEmpty) return
-        synchronized(lock) { byLocation[hint] = target }
+        synchronized(lock) { byNode[nodeId] = target }
     }
 
-    /** @param locationUrl the `locationUrl` of the tree node, i.e. the `locationHint` its message carried. */
-    fun targetFor(locationUrl: String?): TestoRunTarget? {
-        if (locationUrl == null) return null
-        synchronized(lock) { return byLocation[locationUrl] }
-    }
+    /** The recipe for rerunning the node a tree selection stands for, or `null` when this run announced none. */
+    fun targetFor(proxy: SMTestProxy?): TestoRunTarget? = nodes.nodeIdOf(proxy)?.let { targetForNode(it) }
+
+    /** The same lookup, by the id itself — resolving a tree node to one is [TestoNodeIndex]'s half of the job. */
+    internal fun targetForNode(nodeId: String): TestoRunTarget? = synchronized(lock) { byNode[nodeId] }
 
     fun clear() {
-        synchronized(lock) { byLocation.clear() }
+        synchronized(lock) { byNode.clear() }
     }
 }

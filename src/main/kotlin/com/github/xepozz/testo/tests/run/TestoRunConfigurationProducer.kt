@@ -133,8 +133,10 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
      * and reading them costs nothing. The model is what ties the node back to the run it belongs to — the store is
      * per-run, and a stale target from another console would rerun the wrong thing.
      *
-     * The node is identified by its `locationUrl`, which is the `locationHint` its message carried, verbatim: the
-     * name would not do, since every data provider in a run opens a `Dataset #0 [0]` of its own.
+     * The node is identified by the `nodeId` its messages carried, resolved through `TestoNodeIndex`. Neither its
+     * name nor its location hint would do: every data provider in a run opens a `Dataset #0:0 [0]` of its own, and a
+     * hint names code rather than a node, so one method announced under two types answers with the same hint twice —
+     * which is precisely when the two nodes want different `--type`s.
      */
     private fun treeTarget(context: ConfigurationContext): TestoRunTarget? {
         val dataContext = context.dataContext
@@ -142,7 +144,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         val model = dataContext.getData(TestTreeView.MODEL_DATA_KEY) ?: return null
         val properties = model.properties as? TestoConsoleProperties ?: return null
 
-        return properties.targetStore.targetFor(proxy.locationUrl)
+        return properties.targetStore.targetFor(proxy)
     }
 
     private fun applyTreeTarget(settings: TestoRunnerSettings, target: TestoRunTarget) {

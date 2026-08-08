@@ -7,11 +7,9 @@ import java.util.EnumMap
  * The Testo status of each test of the current run, as reported in the `status` attribute of its service messages,
  * plus the assertion counts and the running tally the toolbar widget shows.
  *
- * Keyed by the location hint a node was opened with, exactly as [TestoTargetStore] is: the converter resolves it off
- * the message's `nodeId`, and this side reads it back as [SMTestProxy.getLocationUrl], which the id-based convertor
- * fills with the same string. Names would not do — Testo builds a data set's name out of its coordinates alone, so
- * every list-shaped provider in a run opens a `Dataset #0:0 [0]`, and one shared key would give them all one status
- * between them and count them as a single test.
+ * Keyed by `nodeId`, the only thing that identifies a node outright — neither its name nor its location hint does,
+ * see [TestoNodeIndex]. The converter has the id on every message; a tree node is resolved back to it through that
+ * index.
  *
  * Group nodes are kept in a map of their own ([noteSuite]): they have a verdict worth showing in the tree, but they
  * are not tests and must not reach the tally.
@@ -26,23 +24,23 @@ import java.util.EnumMap
  * run is over — replacing the running estimate with what the tree actually holds, including the tests a Stop left
  * unfinished.
  */
-class TestoStatusStore {
+class TestoStatusStore(private val nodes: TestoNodeIndex) {
     private class Entry(val status: TestoTestStatus, val reported: Boolean)
 
     private val lock = Any()
-    private val byKey = HashMap<String, Entry>()
-    private val suiteByKey = HashMap<String, TestoTestStatus>()
+    private val byNode = HashMap<String, Entry>()
+    private val suiteByNode = HashMap<String, TestoTestStatus>()
     private val counts = EnumMap<TestoTestStatus, Int>(TestoTestStatus::class.java)
-    private val assertionsByKey = HashMap<String, Int>()
+    private val assertionsByNode = HashMap<String, Int>()
     private var started = 0
     private var declaredTotal = 0
 
     /**
      * Testo's own verdict, off the `status` attribute.
      *
-     * @param key the node's location hint, as the converter resolved it — see the note on keying above.
+     * @param nodeId the `nodeId` of the message the status came with.
      */
-    fun note(key: String, status: TestoTestStatus) = put(key, status, reported = true, onlyIfAbsent = false)
+    fun note(nodeId: String, status: TestoTestStatus) = put(nodeId, status, reported = true, onlyIfAbsent = false)
 
     /**
      * The verdict read off the kind of message that closed the test, for a Testo that sends no `status`.
@@ -50,14 +48,14 @@ class TestoStatusStore {
      * @param onlyIfAbsent for the guess that a bare `testFinished` means the test passed — true only until the test
      *        has said otherwise, since `testFailed` and `testIgnored` come first and `testFinished` follows them.
      */
-    fun noteInferred(key: String, status: TestoTestStatus, onlyIfAbsent: Boolean) =
-        put(key, status, reported = false, onlyIfAbsent = onlyIfAbsent)
+    fun noteInferred(nodeId: String, status: TestoTestStatus, onlyIfAbsent: Boolean) =
+        put(nodeId, status, reported = false, onlyIfAbsent = onlyIfAbsent)
 
-    private fun put(key: String, status: TestoTestStatus, reported: Boolean, onlyIfAbsent: Boolean) {
+    private fun put(nodeId: String, status: TestoTestStatus, reported: Boolean, onlyIfAbsent: Boolean) {
         synchronized(lock) {
-            val previous = byKey[key]
+            val previous = byNode[nodeId]
             if (previous != null && (onlyIfAbsent || (previous.reported && !reported))) return
-            byKey[key] = Entry(status, reported)
+            byNode[nodeId] = Entry(status, reported)
             if (previous?.status == status) return
             // Drop a counter that runs out instead of leaving a zero behind — the widget reads the map as "what to show".
             previous?.let { counts.computeIfPresent(it.status) { _, n -> (n - 1).takeIf { left -> left > 0 } } }
@@ -73,26 +71,23 @@ class TestoStatusStore {
      * data-provider batch and per suite of the run: counting those as more tests would inflate every number the
      * toolbar shows and make the progress ring divide by a total no run can reach.
      */
-    fun noteSuite(key: String, status: TestoTestStatus) {
-        synchronized(lock) { suiteByKey[key] = status }
-    }
-
-    /** Known status of the node, or the platform's coarse reading of it when nothing was recorded for it. */
-    fun statusOf(proxy: SMTestProxy): TestoTestStatus? {
-        if (proxy.isInProgress) return null
-        val key = keyOf(proxy)
-        val known = synchronized(lock) {
-            if (proxy.isSuite) suiteByKey[key] else byKey[key]?.status
-        }
-        return known ?: TestoTestStatus.fromProxy(proxy)
+    fun noteSuite(nodeId: String, status: TestoTestStatus) {
+        synchronized(lock) { suiteByNode[nodeId] = status }
     }
 
     /**
-     * How a tree node names itself to this store: its location url, which is the `locationHint` its opening message
-     * carried, verbatim. A node announced without one — a suite of the run — falls back to its name, exactly as the
-     * converter does.
+     * Known status of the node, or the platform's coarse reading of it when nothing was recorded for it.
+     *
+     * A node this run never announced answers with the latter too — an imported history one, which has no id.
      */
-    private fun keyOf(proxy: SMTestProxy): String = proxy.locationUrl ?: proxy.name
+    fun statusOf(proxy: SMTestProxy): TestoTestStatus? {
+        if (proxy.isInProgress) return null
+        val nodeId = nodes.nodeIdOf(proxy)
+        val known = nodeId?.let {
+            synchronized(lock) { if (proxy.isSuite) suiteByNode[it] else byNode[it]?.status }
+        }
+        return known ?: TestoTestStatus.fromProxy(proxy)
+    }
 
     fun counts(): Map<TestoTestStatus, Int> = synchronized(lock) { EnumMap(counts) }
 
@@ -102,13 +97,13 @@ class TestoStatusStore {
      * How many assertions the test ran, off the `assertions` attribute of its `testFinished`. Stored per test rather
      * than summed on arrival so a re-reported test replaces its own figure instead of doubling the total.
      */
-    fun noteAssertions(key: String, assertions: Int) {
-        synchronized(lock) { assertionsByKey[key] = assertions }
+    fun noteAssertions(nodeId: String, assertions: Int) {
+        synchronized(lock) { assertionsByNode[nodeId] = assertions }
     }
 
     /** Assertions across the whole run, or `null` when this Testo reports none at all. */
     fun assertionCount(): Int? = synchronized(lock) {
-        if (assertionsByKey.isEmpty()) null else assertionsByKey.values.sum()
+        if (assertionsByNode.isEmpty()) null else assertionsByNode.values.sum()
     }
 
     /** One more test has begun; what the progress ring divides by until a better number turns up. */
@@ -150,10 +145,10 @@ class TestoStatusStore {
 
     fun clear() {
         synchronized(lock) {
-            byKey.clear()
-            suiteByKey.clear()
+            byNode.clear()
+            suiteByNode.clear()
             counts.clear()
-            assertionsByKey.clear()
+            assertionsByNode.clear()
             started = 0
             declaredTotal = 0
         }

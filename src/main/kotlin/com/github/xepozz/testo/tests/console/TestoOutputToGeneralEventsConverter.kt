@@ -3,6 +3,7 @@ package com.github.xepozz.testo.tests.console
 import com.github.xepozz.testo.TestoBundle
 import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.execution.testframework.TestConsoleProperties
+import com.intellij.execution.testframework.sm.runner.GeneralTestEventsProcessor
 import com.intellij.execution.testframework.sm.runner.OutputToGeneralTestEventsConverter
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -18,7 +19,18 @@ class TestoOutputToGeneralEventsConverter(
     private val statusStore: TestoStatusStore,
     private val timings: TestoRunTimings,
     private val targetStore: TestoTargetStore,
+    private val nodes: TestoNodeIndex,
 ) : OutputToGeneralTestEventsConverter(testFrameworkName, consoleProperties) {
+
+    /**
+     * Everything this converter records is keyed by `nodeId`, and the tree side has no way to it — so the pairing is
+     * recorded from the processor's own node events. Hooked here, the moment the platform hands the processor over,
+     * which is before a single line of output has been read.
+     */
+    override fun setProcessor(processor: GeneralTestEventsProcessor?) {
+        super.setProcessor(processor)
+        processor?.let { nodes.attachTo(it) }
+    }
 
     /** Version off the banner, kept only to name it in the too-old notification. */
     private var runnerVersion: String? = null
@@ -30,13 +42,9 @@ class TestoOutputToGeneralEventsConverter(
     private val reportedProblems = HashSet<String>()
 
     /**
-     * The `locationHint` each node was opened with, by the `nodeId` every message about it carries.
-     *
-     * This is what identifies a node here. Names do not: Testo builds a data set's name out of its coordinates alone
-     * (`Dataset #0:0 [0]`), so every list-shaped provider in a run opens one of those, and a batch node is named
-     * after its test, which two cases may well share. Node ids are the protocol's own identity — the whole reason
-     * the tree is id-based — and a closing message carries the id but no hint, so the hint is remembered here when
-     * the node opens and looked up when it closes.
+     * The `locationHint` each node was opened with, by the `nodeId` every message about it carries. Only the channel
+     * store needs this — it files a node's description under the same key its output goes to, and that key is a hint.
+     * Everything else here is keyed by the node id itself.
      */
     private val hintByNodeId = HashMap<String, String>()
 
@@ -77,8 +85,8 @@ class TestoOutputToGeneralEventsConverter(
                         if (nodeId != null) hintByNodeId[nodeId] = location
                     }
                     val metainfo = attrs["metainfo"]
-                    if (!metainfo.isNullOrBlank()) nodeKey(attrs)?.let { store.setDescription(it, metainfo) }
-                    targetStore.note(TestoRunTarget(location, attrs["testSuite"], attrs["testType"]))
+                    if (!metainfo.isNullOrBlank()) store.setDescription(descriptionKey(attrs), metainfo)
+                    targetStore.note(nodeId, TestoRunTarget(location, attrs["testSuite"], attrs["testType"]))
                 }
             }
 
@@ -127,8 +135,8 @@ class TestoOutputToGeneralEventsConverter(
         // the tally: one of these arrives per case, per DataProvider batch and per suite of the run, and counting
         // them as tests would inflate every number the toolbar shows.
         if (message.messageName == TEST_SUITE_FINISHED) {
-            nodeKey(attrs)?.let { key ->
-                TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.noteSuite(key, it) }
+            attrs["nodeId"]?.let { nodeId ->
+                TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.noteSuite(nodeId, it) }
             }
         }
 
@@ -136,31 +144,29 @@ class TestoOutputToGeneralEventsConverter(
         // express, and `assertions` on testFinished is a number it has nowhere to put at all. Only the messages that
         // close a *test* feed the tally — see the suite branch above.
         if (message.messageName == TEST_FINISHED || message.messageName == TEST_FAILED || message.messageName == TEST_IGNORED) {
-            nodeKey(attrs)?.let { key ->
-                TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.note(key, it) }
-                attrs["assertions"]?.toIntOrNull()?.let { statusStore.noteAssertions(key, it) }
-                noteStatusFromMessageKind(message.messageName, key)
+            attrs["nodeId"]?.let { nodeId ->
+                TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.note(nodeId, it) }
+                attrs["assertions"]?.toIntOrNull()?.let { statusStore.noteAssertions(nodeId, it) }
+                noteStatusFromMessageKind(message.messageName, nodeId)
             }
         }
 
         // Where the testing phase ends. A test closes with testFinished whatever its status, so this mark is what
         // separates the run's post-processing from the tests, and `duration` is the test's own share of the clock.
         if (message.messageName == TEST_FINISHED) {
-            nodeKey(attrs)?.let { timings.noteTestFinished(it, attrs["duration"]?.toLongOrNull()) }
+            attrs["nodeId"]?.let { timings.noteTestFinished(it, attrs["duration"]?.toLongOrNull()) }
         }
 
         super.processServiceMessage(message, visitor)
     }
 
     /**
-     * What identifies the node a message is about: the `locationHint` it was opened with, or its name when it has
-     * none — a suite of the run is a configuration entry and points at no code.
-     *
-     * The reader's half of this is `SMTestProxy.getLocationUrl()`, which the id-based convertor fills with the very
-     * same hint, falling back to the node's name the same way. Anything keyed here is looked up there.
+     * Where a node's description goes: the same key its channel output does, which is the hint it was opened with,
+     * falling back to its name. The channel tabs look a description up that way, so it cannot move to the node id
+     * along with everything else.
      */
-    private fun nodeKey(attrs: Map<String, String>): String? =
-        attrs["nodeId"]?.let { hintByNodeId[it] } ?: attrs["name"]
+    private fun descriptionKey(attrs: Map<String, String>): String =
+        attrs["nodeId"]?.let { hintByNodeId[it] } ?: store.keyFor(attrs["name"].orEmpty())
 
     /**
      * The coarse verdict a Testo too old to send `status` still conveys: TeamCity has always had exactly three

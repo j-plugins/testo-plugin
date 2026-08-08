@@ -148,7 +148,8 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoStatusStore.kt     # per-test status/assertions + the tally the toolbar summary renders
 │   │   ├── TestoRunTimings.kt      # start/first test/last test/finish marks + summed test durations
 │   │   ├── TestoRunTarget.kt       # a node's own rerun recipe: hint → --filter selector, testSuite/testType
-│   │   ├── TestoTargetStore.kt     # rerun targets of the current run, keyed by location hint
+│   │   ├── TestoTargetStore.kt     # rerun targets of the current run, keyed by node id
+│   │   ├── TestoNodeIndex.kt       # SMTestProxy → nodeId, off the platform's own node events
 │   │   ├── TestoProgressAction.kt  # right-aligned toolbar summary: ring, fraction, status counters, elapsed
 │   │   ├── TestoTestTreeDecorator.kt        # wraps the tree's cell renderer: status icons + description tooltips
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
@@ -399,18 +400,22 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `TestoProtocolGate` detects it off the missing `nodeId` (not off a version comparison, so forks and nightlies are
   covered), and the converter then stops forwarding messages and notifies once. The version in that notification is
   scraped from Testo's banner line, which survives `-q`.
-- **A node is identified by its location hint, never by its name.** Testo builds a data set's name out of its
-  coordinates alone (`Dataset #0:0 [0]`, `TeamcityPlugin::onTestDataSetStarting`), so every list-shaped provider in a
-  run opens one of those, and a batch node is named after its test, which two cases may share. `TestoStatusStore` and
-  `TestoTargetStore` therefore key by the hint: the converter resolves it through its own `nodeId → locationHint` map
-  (a closing message carries the id but no hint), and the reading side takes it back off `SMTestProxy.locationUrl`,
-  which the id-based convertor fills with the same string. Both sides fall back to the name for a node that points at
-  no code — a suite of the run.
+- **A node is identified by `nodeId` and by nothing else.** Its name will not do — a data set's name is built out of
+  its coordinates alone (`Dataset #0:0 [0]`, `TeamcityPlugin::onTestDataSetStarting`), so every list-shaped provider
+  in a run opens one of those. Nor will its location hint: a hint names *code*, and `TestIdentity` keeps the test's
+  type beside the fqn rather than in it, so one method announced as an inline test and as a bench answers with the
+  same hint twice — exactly when the two want different `--type`s. `TestoStatusStore` and `TestoTargetStore` are
+  therefore keyed by the id, which the converter has on every message.
+- **`TestoNodeIndex` is what makes an id-keyed store readable from the tree.** `SMTestProxy` does not carry the id
+  and the convertor's own map is private, but `SMTRunnerEventsListener.onTestStarted(proxy, nodeId, parentNodeId)`
+  hands both out together, once per node. The index records that pairing (keyed by proxy identity — neither proxy
+  class overrides `equals`) and is hooked from `TestoOutputToGeneralEventsConverter.setProcessor`, before any output
+  is read. Writes never consult it: they key by the id directly, so a status recorded before the platform has built
+  the node is in no danger.
 - **Channel storage keys still go through `ChannelOutputStore.keyFor(name)`** (the `locationHint` remembered on
-  `testStarted`, falling back to the name), and so inherit the collision above — the channel tabs look a test up by
-  the name of its tree node. On the converter side keys cannot come from the proxy at all: it may not exist yet while
-  the output streams in, so `SMTestProxy.locationUrl` is unavailable there. Reading it later is fine, which is what
-  the two stores above do.
+  `testStarted`, falling back to the name), and so inherit the name collision above — the channel tabs look a test up
+  by the name of its tree node. They cannot move to node ids wholesale: an imported history run has no ids at all,
+  and `TestoChannelHistory` has to rebuild its tabs from the saved XML.
 - **`TestoChannelsUi` reaches `TestResultsPanel.myConsole` by reflection** — there is no public accessor. It
   degrades gracefully (logs a warning, no channel tabs) if the field disappears.
 - **The tree has one filter slot, and the status counters own it while selected.** `SMTestRunnerResultsForm.setFilter`

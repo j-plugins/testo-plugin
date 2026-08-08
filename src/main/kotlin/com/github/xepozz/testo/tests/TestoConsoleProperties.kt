@@ -3,6 +3,7 @@ package com.github.xepozz.testo.tests
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.tests.console.ChannelOutputStore
 import com.github.xepozz.testo.tests.console.LogLevelFilter
+import com.github.xepozz.testo.tests.console.TestoNodeIndex
 import com.github.xepozz.testo.tests.console.TestoOutputToGeneralEventsConverter
 import com.github.xepozz.testo.tests.console.TestoProgressAction
 import com.github.xepozz.testo.tests.console.TestoRunTimings
@@ -36,11 +37,14 @@ class TestoConsoleProperties(
 
     val levelFilter = LogLevelFilter()
 
-    val statusStore = TestoStatusStore()
+    // What ties a tree node back to the protocol node it came from; every store below is keyed by that node's id.
+    val nodeIndex = TestoNodeIndex()
+
+    val statusStore = TestoStatusStore(nodeIndex)
 
     val runTimings = TestoRunTimings()
 
-    val targetStore = TestoTargetStore()
+    val targetStore = TestoTargetStore(nodeIndex)
 
     val progressAction = TestoProgressAction()
 
@@ -60,6 +64,7 @@ class TestoConsoleProperties(
             statusStore,
             runTimings,
             targetStore,
+            nodeIndex,
         )
 
     override fun getTestStackTraceParser(url: String, proxy: SMTestProxy, project: Project) =

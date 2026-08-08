@@ -1,5 +1,6 @@
 package com.github.xepozz.testo
 
+import com.github.xepozz.testo.tests.console.TestoNodeIndex
 import com.github.xepozz.testo.tests.console.TestoRunTarget
 import com.github.xepozz.testo.tests.console.TestoTargetStore
 import org.junit.Assert.assertEquals
@@ -73,44 +74,43 @@ class TestoRunTargetTest {
     }
 
     @Test
-    fun nodesOfTheSameNameKeepTheirOwnTargets() {
-        val store = TestoTargetStore()
-        // Every data provider of a run opens a `Dataset #0 [0]`; only the hint tells one from another.
-        val first = hint("\\Ns\\A::it:0:0")
-        val second = hint("\\Ns\\B::it:0:0")
-        store.note(TestoRunTarget(first))
-        store.note(TestoRunTarget(second))
+    fun oneHintUnderTwoTypesKeepsBothTargets() {
+        val store = TestoTargetStore(TestoNodeIndex())
+        // A hint names code, not a node: `TestIdentity` keeps the type beside the fqn rather than in it, so a method
+        // announced as an inline test and as a bench answers with the same hint twice. That is exactly the case where
+        // the two nodes must not share a target — the type is what goes into `--type`.
+        val shared = hint("\\Ns\\Calculator::med")
+        store.note("7", TestoRunTarget(shared, type = "inline"))
+        store.note("9", TestoRunTarget(shared, type = "bench"))
 
-        assertEquals("\\Ns\\A::it:0:0", store.targetFor(first)?.filter)
-        assertEquals("\\Ns\\B::it:0:0", store.targetFor(second)?.filter)
+        assertEquals("inline", store.targetForNode("7")?.type)
+        assertEquals("bench", store.targetForNode("9")?.type)
     }
 
     @Test
-    fun aNodeWithoutAHintIsNotWorthRemembering() {
-        val store = TestoTargetStore()
-        // A run-level suite: no location, so the platform runs no producer for it and there is nothing to hand over.
-        store.note(TestoRunTarget(null, suite = "sandbox"))
+    fun aNodeWithoutAnIdIsNotWorthRemembering() {
+        val store = TestoTargetStore(TestoNodeIndex())
+        // Nothing to key it by, and nothing to look it up with either.
+        store.note(null, TestoRunTarget(hint("\\Ns\\C"), suite = "sandbox"))
 
+        assertNull(store.targetForNode("7"))
         assertNull(store.targetFor(null))
-        assertNull(store.targetFor(""))
     }
 
     @Test
     fun anEmptyTargetIsNotWorthRemembering() {
-        val store = TestoTargetStore()
+        val store = TestoTargetStore(TestoNodeIndex())
         // The config-file node: its hint names a file, which selects nothing the element-based path does not already.
-        val fileHint = "php_qn://D:/project/testo.php"
-        store.note(TestoRunTarget(fileHint))
+        store.note("7", TestoRunTarget("php_qn://D:/project/testo.php"))
 
-        assertNull(store.targetFor(fileHint))
+        assertNull(store.targetForNode("7"))
     }
 
     @Test
     fun aCaseIsWorthRememberingOnItsHintAlone() {
-        val store = TestoTargetStore()
-        val caseHint = hint("\\Ns\\TestLevelPipelineFailure")
-        store.note(TestoRunTarget(caseHint))
+        val store = TestoTargetStore(TestoNodeIndex())
+        store.note("7", TestoRunTarget(hint("\\Ns\\TestLevelPipelineFailure")))
 
-        assertEquals("\\Ns\\TestLevelPipelineFailure", store.targetFor(caseHint)?.filter)
+        assertEquals("\\Ns\\TestLevelPipelineFailure", store.targetForNode("7")?.filter)
     }
 }
