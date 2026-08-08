@@ -15,8 +15,9 @@ object TestoIcons {
     // eight statuses: the check, the exclamation and the crossed-out circle each serve two and are told apart by
     // colour only. Colours are the JetBrains palette (red DB5860/C75450, yellow EDA200/F0A732, green 59A869/499C54,
     // grey 6E6E6E/AFB1B3), baked into the SVGs rather than tinted at runtime.
+    // The glyphs are bare; the earlier enclosing-circle drawings are kept beside them under a `circle` prefix.
     object Status {
-        /** Verdict of the whole run — a bare check/cross, so it reads apart from the per-test circles beside it. */
+        /** Verdict of the whole run — the same check/cross drawn full-bleed, so it outweighs the per-test glyphs. */
         @JvmField
         val SUCCESS = IconLoader.getIcon("/icons/status/success.svg", this::class.java)
 
