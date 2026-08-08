@@ -22,6 +22,7 @@ import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.actionSystem.RightAlignedToolbarAction
 import com.intellij.openapi.actionSystem.ex.CustomComponentAction
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.ui.ColorUtil
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.GraphicsUtil
 import com.intellij.util.ui.JBUI
@@ -534,19 +535,24 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
         private fun breakdown(spans: TestoRunTimings.Snapshot): String = buildString {
             append("<html><table cellpadding='0' cellspacing='0'>")
-            row("testo.progress.elapsed.total", formatElapsed(spans.totalMs))
+            // The total is the figure the toolbar already shows; bold and undimmed, it reads as the line the rest
+            // breaks down rather than as one of five figures of equal standing that happens to be their sum. No rule
+            // under it: Swing's <hr> answers to neither CSS nor the theme, and it is decoration either way.
+            row("testo.progress.elapsed.total", formatElapsed(spans.totalMs), emphasized = true, dimLabel = false)
             if (spans.startupMs > 0) row("testo.progress.elapsed.startup", formatElapsed(spans.startupMs))
             if (spans.testsMs > 0) row("testo.progress.elapsed.tests", formatElapsed(spans.testsMs))
             if (spans.summedTestsMs > 0) {
-                // The sum only means something next to the window it fitted into: with tests on fibers it runs well
-                // past the wall clock, and the ratio is the whole point of showing it.
-                val summed = formatElapsed(spans.summedTestsMs)
-                val factor = spans.parallelism
-                row(
-                    "testo.progress.elapsed.summed",
-                    if (factor == null || factor < 1.05) summed
-                    else TestoBundle.message("testo.progress.elapsed.parallel", summed, formatFactor(factor)),
-                )
+                row("testo.progress.elapsed.summed", formatElapsed(spans.summedTestsMs))
+                // The sum on its own reads as overhead; what it actually says is how much of it overlapped, so the
+                // ratio gets a line rather than a parenthetical. Stated as a floor: the window it is measured against
+                // also holds the work between tests, which no test's own duration counts, so the true figure is higher.
+                spans.parallelism?.takeIf { it >= BOOST_FLOOR }?.let { factor ->
+                    row(
+                        "testo.progress.elapsed.boost",
+                        TestoBundle.message("testo.progress.elapsed.boost.value", formatFactor(factor)),
+                        emphasized = true,
+                    )
+                }
             }
             if (spans.postProcessingMs > 0) {
                 row("testo.progress.elapsed.postprocessing", formatElapsed(spans.postProcessingMs))
@@ -554,16 +560,44 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             append("</table></html>")
         }
 
-        // <nobr> on both cells: the tooltip is laid out at whatever width Swing's HTML view first settles on, and
-        // without it "Before the first test" and "12.34 sec" each break across lines and the columns stop lining up.
-        private fun StringBuilder.row(labelKey: String, value: String) {
-            append("<tr><td><nobr>").append(TestoBundle.message(labelKey)).append("&nbsp;&nbsp;&nbsp;</nobr></td>")
-            append("<td align='right'><nobr>").append(value).append("</nobr></td></tr>")
+        /**
+         * One line of the breakdown: label on the left, figure right-aligned under the one above it.
+         *
+         * `<nobr>` on both cells because the tooltip is laid out at whatever width Swing's HTML view first settles
+         * on, and without it "Post-processing" and "12.34 sec" each break across lines and the columns stop lining
+         * up. Emphasis is a `<b>` tag and the dimming a `<font>` one: this is HTML 3.2, where `font-weight` and
+         * `color` on a cell are among the properties the renderer quietly ignores.
+         *
+         * The two are independent: the boost is a figure worth spotting inside the breakdown, so it is bold, but its
+         * label belongs to the same column of labels as the rest and stays dimmed with them. Only the total steps out
+         * of that column entirely.
+         *
+         * @param emphasized bold, both label and figure.
+         * @param dimLabel the label in the muted colour the breakdown's own labels use.
+         */
+        private fun StringBuilder.row(
+            labelKey: String,
+            value: String,
+            emphasized: Boolean = false,
+            dimLabel: Boolean = true,
+        ) {
+            append("<tr><td><nobr>")
+            if (dimLabel) append("<font color='").append(LABEL_COLOR).append("'>")
+            if (emphasized) append("<b>")
+            append(TestoBundle.message(labelKey))
+            if (emphasized) append("</b>")
+            if (dimLabel) append("</font>")
+            append("&nbsp;&nbsp;&nbsp;</nobr></td><td align='right'><nobr>")
+            if (emphasized) append("<b>").append(value).append("</b>") else append(value)
+            append("</nobr></td></tr>")
         }
     }
 
     companion object {
         private const val REFRESH_MS = 100
+        // Below this the overlap is within the noise of rounding two clocks against each other, and a run that simply
+        // went one test at a time should say nothing rather than claim a boost of one.
+        private const val BOOST_FLOOR = 1.05
         private const val SPIN_STEP = 12
         private const val SPIN_ARC = 90.0
 
@@ -577,6 +611,10 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         private val RING_TRACK = JBColor.namedColor("ProgressBar.trackColor", JBColor(0xD5D5D5, 0x4E5157))
         // Falls back to the JetBrains palette blue when the theme names no progress colour of its own.
         private val RING_PROGRESS = JBColor.namedColor("ProgressBar.progressColor", JBColor(0x389FD6, 0x3592C4))
+
+        // Read at build time rather than held: the tooltip is rebuilt on every tick anyway, and a theme switch
+        // between two of them would otherwise leave dark-theme grey on a light background.
+        private val LABEL_COLOR: String get() = "#" + ColorUtil.toHex(UIUtil.getContextHelpForeground())
 
         internal fun formatElapsed(ms: Long): String = when {
             // Hundredths read as precision up to a minute and as noise past it, where whole seconds are enough.

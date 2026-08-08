@@ -48,6 +48,14 @@ class TestoBundleActionMessagesTest {
     }
 
     @Test
+    fun theConcurrencyBoostKeepsItsFloorSign() {
+        // The one non-ASCII character in the bundle: re-saving the file as ISO-8859-1 would turn it into mojibake in
+        // the elapsed-time hover, and the run summary would go from "at least this fast" to a bare, wrong equality.
+        val template = props().getValue("testo.progress.elapsed.boost.value")
+        assertEquals("≥2.1x", java.text.MessageFormat.format(template, "2.1"))
+    }
+
+    @Test
     fun newTestActionLabelsExist() {
         val p = props()
         assertEquals("Testo Test", p.getValue("actions.new.test.action.name"))
