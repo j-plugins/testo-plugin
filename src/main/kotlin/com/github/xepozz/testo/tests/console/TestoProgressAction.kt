@@ -148,6 +148,49 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         })
     }
 
+    /**
+     * The verdict icon the ring turns into once the run is over, or `null` while it is still going.
+     *
+     * Public because the results tree wears the same one on its root node: that node stands for the whole run, and
+     * the run has exactly one verdict — computing it twice is how the two would come to disagree. Recomputed per
+     * call rather than cached, so a repaint of the tree never shows a verdict the summary has already moved past.
+     */
+    fun currentVerdict(): Icon? {
+        val form = resultsForm ?: return null
+        val store = statusStore ?: return null
+        if (timings?.snapshot()?.finished != true) return null
+        return verdict(store.counts(), wasCancelled(form))
+    }
+
+    /**
+     * Whether the run was cut short rather than allowed to end: the platform terminates the root node when testing
+     * finishes while the tree is still incomplete — a Stop mid-flight, or a process that died with tests open.
+     * Anything that ran to the end leaves the root finished instead.
+     *
+     * Do not reach for `ProcessListener.processWillTerminate`'s `willBeDestroyed` here. It reads like "the process is
+     * being killed", but `ProcessHandler.notifyProcessTerminated` passes a hard-coded `true`, so it arrives set on
+     * every termination including an ordinary exit — which greyed out the verdict of every run.
+     */
+    private fun wasCancelled(form: SMTestRunnerResultsForm): Boolean =
+        runCatching { form.testsRootNode.isInterrupted }.getOrDefault(false)
+
+    /**
+     * The icon that replaces the ring once the run is over: green or red normally, grey when the run was cancelled —
+     * the tests that did report still decide between the check and the cross, the grey only says the run never got
+     * to a verdict of its own.
+     */
+    private fun verdict(counts: Map<TestoTestStatus, Int>, cancelled: Boolean): Icon {
+        val problems = counts.any { (status, n) -> status.isProblem && n > 0 }
+        // A killed process has no exit code worth reading, so a cancelled run is judged only by its tests.
+        val failed = if (cancelled) problems else exitCode.get()?.let { it != 0 } ?: problems
+        return when {
+            cancelled && failed -> TestoIcons.Status.FAILURE_CANCELLED
+            cancelled -> TestoIcons.Status.SUCCESS_CANCELLED
+            failed -> TestoIcons.Status.FAILURE
+            else -> TestoIcons.Status.SUCCESS
+        }
+    }
+
     /** Narrows the tree to [status]; passing `null` or the already selected status hands it back to the toggles. */
     private fun toggleFilter(status: TestoTestStatus?) {
         selected = if (status == null || status == selected) null else status
@@ -301,6 +344,9 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             painted = digest
 
             progress.update(finished, total, assertions, running, if (spans.finished) verdict(counts, cancelled) else null)
+            // The root node of the tree wears the same verdict, and the tree repaints on its own schedule — nudge it
+            // on the tick that settles, or the root would keep the icon it was drawn with until something else moved.
+            if (spans.finished) form.treeView?.repaint()
             counters.forEach { it.update(counts[it.status] ?: 0, it.status == selected) }
             elapsed.update(spans)
 
@@ -314,35 +360,6 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                 revalidate()
             }
             repaint()
-        }
-
-        /**
-         * Whether the run was cut short rather than allowed to end: the platform terminates the root node when
-         * testing finishes while the tree is still incomplete — a Stop mid-flight, or a process that died with tests
-         * open. Anything that ran to the end leaves the root finished instead.
-         *
-         * Do not reach for `ProcessListener.processWillTerminate`'s `willBeDestroyed` here. It reads like "the
-         * process is being killed", but `ProcessHandler.notifyProcessTerminated` passes a hard-coded `true`, so it
-         * arrives set on every termination including an ordinary exit — which greyed out the verdict of every run.
-         */
-        private fun wasCancelled(form: SMTestRunnerResultsForm): Boolean =
-            runCatching { form.testsRootNode.isInterrupted }.getOrDefault(false)
-
-        /**
-         * The icon that replaces the ring once the run is over: green or red normally, grey when the run was
-         * cancelled — the tests that did report still decide between the check and the cross, the grey only says
-         * the run never got to a verdict of its own.
-         */
-        private fun verdict(counts: Map<TestoTestStatus, Int>, cancelled: Boolean): Icon {
-            val problems = counts.any { (status, n) -> status.isProblem && n > 0 }
-            // A killed process has no exit code worth reading, so a cancelled run is judged only by its tests.
-            val failed = if (cancelled) problems else exitCode.get()?.let { it != 0 } ?: problems
-            return when {
-                cancelled && failed -> TestoIcons.Status.FAILURE_CANCELLED
-                cancelled -> TestoIcons.Status.SUCCESS_CANCELLED
-                failed -> TestoIcons.Status.FAILURE
-                else -> TestoIcons.Status.SUCCESS
-            }
         }
 
         // The separator fencing the widget off from the buttons on its left.

@@ -23,6 +23,9 @@
   Hiding the passed ones takes flaky along (the same check mark, only yellow) but leaves **risky** — which used to
   arrive as a plain pass and so could not be reached by any toggle at all. Hiding the ignored ones takes cancelled
   along with skipped. With both toggles off the tree holds failed, error, aborted and risky.
+- The tree's root node carries the run's verdict — the same check or cross the summary's ring turns into, grey when
+  the run was stopped before it could reach one. It is read from the summary rather than worked out again, so the
+  two cannot come to disagree.
 - The clock shows the run from start to finish, and its hover breaks that down into what happened before the first
   test, the tests themselves, and what happened after the last one — so the cost of bootstrapping and of merging
   reports is visible separately. Beside them it sums the tests' own durations: with tests on fibers that sum runs

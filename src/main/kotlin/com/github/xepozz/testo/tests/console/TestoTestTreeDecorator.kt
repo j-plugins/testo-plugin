@@ -16,8 +16,8 @@ import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.TreeCellRenderer
 
 /**
- * Teaches the results tree what Testo reported about a node: one icon per case of `Testo\Core\Value\Status`, and the
- * node's description on hover.
+ * Teaches the results tree what Testo reported about a node: one icon per case of `Testo\Core\Value\Status` on the
+ * nodes, the run's own verdict on the root, and the node's description on hover.
  *
  * The platform picks the icon in `TestsPresentationUtil.getIcon`, which is `private static` and limited to what
  * `SMTestProxy` state can express — passed, failed, ignored, running. Everything finer Testo sends (risky, flaky,
@@ -38,7 +38,12 @@ object TestoTestTreeDecorator {
      *        `SMTestProxy.metainfo`, where the platform does put it: [TestoChannelHistory] overwrites that field with
      *        the encoded channel output, the only per-test datum the history XML round-trips.
      */
-    fun install(console: SMTRunnerConsoleView, statuses: TestoStatusStore, describe: (String) -> String?) {
+    fun install(
+        console: SMTRunnerConsoleView,
+        statuses: TestoStatusStore,
+        verdict: () -> Icon?,
+        describe: (String) -> String?,
+    ) {
         val root = console.component as? JComponent ?: return
         val tree = UIUtil.findComponentOfType(root, TestTreeView::class.java)
         if (tree == null) {
@@ -48,7 +53,7 @@ object TestoTestTreeDecorator {
 
         val platform = tree.cellRenderer
         if (platform == null || platform is TestoNodeRenderer) return
-        tree.cellRenderer = TestoNodeRenderer(platform, statuses, describe)
+        tree.cellRenderer = TestoNodeRenderer(platform, statuses, verdict, describe)
 
         // JTree.getToolTipText(MouseEvent) asks the renderer for the hovered node's tooltip, but only once the tree is
         // registered — and the platform's own has no tooltip anywhere, so it never registers itself.
@@ -68,6 +73,7 @@ object TestoTestTreeDecorator {
 private class TestoNodeRenderer(
     private val platform: TreeCellRenderer,
     private val statuses: TestoStatusStore,
+    private val verdict: () -> Icon?,
     private val describe: (String) -> String?,
 ) : TreeCellRenderer {
 
@@ -83,8 +89,13 @@ private class TestoNodeRenderer(
         val component = platform.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus)
         val proxy = testProxyOf(value)
 
-        if (component is SimpleColoredComponent) {
-            testoNodeIcon(proxy?.let(statuses::statusOf), isRoot = proxy?.parent == null)?.let { component.icon = it }
+        if (component is SimpleColoredComponent && proxy != null) {
+            val isRoot = proxy.parent == null
+            testoNodeIcon(
+                status = if (isRoot) null else statuses.statusOf(proxy),
+                isRoot = isRoot,
+                verdict = if (isRoot) verdict() else null,
+            )?.let { component.icon = it }
         }
         // Always assigned, never only when there is one: a renderer is a single component reused for every node, so a
         // description left behind would go on showing over the nodes that have none.
@@ -112,9 +123,10 @@ private class TestoNodeRenderer(
  * carrying their children's outcome rolled up, so they have a Testo verdict of their own to show, and a tree where
  * only the leaves changed would read as two icon families side by side.
  *
- * Two nodes keep the platform's icon. A test still running has no status yet, so returning `null` is what keeps its
- * animation from being frozen into a still image. And the root is not a node of the run but the run itself: its text
- * comes from the platform's own root formatter, and its verdict is already spelled out — ring, counters and all — by
- * the toolbar summary a few pixels above it.
+ * The root is not a node of the run but the run itself, so it wears the run's verdict — the very icon the toolbar
+ * summary's ring turns into, taken from there rather than derived again: a check or a cross, greyed out when the run
+ * was stopped before it could reach a verdict of its own. `null` while the run is still going, which leaves the
+ * platform's animated icon in place — the same reason a test still running keeps its own.
  */
-fun testoNodeIcon(status: TestoTestStatus?, isRoot: Boolean): Icon? = status?.icon?.takeUnless { isRoot }
+fun testoNodeIcon(status: TestoTestStatus?, isRoot: Boolean, verdict: Icon?): Icon? =
+    if (isRoot) verdict else status?.icon
