@@ -109,12 +109,13 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         if (settings.suite != target.suite.orEmpty()) return false
         if (settings.testoType != target.type.orEmpty()) return false
 
-        target.methodFilter?.let {
+        target.filter?.let {
             return settings.scope == PhpTestRunnerSettings.Scope.Method && settings.methodName == it
         }
 
-        // No selector: the node is a case, and the element-based check knows how to compare one — except that it
-        // expects an untyped class run, while this node's own type is what the configuration was given.
+        // A hint that names no symbol at all — a file, i.e. a config-file node announced with a suite. Should it still
+        // resolve to a class, the element-based check is the right comparison, save that it expects an untyped class
+        // run while this node's own type is what the configuration was given.
         val element = context.psiLocation?.let { findTestElement(it, getWorkingDirectory(it)) }
         if (element is PhpClass) return isClassConfigurationFromContext(settings, element, target.type.orEmpty())
 
@@ -151,7 +152,10 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         // The whole selector goes into `--filter`, class and all: `--filter "\Ns\Calculator::med:3:0"` picks exactly
         // the node, where the bare method name would also match a namesake elsewhere in the file. `--path` stays as
         // the element-based path set it, so the run still only reads the one file.
-        val filter = target.methodFilter ?: return
+        //
+        // A case selector goes in too, even though the element-based path already found the right file: a file may
+        // declare several cases, and `--path` alone would run every one of them.
+        val filter = target.filter ?: return
         if (settings.filePath.isNullOrEmpty()) return
         settings.scope = PhpTestRunnerSettings.Scope.Method
         settings.methodName = filter

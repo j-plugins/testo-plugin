@@ -7,6 +7,8 @@ import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.process.ProcessListener
 import com.intellij.execution.testframework.AbstractTestProxy
 import com.intellij.execution.testframework.Filter
+import com.intellij.execution.testframework.TestConsoleProperties
+import com.intellij.execution.testframework.TestFrameworkPropertyListener
 import com.intellij.execution.testframework.TestFrameworkRunningModel
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
@@ -44,8 +46,11 @@ import javax.swing.Timer
  * finished/total fraction, one counter per Testo status, and the elapsed time.
  *
  * Every counter is a button. Clicking one narrows the test tree to that status; clicking it again — or clicking the
- * fraction on the left — clears the filter. The narrowing goes through [SMTestRunnerResultsForm.setFilter], the same
- * entry point the platform's own "Hide passed" toggle uses, so toggling that afterwards simply wins and replaces ours.
+ * fraction on the left — clears the filter and hands the tree back to the toolbar's standing toggles.
+ *
+ * Those toggles and these counters share one slot: [SMTestRunnerResultsForm.setFilter] writes the tree structure's
+ * only filter, and the platform composes "Show passed" / "Show ignored" into that same slot. So the two are arranged
+ * as owner and deputy rather than as layers — see [applyFilter].
  *
  * [RightAlignedToolbarAction] pushes the whole thing past every other button; the separator in front of it is painted
  * by the component itself, because a `Separator` action would stay behind with the left-aligned group.
@@ -62,6 +67,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
     private var resultsForm: SMTestRunnerResultsForm? = null
     private var statusStore: TestoStatusStore? = null
+    private var consoleProperties: TestConsoleProperties? = null
 
     /** What the tree is narrowed to right now; `null` means no filter of ours is applied. */
     private var selected: TestoTestStatus? = null
@@ -87,6 +93,16 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         resultsForm = viewer
         statusStore = store
         timings = clock
+        consoleProperties = console.properties
+
+        // The platform recomposes its filter whenever either toggle changes and writes it to the shared slot, which
+        // would drop a counter mid-flight. Registered here, i.e. after ToolbarPanel installed the platform's own
+        // listener, so this one runs second and re-asserts whichever filter is actually in charge.
+        val onToggle = object : TestFrameworkPropertyListener<Boolean> {
+            override fun onChanged(value: Boolean) = applyFilter()
+        }
+        console.properties.addListener(TestConsoleProperties.HIDE_PASSED_TESTS, onToggle)
+        console.properties.addListener(TestConsoleProperties.HIDE_IGNORED_TEST, onToggle)
         // Called from the augmenter's processStarted, so this is as close to the real start as the plugin can get.
         clock.noteStart()
 
@@ -132,23 +148,67 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         })
     }
 
-    /** Narrows the tree to [status]; passing `null` or the already selected status restores the full tree. */
+    /** Narrows the tree to [status]; passing `null` or the already selected status hands it back to the toggles. */
     private fun toggleFilter(status: TestoTestStatus?) {
+        selected = if (status == null || status == selected) null else status
+        applyFilter()
+    }
+
+    /**
+     * Writes whichever filter is in charge into the tree's one filter slot.
+     *
+     * A selected counter owns the tree outright — it does not narrow the standing toggles further, it replaces them.
+     * Otherwise asking for "show me the passed ones" while "Show passed" is off would answer with an empty tree, and
+     * the click that was meant to reveal something would look broken. The toggles are not lost meanwhile: they keep
+     * their state, any change to them is recorded, and releasing the counter puts the tree back under them —
+     * whichever way they were moved in between.
+     */
+    private fun applyFilter() {
         val form = resultsForm ?: return
         val store = statusStore ?: return
-        selected = if (status == null || status == selected) null else status
         val active = selected
-        if (active == null) form.setFilter(Filter.NO_FILTER) else form.setFilter(StatusFilter(active, store))
+        form.setFilter(if (active != null) OnlyStatus(active, store) else standingFilter(store))
+    }
+
+    /**
+     * What the toolbar's own two toggles come to, read in Testo's statuses rather than the platform's three.
+     *
+     * The platform composes this itself, in the private `TestFrameworkActions.getFilter`, off `isPassed`/`isIgnored` —
+     * a view in which Testo's eight statuses collapse to three. Flaky and risky both arrive as plain passed there, so
+     * "Show passed" hid a risky test and no toggle could ever reach it. Recomposing here from what Testo actually
+     * reported keeps each button meaning what it says. See [hiddenByToggles].
+     */
+    private fun standingFilter(store: TestoStatusStore): Filter<AbstractTestProxy> {
+        val properties = consoleProperties ?: return Filter.NO_FILTER
+        val hidden = hiddenByToggles(
+            hidePassed = TestConsoleProperties.HIDE_PASSED_TESTS.value(properties),
+            hideIgnored = TestConsoleProperties.HIDE_IGNORED_TEST.value(properties),
+        )
+        return if (hidden.isEmpty()) Filter.NO_FILTER else ExceptStatuses(hidden, store)
     }
 
     /** Keeps suites whose subtree still holds a matching test, so the matches stay reachable under their parents. */
-    private class StatusFilter(
+    private class OnlyStatus(
         private val status: TestoTestStatus,
         private val store: TestoStatusStore,
     ) : Filter<AbstractTestProxy>() {
         override fun shouldAccept(test: AbstractTestProxy): Boolean {
             val proxy = test as? SMTestProxy ?: return true
             return if (proxy.isSuite) proxy.children.any { shouldAccept(it) } else store.statusOf(proxy) == status
+        }
+    }
+
+    /** The standing toggles: everything survives except the listed statuses. */
+    private class ExceptStatuses(
+        private val hidden: Set<TestoTestStatus>,
+        private val store: TestoStatusStore,
+    ) : Filter<AbstractTestProxy>() {
+        override fun shouldAccept(test: AbstractTestProxy): Boolean {
+            val proxy = test as? SMTestProxy ?: return true
+            // A childless suite hides nothing, so it stays — unlike under OnlyStatus, where it holds no match either.
+            // A test still running has no status yet and is never one of the hidden ones.
+            if (proxy.isSuite) return proxy.children.isEmpty() || proxy.children.any { shouldAccept(it) }
+            return store.statusOf(proxy) !in hidden
         }
     }
 
@@ -508,5 +568,28 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         }
 
         internal fun formatFactor(factor: Double): String = String.format(Locale.ROOT, "%.1f", factor)
+    }
+}
+
+/**
+ * Which Testo statuses the toolbar's two standing toggles take out of the tree.
+ *
+ * Flaky goes with passed: it wears the same check, only yellow, and a run that ended green on the retry is not what
+ * "hide what passed" is meant to leave behind. Risky does not — its icon is an exclamation, it is the framework
+ * saying the test did something it could not vouch for, and that is exactly what a failures-only view is for. So with
+ * both toggles off the tree holds failed, error, aborted and risky, which is the set worth looking at.
+ *
+ * Cancelled goes with skipped for the same kind of reason: neither reached a verdict, and Testo reports both to the
+ * platform through `testIgnored`, so this is also what the button did before — only now it says so in Testo's terms
+ * rather than by accident of the three states the protocol can carry.
+ */
+fun hiddenByToggles(hidePassed: Boolean, hideIgnored: Boolean): Set<TestoTestStatus> = buildSet {
+    if (hidePassed) {
+        add(TestoTestStatus.PASSED)
+        add(TestoTestStatus.FLAKY)
+    }
+    if (hideIgnored) {
+        add(TestoTestStatus.SKIPPED)
+        add(TestoTestStatus.CANCELLED)
     }
 }

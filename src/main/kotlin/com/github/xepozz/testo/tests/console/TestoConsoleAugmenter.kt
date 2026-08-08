@@ -86,6 +86,10 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             props.channelsInstalled = true
             captureHeader(props, handler)
             TestoChannelsUi.install(console, props.channelStore, props.levelFilter, project, console)
+            // One icon per Testo status in the tree, so the toolbar summary's counters point at findable nodes.
+            TestoTestTreeDecorator.install(console, props.statusStore) { name ->
+                props.channelStore.description(props.channelStore.keyFor(name))
+            }
             // Persist each test's channel output into proxy metainfo so an imported-history run can rebuild the tabs.
             TestoChannelHistory.subscribeMetainfoWriter(project, console, props.channelStore)
             props.progressAction.attachTo(console, props.statusStore, props.runTimings, props.targetStore, handler)

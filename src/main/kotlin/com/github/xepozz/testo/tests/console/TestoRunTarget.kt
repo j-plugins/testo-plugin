@@ -23,19 +23,19 @@ data class TestoRunTarget(
     val suite: String? = null,
     val type: String? = null,
 ) {
-    /** The tail of the hint: `\Ns\Class::med:3:0`, `\Ns\Class` or `\Ns\freeFunction`. */
-    val filter: String? get() = locationHint?.let(Companion::filterOf)
-
     /**
-     * The tail, but only when it names something inside a class. A bare `\Ns\Class` (a case) or `\Ns\freeFunction`
-     * is already what the producer builds from the resolved PSI, so there is nothing to correct; a `Class::method`
-     * selector is the one the PSI cannot express.
+     * The tail of the hint — `\Ns\Class::med:3:0`, `\Ns\Class` or `\Ns\freeFunction` — which is exactly what
+     * `--filter` takes, whichever of the three it is.
+     *
+     * A class selector matters as much as a method one: the element-based path narrows a case node to `--path <file>`,
+     * and one file may declare several cases (`PipelineFailureSandbox.php` holding `TestLevelPipelineFailure` beside
+     * its siblings), so without the filter a right-click on one case runs all of them.
      */
-    val methodFilter: String? get() = filter?.takeIf { it.contains("::") }
+    val filter: String? get() = locationHint?.let(Companion::filterOf)
 
     /** Nothing here narrows anything: the node was announced without a hint and without either attribute. */
     val isEmpty: Boolean
-        get() = methodFilter == null && suite.isNullOrBlank() && type.isNullOrBlank()
+        get() = filter == null && suite.isNullOrBlank() && type.isNullOrBlank()
 
     companion object {
         /**

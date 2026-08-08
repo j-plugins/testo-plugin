@@ -53,24 +53,23 @@ class TestoRunTargetTest {
     }
 
     @Test
-    fun onlyASelectorNamingAMethodCorrectsTheProducer() {
-        // A case or a free function is already what the resolved PSI produces; a method selector is not.
-        assertEquals(
-            "\\Ns\\C::it:1:2",
-            TestoRunTarget(hint("\\Ns\\C::it:1:2")).methodFilter,
-        )
-        assertNull(TestoRunTarget(hint("\\Ns\\C")).methodFilter)
-        assertNull(TestoRunTarget(hint("\\Ns\\freeFunction")).methodFilter)
+    fun aSelectorOfAnyShapeCorrectsTheProducer() {
+        // Whatever the hint names goes to `--filter` verbatim. A case is not exempt: the element-based path narrows it
+        // to `--path <file>`, and a file may declare several cases.
+        assertEquals("\\Ns\\C::it:1:2", TestoRunTarget(hint("\\Ns\\C::it:1:2")).filter)
+        assertEquals("\\Ns\\C", TestoRunTarget(hint("\\Ns\\C")).filter)
+        assertEquals("\\Ns\\freeFunction", TestoRunTarget(hint("\\Ns\\freeFunction")).filter)
     }
 
     @Test
     fun aNodeThatNarrowsNothingIsEmpty() {
         assertTrue(TestoRunTarget().isEmpty)
-        assertTrue("a case hint alone adds nothing", TestoRunTarget(hint("\\Ns\\C")).isEmpty)
+        assertFalse("a case hint narrows the run to that one case", TestoRunTarget(hint("\\Ns\\C")).isEmpty)
         assertFalse(TestoRunTarget(hint("\\Ns\\C::it")).isEmpty)
-        assertFalse(TestoRunTarget(hint("\\Ns\\C"), suite = "Unit").isEmpty)
-        assertFalse(TestoRunTarget(hint("\\Ns\\C"), type = "bench").isEmpty)
+        assertFalse(TestoRunTarget(null, suite = "Unit").isEmpty)
+        assertFalse(TestoRunTarget(null, type = "bench").isEmpty)
         assertTrue("blank attributes are as good as absent", TestoRunTarget(null, suite = " ", type = "").isEmpty)
+        assertTrue("a hint naming only a file selects nothing", TestoRunTarget("php_qn://D:/p/testo.php").isEmpty)
     }
 
     @Test
@@ -82,8 +81,8 @@ class TestoRunTargetTest {
         store.note(TestoRunTarget(first))
         store.note(TestoRunTarget(second))
 
-        assertEquals("\\Ns\\A::it:0:0", store.targetFor(first)?.methodFilter)
-        assertEquals("\\Ns\\B::it:0:0", store.targetFor(second)?.methodFilter)
+        assertEquals("\\Ns\\A::it:0:0", store.targetFor(first)?.filter)
+        assertEquals("\\Ns\\B::it:0:0", store.targetFor(second)?.filter)
     }
 
     @Test
@@ -99,9 +98,19 @@ class TestoRunTargetTest {
     @Test
     fun anEmptyTargetIsNotWorthRemembering() {
         val store = TestoTargetStore()
-        val caseHint = hint("\\Ns\\C")
+        // The config-file node: its hint names a file, which selects nothing the element-based path does not already.
+        val fileHint = "php_qn://D:/project/testo.php"
+        store.note(TestoRunTarget(fileHint))
+
+        assertNull(store.targetFor(fileHint))
+    }
+
+    @Test
+    fun aCaseIsWorthRememberingOnItsHintAlone() {
+        val store = TestoTargetStore()
+        val caseHint = hint("\\Ns\\TestLevelPipelineFailure")
         store.note(TestoRunTarget(caseHint))
 
-        assertNull(store.targetFor(caseHint))
+        assertEquals("\\Ns\\TestLevelPipelineFailure", store.targetFor(caseHint)?.filter)
     }
 }

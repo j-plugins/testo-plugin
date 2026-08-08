@@ -16,6 +16,13 @@
 - Every counter in that summary filters the test tree: click one to see only tests with that status, click it again
   or click the total on the left to bring the whole tree back. Hovering the total shows how many assertions the run
   made, off the `assertions` attribute of `testFinished`.
+- A selected counter owns the tree while it is selected, rather than narrowing the toolbar's standing *Show passed* /
+  *Show ignored* toggles further — so asking for the passed tests answers with them even when passed ones are hidden.
+  Releasing the counter puts the tree back under those toggles, including any change made to them meanwhile.
+- *Show passed* and *Show ignored* now read Testo's statuses instead of the three the TeamCity protocol carries.
+  Hiding the passed ones takes flaky along (the same check mark, only yellow) but leaves **risky** — which used to
+  arrive as a plain pass and so could not be reached by any toggle at all. Hiding the ignored ones takes cancelled
+  along with skipped. With both toggles off the tree holds failed, error, aborted and risky.
 - The clock shows the run from start to finish, and its hover breaks that down into what happened before the first
   test, the tests themselves, and what happened after the last one — so the cost of bootstrapping and of merging
   reports is visible separately. Beside them it sums the tests' own durations: with tests on fibers that sum runs
@@ -29,6 +36,12 @@
 - A node of the results tree can be announced with `testSuite` and `testType`, and rerunning it from the tree keeps
   them: `--suite` and `--type` are added to the command the way the node itself was narrowed. Optional, so a Testo
   that sends neither runs exactly as before.
+- The results tree carries one icon per Testo status, the same eight the toolbar summary counts — so a counter
+  reading `42 flaky` now points at nodes that can be told apart on sight, instead of at tests the platform draws as
+  plain passed ones. Group nodes — a case, a data-provider batch, a suite of the run — get one too, off the outcome
+  Testo rolls up onto their `testSuiteFinished`. A test still running keeps its animation, and the root keeps the
+  platform's icon: the toolbar summary already states the run's verdict.
+- A test's `metainfo` — its PHPDoc summary — shows as the tooltip of its node in the results tree.
 
 ### Fixed
 
@@ -36,6 +49,20 @@
   sends spells out the selector (`\Ns\Calculator::med:3:0`), but the PSI it resolves to cannot: a data set has no
   method of its own to find, so it landed on its class. The selector now goes to `--filter` verbatim, class and all,
   which also stops a bare method name from matching a namesake elsewhere in the same file.
+- No more "Cannot find '…' in '….php'" stopping a run that Testo would have executed. That check assumed the Method
+  field names a member the file declares, but it holds a `--filter` selector — `med:1:0`, `\Ns\Case::med:1:0`,
+  `\Ns\Case`, `\Ns\freeFunction` — and PHP declares nothing under any of those spellings. The check is off; whether a
+  filter matches anything is Testo's call, and it reports an empty selection itself. The file-type and non-empty
+  checks on the field are unaffected.
+- Rerunning a case from the results tree runs that case, not every case its file declares. The node's own hint names
+  the class, and it now reaches `--filter` the same way a method selector does; before, only the file made it into the
+  command, so a right-click on `TestLevelPipelineFailure` in `PipelineFailureSandbox.php` ran the file's other cases
+  along with it.
+- Jump to Source on a data set node opens the test it belongs to. The location hint names the data set by its
+  position — `\Ns\Calculator::med:3:0` — and PHP declares no such member, so the platform missed the method and
+  answered with the enclosing class instead, or with the file when the hint named a standalone test function. The
+  coordinates are now taken off before the lookup, and a standalone function is looked for even in a file that also
+  holds a class.
 - A Testo older than 0.10.39 no longer floods the IDE with internal errors. Such a build sends its service messages
   without the node ids the test tree is built from, and every one of them was answered with a logged error; the run
   now stops at the first such message and says what to update instead.

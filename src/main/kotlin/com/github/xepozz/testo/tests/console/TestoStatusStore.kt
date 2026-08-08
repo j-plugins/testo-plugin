@@ -11,6 +11,9 @@ import java.util.EnumMap
  * on `testStarted` — so the converter (which writes) and the widget (which reads a tree node) agree on the same test
  * without ever touching `SMTestProxy.locationUrl`.
  *
+ * Group nodes are kept in a map of their own ([noteSuite]): they have a verdict worth showing in the tree, but they
+ * are not tests and must not reach the tally.
+ *
  * A Testo too old to send `status` is not left without counters: [noteInferred] derives one from the message that
  * closed the test, which is the same three the TeamCity protocol has always had — `testFailed`, `testIgnored` and a
  * plain `testFinished`. A reported status always wins over an inferred one whichever arrives first, so a run that
@@ -26,6 +29,7 @@ class TestoStatusStore(private val channels: ChannelOutputStore) {
 
     private val lock = Any()
     private val byKey = HashMap<String, Entry>()
+    private val suiteByKey = HashMap<String, TestoTestStatus>()
     private val counts = EnumMap<TestoTestStatus, Int>(TestoTestStatus::class.java)
     private val assertionsByKey = HashMap<String, Int>()
     private var started = 0
@@ -60,11 +64,26 @@ class TestoStatusStore(private val channels: ChannelOutputStore) {
         }
     }
 
+    /**
+     * The aggregated verdict of a group node — a run suite, a case, a DataProvider batch — off the `status` of its
+     * `testSuiteFinished`.
+     *
+     * Filed apart from the tests on purpose. [counts] tallies *tests*, and Testo announces one suite per case, per
+     * data-provider batch and per suite of the run: counting those as more tests would inflate every number the
+     * toolbar shows and make the progress ring divide by a total no run can reach.
+     */
+    fun noteSuite(name: String, status: TestoTestStatus) {
+        synchronized(lock) { suiteByKey[channels.keyFor(name)] = status }
+    }
+
     /** Known status of the node, or the platform's coarse reading of it when nothing was recorded for it. */
     fun statusOf(proxy: SMTestProxy): TestoTestStatus? {
         if (proxy.isInProgress) return null
-        val known = synchronized(lock) { byKey[channels.keyFor(proxy.name)] }
-        return known?.status ?: TestoTestStatus.fromProxy(proxy)
+        val key = channels.keyFor(proxy.name)
+        val known = synchronized(lock) {
+            if (proxy.isSuite) suiteByKey[key] else byKey[key]?.status
+        }
+        return known ?: TestoTestStatus.fromProxy(proxy)
     }
 
     fun counts(): Map<TestoTestStatus, Int> = synchronized(lock) { EnumMap(counts) }
@@ -124,6 +143,7 @@ class TestoStatusStore(private val channels: ChannelOutputStore) {
     fun clear() {
         synchronized(lock) {
             byKey.clear()
+            suiteByKey.clear()
             counts.clear()
             assertionsByKey.clear()
             started = 0

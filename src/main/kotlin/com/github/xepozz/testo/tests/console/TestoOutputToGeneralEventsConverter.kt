@@ -108,10 +108,18 @@ class TestoOutputToGeneralEventsConverter(
             }
         }
 
+        // A group node closes with its children's outcome rolled up. Worth showing on the node, but filed away from
+        // the tally: one of these arrives per case, per DataProvider batch and per suite of the run, and counting
+        // them as tests would inflate every number the toolbar shows.
+        if (message.messageName == TEST_SUITE_FINISHED) {
+            attrs["name"]?.let { name ->
+                TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.noteSuite(name, it) }
+            }
+        }
+
         // Testo's own verdict (`status`, lower-case) is finer than the passed / failed / ignored the platform can
         // express, and `assertions` on testFinished is a number it has nowhere to put at all. Only the messages that
-        // close a *test* feed the tally: `testSuiteFinished` carries the same attribute with a suite's aggregated
-        // outcome, and reading it would count every suite, case and DataProvider batch as one more test.
+        // close a *test* feed the tally — see the suite branch above.
         if (message.messageName == TEST_FINISHED || message.messageName == TEST_FAILED || message.messageName == TEST_IGNORED) {
             attrs["name"]?.let { name ->
                 TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.note(name, it) }
@@ -200,6 +208,7 @@ class TestoOutputToGeneralEventsConverter(
         private const val TEST_COUNT = "testCount"
         private const val TEST_STARTED = "testStarted"
         private const val TEST_SUITE_STARTED = "testSuiteStarted"
+        private const val TEST_SUITE_FINISHED = "testSuiteFinished"
         private const val TEST_FINISHED = "testFinished"
         private const val TEST_STD_OUT = "testStdOut"
         private const val TEST_STD_ERR = "testStdErr"

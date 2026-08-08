@@ -150,6 +150,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoRunTarget.kt       # a node's own rerun recipe: hint → --filter selector, testSuite/testType
 │   │   ├── TestoTargetStore.kt     # rerun targets of the current run, keyed by location hint
 │   │   ├── TestoProgressAction.kt  # right-aligned toolbar summary: ring, fraction, status counters, elapsed
+│   │   ├── TestoTestTreeDecorator.kt        # wraps the tree's cell renderer: status icons + description tooltips
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
 │   │
@@ -169,8 +170,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoRunnerSettings.kt           # Testo-specific persisted fields + transient rerunFilters
 │   │   ├── TestoRunConfigurationProducer.kt # context → configuration (~615 lines, the trickiest file)
 │   │   ├── TestoTestRunConfigurationEditor.kt  # "Testo Options" panel wrapping the PHP editor
-│   │   ├── TestoTestRunnerSettingsValidator.kt
-│   │   ├── TestoTestMethodFinder.kt
+│   │   ├── TestoTestRunnerSettingsValidator.kt # + the finder that switches the "Cannot find …" gate off
 │   │   └── TestoDebugRunner.kt              # debug session + channel tabs + rerun buttons
 │   │
 │   └── runAnything/
@@ -407,6 +407,21 @@ Non-obvious constraints already paid for in blood — read before touching the r
   opens a `Dataset #0 [0]`), which is why that store keys by the hint itself.
 - **`TestoChannelsUi` reaches `TestResultsPanel.myConsole` by reflection** — there is no public accessor. It
   degrades gracefully (logs a warning, no channel tabs) if the field disappears.
+- **The tree has one filter slot, and the status counters own it while selected.** `SMTestRunnerResultsForm.setFilter`
+  writes `SMTRunnerTreeStructure`'s only filter, and the platform composes *Show passed* / *Show ignored* into that
+  same slot from the private `TestFrameworkActions.getFilter`. So `TestoProgressAction.applyFilter` is the single
+  writer: a selected counter replaces the toggles outright (intersecting would answer "show me the passed ones" with
+  an empty tree), and releasing it recomposes them via `hiddenByToggles` — off Testo's statuses, not off
+  `isPassed`/`isIgnored`, in which flaky and risky are indistinguishable from a plain pass. A listener on both
+  `BooleanProperty`s re-asserts this after the platform's own listener, which would otherwise drop a live counter.
+- **The results tree is re-skinned from outside, not subclassed.** The platform's hook for supplying a tree of one's
+  own, `SMTRunnerTestTreeViewProvider`, is `@ApiStatus.Internal`, and so is the `TestTreeRenderer` one would subclass
+  — both fail the verifier's default `failureLevel`. `TestoTestTreeDecorator` instead takes the renderer the console
+  already installed and wraps it (`JTree.getCellRenderer` / `setCellRenderer`), overwriting the icon and the tooltip
+  of the component it returns. Safe because `attachToModel` — the only installer — runs inside
+  `SMTestRunnerResultsForm.createTestTreeView()`, long before the console reaches the augmenter, and nothing in the
+  test-framework packages ever reads the renderer back. The node's proxy is read off `NodeDescriptor.getElement()`
+  rather than `SMTRunnerTestTreeView.getTestProxyFor`, for the same reason: same object, public class.
 - **`TestoHistoryIndex.refreshLens` uses the internal `ModificationStampUtil`** to force code-vision recomputation
   after a run; a test run never touches PHP source, so neither `DaemonCodeAnalyzer.restart()` nor
   `invalidateProvider` alone re-runs `getHint`. Wrapped in `runCatching`.
@@ -438,6 +453,12 @@ Non-obvious constraints already paid for in blood — read before touching the r
   deliberate (the commented-out line records the intent); changing it affects framework auto-detection.
 - **`TestoTestRunLineMarkerProviderInfo.shouldReplace = true`** so Testo's gutter icon wins over PhpStorm's
   PHPUnit contributor for the same element.
+- **The Method field is a `--filter` selector, not a member name, so its validation gate is off.** Every shape Testo
+  accepts (`med:1:0`, `\Ns\Case::med:1:0`, `\Ns\Case`, `\Ns\freeFunction`) is something PHP declares nothing under, so
+  `PhpDefaultTestRunnerSettingsValidator`'s "Cannot find 'X' in 'Y.php'" fired on runs Testo executes correctly — and
+  had to be taught each new shape as it appeared. `AnyMethodIsValid` (in `TestoTestRunnerSettingsValidator.kt`) accepts
+  anything, which disables that one check and leaves the file-type and non-empty checks in place. An actually empty
+  selection is reported by Testo itself, via `buildProblem`.
 - **`TestoRunConfiguration.checkConfiguration` swallows one exact platform error.** A group-only run (scope
   `ConfigurationFile`, no config file, non-empty `group`) trips the platform's "Configuration file is not
   specified" `RuntimeConfigurationError`, though Testo needs no config file. The error is matched by message
