@@ -136,6 +136,10 @@ private class TestoNodeRenderer(
      * Replaced with the classic frame-by-frame spinner, which is a set of ordinary SVG icons and so is rendered at the
      * size in force when it is painted. Only when the two sizes actually disagree: at the default zoom the platform's
      * is correct, smoother, and the one the rest of the IDE shows.
+     *
+     * A workaround with an end in sight: the cache key is fixed upstream by IJPL-252440
+     * (https://github.com/JetBrains/intellij-community/pull/3605). Once that ships in the oldest platform this plugin
+     * builds against, this method can answer `null` always and go.
      */
     private fun zoomProofSpinner(current: Icon?): Icon? {
         if (current == null || current.iconHeight == JBUI.scale(SPINNER_SIZE)) return null

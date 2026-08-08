@@ -74,7 +74,8 @@
 - The spinner on a running test follows the IDE's zoom too. The platform's rasterizes its frames on first paint and
   caches them under the icon's colour alone, so a zoom never rebuilds them and a 16-pixel spinner is left among
   32-pixel icons for the rest of the session. Where the two sizes disagree the tree now draws a spinner of its own
-  that is sized when it is painted; at the default zoom the platform's own, smoother one is kept.
+  that is sized when it is painted; at the default zoom the platform's own, smoother one is kept. The cache key
+  itself is fixed upstream in [IJPL-252440](https://youtrack.jetbrains.com/issue/IJPL-252440).
 - A Testo older than 0.10.39 no longer floods the IDE with internal errors. Such a build sends its service messages
   without the node ids the test tree is built from, and every one of them was answered with a logged error; the run
   now stops at the first such message and says what to update instead.
