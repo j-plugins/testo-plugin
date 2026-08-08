@@ -7,9 +7,11 @@ import java.util.EnumMap
  * The Testo status of each test of the current run, as reported in the `status` attribute of its service messages,
  * plus the assertion counts and the running tally the toolbar widget shows.
  *
- * Keyed exactly like [ChannelOutputStore] — through [ChannelOutputStore.keyFor], i.e. by the location hint remembered
- * on `testStarted` — so the converter (which writes) and the widget (which reads a tree node) agree on the same test
- * without ever touching `SMTestProxy.locationUrl`.
+ * Keyed by the location hint a node was opened with, exactly as [TestoTargetStore] is: the converter resolves it off
+ * the message's `nodeId`, and this side reads it back as [SMTestProxy.getLocationUrl], which the id-based convertor
+ * fills with the same string. Names would not do — Testo builds a data set's name out of its coordinates alone, so
+ * every list-shaped provider in a run opens a `Dataset #0:0 [0]`, and one shared key would give them all one status
+ * between them and count them as a single test.
  *
  * Group nodes are kept in a map of their own ([noteSuite]): they have a verdict worth showing in the tree, but they
  * are not tests and must not reach the tally.
@@ -24,7 +26,7 @@ import java.util.EnumMap
  * run is over — replacing the running estimate with what the tree actually holds, including the tests a Stop left
  * unfinished.
  */
-class TestoStatusStore(private val channels: ChannelOutputStore) {
+class TestoStatusStore {
     private class Entry(val status: TestoTestStatus, val reported: Boolean)
 
     private val lock = Any()
@@ -38,9 +40,9 @@ class TestoStatusStore(private val channels: ChannelOutputStore) {
     /**
      * Testo's own verdict, off the `status` attribute.
      *
-     * @param name the `name` attribute of the service message the status came with.
+     * @param key the node's location hint, as the converter resolved it — see the note on keying above.
      */
-    fun note(name: String, status: TestoTestStatus) = put(name, status, reported = true, onlyIfAbsent = false)
+    fun note(key: String, status: TestoTestStatus) = put(key, status, reported = true, onlyIfAbsent = false)
 
     /**
      * The verdict read off the kind of message that closed the test, for a Testo that sends no `status`.
@@ -48,12 +50,11 @@ class TestoStatusStore(private val channels: ChannelOutputStore) {
      * @param onlyIfAbsent for the guess that a bare `testFinished` means the test passed — true only until the test
      *        has said otherwise, since `testFailed` and `testIgnored` come first and `testFinished` follows them.
      */
-    fun noteInferred(name: String, status: TestoTestStatus, onlyIfAbsent: Boolean) =
-        put(name, status, reported = false, onlyIfAbsent = onlyIfAbsent)
+    fun noteInferred(key: String, status: TestoTestStatus, onlyIfAbsent: Boolean) =
+        put(key, status, reported = false, onlyIfAbsent = onlyIfAbsent)
 
-    private fun put(name: String, status: TestoTestStatus, reported: Boolean, onlyIfAbsent: Boolean) {
+    private fun put(key: String, status: TestoTestStatus, reported: Boolean, onlyIfAbsent: Boolean) {
         synchronized(lock) {
-            val key = channels.keyFor(name)
             val previous = byKey[key]
             if (previous != null && (onlyIfAbsent || (previous.reported && !reported))) return
             byKey[key] = Entry(status, reported)
@@ -72,19 +73,26 @@ class TestoStatusStore(private val channels: ChannelOutputStore) {
      * data-provider batch and per suite of the run: counting those as more tests would inflate every number the
      * toolbar shows and make the progress ring divide by a total no run can reach.
      */
-    fun noteSuite(name: String, status: TestoTestStatus) {
-        synchronized(lock) { suiteByKey[channels.keyFor(name)] = status }
+    fun noteSuite(key: String, status: TestoTestStatus) {
+        synchronized(lock) { suiteByKey[key] = status }
     }
 
     /** Known status of the node, or the platform's coarse reading of it when nothing was recorded for it. */
     fun statusOf(proxy: SMTestProxy): TestoTestStatus? {
         if (proxy.isInProgress) return null
-        val key = channels.keyFor(proxy.name)
+        val key = keyOf(proxy)
         val known = synchronized(lock) {
             if (proxy.isSuite) suiteByKey[key] else byKey[key]?.status
         }
         return known ?: TestoTestStatus.fromProxy(proxy)
     }
+
+    /**
+     * How a tree node names itself to this store: its location url, which is the `locationHint` its opening message
+     * carried, verbatim. A node announced without one — a suite of the run — falls back to its name, exactly as the
+     * converter does.
+     */
+    private fun keyOf(proxy: SMTestProxy): String = proxy.locationUrl ?: proxy.name
 
     fun counts(): Map<TestoTestStatus, Int> = synchronized(lock) { EnumMap(counts) }
 
@@ -94,8 +102,8 @@ class TestoStatusStore(private val channels: ChannelOutputStore) {
      * How many assertions the test ran, off the `assertions` attribute of its `testFinished`. Stored per test rather
      * than summed on arrival so a re-reported test replaces its own figure instead of doubling the total.
      */
-    fun noteAssertions(name: String, assertions: Int) {
-        synchronized(lock) { assertionsByKey[channels.keyFor(name)] = assertions }
+    fun noteAssertions(key: String, assertions: Int) {
+        synchronized(lock) { assertionsByKey[key] = assertions }
     }
 
     /** Assertions across the whole run, or `null` when this Testo reports none at all. */

@@ -119,8 +119,15 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                     clock.noteStart()
                     exitCode.set(null)
                 }
-                // A narrowed tree must not survive into the next run: its statuses are gone with the store.
-                if (selected != null) ApplicationManager.getApplication().invokeLater { toggleFilter(null) }
+                // Unconditionally, not just when a counter was left selected. A narrowed tree must not survive into
+                // the next run — its statuses are gone with the store — and the standing toggles have to be restated
+                // in Testo's terms right away: whatever the platform composed off isPassed/isIgnored is what sits in
+                // the filter slot until we write ours, and a "Show passed" left off from a previous run would go on
+                // hiding risky tests as passes until the user happened to touch a button.
+                ApplicationManager.getApplication().invokeLater {
+                    selected = null
+                    applyFilter()
+                }
             }
 
             override fun onTestNodeAdded(viewer: TestResultsViewer, test: SMTestProxy) = Unit

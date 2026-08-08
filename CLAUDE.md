@@ -399,12 +399,18 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `TestoProtocolGate` detects it off the missing `nodeId` (not off a version comparison, so forks and nightlies are
   covered), and the converter then stops forwarding messages and notifies once. The version in that notification is
   scraped from Testo's banner line, which survives `-q`.
-- **Channel storage keys go through `ChannelOutputStore.keyFor(name)`** (the `locationHint` remembered on
-  `testStarted`, falling back to the name). On the converter side keys must come from the message attributes — the
-  proxy for a node may not exist yet while its output streams in, so `SMTestProxy.locationUrl` is not available
-  there. Reading it later is fine: the id-based convertor sets it when it builds the proxy, and that click-time read
-  is exactly how `TestoTargetStore` keys the rerun targets. Names alone do not identify a node (every data provider
-  opens a `Dataset #0 [0]`), which is why that store keys by the hint itself.
+- **A node is identified by its location hint, never by its name.** Testo builds a data set's name out of its
+  coordinates alone (`Dataset #0:0 [0]`, `TeamcityPlugin::onTestDataSetStarting`), so every list-shaped provider in a
+  run opens one of those, and a batch node is named after its test, which two cases may share. `TestoStatusStore` and
+  `TestoTargetStore` therefore key by the hint: the converter resolves it through its own `nodeId → locationHint` map
+  (a closing message carries the id but no hint), and the reading side takes it back off `SMTestProxy.locationUrl`,
+  which the id-based convertor fills with the same string. Both sides fall back to the name for a node that points at
+  no code — a suite of the run.
+- **Channel storage keys still go through `ChannelOutputStore.keyFor(name)`** (the `locationHint` remembered on
+  `testStarted`, falling back to the name), and so inherit the collision above — the channel tabs look a test up by
+  the name of its tree node. On the converter side keys cannot come from the proxy at all: it may not exist yet while
+  the output streams in, so `SMTestProxy.locationUrl` is unavailable there. Reading it later is fine, which is what
+  the two stores above do.
 - **`TestoChannelsUi` reaches `TestResultsPanel.myConsole` by reflection** — there is no public accessor. It
   degrades gracefully (logs a warning, no channel tabs) if the field disappears.
 - **The tree has one filter slot, and the status counters own it while selected.** `SMTestRunnerResultsForm.setFilter`

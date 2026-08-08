@@ -36,7 +36,7 @@ class TestoConsoleProperties(
 
     val levelFilter = LogLevelFilter()
 
-    val statusStore = TestoStatusStore(channelStore)
+    val statusStore = TestoStatusStore()
 
     val runTimings = TestoRunTimings()
 

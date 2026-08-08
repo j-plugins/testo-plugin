@@ -1,6 +1,5 @@
 package com.github.xepozz.testo
 
-import com.github.xepozz.testo.tests.console.ChannelOutputStore
 import com.github.xepozz.testo.tests.console.TestoProgressAction
 import com.github.xepozz.testo.tests.console.TestoStatusStore
 import com.github.xepozz.testo.tests.console.TestoTestStatus
@@ -53,7 +52,7 @@ class TestoTestStatusTest {
 
     @Test
     fun tallyCountsOneEntryPerTest() {
-        val store = TestoStatusStore(ChannelOutputStore())
+        val store = TestoStatusStore()
         store.note("a", TestoTestStatus.PASSED)
         store.note("b", TestoTestStatus.PASSED)
         store.note("c", TestoTestStatus.RISKY)
@@ -64,7 +63,7 @@ class TestoTestStatusTest {
 
     @Test
     fun restatingATestMovesItBetweenCounters() {
-        val store = TestoStatusStore(ChannelOutputStore())
+        val store = TestoStatusStore()
         // A test reports failed first and then finishes as flaky after a retry; it must not be counted twice.
         store.note("a", TestoTestStatus.FAILED)
         store.note("a", TestoTestStatus.FLAKY)
@@ -74,22 +73,33 @@ class TestoTestStatusTest {
     }
 
     @Test
-    fun statusesAreKeyedByLocationHintLikeChannelOutput() {
-        val channels = ChannelOutputStore()
-        // Two tests of the same name in different classes: the hint recorded on testStarted is what tells them apart.
-        channels.rememberLocation("itWorks", "php_qn:///a.php::\\A::itWorks")
-        val store = TestoStatusStore(channels)
-        store.note("itWorks", TestoTestStatus.PASSED)
-
-        channels.rememberLocation("itWorks", "php_qn:///b.php::\\B::itWorks")
-        store.note("itWorks", TestoTestStatus.FAILED)
+    fun nodesOfTheSameNameKeepTheirOwnStatus() {
+        val store = TestoStatusStore()
+        // Testo builds a data set's name out of its coordinates alone, so every list-shaped provider in a run opens a
+        // `Dataset #0:0 [0]`. Only the location tells them apart — and the converter keys by it, resolved off the
+        // node id, precisely so two of these cannot collapse into one entry and count as a single test.
+        store.note("php_qn:///a.php::\\A::it:0:0", TestoTestStatus.PASSED)
+        store.note("php_qn:///b.php::\\B::it:0:0", TestoTestStatus.FAILED)
 
         assertEquals(mapOf(TestoTestStatus.PASSED to 1, TestoTestStatus.FAILED to 1), store.counts())
+        assertEquals(2, store.finishedCount())
+    }
+
+    @Test
+    fun aGroupNodeIsKeptApartFromTheTests() {
+        val store = TestoStatusStore()
+        // A case, a batch and a suite of the run all close with testSuiteFinished. They have a verdict worth showing
+        // in the tree, but they are not tests: counting them would inflate the fraction the ring divides.
+        store.note("php_qn:///a.php::\\A::it", TestoTestStatus.PASSED)
+        store.noteSuite("php_qn:///a.php::\\A", TestoTestStatus.FAILED)
+
+        assertEquals(mapOf(TestoTestStatus.PASSED to 1), store.counts())
+        assertEquals(1, store.finishedCount())
     }
 
     @Test
     fun anOldTestoStillGetsTheThreeStatusesTeamcityCarries() {
-        val store = TestoStatusStore(ChannelOutputStore())
+        val store = TestoStatusStore()
         // No `status` anywhere: the message that closes each test is all there is to go on.
         store.noteInferred("passed", TestoTestStatus.PASSED, onlyIfAbsent = true)     // testFinished
 
@@ -107,13 +117,13 @@ class TestoTestStatusTest {
 
     @Test
     fun aReportedStatusOutranksAnInferredOneWhicheverArrivesFirst() {
-        val early = TestoStatusStore(ChannelOutputStore())
+        val early = TestoStatusStore()
         // testFailed with no status, then testFinished carrying status='error'.
         early.noteInferred("a", TestoTestStatus.FAILED, onlyIfAbsent = false)
         early.note("a", TestoTestStatus.ERROR)
         assertEquals(mapOf(TestoTestStatus.ERROR to 1), early.counts())
 
-        val late = TestoStatusStore(ChannelOutputStore())
+        val late = TestoStatusStore()
         // testFailed carrying status='aborted', then a bare testFinished that must not coarsen it back.
         late.note("a", TestoTestStatus.ABORTED)
         late.noteInferred("a", TestoTestStatus.FAILED, onlyIfAbsent = false)
@@ -123,7 +133,7 @@ class TestoTestStatusTest {
 
     @Test
     fun aRiskyTestIsCountedAsPassedWhenTestoCannotSayOtherwise() {
-        val store = TestoStatusStore(ChannelOutputStore())
+        val store = TestoStatusStore()
         // An old Testo announces risky only as a warning on stdout and then finishes the test normally.
         store.noteInferred("a", TestoTestStatus.PASSED, onlyIfAbsent = true)
 
@@ -133,7 +143,7 @@ class TestoTestStatusTest {
 
     @Test
     fun assertionsAreSummedPerTestAndReplacedOnRestatement() {
-        val store = TestoStatusStore(ChannelOutputStore())
+        val store = TestoStatusStore()
         assertNull("no assertion attribute seen yet", store.assertionCount())
 
         store.noteAssertions("a", 3)
@@ -147,7 +157,7 @@ class TestoTestStatusTest {
 
     @Test
     fun totalFallsBackToStartedTestsUntilTestoAnnouncesOne() {
-        val store = TestoStatusStore(ChannelOutputStore())
+        val store = TestoStatusStore()
         assertEquals(0, store.totalHint())
 
         repeat(3) { store.noteStarted() }
@@ -159,7 +169,7 @@ class TestoTestStatusTest {
 
     @Test
     fun declaredTotalsAccumulateAcrossSuites() {
-        val store = TestoStatusStore(ChannelOutputStore())
+        val store = TestoStatusStore()
         // Testo announces one testCount per suite; the divisor is their sum, as the platform's progress bar sums them.
         store.noteDeclaredTotal(10)
         store.noteDeclaredTotal(5)
@@ -169,7 +179,7 @@ class TestoTestStatusTest {
 
     @Test
     fun clearResetsTheTally() {
-        val store = TestoStatusStore(ChannelOutputStore())
+        val store = TestoStatusStore()
         store.note("a", TestoTestStatus.PASSED)
         store.noteAssertions("a", 2)
         store.clear()

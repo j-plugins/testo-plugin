@@ -34,9 +34,10 @@ object TestoTestTreeDecorator {
     private val LOG = logger<TestoTestTreeDecorator>()
 
     /**
-     * @param describe the description of a node, by node name — see [ChannelOutputStore.description]. Not read off
-     *        `SMTestProxy.metainfo`, where the platform does put it: [TestoChannelHistory] overwrites that field with
-     *        the encoded channel output, the only per-test datum the history XML round-trips.
+     * @param describe the description of a node, by the same key the converter filed it under — its location hint,
+     *        or its name when it has none. See [ChannelOutputStore.description]. Not read off `SMTestProxy.metainfo`,
+     *        where the platform does put it: [TestoChannelHistory] overwrites that field with the encoded channel
+     *        output, the only per-test datum the history XML round-trips.
      */
     fun install(
         console: SMTRunnerConsoleView,
@@ -100,7 +101,8 @@ private class TestoNodeRenderer(
         // Always assigned, never only when there is one: a renderer is a single component reused for every node, so a
         // description left behind would go on showing over the nodes that have none.
         if (component is JComponent) {
-            val tip = proxy?.name?.let(describe)?.takeIf { it.isNotBlank() }
+            // Keyed by location, not by name: two data sets of different tests share a name (`Dataset #0:0 [0]`).
+            val tip = proxy?.let { describe(it.locationUrl ?: it.name) }?.takeIf { it.isNotBlank() }
             if (component.toolTipText != tip) component.toolTipText = tip
         }
         return component
