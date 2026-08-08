@@ -6,79 +6,46 @@
 
 ### Added
 
-- The test toolbar ends with a run summary: a progress ring that fills as tests finish and turns into a green check
-  or a red cross when the process exits — grey when the run was stopped before it could reach a verdict of its own,
-  the check or the cross still chosen by whatever its tests managed to report — the finished/total count, one counter
-  per Testo status, and the elapsed time. Each counter names what it counts — `1234/2000 total`, `42 flaky`. Statuses come from the `status` attribute
-  of Testo's service messages, so all eight cases of `Testo\Core\Value\Status` — including risky, flaky, cancelled
-  and aborted — are told apart. A Testo too old to send that attribute still gets counters, from the three outcomes
-  TeamCity has always carried: `testFailed`, `testIgnored` and a plain `testFinished`.
-- Every counter in that summary filters the test tree: click one to see only tests with that status, click it again
-  or click the total on the left to bring the whole tree back. Hovering the total shows how many assertions the run
-  made, off the `assertions` attribute of `testFinished`.
-- A selected counter owns the tree while it is selected, rather than narrowing the toolbar's standing *Show passed* /
-  *Show ignored* toggles further — so asking for the passed tests answers with them even when passed ones are hidden.
-  Releasing the counter puts the tree back under those toggles, including any change made to them meanwhile.
-- *Show passed* and *Show ignored* now read Testo's statuses instead of the three the TeamCity protocol carries.
-  Hiding the passed ones takes flaky along (the same check mark, only yellow) but leaves **risky** — which used to
-  arrive as a plain pass and so could not be reached by any toggle at all. Hiding the ignored ones takes cancelled
-  along with skipped. With both toggles off the tree holds failed, error, aborted and risky.
-- The tree's root node carries the run's verdict — the same check or cross the summary's ring turns into, grey when
-  the run was stopped before it could reach one. It is read from the summary rather than worked out again, so the
-  two cannot come to disagree.
-- The clock shows the run from start to finish, and its hover breaks that down into what happened before the first
-  test, the tests themselves, and what happened after the last one — so the cost of bootstrapping and of merging
-  reports is visible separately. Beside them it sums the tests' own durations, but only where that sum parts with
-  the window they fitted into — level with it, it would be the same figure twice. With tests on fibers the sum runs
-  past that window, and the difference is read as a concurrency boost on a line of its own rather than pretended to
-  be framework overhead. Stated as a floor — `≥2.1x` — because the window it is measured against also holds the work
-  between tests, which no test's own duration counts.
+- The test toolbar ends with a run summary: a progress ring that turns into the run's verdict, the finished/total
+  count, one counter per Testo status and the elapsed time. Statuses come from the `status` attribute of Testo's
+  service messages, so all eight cases of `Testo\Core\Value\Status` are told apart; a Testo too old to send it still
+  gets counters, from the three outcomes TeamCity has always carried.
+- Every counter filters the test tree: click one to see only tests with that status, click it again or click the
+  total to bring the whole tree back. Hovering the total shows how many assertions the run made.
+- A selected counter owns the tree while it is selected rather than narrowing the standing *Show passed* /
+  *Show ignored* toggles further; releasing it puts the tree back under them.
+- *Show passed* and *Show ignored* now read Testo's statuses. Hiding the passed ones takes flaky along but leaves
+  **risky**, which used to arrive as a plain pass; hiding the ignored ones takes cancelled along with skipped.
+- The tree's root node carries the run's verdict, read from the summary rather than worked out again.
+- The clock's hover breaks the run into startup, the tests themselves and post-processing, and sums the tests' own
+  durations beside them — only where that sum parts with the window they fitted into. With tests on fibers it runs
+  past that window, and the difference is read as a concurrency boost, stated as a floor (`≥2.1x`).
 - A problem Testo raises about the run itself rather than about a test — `##teamcity[buildProblem …]`, as an empty
-  run reports — is now visible instead of parsed and dropped: as a red line in Output, as a run-level notice in All,
-  and as a notification, since a run that executed nothing otherwise looks like a run that simply finished. Reported
-  once per problem, keyed by the message's own `identity`.
-
-- A node of the results tree can be announced with `testSuite` and `testType`, and rerunning it from the tree keeps
-  them: `--suite` and `--type` are added to the command the way the node itself was narrowed. Optional, so a Testo
-  that sends neither runs exactly as before.
-- The results tree carries one icon per Testo status, the same eight the toolbar summary counts — so a counter
-  reading `42 flaky` now points at nodes that can be told apart on sight, instead of at tests the platform draws as
-  plain passed ones. Group nodes — a case, a data-provider batch, a suite of the run — get one too, off the outcome
-  Testo rolls up onto their `testSuiteFinished`. A test still running keeps its animation, and the root keeps the
-  platform's icon: the toolbar summary already states the run's verdict.
+  run reports — is now shown: a red line in Output, a run-level notice in All, and a notification. Once per
+  `identity`.
+- A node announced with `testSuite` and `testType` keeps them on rerun: `--suite` and `--type` are added the way the
+  node itself was narrowed. Optional, so a Testo that sends neither runs exactly as before.
+- The results tree carries one icon per Testo status, group nodes included — off the outcome Testo rolls up onto
+  their `testSuiteFinished`. A test still running keeps its animation.
 - A test's `metainfo` — its PHPDoc summary — shows as the tooltip of its node in the results tree.
 
 ### Fixed
 
-- Rerunning a data set from the results tree runs that data set again, not its whole file. The location hint Testo
-  sends spells out the selector (`\Ns\Calculator::med:3:0`), but the PSI it resolves to cannot: a data set has no
-  method of its own to find, so it landed on its class. The selector now goes to `--filter` verbatim, class and all,
-  which also stops a bare method name from matching a namesake elsewhere in the same file.
+- Rerunning a data set or a case from the results tree runs that data set or case, not its whole file. The node's own
+  hint spells out the selector (`\Ns\Calculator::med:3:0`), but PHP declares no such member, so it resolved to the
+  class; the selector now goes to `--filter` verbatim, class and all.
 - No more "Cannot find '…' in '….php'" stopping a run that Testo would have executed. That check assumed the Method
-  field names a member the file declares, but it holds a `--filter` selector — `med:1:0`, `\Ns\Case::med:1:0`,
-  `\Ns\Case`, `\Ns\freeFunction` — and PHP declares nothing under any of those spellings. The check is off; whether a
-  filter matches anything is Testo's call, and it reports an empty selection itself. The file-type and non-empty
-  checks on the field are unaffected.
-- Rerunning a case from the results tree runs that case, not every case its file declares. The node's own hint names
-  the class, and it now reaches `--filter` the same way a method selector does; before, only the file made it into the
-  command, so a right-click on `TestLevelPipelineFailure` in `PipelineFailureSandbox.php` ran the file's other cases
-  along with it.
-- Jump to Source on a data set node opens the test it belongs to. The location hint names the data set by its
-  position — `\Ns\Calculator::med:3:0` — and PHP declares no such member, so the platform missed the method and
-  answered with the enclosing class instead, or with the file when the hint named a standalone test function. The
-  coordinates are now taken off before the lookup, and a standalone function is looked for even in a file that also
-  holds a class.
-- The toolbar run summary follows the IDE's zoom. Its cells are painted by hand and took the label font once, when
-  the toolbar was built, and nothing reinstalls a font on a component that has no UI delegate — so the counters kept
-  the size the IDE had at the start of the run while everything around them grew.
-- The spinner on a running test follows the IDE's zoom too. The platform's rasterizes its frames on first paint and
-  caches them under the icon's colour alone, so a zoom never rebuilds them and a 16-pixel spinner is left among
-  32-pixel icons for the rest of the session. Where the two sizes disagree the tree now draws a spinner of its own
-  that is sized when it is painted; at the default zoom the platform's own, smoother one is kept. The cache key
-  itself is fixed upstream in [IJPL-252440](https://youtrack.jetbrains.com/issue/IJPL-252440).
-- A Testo older than 0.10.39 no longer floods the IDE with internal errors. Such a build sends its service messages
-  without the node ids the test tree is built from, and every one of them was answered with a logged error; the run
-  now stops at the first such message and says what to update instead.
+  field names a member the file declares, but it holds a `--filter` selector — `med:1:0`, `\Ns\Case`,
+  `\Ns\freeFunction` — that PHP declares nothing under. Whether a filter matches anything is Testo's call.
+- Jump to Source on a data set node opens the test it belongs to: the coordinates are taken off the hint before the
+  lookup, and a standalone function is looked for even in a file that also holds a class.
+- The toolbar run summary follows the IDE's zoom. Its cells are painted by hand and took the label font once, and
+  nothing reinstalls a font on a component that has no UI delegate.
+- The spinner on a running test follows the IDE's zoom too. The platform's caches its rasterized frames under the
+  icon's colour alone, so the tree draws its own where the sizes disagree; the cache key is fixed upstream in
+  [IJPL-252440](https://youtrack.jetbrains.com/issue/IJPL-252440).
+- A Testo older than 0.10.39 no longer floods the IDE with internal errors. Such a build sends no node ids, so the
+  run now stops at the first such message and says what to update instead.
 
 ## [2026.3.1] - 2026-08-04
 

@@ -12,8 +12,8 @@ object TestoIcons {
     val TESTO = IconLoader.getIcon("/icons/testo/icon.svg", this::class.java)
 
     // One icon per Testo\Core\Value\Status case, plus the pair the run is judged by. Five shapes cover the eight:
-    // check, exclamation and crossed-out circle each serve two and are told apart by colour, from the JetBrains
-    // palette and baked into the SVGs rather than tinted at runtime. The circled drawings live under `circle`.
+    // check, exclamation and crossed-out circle each serve two and are told apart by colour, baked into the SVGs
+    // rather than tinted at runtime.
     object Status {
         /** Verdict of the whole run — the same check/cross drawn full-bleed, so it outweighs the per-test glyphs. */
         @JvmField
