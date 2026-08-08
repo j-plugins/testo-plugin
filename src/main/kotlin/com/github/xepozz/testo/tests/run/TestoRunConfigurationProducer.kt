@@ -71,14 +71,12 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     /**
      * Right-clicking a node of the results tree, rather than a piece of source.
      *
-     * The PSI a location hint resolves to is lossy — a data set has no method of its own to find, so it lands on its
-     * class and the run widens to the whole file — and the `testSuite` / `testType` a node may have been announced
-     * with are not in the PSI at all. So whatever the element-based path produced is corrected here with what the
-     * node's own service message said. See [TestoRunTarget].
+     * The PSI a location hint resolves to is lossy — a data set lands on its class and the run widens to the file —
+     * and `testSuite`/`testType` are not in the PSI at all, so the element-based result is corrected here with what
+     * the node's own message said. See [TestoRunTarget].
      *
-     * Only a node the platform could resolve to a [Location] gets here at all: `PreferredProducerFind` runs no
-     * producer without one. That covers cases, tests, DataProvider batches and data sets — every node Testo points at
-     * code — but not a run-level suite, which is a configuration entry with no location hint of its own.
+     * Only a node the platform resolved to a [Location] gets here: `PreferredProducerFind` runs no producer without
+     * one, which leaves out a run-level suite.
      */
     override fun setupConfigurationFromContext(
         configuration: TestoRunConfiguration,
@@ -98,11 +96,9 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         configuration: TestoRunConfiguration,
         context: ConfigurationContext,
     ): Boolean {
-        // A configuration built from source can look like "this context" to the element-based check while missing the
-        // very selector the node was announced with — reusing it would silently run the whole file instead of the one
-        // data set. When the context is a tree node, only a configuration that spells the node out counts, and
-        // nothing beyond it: a class node and a method node of the same class agree on suite and type, so matching
-        // on those alone would hand the class the method's configuration.
+        // A configuration built from source can look like "this context" while missing the selector the node was
+        // announced with, and reusing it would run the whole file. The match is therefore exact on all three: a class
+        // node and a method node of the same class agree on suite and type, so those alone are not enough.
         val target = treeTarget(context) ?: return super.isConfigurationFromContext(configuration, context)
         val settings = configuration.testoSettings.getTestoRunnerSettings()
 
@@ -113,30 +109,23 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             return settings.scope == PhpTestRunnerSettings.Scope.Method && settings.methodName == it
         }
 
-        // A hint that names no symbol at all — a file, i.e. a config-file node announced with a suite. Should it still
-        // resolve to a class, the element-based check is the right comparison, save that it expects an untyped class
-        // run while this node's own type is what the configuration was given.
+        // A hint naming no symbol — a config-file node announced with a suite. Should it resolve to a class anyway,
+        // the element-based check applies, except that it expects an untyped run while this node carries a type.
         val element = context.psiLocation?.let { findTestElement(it, getWorkingDirectory(it)) }
         if (element is PhpClass) return isClassConfigurationFromContext(settings, element, target.type.orEmpty())
 
-        // A free test function falls through untyped: its element-based check never compares testoType, so once
-        // Testo starts sending `testType` a typed function configuration could be confused with an untyped one —
-        // the mirror of the class problem solved above. Latent until then: a function node without the attributes
-        // has an empty target and never reaches this method at all.
+        // A free function falls through untyped: its element-based check never compares testoType, so once Testo
+        // sends `testType` a typed function configuration could pass for an untyped one — the mirror of the class
+        // case above. Latent until then: without the attributes such a target is empty and never stored.
         return super.isConfigurationFromContext(configuration, context)
     }
 
     /**
      * What the selected results-tree node was announced with, or null when the context is not a Testo run's tree.
      *
-     * Both keys are filled eagerly by `TestTreeView.uiDataSnapshot`, so they are in the snapshot the context carries
-     * and reading them costs nothing. The model is what ties the node back to the run it belongs to — the store is
-     * per-run, and a stale target from another console would rerun the wrong thing.
-     *
-     * The node is identified by the `nodeId` its messages carried, resolved through `TestoNodeIndex`. Neither its
-     * name nor its location hint would do: every data provider in a run opens a `Dataset #0:0 [0]` of its own, and a
-     * hint names code rather than a node, so one method announced under two types answers with the same hint twice —
-     * which is precisely when the two nodes want different `--type`s.
+     * Both keys come from `TestTreeView.uiDataSnapshot`. The model ties the node back to its own run: the store is
+     * per-run, and a target from another console would rerun the wrong thing. Identified by `nodeId` — see
+     * [com.github.xepozz.testo.tests.console.TestoNodeIndex].
      */
     private fun treeTarget(context: ConfigurationContext): TestoRunTarget? {
         val dataContext = context.dataContext
@@ -151,12 +140,8 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         target.suite?.takeIf { it.isNotBlank() }?.let { settings.suite = it }
         target.type?.takeIf { it.isNotBlank() }?.let { settings.testoType = it }
 
-        // The whole selector goes into `--filter`, class and all: `--filter "\Ns\Calculator::med:3:0"` picks exactly
-        // the node, where the bare method name would also match a namesake elsewhere in the file. `--path` stays as
-        // the element-based path set it, so the run still only reads the one file.
-        //
-        // A case selector goes in too, even though the element-based path already found the right file: a file may
-        // declare several cases, and `--path` alone would run every one of them.
+        // The whole selector, class and all: a bare method name would also match a namesake in the same file, and a
+        // case needs it too, since `--path` alone runs every case the file declares. `--path` stays as it was.
         val filter = target.filter ?: return
         if (settings.filePath.isNullOrEmpty()) return
         settings.scope = PhpTestRunnerSettings.Scope.Method

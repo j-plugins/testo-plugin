@@ -19,28 +19,20 @@ import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.TreeCellRenderer
 
 /**
- * Teaches the results tree what Testo reported about a node: one icon per case of `Testo\Core\Value\Status` on the
- * nodes, the run's own verdict on the root, and the node's description on hover.
+ * Puts Testo's own status icons, the run's verdict and per-node descriptions on the results tree.
  *
- * The platform picks the icon in `TestsPresentationUtil.getIcon`, which is `private static` and limited to what
- * `SMTestProxy` state can express — passed, failed, ignored, running. Everything finer Testo sends (risky, flaky,
- * cancelled, aborted, error) has no way in, so the toolbar summary counts statuses the tree cannot show.
- *
- * The renderer that draws all this is installed once, in `TestTreeView.attachToModel`, and the only hook the platform
- * offers for supplying a different one — `SMTRunnerTestTreeViewProvider` — is `@ApiStatus.Internal`. So the tree is
- * decorated after the fact instead, through plain Swing: `getCellRenderer` / `setCellRenderer` on the `JTree` the
- * console already built. Nothing in `intellij.platform.smRunner` or `intellij.platform.testRunner` reads the renderer
- * back (checked across all 216 classes of the package), and `attachToModel` runs inside
- * `SMTestRunnerResultsForm.createTestTreeView()` — long before the console reaches us — so no one overwrites this.
+ * The platform picks icons in `TestsPresentationUtil.getIcon` (`private static`, limited to passed / failed /
+ * ignored / running), and its hook for supplying a tree of one's own, `SMTRunnerTestTreeViewProvider`, is
+ * `@ApiStatus.Internal` — which `verifyPlugin` fails on. So the renderer the console already installed is wrapped
+ * through plain `JTree.getCellRenderer` / `setCellRenderer` instead. Safe: `attachToModel` is its only installer and
+ * runs at form construction, and nothing in the test-framework packages reads the renderer back.
  */
 object TestoTestTreeDecorator {
     private val LOG = logger<TestoTestTreeDecorator>()
 
     /**
-     * @param describe the description of a node, by the same key the converter filed it under — its location hint,
-     *        or its name when it has none. See [ChannelOutputStore.description]. Not read off `SMTestProxy.metainfo`,
-     *        where the platform does put it: [TestoChannelHistory] overwrites that field with the encoded channel
-     *        output, the only per-test datum the history XML round-trips.
+     * @param describe a node's description, by the key the converter filed it under. Not `SMTestProxy.metainfo`,
+     *        where the platform puts it: [TestoChannelHistory] overwrites that field with the channel output.
      */
     fun install(
         console: SMTRunnerConsoleView,
@@ -59,20 +51,18 @@ object TestoTestTreeDecorator {
         if (platform == null || platform is TestoNodeRenderer) return
         tree.cellRenderer = TestoNodeRenderer(platform, statuses, verdict, describe)
 
-        // JTree.getToolTipText(MouseEvent) asks the renderer for the hovered node's tooltip, but only once the tree is
-        // registered — and the platform's own has no tooltip anywhere, so it never registers itself.
+        // JTree.getToolTipText asks the renderer for the tooltip, but only for a registered component — and the
+        // platform's tree has no tooltip anywhere, so it never registers itself.
         ToolTipManager.sharedInstance().registerComponent(tree)
     }
 }
 
 /**
- * The platform renderer with two of its properties overwritten — wrapped, not subclassed.
+ * The platform renderer with its icon and tooltip overwritten — wrapped, not subclassed.
  *
- * `TestTreeRenderer` does more than pick an icon: it paints the duration text beside the node out of its own
- * `paintComponent`/`getPreferredSize`, carries the accessible status the view supplies, and routes the root through
- * any registered `SMRootTestProxyFormatter`. Subclassing would mean re-supplying all of that (and it is
- * `@ApiStatus.Internal` besides). Wrapping keeps every bit of it: the component handed back *is* the platform's own,
- * with two fields of it set.
+ * `TestTreeRenderer` also paints the duration text, carries the accessible status and routes the root through any
+ * `SMRootTestProxyFormatter`; subclassing would mean re-supplying all of it. The component handed back here is the
+ * platform's own, with two fields set.
  */
 private class TestoNodeRenderer(
     private val platform: TreeCellRenderer,
@@ -105,48 +95,37 @@ private class TestoNodeRenderer(
                 proxy.isInProgress -> zoomProofSpinner(component.icon)?.let { component.icon = it }
             }
         }
-        // Always assigned, never only when there is one: a renderer is a single component reused for every node, so a
-        // description left behind would go on showing over the nodes that have none.
+        // Assigned even when absent: one component is reused for every node, so a stale tooltip would follow along.
         if (component is JComponent) {
-            // Keyed by location, not by name: two data sets of different tests share a name (`Dataset #0:0 [0]`).
+            // By location, not by name: two data sets of different tests share a name (`Dataset #0:0 [0]`).
             val tip = proxy?.let { describe(it.locationUrl ?: it.name) }?.takeIf { it.isNotBlank() }
             if (component.toolTipText != tip) component.toolTipText = tip
         }
         return component
     }
 
-    /**
-     * The test a tree node stands for. This is what `SMTRunnerTestTreeView.getTestProxyFor` does, spelled out against
-     * the public [NodeDescriptor] rather than the `SMTRunnerNodeDescriptor` it names — the same object either way.
-     */
+    /** What `SMTRunnerTestTreeView.getTestProxyFor` does, against the public [NodeDescriptor] rather than its own. */
     private fun testProxyOf(value: Any): SMTestProxy? {
         val userObject = (value as? DefaultMutableTreeNode)?.userObject
         return (userObject as? NodeDescriptor<*>)?.element as? SMTestProxy
     }
 
     /**
-     * A spinner for a running node that follows the IDE's zoom, or `null` to keep the platform's own.
+     * A frame-by-frame spinner for a running node, or `null` to keep the platform's own.
      *
-     * The platform's is `SMPoolOfTestIcons.RUNNING_ICON`, whose frames come from one `SpinningProgressIcon` built into
-     * a static field. That class rasterizes its frames on first paint and caches them under a key that is the icon's
-     * colour and nothing else — the scale is read afterwards, for the rasterizing alone. So the frames are fixed at
-     * whatever the zoom was when the first spinner of the session was drawn, and zooming to 200% leaves a 16-pixel
-     * spinner among 32-pixel everything (until a theme change happens to alter the colour and drop the cache).
+     * `SpinningProgressIcon` caches its rasterized frames under the icon's colour alone, so a zoom never rebuilds
+     * them and a 16-pixel spinner is stranded among 32-pixel icons. Ordinary SVG icons are rendered at the size in
+     * force when painted; used only where the two sizes disagree, since the platform's is smoother.
      *
-     * Replaced with the classic frame-by-frame spinner, which is a set of ordinary SVG icons and so is rendered at the
-     * size in force when it is painted. Only when the two sizes actually disagree: at the default zoom the platform's
-     * is correct, smoother, and the one the rest of the IDE shows.
-     *
-     * A workaround with an end in sight: the cache key is fixed upstream by IJPL-252440
-     * (https://github.com/JetBrains/intellij-community/pull/3605). Once that ships in the oldest platform this plugin
-     * builds against, this method can answer `null` always and go.
+     * Workaround for IJPL-252440 (JetBrains/intellij-community#3605); drop it once that ships in the oldest platform
+     * this plugin builds against.
      */
     private fun zoomProofSpinner(current: Icon?): Icon? {
         if (current == null || current.iconHeight == JBUI.scale(SPINNER_SIZE)) return null
         return spinner
     }
 
-    // One per tree rather than shared: AnimatedIcon remembers which components it has asked to repaint.
+    // One per tree: AnimatedIcon remembers which components it has asked to repaint.
     private val spinner = AnimatedIcon(
         AnimatedIcon.Default.DELAY,
         AllIcons.Process.Step_1,
@@ -160,20 +139,14 @@ private class TestoNodeRenderer(
     )
 }
 
-/** The side every test-tree status icon is drawn at, before the IDE's scale is applied to it. */
+/** The side a test-tree status icon is drawn at, before the IDE's scale. */
 private const val SPINNER_SIZE = 16
 
 /**
- * The icon a results-tree node should carry, or `null` to leave the platform's own in place.
+ * The icon a node should carry, or `null` to keep the platform's — which is what a still-running node gets.
  *
- * Group nodes get one too — a case, a DataProvider batch and a suite of the run all close with `testSuiteFinished`
- * carrying their children's outcome rolled up, so they have a Testo verdict of their own to show, and a tree where
- * only the leaves changed would read as two icon families side by side.
- *
- * The root is not a node of the run but the run itself, so it wears the run's verdict — the very icon the toolbar
- * summary's ring turns into, taken from there rather than derived again: a check or a cross, greyed out when the run
- * was stopped before it could reach a verdict of its own. `null` while the run is still going, which leaves the
- * platform's animated icon in place — the same reason a test still running keeps its own.
+ * Group nodes get one too, off the verdict `testSuiteFinished` rolls up; the root stands for the run itself and
+ * wears the summary's own verdict rather than one derived a second time.
  */
 fun testoNodeIcon(status: TestoTestStatus?, isRoot: Boolean, verdict: Icon?): Icon? =
     if (isRoot) verdict else status?.icon

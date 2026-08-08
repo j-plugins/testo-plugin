@@ -22,11 +22,7 @@ class TestoOutputToGeneralEventsConverter(
     private val nodes: TestoNodeIndex,
 ) : OutputToGeneralTestEventsConverter(testFrameworkName, consoleProperties) {
 
-    /**
-     * Everything this converter records is keyed by `nodeId`, and the tree side has no way to it — so the pairing is
-     * recorded from the processor's own node events. Hooked here, the moment the platform hands the processor over,
-     * which is before a single line of output has been read.
-     */
+    /** Hooked the moment the platform hands the processor over, which is before any output is read. */
     override fun setProcessor(processor: GeneralTestEventsProcessor?) {
         super.setProcessor(processor)
         processor?.let { nodes.attachTo(it) }
@@ -41,11 +37,7 @@ class TestoOutputToGeneralEventsConverter(
     /** Build problems already surfaced this run, keyed the way TeamCity means them to be deduplicated. */
     private val reportedProblems = HashSet<String>()
 
-    /**
-     * The `locationHint` each node was opened with, by the `nodeId` every message about it carries. Only the channel
-     * store needs this — it files a node's description under the same key its output goes to, and that key is a hint.
-     * Everything else here is keyed by the node id itself.
-     */
+    /** Hint by node id, for the channel store alone: it keys a description like the output it belongs to. */
     private val hintByNodeId = HashMap<String, String>()
 
     override fun process(text: String, outputType: Key<*>) {
@@ -56,9 +48,8 @@ class TestoOutputToGeneralEventsConverter(
     override fun processServiceMessage(message: ServiceMessage, visitor: ServiceMessageVisitor) {
         val attrs = message.attributes
 
-        // A Testo older than the id-based protocol sends every node message without a nodeId, and the platform
-        // convertor answers each one with a logged error — a run turns into hundreds of IDE internal errors. Say once
-        // what is wrong and stop feeding it: an empty tree beside a clear notification beats that.
+        // A pre-id-based Testo sends no nodeId, and the platform convertor logs an error per message — hundreds of
+        // IDE internal errors per run. Say once what is wrong and stop feeding it.
         if (legacyRunner) return
         if (TestoProtocolGate.isLegacyMessage(message.messageName, attrs)) {
             legacyRunner = true
@@ -69,8 +60,7 @@ class TestoOutputToGeneralEventsConverter(
         when (message.messageName) {
             TEST_COUNT -> attrs["count"]?.toIntOrNull()?.let { statusStore.noteDeclaredTotal(it) }
 
-            // A suite message opens a node the same way a test message does — a run suite, a case, or the batch node
-            // of a DataProvider test — and carries the same optional narrowing attributes, so both are recorded.
+            // A suite message opens a node the same way a test message does, carrying the same optional attributes.
             TEST_STARTED, TEST_SUITE_STARTED -> {
                 if (message.messageName == TEST_STARTED) {
                     statusStore.noteStarted()
@@ -124,25 +114,22 @@ class TestoOutputToGeneralEventsConverter(
 
             BUILD_PROBLEM -> {
                 reportBuildProblem(attrs["description"].orEmpty(), attrs["identity"].orEmpty())
-                // Not forwarded. The SM runner's visitor knows a fixed list of message names and sends everything
-                // else to handleUnexpectedServiceMessage, which logs a problem and echoes the raw
-                // `##teamcity[buildProblem …]` line into the console — right under the readable one we just wrote.
+                // Not forwarded: the visitor sends unknown names to handleUnexpectedServiceMessage, which echoes the
+                // raw `##teamcity[buildProblem …]` line right under the readable one we just wrote.
                 return
             }
         }
 
-        // A group node closes with its children's outcome rolled up. Worth showing on the node, but filed away from
-        // the tally: one of these arrives per case, per DataProvider batch and per suite of the run, and counting
-        // them as tests would inflate every number the toolbar shows.
+        // A group node closes with its children's outcome rolled up: worth drawing, but filed apart from the tally —
+        // one arrives per case, per batch and per suite, and counting them as tests would inflate every number.
         if (message.messageName == TEST_SUITE_FINISHED) {
             attrs["nodeId"]?.let { nodeId ->
                 TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.noteSuite(nodeId, it) }
             }
         }
 
-        // Testo's own verdict (`status`, lower-case) is finer than the passed / failed / ignored the platform can
-        // express, and `assertions` on testFinished is a number it has nowhere to put at all. Only the messages that
-        // close a *test* feed the tally — see the suite branch above.
+        // `status` is finer than the platform's passed / failed / ignored, and `assertions` has nowhere to go at all.
+        // Only test-closing messages feed the tally — see the suite branch above.
         if (message.messageName == TEST_FINISHED || message.messageName == TEST_FAILED || message.messageName == TEST_IGNORED) {
             attrs["nodeId"]?.let { nodeId ->
                 TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.note(nodeId, it) }
@@ -151,8 +138,7 @@ class TestoOutputToGeneralEventsConverter(
             }
         }
 
-        // Where the testing phase ends. A test closes with testFinished whatever its status, so this mark is what
-        // separates the run's post-processing from the tests, and `duration` is the test's own share of the clock.
+        // Every test closes with testFinished, so this mark separates the run's post-processing from the tests.
         if (message.messageName == TEST_FINISHED) {
             attrs["nodeId"]?.let { timings.noteTestFinished(it, attrs["duration"]?.toLongOrNull()) }
         }
@@ -160,21 +146,13 @@ class TestoOutputToGeneralEventsConverter(
         super.processServiceMessage(message, visitor)
     }
 
-    /**
-     * Where a node's description goes: the same key its channel output does, which is the hint it was opened with,
-     * falling back to its name. The channel tabs look a description up that way, so it cannot move to the node id
-     * along with everything else.
-     */
+    /** The channel store's key: the hint, falling back to the name. Not the node id — the channel tabs look it up. */
     private fun descriptionKey(attrs: Map<String, String>): String =
         attrs["nodeId"]?.let { hintByNodeId[it] } ?: store.keyFor(attrs["name"].orEmpty())
 
     /**
-     * The coarse verdict a Testo too old to send `status` still conveys: TeamCity has always had exactly three
-     * outcomes, and which message closes the test is what picks between them.
-     *
-     * `testFinished` follows `testFailed` and `testIgnored` rather than replacing them, so the pass it implies only
-     * counts while the test has said nothing else. Anything reported through `status` outranks all of this — the
-     * store keeps the two apart, so a newer Testo is never coarsened by the guess.
+     * The verdict of a Testo too old to send `status`, off which message closed the test — TeamCity's three
+     * outcomes. `testFinished` follows the other two rather than replacing them, hence `onlyIfAbsent`.
      */
     private fun noteStatusFromMessageKind(messageName: String, key: String) = when (messageName) {
         TEST_FAILED -> statusStore.noteInferred(key, TestoTestStatus.FAILED, onlyIfAbsent = false)
@@ -186,22 +164,13 @@ class TestoOutputToGeneralEventsConverter(
     private fun keyFor(name: String?): String? = name?.let { store.keyFor(it) }
 
     /**
-     * A problem Testo raises about the run as a whole — an empty run, a bootstrap that failed — rather than about any
-     * one test.
+     * A problem about the run as a whole — an empty run, a failed bootstrap — rather than about one test.
      *
-     * The message is consumed here rather than forwarded, so the raw line stays out of the console (see the branch
-     * that calls this). What the user sees instead is written to all three surfaces below, because which of them
-     * they are looking at depends on the run:
+     * Written to three surfaces, since which one the user is looking at depends on the run: **Output** as uncaptured
+     * stderr (the only way in when the tree is empty, and red for free), **All** as a run-level notice, and a
+     * **notification**, because a run that executed nothing otherwise looks like one that simply finished.
      *
-     *  - **Output** gets it as uncaptured stderr, which is the only way in when the tree is empty. That is exactly
-     *    the `testo.noTests` case: nothing to select, so the channel tabs never build and Output is the platform's
-     *    own console. Going out as stderr also colours it red for free.
-     *  - **All** gets it as a run-level notice. It belongs to no test, and the key it used to be filed under ("") is
-     *    one no view ever looks up — it was written and never shown.
-     *  - **A notification**, because a run that executed nothing otherwise looks like a run that simply finished.
-     *
-     * Reported once per problem. TeamCity's `identity` exists precisely to deduplicate a problem raised more than
-     * once; a Testo that sends none falls back to the text.
+     * Deduplicated by TeamCity's `identity`, falling back to the text.
      */
     private fun reportBuildProblem(description: String, identity: String) {
         val text = description.ifBlank { identity }

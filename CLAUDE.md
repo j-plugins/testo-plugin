@@ -358,12 +358,11 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
    copy buttons, log-level filtering and per-channel icons/colors.
 
 3. **Toolbar run summary** (`TestoProgressAction`) — a progress ring, the finished/total count, a counter per Testo
-   status and the elapsed time, pushed past every other button by `RightAlignedToolbarAction`. Statuses come from the
-   `status` attribute of the service messages and assertion counts from `assertions` (`TestoStatusStore`, keyed like
-   `ChannelOutputStore`); each counter narrows the tree through `SMTestRunnerResultsForm.setFilter`. `TestoRunTimings`
-   splits the run into startup / tests / post-processing for the clock's hover and sums the `duration` attributes beside
-   them — concurrent tests make that sum exceed the window they ran in, which is reported as a parallelism factor
-   rather than mistaken for overhead.
+   status and the elapsed time, pushed right by `RightAlignedToolbarAction`. Statuses and assertion counts come off
+   the service messages into `TestoStatusStore`; each counter narrows the tree through
+   `SMTestRunnerResultsForm.setFilter`, and `TestoTestTreeDecorator` draws the same statuses on the nodes.
+   `TestoRunTimings` splits the run into startup / tests / post-processing for the hover and sums the `duration`
+   attributes beside them, which concurrency pushes past the window the tests ran in.
 
 4. **Run history** — three cooperating pieces: `TestoChannelHistory` round-trips channel output through
    `SMTestProxy.metainfo` (the only per-test datum the platform's history XML preserves), `TestoHistoryIndex` knows
@@ -400,39 +399,29 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `TestoProtocolGate` detects it off the missing `nodeId` (not off a version comparison, so forks and nightlies are
   covered), and the converter then stops forwarding messages and notifies once. The version in that notification is
   scraped from Testo's banner line, which survives `-q`.
-- **A node is identified by `nodeId` and by nothing else.** Its name will not do — a data set's name is built out of
-  its coordinates alone (`Dataset #0:0 [0]`, `TeamcityPlugin::onTestDataSetStarting`), so every list-shaped provider
-  in a run opens one of those. Nor will its location hint: a hint names *code*, and `TestIdentity` keeps the test's
-  type beside the fqn rather than in it, so one method announced as an inline test and as a bench answers with the
-  same hint twice — exactly when the two want different `--type`s. `TestoStatusStore` and `TestoTargetStore` are
-  therefore keyed by the id, which the converter has on every message.
-- **`TestoNodeIndex` is what makes an id-keyed store readable from the tree.** `SMTestProxy` does not carry the id
-  and the convertor's own map is private, but `SMTRunnerEventsListener.onTestStarted(proxy, nodeId, parentNodeId)`
-  hands both out together, once per node. The index records that pairing (keyed by proxy identity — neither proxy
-  class overrides `equals`) and is hooked from `TestoOutputToGeneralEventsConverter.setProcessor`, before any output
-  is read. Writes never consult it: they key by the id directly, so a status recorded before the platform has built
-  the node is in no danger.
-- **Channel storage keys still go through `ChannelOutputStore.keyFor(name)`** (the `locationHint` remembered on
-  `testStarted`, falling back to the name), and so inherit the name collision above — the channel tabs look a test up
-  by the name of its tree node. They cannot move to node ids wholesale: an imported history run has no ids at all,
-  and `TestoChannelHistory` has to rebuild its tabs from the saved XML.
+- **A node is identified by `nodeId`, never by name or hint.** A data set's name is its coordinates alone
+  (`Dataset #0:0 [0]`), so every list-shaped provider opens one; a hint names *code*, and `TestIdentity` keeps the
+  type beside the fqn, so one method announced under two types shares it. `TestoStatusStore` and `TestoTargetStore`
+  key by the id.
+- **`TestoNodeIndex` makes an id-keyed store readable from the tree.** `SMTestProxy` does not carry the id, but
+  `SMTRunnerEventsListener.onTestStarted(proxy, nodeId, parentNodeId)` hands both out together. Hooked from
+  `TestoOutputToGeneralEventsConverter.setProcessor`, before any output is read. Writes never consult it.
+- **Channel storage keys still go through `ChannelOutputStore.keyFor(name)`** and so inherit the name collision.
+  They cannot move to node ids: an imported history run has none, and `TestoChannelHistory` rebuilds its tabs from
+  the saved XML.
 - **`TestoChannelsUi` reaches `TestResultsPanel.myConsole` by reflection** — there is no public accessor. It
   degrades gracefully (logs a warning, no channel tabs) if the field disappears.
-- **The tree has one filter slot, and the status counters own it while selected.** `SMTestRunnerResultsForm.setFilter`
-  writes `SMTRunnerTreeStructure`'s only filter, and the platform composes *Show passed* / *Show ignored* into that
-  same slot from the private `TestFrameworkActions.getFilter`. So `TestoProgressAction.applyFilter` is the single
-  writer: a selected counter replaces the toggles outright (intersecting would answer "show me the passed ones" with
-  an empty tree), and releasing it recomposes them via `hiddenByToggles` — off Testo's statuses, not off
-  `isPassed`/`isIgnored`, in which flaky and risky are indistinguishable from a plain pass. A listener on both
-  `BooleanProperty`s re-asserts this after the platform's own listener, which would otherwise drop a live counter.
-- **The results tree is re-skinned from outside, not subclassed.** The platform's hook for supplying a tree of one's
-  own, `SMTRunnerTestTreeViewProvider`, is `@ApiStatus.Internal`, and so is the `TestTreeRenderer` one would subclass
-  — both fail the verifier's default `failureLevel`. `TestoTestTreeDecorator` instead takes the renderer the console
-  already installed and wraps it (`JTree.getCellRenderer` / `setCellRenderer`), overwriting the icon and the tooltip
-  of the component it returns. Safe because `attachToModel` — the only installer — runs inside
-  `SMTestRunnerResultsForm.createTestTreeView()`, long before the console reaches the augmenter, and nothing in the
-  test-framework packages ever reads the renderer back. The node's proxy is read off `NodeDescriptor.getElement()`
-  rather than `SMTRunnerTestTreeView.getTestProxyFor`, for the same reason: same object, public class.
+- **The tree has one filter slot, shared with *Show passed* / *Show ignored*.** `TestoProgressAction.applyFilter` is
+  its single writer: a selected counter replaces the toggles rather than narrowing them (intersecting would answer
+  "show me the passed ones" with an empty tree), and releasing it recomposes them via `hiddenByToggles` — off Testo's
+  statuses, not `isPassed`/`isIgnored`, where flaky and risky look like a plain pass. A listener on both
+  `BooleanProperty`s re-asserts this after the platform's own, which would otherwise drop a live counter.
+- **The results tree is re-skinned from outside, not subclassed.** `SMTRunnerTestTreeViewProvider` and
+  `TestTreeRenderer` are both `@ApiStatus.Internal` and fail the verifier's default `failureLevel`, so
+  `TestoTestTreeDecorator` wraps the renderer the console already installed (`JTree.getCellRenderer` /
+  `setCellRenderer`). Safe: `attachToModel` is the only installer and runs at form construction, and nothing in the
+  test-framework packages reads the renderer back. The proxy comes off `NodeDescriptor.getElement()` for the same
+  reason — same object, public class.
 - **`TestoHistoryIndex.refreshLens` uses the internal `ModificationStampUtil`** to force code-vision recomputation
   after a run; a test run never touches PHP source, so neither `DaemonCodeAnalyzer.restart()` nor
   `invalidateProvider` alone re-runs `getHint`. Wrapped in `runCatching`.
@@ -465,11 +454,9 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **`TestoTestRunLineMarkerProviderInfo.shouldReplace = true`** so Testo's gutter icon wins over PhpStorm's
   PHPUnit contributor for the same element.
 - **The Method field is a `--filter` selector, not a member name, so its validation gate is off.** Every shape Testo
-  accepts (`med:1:0`, `\Ns\Case::med:1:0`, `\Ns\Case`, `\Ns\freeFunction`) is something PHP declares nothing under, so
-  `PhpDefaultTestRunnerSettingsValidator`'s "Cannot find 'X' in 'Y.php'" fired on runs Testo executes correctly — and
-  had to be taught each new shape as it appeared. `AnyMethodIsValid` (in `TestoTestRunnerSettingsValidator.kt`) accepts
-  anything, which disables that one check and leaves the file-type and non-empty checks in place. An actually empty
-  selection is reported by Testo itself, via `buildProblem`.
+  accepts (`med:1:0`, `\Ns\Case::med:1:0`, `\Ns\Case`, `\Ns\freeFunction`) is one PHP declares nothing under, so the
+  platform's "Cannot find 'X' in 'Y.php'" fired on correct runs. `AnyMethodIsValid` disables that one check; the
+  file-type and non-empty checks stay, and an empty selection is Testo's own `buildProblem`.
 - **`TestoRunConfiguration.checkConfiguration` swallows one exact platform error.** A group-only run (scope
   `ConfigurationFile`, no config file, non-empty `group`) trips the platform's "Configuration file is not
   specified" `RuntimeConfigurationError`, though Testo needs no config file. The error is matched by message

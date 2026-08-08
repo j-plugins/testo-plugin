@@ -1,19 +1,14 @@
 package com.github.xepozz.testo.tests.console
 
 /**
- * The clock of one run, split into the phases the plugin can actually tell apart.
+ * The clock of one run, split into the phases the plugin can tell apart.
  *
- * Four marks are recorded — the process starting, the first `testStarted`, the last test event, and the run being
- * over — and the three spans between them add up to the total exactly, so the hover accounts for every millisecond
- * the toolbar shows. That is the only honest split available: the last mark is what separates the run's
- * post-processing from the testing itself, which no service message announces.
+ * Four marks — process start, first `testStarted`, last test event, run over — and the three spans between them add
+ * up to the total exactly, so the hover accounts for every millisecond the toolbar shows.
  *
- * The sum of the tests' own `duration` attributes is kept beside them, and deliberately *not* presented as a phase:
- * Testo runs tests concurrently, so two five-second tests on two fibers sum to ten seconds inside a five-second
- * window. Read against [Snapshot.testsMs] the sum states how much parallelism the run got, which is worth more than
- * the "framework overhead" subtraction it used to allow back when tests ran one after another.
- *
- * Durations are held per test rather than summed on arrival, so a test that reports twice replaces its own figure.
+ * The sum of the tests' own `duration` attributes is kept beside them but is not a phase: tests run concurrently, so
+ * two five-second tests on two fibers sum to ten inside a five-second window. Against [Snapshot.testsMs] the sum
+ * says how much overlapped. Held per test, so a test reporting twice replaces its own figure.
  */
 class TestoRunTimings {
 
@@ -27,10 +22,8 @@ class TestoRunTimings {
         /** Sum of every test's own reported duration; above [testsMs] by however much ran in parallel. */
         val summedTestsMs: Long,
         /**
-         * Last test event to the end: merging reports and shutting down.
-         *
-         * Not called teardown, here or in the tooltip: fixture teardown runs inside a test and is therefore part of
-         * [testsMs], so the word would name the wrong span.
+         * Last test event to the end: merging reports and shutting down. Not "teardown" — fixture teardown runs
+         * inside a test and is part of [testsMs].
          */
         val postProcessingMs: Long,
         val finished: Boolean,
@@ -43,8 +36,7 @@ class TestoRunTimings {
     private val lock = Any()
     private val durationByKey = HashMap<String, Long>()
 
-    // Nullable rather than a zero sentinel: a mark of zero is a perfectly good timestamp, and conflating the two
-    // makes "not recorded" indistinguishable from "recorded at the epoch" the moment anything supplies its own clock.
+    // Nullable rather than a zero sentinel: zero is a perfectly good timestamp once a caller supplies its own clock.
     private var startedAt: Long? = null
     private var firstTestAt: Long? = null
     private var lastTestAt: Long? = null

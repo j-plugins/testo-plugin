@@ -8,10 +8,9 @@ import javax.swing.Icon
 /**
  * The outcome of a single test, mirroring `Testo\Core\Value\Status`.
  *
- * Testo names the case in the `status` attribute of its `testFinished` / `testFailed` / `testIgnored` service
- * messages. The platform only knows passed / failed / ignored, so everything finer — risky, flaky, cancelled,
- * aborted — reaches the IDE through that attribute alone and is lost the moment it is absent: [fromProxy] then
- * collapses the tree state back onto the three statuses the platform can express.
+ * Named in the `status` attribute of the messages that close a test. The platform knows only passed / failed /
+ * ignored, so everything finer travels through that attribute alone; without it [fromProxy] collapses back onto
+ * the three.
  */
 enum class TestoTestStatus(
     /** Value of the `status` attribute, matched case-insensitively against the PHP enum case name. */
@@ -19,8 +18,7 @@ enum class TestoTestStatus(
     val icon: Icon,
     private val labelKey: String,
 ) {
-    // Labels are lower-case nouns: they read as a unit with the number in front of them ("42 flaky") and slot into
-    // the tooltip sentence unchanged ("Click to show only flaky tests").
+    // Lower-case nouns: they read with the number in front ("42 flaky") and inside the tooltip sentence unchanged.
     PASSED("passed", TestoIcons.Status.PASSED, "testo.status.passed"),
     FAILED("failed", TestoIcons.Status.FAILED, "testo.status.failed"),
     ERROR("error", TestoIcons.Status.ERROR, "testo.status.error"),
@@ -43,9 +41,8 @@ enum class TestoTestStatus(
             raw?.takeIf { it.isNotBlank() }?.let { BY_WIRE_NAME[it.trim().lowercase()] }
 
         /**
-         * Best guess from the tree node alone, for runs where no `status` attribute arrived — an older Testo, or a
-         * history import (the platform's history XML keeps the node state, not our attributes). Returns `null` while
-         * the test is still running or has not started.
+         * Best guess from the tree node alone, for a run with no `status` — an older Testo, or a history import.
+         * `null` while the test is running or has not started.
          */
         fun fromProxy(proxy: SMTestProxy): TestoTestStatus? = when {
             proxy.isInProgress -> null

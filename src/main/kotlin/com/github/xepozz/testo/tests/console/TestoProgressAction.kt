@@ -47,12 +47,8 @@ import javax.swing.Timer
  * The run summary at the far right of the test toolbar: a progress ring that turns into a verdict icon, the
  * finished/total fraction, one counter per Testo status, and the elapsed time.
  *
- * Every counter is a button. Clicking one narrows the test tree to that status; clicking it again — or clicking the
- * fraction on the left — clears the filter and hands the tree back to the toolbar's standing toggles.
- *
- * Those toggles and these counters share one slot: [SMTestRunnerResultsForm.setFilter] writes the tree structure's
- * only filter, and the platform composes "Show passed" / "Show ignored" into that same slot. So the two are arranged
- * as owner and deputy rather than as layers — see [applyFilter].
+ * Every counter is a button: it narrows the tree to that status, and clicking it again hands the tree back to the
+ * toolbar's standing toggles. Both write the tree's single filter slot — see [applyFilter].
  *
  * [RightAlignedToolbarAction] pushes the whole thing past every other button; the separator in front of it is painted
  * by the component itself, because a `Separator` action would stay behind with the left-aligned group.
@@ -62,9 +58,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
     /** Exit code of the run, once it has one — the verdict icon prefers it over what the tree says. */
     private val exitCode = AtomicReference<Int?>(null)
 
-    // The clock lives in TestoRunTimings rather than being read off SMTestRunnerResultsForm: its getStartTime and
-    // getEndTime (and getTotalTestCount, whose job TestoStatusStore.totalHint does) are only public from 2026.2 on,
-    // this plugin still ships a 252 build — and the form knows nothing of the phases the hover breaks the run into.
+    // Not read off SMTestRunnerResultsForm: getStartTime/getEndTime/getTotalTestCount are only public from 2026.2,
+    // and the form knows nothing of the phases the hover breaks the run into.
     private var timings: TestoRunTimings? = null
 
     private var resultsForm: SMTestRunnerResultsForm? = null
@@ -97,9 +92,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         timings = clock
         consoleProperties = console.properties
 
-        // The platform recomposes its filter whenever either toggle changes and writes it to the shared slot, which
-        // would drop a counter mid-flight. Registered here, i.e. after ToolbarPanel installed the platform's own
-        // listener, so this one runs second and re-asserts whichever filter is actually in charge.
+        // The platform rewrites the shared slot on every toggle, dropping a live counter. Registered after its own
+        // listener, so this one runs second and re-asserts whichever filter is in charge.
         val onToggle = object : TestFrameworkPropertyListener<Boolean> {
             override fun onChanged(value: Boolean) = applyFilter()
         }
@@ -110,9 +104,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
         viewer.addEventsListener(object : TestResultsViewer.EventsListener {
             override fun onTestingStarted(viewer: TestResultsViewer) {
-                // A console can host a second session, and the platform resets its tree for one. Only then is
-                // wiping right: doing it on every announcement would throw away what the converter has already
-                // reported for this very run, since it reads the stream well before the platform gets here.
+                // Only on a second session in the same console: wiping on every announcement would throw away what
+                // the converter already reported for this run, since it reads the stream before the platform.
                 if (clock.isFinished()) {
                     store.clear()
                     targets.clear()
@@ -120,11 +113,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                     clock.noteStart()
                     exitCode.set(null)
                 }
-                // Unconditionally, not just when a counter was left selected. A narrowed tree must not survive into
-                // the next run — its statuses are gone with the store — and the standing toggles have to be restated
-                // in Testo's terms right away: whatever the platform composed off isPassed/isIgnored is what sits in
-                // the filter slot until we write ours, and a "Show passed" left off from a previous run would go on
-                // hiding risky tests as passes until the user happened to touch a button.
+                // Unconditionally: a narrowed tree must not survive into the next run, and until we write ours the
+                // slot holds the platform's isPassed/isIgnored composition, which hides risky tests as passes.
                 ApplicationManager.getApplication().invokeLater {
                     selected = null
                     applyFilter()
@@ -140,8 +130,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             ) = Unit
 
             override fun onTestingFinished(viewer: TestResultsViewer) {
-                // The only safe moment to read the tree: nothing appends to it any more. This replaces the streamed
-                // estimate with what the tree actually holds, including the tests a Stop left unfinished.
+                // The only safe moment to read the tree: nothing appends to it any more.
                 runCatching { store.recountFrom(viewer.testsRootNode) }
                 clock.noteFinish()
             }
@@ -160,9 +149,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
     /**
      * The verdict icon the ring turns into once the run is over, or `null` while it is still going.
      *
-     * Public because the results tree wears the same one on its root node: that node stands for the whole run, and
-     * the run has exactly one verdict — computing it twice is how the two would come to disagree. Recomputed per
-     * call rather than cached, so a repaint of the tree never shows a verdict the summary has already moved past.
+     * Public because the tree's root wears the same one — the run has one verdict, and deriving it twice is how the
+     * two would come to disagree. Recomputed per call, so a repaint never shows a verdict already moved past.
      */
     fun currentVerdict(): Icon? {
         val form = resultsForm ?: return null
@@ -172,22 +160,16 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
     }
 
     /**
-     * Whether the run was cut short rather than allowed to end: the platform terminates the root node when testing
-     * finishes while the tree is still incomplete — a Stop mid-flight, or a process that died with tests open.
-     * Anything that ran to the end leaves the root finished instead.
+     * Whether the run was cut short: the platform terminates the root node when testing finishes with the tree
+     * still incomplete.
      *
-     * Do not reach for `ProcessListener.processWillTerminate`'s `willBeDestroyed` here. It reads like "the process is
-     * being killed", but `ProcessHandler.notifyProcessTerminated` passes a hard-coded `true`, so it arrives set on
-     * every termination including an ordinary exit — which greyed out the verdict of every run.
+     * Not `processWillTerminate`'s `willBeDestroyed` — `notifyProcessTerminated` hard-codes that to `true`, so it
+     * arrives set on an ordinary exit too and greyed out every verdict.
      */
     private fun wasCancelled(form: SMTestRunnerResultsForm): Boolean =
         runCatching { form.testsRootNode.isInterrupted }.getOrDefault(false)
 
-    /**
-     * The icon that replaces the ring once the run is over: green or red normally, grey when the run was cancelled —
-     * the tests that did report still decide between the check and the cross, the grey only says the run never got
-     * to a verdict of its own.
-     */
+    /** Green or red normally, grey when cancelled — the tests that did report still pick check or cross. */
     private fun verdict(counts: Map<TestoTestStatus, Int>, cancelled: Boolean): Icon {
         val problems = counts.any { (status, n) -> status.isProblem && n > 0 }
         // A killed process has no exit code worth reading, so a cancelled run is judged only by its tests.
@@ -209,11 +191,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
     /**
      * Writes whichever filter is in charge into the tree's one filter slot.
      *
-     * A selected counter owns the tree outright — it does not narrow the standing toggles further, it replaces them.
-     * Otherwise asking for "show me the passed ones" while "Show passed" is off would answer with an empty tree, and
-     * the click that was meant to reveal something would look broken. The toggles are not lost meanwhile: they keep
-     * their state, any change to them is recorded, and releasing the counter puts the tree back under them —
-     * whichever way they were moved in between.
+     * A selected counter replaces the standing toggles rather than narrowing them further: intersecting would answer
+     * "show me the passed ones" with an empty tree while "Show passed" is off. Releasing it restores them.
      */
     private fun applyFilter() {
         val form = resultsForm ?: return
@@ -223,12 +202,10 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
     }
 
     /**
-     * What the toolbar's own two toggles come to, read in Testo's statuses rather than the platform's three.
+     * The toolbar's two toggles, read in Testo's statuses rather than the platform's three.
      *
-     * The platform composes this itself, in the private `TestFrameworkActions.getFilter`, off `isPassed`/`isIgnored` —
-     * a view in which Testo's eight statuses collapse to three. Flaky and risky both arrive as plain passed there, so
-     * "Show passed" hid a risky test and no toggle could ever reach it. Recomposing here from what Testo actually
-     * reported keeps each button meaning what it says. See [hiddenByToggles].
+     * The platform composes them off `isPassed`/`isIgnored`, where flaky and risky both look like a plain pass — so
+     * "Show passed" hid risky tests and no toggle could reach them. See [hiddenByToggles].
      */
     private fun standingFilter(store: TestoStatusStore): Filter<AbstractTestProxy> {
         val properties = consoleProperties ?: return Filter.NO_FILTER
@@ -257,8 +234,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
     ) : Filter<AbstractTestProxy>() {
         override fun shouldAccept(test: AbstractTestProxy): Boolean {
             val proxy = test as? SMTestProxy ?: return true
-            // A childless suite hides nothing, so it stays — unlike under OnlyStatus, where it holds no match either.
-            // A test still running has no status yet and is never one of the hidden ones.
+            // A childless suite hides nothing, so it stays. A running test has no status yet and is never hidden.
             if (proxy.isSuite) return proxy.children.isEmpty() || proxy.children.any { shouldAccept(it) }
             return store.statusOf(proxy) !in hidden
         }
@@ -276,10 +252,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
         init {
             isOpaque = false
-            // Laid out by hand. A LayoutManager caches its size requirements until something invalidates it, and the
-            // cache is exactly what this panel cannot have: the row is re-measured on a timer, and asking a stale
-            // cache whether the width changed answers "no" forever — the counters then stay at the width they had
-            // when the first test finished and clip everything that grows past it.
+            // Laid out by hand: a LayoutManager caches its size requirements, and this row is re-measured on a
+            // timer — a stale cache answers "width unchanged" forever and the counters clip every digit that grows.
             layout = null
             border = JBUI.Borders.empty(0, 10, 0, 6)
             add(progress)
@@ -302,8 +276,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             return Dimension(width, height + insets.top + insets.bottom)
         }
 
-        // The row is a fixed set of labels: there is nothing to give up when space runs short, and nothing to do
-        // with more of it.
+        // A fixed set of labels: nothing to give up when space runs short, nothing to do with more of it.
         override fun getMinimumSize(): Dimension = preferredSize
         override fun getMaximumSize(): Dimension = preferredSize
 
@@ -330,9 +303,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             super.removeNotify()
         }
 
-        // Zooming the IDE reaches every component through this call. The cells read the new font on their own, but a
-        // settled run draws nothing more on its own: the tick that would measure the row again is skipped while the
-        // digest is unchanged, so the widths have to be declared stale from here.
+        // Zooming reaches every component through this call. The cells pick up the new font themselves, but a
+        // settled run skips the tick that would re-measure the row, so the widths are declared stale here.
         override fun updateUI() {
             super.updateUI()
             painted = null
@@ -364,16 +336,14 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             painted = digest
 
             progress.update(finished, total, assertions, running, if (spans.finished) verdict(counts, cancelled) else null)
-            // The root node of the tree wears the same verdict, and the tree repaints on its own schedule — nudge it
-            // on the tick that settles, or the root would keep the icon it was drawn with until something else moved.
+            // The tree's root wears the same verdict and repaints on its own schedule: nudge it on the settling tick.
             if (spans.finished) form.treeView?.repaint()
             counters.forEach { it.update(counts[it.status] ?: 0, it.status == selected) }
             elapsed.update(spans)
 
             // Nothing reported and nothing running: give the width back to the buttons on the left.
             isVisible = running || finished > 0 || spans.finished
-            // Only a width change concerns the toolbar; the ring animating in place does not. The comparison is
-            // against a freshly summed preferred size, so a counter growing a digit really does reach the toolbar.
+            // Only a width change concerns the toolbar; the ring animating in place does not.
             val width = preferredSize.width
             if (width != laidOutWidth) {
                 laidOutWidth = width
@@ -391,10 +361,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         }
     }
 
-    /**
-     * One icon-and-number cell. Everything is drawn by hand rather than assembled from labels so the hover
-     * highlight, the ring and the text share one baseline and one set of insets.
-     */
+    /** One icon-and-number cell, drawn by hand so the hover highlight, the ring and the text share one baseline. */
     private abstract inner class Cell : JComponent() {
         private var hovered = false
         protected var active = false
@@ -404,10 +371,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         /** Width reserved before the text: the icon, or whatever a subclass paints in its place. */
         protected open val leadingWidth: Int get() = icon?.iconWidth ?: 0
 
-        // Asked for on every paint and every measurement rather than assigned once in the constructor. Zooming the IDE
-        // replaces the label font wholesale, and a font set on the component would outlive that: a raw JComponent has
-        // no UI delegate, so nothing reinstalls it, and the row would keep the size the toolbar had when it was built
-        // while every freshly created label around it grew.
+        // Asked for per paint rather than assigned once: a font set on a raw JComponent outlives a zoom, since
+        // there is no UI delegate to reinstall it, and the row would keep the size it was built at.
         override fun getFont(): Font = UIUtil.getLabelFont()
 
         init {
@@ -538,10 +503,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         }
     }
 
-    /**
-     * Not a button — the run's wall clock, with the phase breakdown on the hover. The row shows only the total
-     * because that is the one figure that needs no explaining; the rest is worth reading, not worth the width.
-     */
+    /** Not a button — the run's wall clock, with the phase breakdown on the hover. */
     private inner class ElapsedCell : Cell() {
         init {
             icon = AllIcons.Vcs.History
@@ -559,22 +521,19 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
         private fun breakdown(spans: TestoRunTimings.Snapshot): String = buildString {
             append("<html><table cellpadding='0' cellspacing='0'>")
-            // The total is the figure the toolbar already shows; bold and undimmed, it reads as the line the rest
-            // breaks down rather than as one of five figures of equal standing that happens to be their sum. No rule
-            // under it: Swing's <hr> answers to neither CSS nor the theme, and it is decoration either way.
+            // Bold and undimmed: the line the rest breaks down, not one figure among five. No rule under it —
+            // Swing's <hr> answers to neither CSS nor the theme.
             row("testo.progress.elapsed.total", formatElapsed(spans.totalMs), emphasized = true, dimLabel = false)
             if (spans.startupMs > 0) row("testo.progress.elapsed.startup", formatElapsed(spans.startupMs))
             if (spans.testsMs > 0) row("testo.progress.elapsed.tests", formatElapsed(spans.testsMs))
             if (spans.summedTestsMs > 0) {
                 val factor = spans.parallelism
-                // The sum is worth a line only where it parts with the window it fitted into: level with the wall
-                // clock it is the Tests figure printed twice. Above, the tests overlapped; below, the window holds
-                // work between tests that no test's own duration counts.
+                // Worth a line only where it parts with the window it fitted into: level with the wall clock it is
+                // the Tests figure printed twice.
                 if (factor == null || factor >= BOOST_FLOOR || factor <= 1 / BOOST_FLOOR) {
                     row("testo.progress.elapsed.summed", formatElapsed(spans.summedTestsMs))
                 }
-                // The overlap read as a ratio rather than as a difference the eye has to take: stated as a floor,
-                // since the work between tests inflates the window it is measured against.
+                // A floor, not an equality: the window also holds work between tests that no duration counts.
                 factor?.takeIf { it >= BOOST_FLOOR }?.let {
                     row(
                         "testo.progress.elapsed.boost",
@@ -590,19 +549,14 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         }
 
         /**
-         * One line of the breakdown: label on the left, figure right-aligned under the one above it.
+         * One line of the breakdown: label left, figure right-aligned.
          *
-         * `<nobr>` on both cells because the tooltip is laid out at whatever width Swing's HTML view first settles
-         * on, and without it "Post-processing" and "12.34 sec" each break across lines and the columns stop lining
-         * up. Emphasis is a `<b>` tag and the dimming a `<font>` one: this is HTML 3.2, where `font-weight` and
-         * `color` on a cell are among the properties the renderer quietly ignores.
-         *
-         * The two are independent: the boost is a figure worth spotting inside the breakdown, so it is bold, but its
-         * label belongs to the same column of labels as the rest and stays dimmed with them. Only the total steps out
-         * of that column entirely.
+         * `<nobr>` on both cells, or the columns stop lining up at the width Swing's HTML view first settles on.
+         * Emphasis and dimming are `<b>` and `<font>` tags: this is HTML 3.2, which ignores `font-weight` and
+         * `color` on a cell.
          *
          * @param emphasized bold, both label and figure.
-         * @param dimLabel the label in the muted colour the breakdown's own labels use.
+         * @param dimLabel the label in the breakdown's muted colour.
          */
         private fun StringBuilder.row(
             labelKey: String,
@@ -624,9 +578,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
     companion object {
         private const val REFRESH_MS = 100
-        // How far the summed test time has to stand from the window it fitted into before either of them is worth
-        // saying. Within this band the two are the same figure read off two clocks, and a run that simply went one
-        // test at a time should say nothing rather than claim a boost of one.
+        // How far the summed test time must stand from the window it fitted into to be worth saying at all; within
+        // this band the two are one figure read off two clocks.
         private const val BOOST_FLOOR = 1.05
         private const val SPIN_STEP = 12
         private const val SPIN_ARC = 90.0
@@ -642,8 +595,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         // Falls back to the JetBrains palette blue when the theme names no progress colour of its own.
         private val RING_PROGRESS = JBColor.namedColor("ProgressBar.progressColor", JBColor(0x389FD6, 0x3592C4))
 
-        // Read at build time rather than held: the tooltip is rebuilt on every tick anyway, and a theme switch
-        // between two of them would otherwise leave dark-theme grey on a light background.
+        // Read per build, not held: a theme switch would otherwise leave dark-theme grey on a light background.
         private val LABEL_COLOR: String get() = "#" + ColorUtil.toHex(UIUtil.getContextHelpForeground())
 
         internal fun formatElapsed(ms: Long): String = when {

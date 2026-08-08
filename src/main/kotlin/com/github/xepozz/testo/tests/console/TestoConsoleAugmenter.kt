@@ -86,9 +86,8 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             props.channelsInstalled = true
             captureHeader(props, handler)
             TestoChannelsUi.install(console, props.channelStore, props.levelFilter, project, console)
-            // One icon per Testo status in the tree, so the toolbar summary's counters point at findable nodes, and
-            // that summary's own verdict on the root. The verdict is a supplier, not a value: the progress action is
-            // wired a few lines further down and only reaches a verdict when the run ends.
+            // The verdict is a supplier, not a value: the progress action is wired below and only reaches one at the
+            // end of the run.
             TestoTestTreeDecorator.install(
                 console,
                 props.statusStore,

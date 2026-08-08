@@ -24,9 +24,8 @@ class TestoTestLocator(pathMapper: PhpPathMapper) :
         }
 
         val classes = PhpPsiUtil.findAllClasses(file)
-        // A standalone test function is named where a class would be, and no class lookup will ever find it. Checked
-        // before the classes rather than only when the file has none: the platform answers a class miss with the file
-        // itself, so in a file holding both, jumping to a function used to land on the file (or on the first class).
+        // A standalone test function is named where a class would be. Checked before the classes, not only when the
+        // file has none: a class miss answers with the file itself, so in a mixed file the jump landed on the file.
         if (classes.none { it.fqn == className }) {
             findFunction(file, className)?.let { return LocationElementStore(it, it) }
         }
@@ -75,21 +74,16 @@ class TestoTestLocator(pathMapper: PhpPathMapper) :
 }
 
 /**
- * The name a segment of a location hint actually declares, without the coordinates appended to it.
+ * The name a hint segment declares, without the coordinates appended to it.
  *
- * Testo points at one data set by spelling out the test it belongs to and then its position:
- * `\Ns\Calculator::med:3:0` — attribute #3 of `med`, and its data set #0. PHP declares no such member, so handing the
- * whole thing to the platform makes `findOwnMethodByName` miss, and it answers a miss with the enclosing class — or,
- * when the hint named a standalone function, with the file. Either way Jump to Source lands nowhere near the test.
- * A PHP identifier cannot contain a colon, so the first one starts the coordinates.
+ * `\Ns\Calculator::med:3:0` names data set #0 of attribute #3; PHP declares no such member, so `findOwnMethodByName`
+ * misses and the platform answers with the enclosing class — or with the file, for a standalone function. An
+ * identifier cannot contain a colon, so the first one starts the coordinates.
  *
- * Navigation stops at the method rather than reaching the data set itself. `:3` numbers the attribute *within its own
- * group* — data, inline and bench are counted independently (`PsiUtil.ATTRIBUTE_GROUPS`) — and which group that is
- * comes from the run's `--type`, which the hint does not carry. So `:3` alone cannot pick an attribute, and without
- * the attribute there is no provider to count `:0` into.
+ * Navigation stops at the method: `:3` numbers the attribute within its own group, and which group that is comes from
+ * the run's `--type`, which the hint does not carry.
  *
- * The two suffixes the plugin's own hints can carry are dropped as well: `#<index>` from the line markers and
- * ` with data set #N` from Testo's node names, neither of which is part of a name either.
+ * `#<index>` and ` with data set #N` are the plugin's own display suffixes and go too.
  */
 fun stripTestoCoordinates(segment: String): String? = segment
     .substringBefore(" with data set")

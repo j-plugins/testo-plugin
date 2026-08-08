@@ -1,22 +1,20 @@
 package com.github.xepozz.testo.tests.console
 
 /**
- * How to run one node of the tree again, as its own service message spelled it out.
+ * How to run one tree node again, as its own service message spelled it out.
  *
- * The PSI a location hint resolves to is not enough to reproduce a run: a data set resolves to its class (the method
- * name carries coordinates no `findOwnMethodByName` will match), so a right-click on `Dataset #3 [3]` would rerun the
- * whole file. The hint itself, however, is exact — Testo builds its tail out of the very selector `--filter` takes:
+ * The PSI a hint resolves to is not enough: a data set has no method of its own to find, so it lands on its class and
+ * the run widens to the file. The hint is exact — Testo builds its tail out of the very selector `--filter` takes:
  *
  * ```
- * php_qn://…/Calculator.php::\Testo\Bench\Internal\Calculator            a case
- * php_qn://…/Calculator.php::\Testo\Bench\Internal\Calculator::med       a test, or its DataProvider batch node
- * php_qn://…/Calculator.php::\Testo\Bench\Internal\Calculator::med:3:0   data provider #3, data set #0
- * php_qn://…/functions.php::\Testo\Bench\medianOf                        a free test function
+ * php_qn://…/Calculator.php::\Ns\Calculator            a case
+ * php_qn://…/Calculator.php::\Ns\Calculator::med       a test, or its DataProvider batch node
+ * php_qn://…/Calculator.php::\Ns\Calculator::med:3:0   data provider #3, data set #0
+ * php_qn://…/functions.php::\Ns\medianOf               a free test function
  * ```
  *
- * [suite] and [type] come from the optional `testSuite` / `testType` attributes, which narrow the rerun the way the
- * node itself was narrowed. All three are optional: a Testo that sends none leaves an [isEmpty] target and the
- * producer is left to work off the PSI alone, exactly as before.
+ * [suite] and [type] come from the optional `testSuite` / `testType` attributes. All three are optional; without them
+ * the target is [isEmpty] and the producer works off the PSI alone.
  */
 data class TestoRunTarget(
     val locationHint: String? = null,
@@ -24,26 +22,22 @@ data class TestoRunTarget(
     val type: String? = null,
 ) {
     /**
-     * The tail of the hint — `\Ns\Class::med:3:0`, `\Ns\Class` or `\Ns\freeFunction` — which is exactly what
-     * `--filter` takes, whichever of the three it is.
+     * The tail of the hint, which is what `--filter` takes.
      *
-     * A class selector matters as much as a method one: the element-based path narrows a case node to `--path <file>`,
-     * and one file may declare several cases (`PipelineFailureSandbox.php` holding `TestLevelPipelineFailure` beside
-     * its siblings), so without the filter a right-click on one case runs all of them.
+     * A class selector matters as much as a method one: the element-based path narrows a case to `--path <file>`, and
+     * one file may declare several cases.
      */
     val filter: String? get() = locationHint?.let(Companion::filterOf)
 
-    /** Nothing here narrows anything: the node was announced without a hint and without either attribute. */
     val isEmpty: Boolean
         get() = filter == null && suite.isNullOrBlank() && type.isNullOrBlank()
 
     companion object {
         /**
-         * `php_qn://<file>::<selector>` -> `<selector>`, or null when the hint points at a file and nothing more.
+         * `php_qn://<file>::<selector>` → `<selector>`, or null for a hint naming nothing but a file.
          *
-         * The `#<index>` and ` with data set #N` suffixes are the plugin's own additions to a hint (line markers,
-         * history lookup) rather than anything Testo sends, but a hint may reach this from either side, so both are
-         * cut off — they are display coordinates, not part of a selector.
+         * `#<index>` and ` with data set #N` are the plugin's own display coordinates (line markers, history
+         * lookup), never part of a selector, so a hint arriving from either side is cut back.
          */
         fun filterOf(hint: String): String? = hint
             .substringBefore(" with data set")
