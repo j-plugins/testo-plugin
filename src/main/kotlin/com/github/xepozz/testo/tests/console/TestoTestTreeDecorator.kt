@@ -3,9 +3,12 @@ package com.github.xepozz.testo.tests.console
 import com.intellij.execution.testframework.TestTreeView
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
+import com.intellij.icons.AllIcons
 import com.intellij.ide.util.treeView.NodeDescriptor
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.ui.AnimatedIcon
 import com.intellij.ui.SimpleColoredComponent
+import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import java.awt.Component
 import javax.swing.Icon
@@ -92,11 +95,15 @@ private class TestoNodeRenderer(
 
         if (component is SimpleColoredComponent && proxy != null) {
             val isRoot = proxy.parent == null
-            testoNodeIcon(
+            val icon = testoNodeIcon(
                 status = if (isRoot) null else statuses.statusOf(proxy),
                 isRoot = isRoot,
                 verdict = if (isRoot) verdict() else null,
-            )?.let { component.icon = it }
+            )
+            when {
+                icon != null -> component.icon = icon
+                proxy.isInProgress -> zoomProofSpinner(component.icon)?.let { component.icon = it }
+            }
         }
         // Always assigned, never only when there is one: a renderer is a single component reused for every node, so a
         // description left behind would go on showing over the nodes that have none.
@@ -116,7 +123,41 @@ private class TestoNodeRenderer(
         val userObject = (value as? DefaultMutableTreeNode)?.userObject
         return (userObject as? NodeDescriptor<*>)?.element as? SMTestProxy
     }
+
+    /**
+     * A spinner for a running node that follows the IDE's zoom, or `null` to keep the platform's own.
+     *
+     * The platform's is `SMPoolOfTestIcons.RUNNING_ICON`, whose frames come from one `SpinningProgressIcon` built into
+     * a static field. That class rasterizes its frames on first paint and caches them under a key that is the icon's
+     * colour and nothing else — the scale is read afterwards, for the rasterizing alone. So the frames are fixed at
+     * whatever the zoom was when the first spinner of the session was drawn, and zooming to 200% leaves a 16-pixel
+     * spinner among 32-pixel everything (until a theme change happens to alter the colour and drop the cache).
+     *
+     * Replaced with the classic frame-by-frame spinner, which is a set of ordinary SVG icons and so is rendered at the
+     * size in force when it is painted. Only when the two sizes actually disagree: at the default zoom the platform's
+     * is correct, smoother, and the one the rest of the IDE shows.
+     */
+    private fun zoomProofSpinner(current: Icon?): Icon? {
+        if (current == null || current.iconHeight == JBUI.scale(SPINNER_SIZE)) return null
+        return spinner
+    }
+
+    // One per tree rather than shared: AnimatedIcon remembers which components it has asked to repaint.
+    private val spinner = AnimatedIcon(
+        AnimatedIcon.Default.DELAY,
+        AllIcons.Process.Step_1,
+        AllIcons.Process.Step_2,
+        AllIcons.Process.Step_3,
+        AllIcons.Process.Step_4,
+        AllIcons.Process.Step_5,
+        AllIcons.Process.Step_6,
+        AllIcons.Process.Step_7,
+        AllIcons.Process.Step_8,
+    )
 }
+
+/** The side every test-tree status icon is drawn at, before the IDE's scale is applied to it. */
+private const val SPINNER_SIZE = 16
 
 /**
  * The icon a results-tree node should carry, or `null` to leave the platform's own in place.
