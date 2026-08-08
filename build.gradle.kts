@@ -1,4 +1,5 @@
 import org.jetbrains.changelog.markdownToHTML
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
@@ -138,6 +139,17 @@ tasks {
 
 intellijPlatformTesting {
     runIde {
+        // The build targets IU (see platformType), but the sandbox can be PhpStorm — closer to most users' setup.
+        // Its own version property: PhpStorm publishes releases, not the IU build numbers `platformVersion` holds.
+        register("runPhpStorm") {
+            type = IntelliJPlatformType.PhpStorm
+            version = apiProperty("phpStormVersion")
+
+            task {
+                autoReload = false
+            }
+        }
+
         register("runIdeForUiTests") {
             task {
                 jvmArgumentProviders += CommandLineArgumentProvider {
