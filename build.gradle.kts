@@ -1,4 +1,5 @@
 import org.jetbrains.changelog.markdownToHTML
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 plugins {
@@ -127,10 +128,28 @@ tasks {
     runIde {
         autoReload = false
     }
+    test {
+        // The bundled Kotlin plugin's KotlinScriptDefinitionCodeVisionProvider cannot be instantiated in the 2026.2
+        // test fixture (its message bundle is missing the provider's name key), and the error is logged from a
+        // project startup activity — outside any window a test could guard — failing whichever test the project
+        // came up under. Nothing here needs the Kotlin plugin, so it is kept out of the test IDE entirely.
+        systemProperty("idea.suppressed.plugins.id", "org.jetbrains.kotlin")
+    }
 }
 
 intellijPlatformTesting {
     runIde {
+        // The build targets IU (see platformType), but the sandbox can be PhpStorm — closer to most users' setup.
+        // Its own version property: PhpStorm publishes releases, not the IU build numbers `platformVersion` holds.
+        register("runPhpStorm") {
+            type = IntelliJPlatformType.PhpStorm
+            version = apiProperty("phpStormVersion")
+
+            task {
+                autoReload = false
+            }
+        }
+
         register("runIdeForUiTests") {
             task {
                 jvmArgumentProviders += CommandLineArgumentProvider {

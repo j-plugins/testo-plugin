@@ -315,6 +315,30 @@ class ChannelOutputStoreTest {
     }
 
     @Test
+    fun noticesFollowTheBannerWhicheverArrivesFirst() {
+        val store = ChannelOutputStore()
+        // A build problem can reach the converter before the augmenter has set the banner — the notice must survive
+        // that, and the banner must still come first.
+        store.appendNotice(ChannelOutputStore.Chunk("problem\n", "stderr"))
+        store.setHeader(listOf(ChannelOutputStore.Chunk("command line\n", null)))
+        store.appendNotice(ChannelOutputStore.Chunk("another\n", "stderr"))
+
+        assertEquals(listOf("command line\n", "problem\n", "another\n"), store.header().map { it.text })
+    }
+
+    @Test
+    fun clearDropsNoticesButKeepsTheBanner() {
+        val store = ChannelOutputStore()
+        store.setHeader(listOf(ChannelOutputStore.Chunk("command line\n", null)))
+        store.appendNotice(ChannelOutputStore.Chunk("problem\n", "stderr"))
+
+        store.clear()
+
+        // The banner is set once per run, before the per-test clears fire; a notice belongs to the run that raised it.
+        assertEquals(listOf("command line\n"), store.header().map { it.text })
+    }
+
+    @Test
     fun clearDropsLiveSinks() {
         val store = ChannelOutputStore()
         val seen = mutableListOf<String>()

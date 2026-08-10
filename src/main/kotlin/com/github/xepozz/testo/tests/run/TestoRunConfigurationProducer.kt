@@ -12,17 +12,23 @@ import com.github.xepozz.testo.isTestoConfigFile
 import com.github.xepozz.testo.isTestoFile
 import com.github.xepozz.testo.isTestoFunction
 import com.github.xepozz.testo.isTestoMethod
+import com.github.xepozz.testo.tests.TestoConsoleProperties
+import com.github.xepozz.testo.tests.console.TestoRunTarget
 import com.github.xepozz.testo.util.PsiUtil
 import com.intellij.execution.Location
 import com.intellij.execution.PsiLocation
 import com.intellij.execution.actions.ConfigurationContext
 import com.intellij.execution.actions.ConfigurationFromContext
+import com.intellij.execution.testframework.AbstractTestProxy
+import com.intellij.execution.testframework.TestTreeView
+import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Condition
+import com.intellij.openapi.util.Ref
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDirectory
@@ -61,6 +67,86 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     METHOD,
 ) {
     override fun isEnabled(project: Project) = TestoUtil.isEnabled(project)
+
+    /**
+     * Right-clicking a node of the results tree, rather than a piece of source.
+     *
+     * The PSI a location hint resolves to is lossy — a data set lands on its class and the run widens to the file —
+     * and `testSuite`/`testType` are not in the PSI at all, so the element-based result is corrected here with what
+     * the node's own message said. See [TestoRunTarget].
+     *
+     * Only a node the platform resolved to a [Location] gets here: `PreferredProducerFind` runs no producer without
+     * one, which leaves out a run-level suite.
+     */
+    override fun setupConfigurationFromContext(
+        configuration: TestoRunConfiguration,
+        context: ConfigurationContext,
+        sourceElement: Ref<PsiElement>,
+    ): Boolean {
+        val target = treeTarget(context)
+        if (!super.setupConfigurationFromContext(configuration, context, sourceElement)) return false
+        if (target == null) return true
+
+        applyTreeTarget(configuration.testoSettings.getTestoRunnerSettings(), target)
+        configuration.name = configuration.suggestedName()
+        return true
+    }
+
+    override fun isConfigurationFromContext(
+        configuration: TestoRunConfiguration,
+        context: ConfigurationContext,
+    ): Boolean {
+        // A configuration built from source can look like "this context" while missing the selector the node was
+        // announced with, and reusing it would run the whole file. The match is therefore exact on all three: a class
+        // node and a method node of the same class agree on suite and type, so those alone are not enough.
+        val target = treeTarget(context) ?: return super.isConfigurationFromContext(configuration, context)
+        val settings = configuration.testoSettings.getTestoRunnerSettings()
+
+        if (settings.suite != target.suite.orEmpty()) return false
+        if (settings.testoType != target.type.orEmpty()) return false
+
+        target.filter?.let {
+            return settings.scope == PhpTestRunnerSettings.Scope.Method && settings.methodName == it
+        }
+
+        // A hint naming no symbol — a config-file node announced with a suite. Should it resolve to a class anyway,
+        // the element-based check applies, except that it expects an untyped run while this node carries a type.
+        val element = context.psiLocation?.let { findTestElement(it, getWorkingDirectory(it)) }
+        if (element is PhpClass) return isClassConfigurationFromContext(settings, element, target.type.orEmpty())
+
+        // A free function falls through untyped: its element-based check never compares testoType, so once Testo
+        // sends `testType` a typed function configuration could pass for an untyped one — the mirror of the class
+        // case above. Latent until then: without the attributes such a target is empty and never stored.
+        return super.isConfigurationFromContext(configuration, context)
+    }
+
+    /**
+     * What the selected results-tree node was announced with, or null when the context is not a Testo run's tree.
+     *
+     * Both keys come from `TestTreeView.uiDataSnapshot`. The model ties the node back to its own run: the store is
+     * per-run, and a target from another console would rerun the wrong thing. Identified by `nodeId` — see
+     * [com.github.xepozz.testo.tests.console.TestoNodeIndex].
+     */
+    private fun treeTarget(context: ConfigurationContext): TestoRunTarget? {
+        val dataContext = context.dataContext
+        val proxy = dataContext.getData(AbstractTestProxy.DATA_KEY) as? SMTestProxy ?: return null
+        val model = dataContext.getData(TestTreeView.MODEL_DATA_KEY) ?: return null
+        val properties = model.properties as? TestoConsoleProperties ?: return null
+
+        return properties.targetStore.targetFor(proxy)
+    }
+
+    private fun applyTreeTarget(settings: TestoRunnerSettings, target: TestoRunTarget) {
+        target.suite?.takeIf { it.isNotBlank() }?.let { settings.suite = it }
+        target.type?.takeIf { it.isNotBlank() }?.let { settings.testoType = it }
+
+        // The whole selector, class and all: a bare method name would also match a namesake in the same file, and a
+        // case needs it too, since `--path` alone runs every case the file declares. `--path` stays as it was.
+        val filter = target.filter ?: return
+        if (settings.filePath.isNullOrEmpty()) return
+        settings.scope = PhpTestRunnerSettings.Scope.Method
+        settings.methodName = filter
+    }
 
     public override fun setupConfiguration(
         testRunnerSettings: PhpTestRunnerSettings,
@@ -255,6 +341,15 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         context: ConfigurationContext,
         startRunnable: Runnable
     ) {
+        // The choosers below exist to resolve what a source element leaves open — which subclass of an abstract case,
+        // which test a data provider feeds. A tree node has none of that open: it is one node of a run that already
+        // happened, and its selector names the concrete class outright. Asking again would only offer a chance to
+        // rerun something else.
+        if (treeTarget(context) != null) {
+            startRunnable.run()
+            return
+        }
+
         val testoRunConfiguration = configuration.configuration as TestoRunConfiguration
         val testRunnerSettings = testoRunConfiguration.testoSettings.runnerSettings
         val location = context.location

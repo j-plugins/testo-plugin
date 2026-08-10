@@ -1,7 +1,9 @@
 package com.github.xepozz.testo.tests.console
 
 import com.github.xepozz.testo.TestoBundle
+import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.execution.testframework.TestConsoleProperties
+import com.intellij.execution.testframework.sm.runner.GeneralTestEventsProcessor
 import com.intellij.execution.testframework.sm.runner.OutputToGeneralTestEventsConverter
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
@@ -14,13 +16,29 @@ class TestoOutputToGeneralEventsConverter(
     private val consoleProperties: TestConsoleProperties,
     private val store: ChannelOutputStore,
     private val levelFilter: LogLevelFilter,
+    private val statusStore: TestoStatusStore,
+    private val timings: TestoRunTimings,
+    private val targetStore: TestoTargetStore,
+    private val nodes: TestoNodeIndex,
 ) : OutputToGeneralTestEventsConverter(testFrameworkName, consoleProperties) {
+
+    /** Hooked the moment the platform hands the processor over, which is before any output is read. */
+    override fun setProcessor(processor: GeneralTestEventsProcessor?) {
+        super.setProcessor(processor)
+        processor?.let { nodes.attachTo(it) }
+    }
 
     /** Version off the banner, kept only to name it in the too-old notification. */
     private var runnerVersion: String? = null
 
     /** Set once a message arrives without a `nodeId`: from then on nothing is handed to the platform convertor. */
     private var legacyRunner = false
+
+    /** Build problems already surfaced this run, keyed the way TeamCity means them to be deduplicated. */
+    private val reportedProblems = HashSet<String>()
+
+    /** Hint by node id, for the channel store alone: it keys a description like the output it belongs to. */
+    private val hintByNodeId = HashMap<String, String>()
 
     override fun process(text: String, outputType: Key<*>) {
         if (runnerVersion == null) runnerVersion = TestoProtocolGate.parseVersion(text)
@@ -30,9 +48,8 @@ class TestoOutputToGeneralEventsConverter(
     override fun processServiceMessage(message: ServiceMessage, visitor: ServiceMessageVisitor) {
         val attrs = message.attributes
 
-        // A Testo older than the id-based protocol sends every node message without a nodeId, and the platform
-        // convertor answers each one with a logged error — a run turns into hundreds of IDE internal errors. Say once
-        // what is wrong and stop feeding it: an empty tree beside a clear notification beats that.
+        // A pre-id-based Testo sends no nodeId, and the platform convertor logs an error per message — hundreds of
+        // IDE internal errors per run. Say once what is wrong and stop feeding it.
         if (legacyRunner) return
         if (TestoProtocolGate.isLegacyMessage(message.messageName, attrs)) {
             legacyRunner = true
@@ -41,13 +58,25 @@ class TestoOutputToGeneralEventsConverter(
         }
 
         when (message.messageName) {
-            TEST_STARTED -> {
+            TEST_COUNT -> attrs["count"]?.toIntOrNull()?.let { statusStore.noteDeclaredTotal(it) }
+
+            // A suite message opens a node the same way a test message does, carrying the same optional attributes.
+            TEST_STARTED, TEST_SUITE_STARTED -> {
+                if (message.messageName == TEST_STARTED) {
+                    statusStore.noteStarted()
+                    timings.noteTestStarted()
+                }
                 val name = attrs["name"]
                 val location = attrs["locationHint"]
-                if (name != null && location != null) store.rememberLocation(name, location)
-                val metainfo = attrs["metainfo"]
-                if (name != null && !metainfo.isNullOrBlank()) {
-                    store.setDescription(store.keyFor(name), metainfo)
+                val nodeId = attrs["nodeId"]
+                if (name != null) {
+                    if (location != null) {
+                        store.rememberLocation(name, location)
+                        if (nodeId != null) hintByNodeId[nodeId] = location
+                    }
+                    val metainfo = attrs["metainfo"]
+                    if (!metainfo.isNullOrBlank()) store.setDescription(descriptionKey(attrs), metainfo)
+                    targetStore.note(nodeId, TestoRunTarget(location, attrs["testSuite"], attrs["testType"]))
                 }
             }
 
@@ -84,22 +113,84 @@ class TestoOutputToGeneralEventsConverter(
             }
 
             BUILD_PROBLEM -> {
-                val description = attrs["description"].orEmpty()
-                val identity = attrs["identity"].orEmpty()
-                val text = buildString {
-                    append("\n⚠ Build problem")
-                    if (identity.isNotBlank()) append(" [").append(identity).append("]")
-                    append(": ").append(description).append("\n")
-                }
-                store.appendAll("", text, "stderr")
-                store.appendOutput("", text, "stderr")
+                reportBuildProblem(attrs["description"].orEmpty(), attrs["identity"].orEmpty())
+                // Not forwarded: the visitor sends unknown names to handleUnexpectedServiceMessage, which echoes the
+                // raw `##teamcity[buildProblem …]` line right under the readable one we just wrote.
+                return
             }
+        }
+
+        // A group node closes with its children's outcome rolled up: worth drawing, but filed apart from the tally —
+        // one arrives per case, per batch and per suite, and counting them as tests would inflate every number.
+        if (message.messageName == TEST_SUITE_FINISHED) {
+            attrs["nodeId"]?.let { nodeId ->
+                TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.noteSuite(nodeId, it) }
+            }
+        }
+
+        // `status` is finer than the platform's passed / failed / ignored, and `assertions` has nowhere to go at all.
+        // Only test-closing messages feed the tally — see the suite branch above.
+        if (message.messageName == TEST_FINISHED || message.messageName == TEST_FAILED || message.messageName == TEST_IGNORED) {
+            attrs["nodeId"]?.let { nodeId ->
+                TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.note(nodeId, it) }
+                attrs["assertions"]?.toIntOrNull()?.let { statusStore.noteAssertions(nodeId, it) }
+                noteStatusFromMessageKind(message.messageName, nodeId)
+            }
+        }
+
+        // Every test closes with testFinished, so this mark separates the run's post-processing from the tests.
+        if (message.messageName == TEST_FINISHED) {
+            attrs["nodeId"]?.let { timings.noteTestFinished(it, attrs["duration"]?.toLongOrNull()) }
         }
 
         super.processServiceMessage(message, visitor)
     }
 
+    /** The channel store's key: the hint, falling back to the name. Not the node id — the channel tabs look it up. */
+    private fun descriptionKey(attrs: Map<String, String>): String =
+        attrs["nodeId"]?.let { hintByNodeId[it] } ?: store.keyFor(attrs["name"].orEmpty())
+
+    /**
+     * The verdict of a Testo too old to send `status`, off which message closed the test — TeamCity's three
+     * outcomes. `testFinished` follows the other two rather than replacing them, hence `onlyIfAbsent`.
+     */
+    private fun noteStatusFromMessageKind(messageName: String, key: String) = when (messageName) {
+        TEST_FAILED -> statusStore.noteInferred(key, TestoTestStatus.FAILED, onlyIfAbsent = false)
+        TEST_IGNORED -> statusStore.noteInferred(key, TestoTestStatus.SKIPPED, onlyIfAbsent = false)
+        TEST_FINISHED -> statusStore.noteInferred(key, TestoTestStatus.PASSED, onlyIfAbsent = true)
+        else -> Unit
+    }
+
     private fun keyFor(name: String?): String? = name?.let { store.keyFor(it) }
+
+    /**
+     * A problem about the run as a whole — an empty run, a failed bootstrap — rather than about one test.
+     *
+     * Written to three surfaces, since which one the user is looking at depends on the run: **Output** as uncaptured
+     * stderr (the only way in when the tree is empty, and red for free), **All** as a run-level notice, and a
+     * **notification**, because a run that executed nothing otherwise looks like one that simply finished.
+     *
+     * Deduplicated by TeamCity's `identity`, falling back to the text.
+     */
+    private fun reportBuildProblem(description: String, identity: String) {
+        val text = description.ifBlank { identity }
+        if (text.isBlank()) return
+        if (!reportedProblems.add(identity.ifBlank { description })) return
+
+        val line = buildString {
+            append("\n⚠ Build problem")
+            if (identity.isNotBlank()) append(" [").append(identity).append("]")
+            append(": ").append(description).append("\n")
+        }
+        fireOnUncapturedOutput(line, ProcessOutputTypes.STDERR)
+        store.appendNotice(ChannelOutputStore.Chunk(line, "stderr"))
+
+        // No title: the group pops over the Run tool window, so the run it belongs to is already obvious, and
+        // Testo's own wording ("No tests were executed") says everything a heading would have to repeat.
+        NotificationGroupManager.getInstance().getNotificationGroup("Testo")
+            ?.createNotification(text, NotificationType.ERROR)
+            ?.notify(consoleProperties.project)
+    }
 
     private fun notifyRunnerTooOld() {
         val version = runnerVersion
@@ -114,10 +205,15 @@ class TestoOutputToGeneralEventsConverter(
     }
 
     companion object {
+        private const val TEST_COUNT = "testCount"
         private const val TEST_STARTED = "testStarted"
+        private const val TEST_SUITE_STARTED = "testSuiteStarted"
+        private const val TEST_SUITE_FINISHED = "testSuiteFinished"
+        private const val TEST_FINISHED = "testFinished"
         private const val TEST_STD_OUT = "testStdOut"
         private const val TEST_STD_ERR = "testStdErr"
         private const val TEST_FAILED = "testFailed"
+        private const val TEST_IGNORED = "testIgnored"
         private const val BUILD_PROBLEM = "buildProblem"
     }
 }
