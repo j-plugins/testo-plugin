@@ -50,4 +50,20 @@ class TestoTestLocatorTest : BasePlatformTestCase() {
         assertEquals("\\Full\\Qualified\\FunctionName", info!!.className)
         assertNull(info.methodName)
     }
+
+    fun testGetLocationInfo_dataSetCoordinatesAreNotPartOfTheMethodName() {
+        // The hint Testo sends for a data set node. `med:3:0` is no member of the class, so left as it is it makes
+        // the platform miss the method and answer with the class instead.
+        val info = locator.getLocationInfo("D:/p/Calculator.php::\\Testo\\Bench\\Internal\\Calculator::med:3:0")
+        assertNotNull(info)
+        assertEquals("\\Testo\\Bench\\Internal\\Calculator", info!!.className)
+        assertEquals("med", info.methodName)
+    }
+
+    fun testGetLocationInfo_dataSetCoordinatesAreNotPartOfAFunctionName() {
+        val info = locator.getLocationInfo("D:/p/bench.php::\\Testo\\Bench\\median:0:1")
+        assertNotNull(info)
+        assertEquals("\\Testo\\Bench\\median", info!!.className)
+        assertNull(info.methodName)
+    }
 }

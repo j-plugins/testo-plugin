@@ -70,7 +70,8 @@ internal fun openTestoHistoryForTest(project: Project, url: String) {
 
 /**
  * Mirrors `AbstractImportTestsAction.ImportRunProfile` (reused for parsing the saved `<config>` and resolving the
- * target), but its first [getState] returns our [TestoImportedRunnableState] so the console is built on our properties.
+ * target): the first [getState] lets the platform import build the console, later ones rerun the reconstructed
+ * configuration.
  */
 // Internal (not private) so the rerun actions' ExecutionEnvironment.testoRunProfile() can recognize an imported Testo
 // history tab as a Testo run tab and surface our toolbar's rerun split button on it.

@@ -144,6 +144,14 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoChannelHistory.kt  # channel output ⇄ SMTestProxy.metainfo (survives history export)
 │   │   ├── TestoHistoryImport.kt   # "Show history": import a saved run onto our own console properties
 │   │   ├── TestoHistoryIndex.kt    # which locationUrls exist in saved history XMLs (+ lens refresh)
+│   │   ├── TestoTestStatus.kt      # the 8 cases of Testo\Core\Value\Status: wire name, icon, label
+│   │   ├── TestoStatusStore.kt     # per-test status/assertions + the tally the toolbar summary renders
+│   │   ├── TestoRunTimings.kt      # start/first test/last test/finish marks + summed test durations
+│   │   ├── TestoRunTarget.kt       # a node's own rerun recipe: hint → --filter selector, testSuite/testType
+│   │   ├── TestoTargetStore.kt     # rerun targets of the current run, keyed by node id
+│   │   ├── TestoNodeIndex.kt       # SMTestProxy → nodeId, off the platform's own node events
+│   │   ├── TestoProgressAction.kt  # right-aligned toolbar summary: ring, fraction, status counters, elapsed
+│   │   ├── TestoTestTreeDecorator.kt        # wraps the tree's cell renderer: status icons + description tooltips
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
 │   │
@@ -163,8 +171,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoRunnerSettings.kt           # Testo-specific persisted fields + transient rerunFilters
 │   │   ├── TestoRunConfigurationProducer.kt # context → configuration (~615 lines, the trickiest file)
 │   │   ├── TestoTestRunConfigurationEditor.kt  # "Testo Options" panel wrapping the PHP editor
-│   │   ├── TestoTestRunnerSettingsValidator.kt
-│   │   ├── TestoTestMethodFinder.kt
+│   │   ├── TestoTestRunnerSettingsValidator.kt # + the finder that switches the "Cannot find …" gate off
 │   │   └── TestoDebugRunner.kt              # debug session + channel tabs + rerun buttons
 │   │
 │   └── runAnything/
@@ -182,6 +189,7 @@ src/main/resources/
 ├── fileTemplates/internal/     # "Testo Test.php.ft" (+ .html description)
 ├── fileTemplates/code/         # "Testo Test Method" template used by TestoTestCreateInfo
 ├── icons/testo, icons/php      # SVG with _dark variants
+├── icons/status                # one per Testo status (5 shapes, 3 reused in a second colour) + success/failure
 ├── liveTemplates/Testo.xml     # `test`, `data`, `bench`
 ├── messages/TestoBundle.properties
 └── testo.dic                   # spellchecker dictionary
@@ -349,26 +357,33 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
    view (All + one tab per channel) in place of the platform console, with syntax highlighting, hyperlinks,
    copy buttons, log-level filtering and per-channel icons/colors.
 
-3. **Run history** — three cooperating pieces: `TestoChannelHistory` round-trips channel output through
+3. **Toolbar run summary** (`TestoProgressAction`) — a progress ring, the finished/total count, a counter per Testo
+   status and the elapsed time, pushed right by `RightAlignedToolbarAction`. Statuses and assertion counts come off
+   the service messages into `TestoStatusStore`; each counter narrows the tree through
+   `SMTestRunnerResultsForm.setFilter`, and `TestoTestTreeDecorator` draws the same statuses on the nodes.
+   `TestoRunTimings` splits the run into startup / tests / post-processing for the hover and sums the `duration`
+   attributes beside them, which concurrency pushes past the window the tests ran in.
+
+4. **Run history** — three cooperating pieces: `TestoChannelHistory` round-trips channel output through
    `SMTestProxy.metainfo` (the only per-test datum the platform's history XML preserves), `TestoHistoryIndex` knows
    which tests appear in saved history files, and `TestoHistoryCodeVisionProvider` shows a clickable
    *Show history* lens that imports the newest run containing that specific test and selects its node.
 
-4. **Rerun toolbar** — two user-selectable styles (`Tools | Testo`): `MIRROR_AWARE` (three executor-pinned buttons
+5. **Rerun toolbar** — two user-selectable styles (`Tools | Testo`): `MIRROR_AWARE` (three executor-pinned buttons
    that hide whichever duplicates the platform Rerun) and `SPLIT_BUTTON` (default; one split button, platform Rerun
    steps aside). `TestoRerunFailedTestsAction` rebuilds a failed-only run as an explicit list of `--filter`s.
 
-5. **Line markers** (`TestoTestRunLineMarkerProvider`) — gutter run icons on test methods/functions/classes,
+6. **Line markers** (`TestoTestRunLineMarkerProvider`) — gutter run icons on test methods/functions/classes,
    runnable attributes, config files, and each `yield`/`return` inside a data provider.
 
-6. **Data provider index** (`index/`) — file-based index keyed by provider name, resolving both
+7. **Data provider index** (`index/`) — file-based index keyed by provider name, resolving both
    `#[DataProvider('name')]` and `#[DataProvider([Class::class, 'name'])]` (incl. `self::`/`static::`).
    Scoped to the project *test* scope on lookup.
 
-7. **Code generation** — file template + `TestoTestCreateInfo` for *Create New Test*, `Generate | Test Method`,
+8. **Code generation** — file template + `TestoTestCreateInfo` for *Create New Test*, `Generate | Test Method`,
    and live templates `test` / `data` / `bench`.
 
-8. **Navigation & output cleanup** — `TestoTestLocator` (click a node → source), `TestoStackTraceParser`
+9. **Navigation & output cleanup** — `TestoTestLocator` (click a node → source), `TestoStackTraceParser`
    (failed line + text), two console foldings, and `PhpBacktraceFileFilter` for hyperlinks in raw output.
 
 ## Implementation notes & gotchas
@@ -384,11 +399,29 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `TestoProtocolGate` detects it off the missing `nodeId` (not off a version comparison, so forks and nightlies are
   covered), and the converter then stops forwarding messages and notifies once. The version in that notification is
   scraped from Testo's banner line, which survives `-q`.
-- **Channel storage keys go through `ChannelOutputStore.keyFor(name)`** (the `locationHint` remembered on
-  `testStarted`, falling back to the name). Deriving keys from `SMTestProxy.locationUrl` breaks, because the
-  platform resolves that lazily.
+- **A node is identified by `nodeId`, never by name or hint.** A data set's name is its coordinates alone
+  (`Dataset #0:0 [0]`), so every list-shaped provider opens one; a hint names *code*, and `TestIdentity` keeps the
+  type beside the fqn, so one method announced under two types shares it. `TestoStatusStore` and `TestoTargetStore`
+  key by the id.
+- **`TestoNodeIndex` makes an id-keyed store readable from the tree.** `SMTestProxy` does not carry the id, but
+  `SMTRunnerEventsListener.onTestStarted(proxy, nodeId, parentNodeId)` hands both out together. Hooked from
+  `TestoOutputToGeneralEventsConverter.setProcessor`, before any output is read. Writes never consult it.
+- **Channel storage keys still go through `ChannelOutputStore.keyFor(name)`** and so inherit the name collision.
+  They cannot move to node ids: an imported history run has none, and `TestoChannelHistory` rebuilds its tabs from
+  the saved XML.
 - **`TestoChannelsUi` reaches `TestResultsPanel.myConsole` by reflection** — there is no public accessor. It
   degrades gracefully (logs a warning, no channel tabs) if the field disappears.
+- **The tree has one filter slot, shared with *Show passed* / *Show ignored*.** `TestoProgressAction.applyFilter` is
+  its single writer: a selected counter replaces the toggles rather than narrowing them (intersecting would answer
+  "show me the passed ones" with an empty tree), and releasing it recomposes them via `hiddenByToggles` — off Testo's
+  statuses, not `isPassed`/`isIgnored`, where flaky and risky look like a plain pass. A listener on both
+  `BooleanProperty`s re-asserts this after the platform's own, which would otherwise drop a live counter.
+- **The results tree is re-skinned from outside, not subclassed.** `SMTRunnerTestTreeViewProvider` and
+  `TestTreeRenderer` are both `@ApiStatus.Internal` and fail the verifier's default `failureLevel`, so
+  `TestoTestTreeDecorator` wraps the renderer the console already installed (`JTree.getCellRenderer` /
+  `setCellRenderer`). Safe: `attachToModel` is the only installer and runs at form construction, and nothing in the
+  test-framework packages reads the renderer back. The proxy comes off `NodeDescriptor.getElement()` for the same
+  reason — same object, public class.
 - **`TestoHistoryIndex.refreshLens` uses the internal `ModificationStampUtil`** to force code-vision recomputation
   after a run; a test run never touches PHP source, so neither `DaemonCodeAnalyzer.restart()` nor
   `invalidateProvider` alone re-runs `getHint`. Wrapped in `runCatching`.
@@ -420,6 +453,10 @@ Non-obvious constraints already paid for in blood — read before touching the r
   deliberate (the commented-out line records the intent); changing it affects framework auto-detection.
 - **`TestoTestRunLineMarkerProviderInfo.shouldReplace = true`** so Testo's gutter icon wins over PhpStorm's
   PHPUnit contributor for the same element.
+- **The Method field is a `--filter` selector, not a member name, so its validation gate is off.** Every shape Testo
+  accepts (`med:1:0`, `\Ns\Case::med:1:0`, `\Ns\Case`, `\Ns\freeFunction`) is one PHP declares nothing under, so the
+  platform's "Cannot find 'X' in 'Y.php'" fired on correct runs. `AnyMethodIsValid` disables that one check; the
+  file-type and non-empty checks stay, and an empty selection is Testo's own `buildProblem`.
 - **`TestoRunConfiguration.checkConfiguration` swallows one exact platform error.** A group-only run (scope
   `ConfigurationFile`, no config file, non-empty `group`) trips the platform's "Configuration file is not
   specified" `RuntimeConfigurationError`, though Testo needs no config file. The error is matched by message

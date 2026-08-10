@@ -37,6 +37,7 @@ class ChannelOutputStore {
     private val colorByChannel = HashMap<String, String>()
 
     private var headerChunks: List<Chunk> = emptyList()
+    private val noticeChunks = mutableListOf<Chunk>()
     private val locationByName = HashMap<String, String>()
     private val descriptionByKey = HashMap<String, String>()
 
@@ -67,8 +68,17 @@ class ChannelOutputStore {
         synchronized(lock) { headerChunks = chunks }
     }
 
+    /**
+     * A run-level line that belongs to no test — a build problem, say. Kept apart from the header rather than
+     * appended to it, so the augmenter setting the banner cannot wipe a notice that arrived before it, and so the
+     * banner always comes first however the two interleave.
+     */
+    fun appendNotice(chunk: Chunk) {
+        synchronized(lock) { noticeChunks += chunk }
+    }
+
     fun header(): List<Chunk> {
-        synchronized(lock) { return headerChunks }
+        synchronized(lock) { return headerChunks + noticeChunks }
     }
 
     fun append(testKey: String, channel: String, text: String, level: String?) {
@@ -137,6 +147,7 @@ class ChannelOutputStore {
     // headerChunks deliberately survives clear(): the header is set once per run, before per-test clears fire.
     fun clear() {
         synchronized(lock) {
+            noticeChunks.clear()
             byTest.clear()
             allByTest.clear()
             outputByTest.clear()

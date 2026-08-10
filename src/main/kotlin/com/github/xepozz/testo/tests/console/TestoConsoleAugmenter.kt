@@ -86,10 +86,16 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             props.channelsInstalled = true
             captureHeader(props, handler)
             TestoChannelsUi.install(console, props.channelStore, props.levelFilter, project, console)
+            // The verdict is a supplier, not a value: the progress action is wired below and only reaches one at the
+            // end of the run.
+            TestoTestTreeDecorator.install(
+                console,
+                props.statusStore,
+                verdict = props.progressAction::currentVerdict,
+            ) { key -> props.channelStore.description(key) }
             // Persist each test's channel output into proxy metainfo so an imported-history run can rebuild the tabs.
             TestoChannelHistory.subscribeMetainfoWriter(project, console, props.channelStore)
-            props.progressAction.attachTo(console)
-            props.progressAction.installClickFilters(console)
+            props.progressAction.attachTo(console, props.statusStore, props.runTimings, props.targetStore, handler)
             hideStatusLine(console)
         }
 

@@ -208,9 +208,10 @@ object TestoChannelsUi {
                 val allCards = newCards(null)
                 store.header().forEach { allCards.add(it) }
                 addCardsAggregate(allCards, viewer, leaves) { key, sink -> store.attachAll(key, sink) }
-                val allTab = addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
+                addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
 
-                addAggregateTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, viewer, leaves, attach = store::attachOutput)
+                val outputTab =
+                    addAggregateTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, viewer, leaves, attach = store::attachOutput)
 
                 // Every channel renders as cards (one per test, that test's messages merged); only the Output tab above
                 // stays a console. A language channel highlights each card; a format-less one keeps its ANSI.
@@ -226,7 +227,9 @@ object TestoChannelsUi {
                         cards.component
                     }
                 }
-                tabbed.select(allTab, false)
+                // Selected last, once every tab exists: JBEditorTabs activates whichever was added first, and the
+                // tab that opens on a node has to be Output whatever else the node happens to have.
+                outputTab?.let { tabbed.select(it, false) }
                 return
             }
 
@@ -238,10 +241,9 @@ object TestoChannelsUi {
                 val allCards = newCards(null)
                 header.forEach { allCards.add(it) }
                 if (key != null) subscriptions += store.attachAll(key) { allCards.add(it) }
-                val allTab = addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
-                tabbed.select(allTab, false)
+                addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
             }
-            addComponentTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, platform)
+            val outputTab = addComponentTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, platform)
             if (key != null) {
                 for ((channel, chunks) in store.channelsFor(key)) {
                     if (chunks.none { levelFilter.isVisible(it.level) }) continue
@@ -250,6 +252,7 @@ object TestoChannelsUi {
                     addComponentTab(tabbed, humanize(channel), channelIcon(channel, chunks), cards.component)
                 }
             }
+            tabbed.select(outputTab, false)
         }
 
         override fun onTestNodeAdded(viewer: TestResultsViewer, test: SMTestProxy) {
@@ -287,9 +290,8 @@ object TestoChannelsUi {
             outputComponent = null
         }
 
-        private fun addTab(tabbed: JBEditorTabs, title: String, icon: Icon, view: ConsoleViewImpl?) {
-            if (view != null) addComponentTab(tabbed, title, icon, view.component)
-        }
+        private fun addTab(tabbed: JBEditorTabs, title: String, icon: Icon, view: ConsoleViewImpl?): TabInfo? =
+            view?.let { addComponentTab(tabbed, title, icon, it.component) }
 
         private fun addComponentTab(tabbed: JBEditorTabs, title: String, icon: Icon, component: JComponent): TabInfo {
             val info = TabInfo(component).setText(title).setIcon(icon)
@@ -437,13 +439,13 @@ object TestoChannelsUi {
             leaves: List<SMTestProxy>,
             prependHeader: Boolean = false,
             attach: (String, (ChannelOutputStore.Chunk) -> Unit) -> (() -> Unit),
-        ) {
+        ): TabInfo? {
             val view = newConsole(emptyList())
             if (prependHeader) printChunks(view, store.header())
             val aggregate = LiveAggregate(view, viewer, attach)
             leaves.forEach { aggregate.addLeaf(it) }
             activeAggregates += aggregate
-            addTab(tabbed, title, icon, view)
+            return addTab(tabbed, title, icon, view)
         }
 
         // A parent-node tab fed by several leaves; late leaves (onTestNodeAdded) are pushed in after selection.

@@ -3,8 +3,12 @@ package com.github.xepozz.testo.tests
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.tests.console.ChannelOutputStore
 import com.github.xepozz.testo.tests.console.LogLevelFilter
+import com.github.xepozz.testo.tests.console.TestoNodeIndex
 import com.github.xepozz.testo.tests.console.TestoOutputToGeneralEventsConverter
 import com.github.xepozz.testo.tests.console.TestoProgressAction
+import com.github.xepozz.testo.tests.console.TestoRunTimings
+import com.github.xepozz.testo.tests.console.TestoStatusStore
+import com.github.xepozz.testo.tests.console.TestoTargetStore
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.Executor
 import com.intellij.execution.Location
@@ -33,6 +37,15 @@ class TestoConsoleProperties(
 
     val levelFilter = LogLevelFilter()
 
+    // What ties a tree node back to the protocol node it came from; every store below is keyed by that node's id.
+    val nodeIndex = TestoNodeIndex()
+
+    val statusStore = TestoStatusStore(nodeIndex)
+
+    val runTimings = TestoRunTimings()
+
+    val targetStore = TestoTargetStore(nodeIndex)
+
     val progressAction = TestoProgressAction()
 
     // Guards the channel-tab install: set once whoever wires the tabs first (the run-path ExecutionListener or the
@@ -43,7 +56,16 @@ class TestoConsoleProperties(
         testFrameworkName: String,
         consoleProperties: TestConsoleProperties,
     ): OutputToGeneralTestEventsConverter =
-        TestoOutputToGeneralEventsConverter(testFrameworkName, consoleProperties, channelStore, levelFilter)
+        TestoOutputToGeneralEventsConverter(
+            testFrameworkName,
+            consoleProperties,
+            channelStore,
+            levelFilter,
+            statusStore,
+            runTimings,
+            targetStore,
+            nodeIndex,
+        )
 
     override fun getTestStackTraceParser(url: String, proxy: SMTestProxy, project: Project) =
         TestoStackTraceParser.parse(url, proxy.stacktrace, proxy.errorMessage, testLocator, project)
@@ -73,8 +95,8 @@ class TestoConsoleProperties(
     public override fun createImportActions(): Array<com.intellij.openapi.actionSystem.AnAction> =
         arrayOf(
             com.github.xepozz.testo.tests.console.TestoLogLevelFilterAction(levelFilter),
-            com.intellij.openapi.actionSystem.Separator.getInstance(),
-            progressAction,
             *(super.createImportActions() ?: emptyArray()),
+            // Last, though the order hardly matters: the widget is right-aligned and lands past everything anyway.
+            progressAction,
         )
 }
