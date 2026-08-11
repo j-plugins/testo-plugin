@@ -20,12 +20,14 @@ class TestoOutputToGeneralEventsConverter(
     private val timings: TestoRunTimings,
     private val targetStore: TestoTargetStore,
     private val nodes: TestoNodeIndex,
+    private val reportStore: TestoReportStore,
 ) : OutputToGeneralTestEventsConverter(testFrameworkName, consoleProperties) {
 
     /** Hooked the moment the platform hands the processor over, which is before any output is read. */
     override fun setProcessor(processor: GeneralTestEventsProcessor?) {
         super.setProcessor(processor)
         processor?.let { nodes.attachTo(it) }
+        LOG.info("Testo converter attached (processor=${processor?.javaClass?.simpleName})")
     }
 
     /** Version off the banner, kept only to name it in the too-old notification. */
@@ -110,6 +112,16 @@ class TestoOutputToGeneralEventsConverter(
                         store.appendOutput(key, "\n$text\n", "stderr")
                     }
                 }
+            }
+
+            // Testo's own message, naming a report of this run. It has to arrive while the run is still going — once the
+            // root suite closes the platform stops feeding this converter — so Testo announces a report when it starts
+            // writing it, and the button waits for the file to appear. Not forwarded, for the same reason as
+            // buildProblem: the platform would echo the raw line into the console.
+            TESTO_REPORT -> {
+                LOG.info("Testo report announced (service message): $attrs")
+                TestoReportRef.fromAttributes(attrs)?.let { reportStore.note(it) }
+                return
             }
 
             BUILD_PROBLEM -> {
@@ -215,5 +227,8 @@ class TestoOutputToGeneralEventsConverter(
         private const val TEST_FAILED = "testFailed"
         private const val TEST_IGNORED = "testIgnored"
         private const val BUILD_PROBLEM = "buildProblem"
+        private const val TESTO_REPORT = "testoReport"
+
+        private val LOG = com.intellij.openapi.diagnostic.logger<TestoOutputToGeneralEventsConverter>()
     }
 }

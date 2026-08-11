@@ -8,6 +8,15 @@
     <depends>com.jetbrains.php</depends>
     <depends optional="true" config-file="coverage.xml">com.intellij.modules.coverage</depends>
 
+    <!-- JCEF, for the report tab, declared twice because the two supported platforms ship it differently: on 262 it is
+         the bundled com.intellij.modules.jcef plugin (optional here, so an IDE without it still loads us), on 252 it is
+         a module inside the monolith and only the v2 form can name it. Neither is load-bearing: if JCEF stays invisible
+         anyway, TestoReportViewer.isAvailable says so and reports open in the browser instead. -->
+    <depends optional="true" config-file="jcef.xml">com.intellij.modules.jcef</depends>
+    <dependencies>
+        <module name="intellij.platform.ui.jcef"/>
+    </dependencies>
+
     <resource-bundle>messages.TestoBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
@@ -30,6 +39,10 @@
                 implementation="com.github.xepozz.testo.references.TestFunctionImplicitUsageProvider"/>
         <iconProvider
                 implementation="com.github.xepozz.testo.ui.TestoIconProvider"/>
+
+        <!-- Shows a generated Testo report in a JCEF tab. Only ever accepts our own TestoReportVirtualFile. -->
+        <fileEditorProvider
+                implementation="com.github.xepozz.testo.ui.TestoReportFileEditorProvider"/>
 
         <codeInsight.daemonBoundCodeVisionProvider
                 implementationClass="com.github.xepozz.testo.ui.TestoHistoryCodeVisionProvider"/>

@@ -69,6 +69,10 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
     /** What the tree is narrowed to right now; `null` means no filter of ours is applied. */
     private var selected: TestoTestStatus? = null
 
+    /** Whether the results form has announced the end of a session — what makes the next start a new run, not a late
+     * event of this one. EDT-only, like the listener that maintains it. */
+    private var formFinished = false
+
     override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
     override fun actionPerformed(e: AnActionEvent) = Unit
@@ -84,6 +88,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         store: TestoStatusStore,
         clock: TestoRunTimings,
         targets: TestoTargetStore,
+        reports: TestoReportStore,
         handler: ProcessHandler?,
     ) {
         val viewer = console.resultsViewer
@@ -106,9 +111,18 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             override fun onTestingStarted(viewer: TestResultsViewer) {
                 // Only on a second session in the same console: wiping on every announcement would throw away what
                 // the converter already reported for this run, since it reads the stream before the platform.
-                if (clock.isFinished()) {
+                //
+                // The gate is this form's own finish, not clock.isFinished(): a short run exits before the platform has
+                // worked through its output buffer, so processTerminated stops the clock and *then* this arrives — and
+                // restarting the clock there left it running forever, with no event left to stop it. The form's two
+                // events are strictly ordered per session, so they can tell a new run from a late announcement.
+                if (formFinished) {
+                    formFinished = false
                     store.clear()
                     targets.clear()
+                    // Reports are deliberately not cleared here: a report is announced before the first test, so this
+                    // may well run after the announcement and would throw it away. A re-run writes the same path, and
+                    // the store replaces by path, so nothing stale survives anyway.
                     clock.clear()
                     clock.noteStart()
                     exitCode.set(null)
@@ -133,6 +147,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                 // The only safe moment to read the tree: nothing appends to it any more.
                 runCatching { store.recountFrom(viewer.testsRootNode) }
                 clock.noteFinish()
+                formFinished = true
             }
         })
 

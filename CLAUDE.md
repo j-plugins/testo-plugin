@@ -36,7 +36,8 @@ Dependabot bumps these regularly — read the files rather than trusting this ta
 `phpstorm-remote-interpreter`, `php.codeception`, `php.behat`, `gherkin`, `xepozz.ide.introspector`
 (+ `hackathon.indices.viewer` on 252 only — it has no 262 build).
 `platformBundledModules`: `intellij.platform.coverage`, `intellij.spellchecker` (+ `intellij.platform.smRunner`,
-`intellij.platform.testRunner` on 262, which split them out of the monolith).
+`intellij.platform.testRunner`, `intellij.platform.ui.jcef` on 262, which split them out of the monolith — asking for
+the JCEF module by name on 252 fails to resolve).
 
 ### Two build variants (`phpApi`)
 
@@ -151,6 +152,8 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoTargetStore.kt     # rerun targets of the current run, keyed by node id
 │   │   ├── TestoNodeIndex.kt       # SMTestProxy → nodeId, off the platform's own node events
 │   │   ├── TestoProgressAction.kt  # right-aligned toolbar summary: ring, fraction, status counters, elapsed
+│   │   ├── TestoReportStore.kt     # reports announced by `##teamcity[testoReport …]` + where to look for them
+│   │   ├── TestoReportAction.kt    # right-aligned split button: WebView / browser / copy path
 │   │   ├── TestoTestTreeDecorator.kt        # wraps the tree's cell renderer: status icons + description tooltips
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
@@ -180,6 +183,7 @@ src/main/kotlin/com/github/xepozz/testo/
 └── ui/
     ├── TestoIconProvider.kt                 # Testo-marked icons for PHP test files
     ├── TestoHistoryCodeVisionProvider.kt    # "Show history" lens above each test
+    ├── TestoReportEditor.kt                 # JCEF editor tab for a generated report (light file + provider)
     └── TestoStackTraceConsoleFolding.kt     # folds `[internal function]` frame runs
 
 src/main/resources/
@@ -386,6 +390,11 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
 9. **Navigation & output cleanup** — `TestoTestLocator` (click a node → source), `TestoStackTraceParser`
    (failed line + text), two console foldings, and `PhpBacktraceFileFilter` for hyperlinks in raw output.
 
+10. **Generated reports** — Testo announces a report it wrote with the non-standard `##teamcity[testoReport …]`;
+    `TestoReportStore` keeps them and `TestoReportAction` is the split button past the run summary, opening the report
+    in a JCEF tab (`ui/TestoReportEditor.kt`) or the external browser. The spec for the report itself lives in the Testo
+    repository (`docs/spec/html-report.md`).
+
 ## Implementation notes & gotchas
 
 Non-obvious constraints already paid for in blood — read before touching the relevant area.
@@ -461,6 +470,24 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `ConfigurationFile`, no config file, non-empty `group`) trips the platform's "Configuration file is not
   specified" `RuntimeConfigurationError`, though Testo needs no config file. The error is matched by message
   text (`PhpBundle`), so a platform rewording fails closed — the validation error merely comes back.
+- **The report button stays visible and merely goes disabled.** RunTab snapshots the toolbar's actions, and a button
+  hidden at that moment — which is every moment before a run ends — never gets a component to show later.
+- **A report must be announced while the run is still going, not once it is written.** Everything after the root
+  `testSuiteFinished` is past the point where the platform still feeds the converter: such a line reaches neither our
+  branch nor the console, it simply vanishes. So Testo announces a report when it *starts* writing it, and the button
+  polls for the file — `update` resolves the path on every toolbar refresh (on BGT, hence the filesystem touch).
+- **JCEF is declared twice and still never trusted.** On 262 it is the bundled `com.intellij.modules.jcef` plugin
+  (`<depends optional>` + `jcef.xml`), on 252 a module inside the monolith (v2 `<dependencies><module>`); compiling
+  against it proves nothing about runtime visibility. `TestoReportViewer.isAvailable` therefore asks by **reflection**:
+  a named reference to `JBCefApp` throws `NoClassDefFoundError` when the *enclosing* method's class is verified, before
+  any `try` around the call can catch it — which is how one absent class took down the whole toolbar action group. No
+  JCEF type may be mentioned outside a class that loads only after `isAvailable` answers true.
+- **The report tab is our own `FileEditorProvider`, not the platform's `HTMLEditorProvider`** — that one is
+  `@ApiStatus.Internal`. It accepts nothing but `TestoReportVirtualFile`, and `TestoReportViewer` keeps one such file
+  per path so re-opening a report returns to its tab (the platform keys tabs by identity, not equality) and reloads it.
+- **A report path is resolved with `pathMapper.getLocalPath`, never `getLocalFile`** — the file was written moments
+  before the message arrived and the VFS need not know it yet. `relativePath` under the project root is the last
+  candidate, and the only one that works when the run's filesystem shares nothing with the host's.
 
 ## Testing
 
