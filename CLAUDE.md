@@ -153,7 +153,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoNodeIndex.kt       # SMTestProxy → nodeId, off the platform's own node events
 │   │   ├── TestoProgressAction.kt  # right-aligned toolbar summary: ring, fraction, status counters, elapsed
 │   │   ├── TestoReportStore.kt     # reports announced by `##teamcity[testoReport …]` + where to look for them
-│   │   ├── TestoReportAction.kt    # right-aligned split button: WebView / browser / copy path
+│   │   ├── TestoReportAction.kt    # right-aligned panel of hand-drawn report buttons (WebView / browser / copy)
 │   │   ├── TestoTestTreeDecorator.kt        # wraps the tree's cell renderer: status icons + description tooltips
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
@@ -390,10 +390,11 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
 9. **Navigation & output cleanup** — `TestoTestLocator` (click a node → source), `TestoStackTraceParser`
    (failed line + text), two console foldings, and `PhpBacktraceFileFilter` for hyperlinks in raw output.
 
-10. **Generated reports** — Testo announces a report it wrote with the non-standard `##teamcity[testoReport …]`;
-    `TestoReportStore` keeps them and `TestoReportAction` is the split button past the run summary, opening the report
-    in a JCEF tab (`ui/TestoReportEditor.kt`) or the external browser. The spec for the report itself lives in the Testo
-    repository (`docs/spec/html-report.md`).
+10. **Generated reports** — Testo announces each report with the non-standard `##teamcity[testoReport …]`;
+    `TestoReportStore` keeps them, and `TestoReportsAction` draws one button per viewable report past the run summary,
+    labelled with the announced name, opening it in a JCEF tab (`ui/TestoReportEditor.kt`) or the external browser. Its
+    four states are: not announced (no button), announced without a file (disabled), file present (enabled), file gone
+    (disabled again). The spec for the report itself lives in the Testo repository (`docs/spec/html-report.md`).
 
 ## Implementation notes & gotchas
 
@@ -470,12 +471,16 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `ConfigurationFile`, no config file, non-empty `group`) trips the platform's "Configuration file is not
   specified" `RuntimeConfigurationError`, though Testo needs no config file. The error is matched by message
   text (`PhpBundle`), so a platform rewording fails closed — the validation error merely comes back.
-- **The report button stays visible and merely goes disabled.** RunTab snapshots the toolbar's actions, and a button
-  hidden at that moment — which is every moment before a run ends — never gets a component to show later.
+- **The report buttons are drawn by hand, inside one right-aligned action.** Every platform widget failed a requirement:
+  a toolbar button shows the icon alone (text becomes a tooltip), `SplitButtonAction` paints its own component and drops
+  the text, `ComboBoxAction` turns the first click into a dropdown, and an expanded `ActionGroup` loses
+  `RightAlignedToolbarAction` — its children land among the buttons on the left. So `TestoReportsAction` owns a panel of
+  cells, the way `TestoProgressAction` does; RunTab snapshots the toolbar's actions, so the panel must exist from the
+  start and hide itself while it has no cells.
 - **A report must be announced while the run is still going, not once it is written.** Everything after the root
   `testSuiteFinished` is past the point where the platform still feeds the converter: such a line reaches neither our
-  branch nor the console, it simply vanishes. So Testo announces a report when it *starts* writing it, and the button
-  polls for the file — `update` resolves the path on every toolbar refresh (on BGT, hence the filesystem touch).
+  branch nor the console, it simply vanishes. So Testo announces a report when it *starts* writing it, and each cell
+  polls for the file twice a second — which is also how a deleted report turns its button off again.
 - **JCEF is declared twice and still never trusted.** On 262 it is the bundled `com.intellij.modules.jcef` plugin
   (`<depends optional>` + `jcef.xml`), on 252 a module inside the monolith (v2 `<dependencies><module>`); compiling
   against it proves nothing about runtime visibility. `TestoReportViewer.isAvailable` therefore asks by **reflection**:

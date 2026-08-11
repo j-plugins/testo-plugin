@@ -6,8 +6,8 @@ import com.github.xepozz.testo.tests.console.LogLevelFilter
 import com.github.xepozz.testo.tests.console.TestoNodeIndex
 import com.github.xepozz.testo.tests.console.TestoOutputToGeneralEventsConverter
 import com.github.xepozz.testo.tests.console.TestoProgressAction
-import com.github.xepozz.testo.tests.console.TestoReportAction
 import com.github.xepozz.testo.tests.console.TestoReportStore
+import com.github.xepozz.testo.tests.console.TestoReportsAction
 import com.github.xepozz.testo.tests.console.TestoRunTimings
 import com.github.xepozz.testo.tests.console.TestoStatusStore
 import com.github.xepozz.testo.tests.console.TestoTargetStore
@@ -54,7 +54,7 @@ class TestoConsoleProperties(
     val progressAction = TestoProgressAction()
 
     // getLocalPath, not getLocalFile: the report was written moments ago and the VFS may not know the file yet.
-    val reportAction = TestoReportAction(reportStore, project) { pathMapper.getLocalPath(it) }
+    val reportsAction = TestoReportsAction(reportStore, project) { pathMapper.getLocalPath(it) }
 
     // Guards the channel-tab install: set once whoever wires the tabs first (the run-path ExecutionListener or the
     // debug runner, which installs them directly), so the other side is a no-op instead of a double install.
@@ -108,9 +108,9 @@ class TestoConsoleProperties(
             com.github.xepozz.testo.tests.console.TestoLogLevelFilterAction(levelFilter),
             *(super.createImportActions() ?: emptyArray()),
             // Both are right-aligned, and the toolbar lays that group out from the right edge inwards — so the one
-            // listed first ends up furthest right. The report button therefore goes before the run summary here to sit
+            // listed first ends up furthest right. The report buttons therefore go before the run summary here to sit
             // past it on screen.
-            reportAction,
+            reportsAction,
             progressAction,
         )
     }

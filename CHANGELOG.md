@@ -6,13 +6,15 @@
 
 ### Added
 
-- A report button at the right end of the test toolbar, past the run summary. It sits there through the run and becomes
-  clickable once Testo announces a report it generated —
-  `##teamcity[testoReport format='html' path='…' relativePath='…' name='…' schemaVersion='…']` — and the file is
-  actually on disk; a run without a report renderer leaves it disabled, saying so on hover.
-- Clicking it opens the report in an editor tab rendered by JCEF; the dropdown also offers the external browser and
+- Report buttons at the right end of the test toolbar, past the run summary — one per report Testo announces with
+  `##teamcity[testoReport format='html' path='…' relativePath='…' name='…' schemaVersion='…']`, labelled with the name
+  the announcement carries. A run that writes no report shows no button; a report announced but not yet written shows a
+  disabled one, saying so on hover; it lights up when the file appears and goes back to disabled if the file is removed.
+- Clicking a button opens the report in an editor tab rendered by JCEF; the arrow on it offers the external browser and
   copying the report's path. Reopening an already-open report reloads it, so the tab shows the run that just finished
   rather than the one it was opened for.
+- Only reports the button can show as a page are offered. Everything else Testo announces is kept, ready for formats the
+  plugin will handle differently.
 - The announced path is absolute inside the *execution* environment, so it is looked for through the PHP path mapper
   first, then as-is, then as `relativePath` under the project root — which is what makes a report written inside a
   container or behind a remote interpreter reachable.

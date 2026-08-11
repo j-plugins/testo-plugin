@@ -4,139 +4,292 @@ import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.ui.TestoReportViewer
 import com.intellij.icons.AllIcons
 import com.intellij.ide.BrowserUtil
-import com.intellij.openapi.actionSystem.ActionGroup
+import com.intellij.ide.DataManager
+import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.actionSystem.RightAlignedToolbarAction
-import com.intellij.openapi.actionSystem.SplitButtonAction
-import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.openapi.actionSystem.ex.CustomComponentAction
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.util.IconLoader
+import com.intellij.ui.JBColor
+import com.intellij.util.ui.GraphicsUtil
+import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
+import java.awt.Cursor
+import java.awt.Dimension
+import java.awt.Font
+import java.awt.Graphics
+import java.awt.Graphics2D
 import java.awt.datatransfer.StringSelection
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import java.nio.file.Files
 import java.nio.file.Path
 import javax.swing.Icon
+import javax.swing.JComponent
+import javax.swing.JPanel
+import javax.swing.Timer
 
 /**
- * The report button at the right end of the test toolbar, past the run summary.
+ * The report buttons at the far right of the test toolbar, past the run summary — one per report Testo announced.
  *
- * Appears only once Testo has announced a report and the file is actually there — a run configured without the reporter
- * shows no button at all. Clicking opens it in an editor tab (JCEF); the dropdown offers the external browser, which is
- * also what the main click falls back to where JCEF is unavailable.
+ * Hand-drawn, for the same reasons the run summary beside it is: a plain toolbar button shows the icon alone (the text
+ * survives only as a tooltip), `SplitButtonAction` paints its own component and drops the text entirely, and
+ * `ComboBoxAction` turns every click into a dropdown. Only a custom component gives icon, name, a click that opens the
+ * report, and an arrow for the other ways to open it — and, being one right-aligned action rather than an expanded
+ * group, it actually lands to the right of the summary instead of among the buttons on the left.
+ *
+ * States, in the order a run walks through them: no announcement, no button; announced but not yet written, a disabled
+ * button; the file appears, the button lights up; the file is deleted, it goes back to disabled.
  */
-class TestoReportAction(
+class TestoReportsAction(
     private val reports: TestoReportStore,
     private val project: Project,
     private val mapToLocal: (String) -> String?,
-) : SplitButtonAction(ReportMenu(reports, project, mapToLocal)), RightAlignedToolbarAction {
+) : AnAction(), CustomComponentAction, RightAlignedToolbarAction, DumbAware {
 
-    // Icon *and* text: a toolbar button draws only its icon unless SHOW_TEXT_IN_TOOLBAR says otherwise, which is how
-    // Testo's name for the report ended up in the tooltip and nowhere else. The presentation is rewritten in update()
-    // once a report is known.
-    private val mainAction = ReportTargetAction(
-        TestoBundle.message("testo.report.action.text"),
-        AllIcons.General.IndentDetected,
-        Mode.DEFAULT,
-        reports::primary,
-        project,
-        mapToLocal,
-    ).apply { templatePresentation.putClientProperty(ActionUtil.SHOW_TEXT_IN_TOOLBAR, true) }
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
 
-    // Resolving a report means touching the filesystem, which must not happen on the EDT.
-    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
-
-    // The button always means the same thing, so it never redraws itself as whichever menu item ran last.
-    override fun useDynamicSplitButton(): Boolean = false
-
-    override fun getMainAction(e: AnActionEvent): AnAction = mainAction
+    override fun actionPerformed(e: AnActionEvent) = Unit
 
     override fun update(e: AnActionEvent) {
-        val report = reports.primary()
-        val located = report?.let { resolveReport(it, project, mapToLocal) }
-        logStateOnce(e.place, located)
-        super.update(e)
-        // Visible even with no report to open, and merely disabled: RunTab snapshots the toolbar's actions, so a button
-        // hidden at that moment — which is every moment before the run ends — never gets a component at all.
-        e.presentation.isVisible = true
-        e.presentation.isEnabled = located != null
-        // Testo's own name for the report, so the button says what it opens; the bundle only covers the empty case.
-        e.presentation.text = report?.name ?: TestoBundle.message("testo.report.action.text")
-        e.presentation.icon = AllIcons.General.IndentDetected
-        // Without this the row shows the icon alone and the text survives only as a tooltip.
-        e.presentation.putClientProperty(ActionUtil.SHOW_TEXT_IN_TOOLBAR, true)
-        e.presentation.description = when (located) {
-            null -> TestoBundle.message("testo.report.action.description.none")
-            else -> TestoBundle.message("testo.report.action.description", located.toString())
+        e.presentation.isEnabledAndVisible = true
+    }
+
+    override fun createCustomComponent(presentation: Presentation, place: String): JComponent = ReportsPanel()
+
+    /**
+     * One cell per announced report, polled rather than subscribed: the store is written by the converter off the
+     * process's thread, and whether the file exists yet changes without anything telling us.
+     */
+    private inner class ReportsPanel : JPanel() {
+        private val cells = LinkedHashMap<String, ReportCell>()
+        private val timer = Timer(REFRESH_MS) { tick() }
+
+        init {
+            isOpaque = false
+            // Laid out by hand, like the run summary: a LayoutManager caches size requirements, and this row is
+            // re-measured whenever a report appears or its name changes.
+            layout = null
+            border = JBUI.Borders.empty(0, 6, 0, 4)
+            isVisible = false
+        }
+
+        override fun addNotify() {
+            super.addNotify()
+            timer.start()
+        }
+
+        override fun removeNotify() {
+            timer.stop()
+            super.removeNotify()
+        }
+
+        override fun getPreferredSize(): Dimension {
+            val insets = insets
+            var width = insets.left + insets.right
+            var height = 0
+            for (child in components) {
+                if (!child.isVisible) continue
+                val size = child.preferredSize
+                width += size.width
+                height = maxOf(height, size.height)
+            }
+            return Dimension(width, height + insets.top + insets.bottom)
+        }
+
+        override fun getMinimumSize(): Dimension = preferredSize
+        override fun getMaximumSize(): Dimension = preferredSize
+
+        override fun doLayout() {
+            var x = insets.left
+            for (child in components) {
+                val size = child.preferredSize
+                child.setBounds(x, (height - size.height) / 2, size.width, size.height)
+                x += size.width
+            }
+        }
+
+        private var laidOutWidth = -1
+
+        private fun tick() {
+            val announced = reports.viewable()
+            // Cells follow the announcements: added when a report shows up, dropped if the store is ever cleared.
+            announced.forEach { ref ->
+                cells.getOrPut(ref.path) { ReportCell(ref).also { add(it) } }.ref = ref
+            }
+            val gone = cells.keys - announced.mapTo(HashSet()) { it.path }
+            gone.forEach { path -> cells.remove(path)?.let { remove(it) } }
+
+            cells.values.forEach { it.refresh() }
+            isVisible = cells.isNotEmpty()
+
+            val width = preferredSize.width
+            if (width != laidOutWidth) {
+                laidOutWidth = width
+                revalidate()
+            }
+            repaint()
         }
     }
 
-    /** What the last update saw, so `update` firing several times a second logs one line per real change. */
-    private var lastLogged: String? = null
+    /** Icon, the report's own name, and a dropdown arrow; the arrow's third of the cell opens the menu. */
+    private inner class ReportCell(ref: TestoReportRef) : JComponent() {
+        var ref: TestoReportRef = ref
+        private var located: Path? = null
+        private var hovered = false
+        private var lastLogged: String? = null
 
-    private fun logStateOnce(place: String, located: Path?) {
-        val announced = reports.all()
-        val primary = reports.primary()
-        val candidates = primary?.let { reportPathCandidates(it, project.basePath, mapToLocal) }.orEmpty()
-        val digest = "place=$place announced=${announced.size} primary=${primary?.path} " +
-            "candidates=$candidates resolved=$located"
-        if (digest == lastLogged) return
-        lastLogged = digest
-        LOG.info("Testo report button: $digest")
+        // Asked for per paint: a font set once on a raw JComponent outlives a zoom, since there is no UI delegate to
+        // reinstall it, and the cell would keep the size it was built at.
+        override fun getFont(): Font = UIUtil.getLabelFont()
+
+        init {
+            isOpaque = false
+            addMouseListener(object : MouseAdapter() {
+                override fun mouseEntered(e: MouseEvent) {
+                    hovered = true
+                    repaint()
+                }
+
+                override fun mouseExited(e: MouseEvent) {
+                    hovered = false
+                    repaint()
+                }
+
+                override fun mouseClicked(e: MouseEvent) {
+                    if (located == null) return
+                    if (e.x >= width - arrowZone()) showMenu() else openDefault()
+                }
+            })
+        }
+
+        private fun text(): String = ref.name ?: TestoBundle.message("testo.report.action.text")
+
+        private fun arrowZone(): Int = ARROW.iconWidth + GAP + PADDING
+
+        /** Re-resolves the file, which is what moves the cell between enabled and disabled. */
+        fun refresh() {
+            val found = resolveReport(ref, project, mapToLocal)
+            val changed = found != located
+            located = found
+            cursor = if (found == null) Cursor.getDefaultCursor() else Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+            toolTipText = when (found) {
+                null -> TestoBundle.message("testo.report.action.description.pending")
+                else -> TestoBundle.message("testo.report.action.description", found.toString())
+            }
+            val digest = "report=${ref.path} resolved=$found"
+            if (digest != lastLogged) {
+                lastLogged = digest
+                LOG.info("Testo report button: $digest")
+            }
+            if (changed) repaint()
+        }
+
+        override fun getPreferredSize(): Dimension {
+            val metrics = getFontMetrics(font)
+            val width = PADDING + ICON.iconWidth + GAP + metrics.stringWidth(text()) + GAP + ARROW.iconWidth + PADDING
+            val height = maxOf(ICON.iconHeight, metrics.height, JBUI.scale(16)) + JBUI.scale(4)
+            return Dimension(width, height)
+        }
+
+        override fun getMinimumSize(): Dimension = preferredSize
+        override fun getMaximumSize(): Dimension = preferredSize
+
+        override fun paintComponent(g: Graphics) {
+            val g2 = g.create() as Graphics2D
+            try {
+                GraphicsUtil.setupAAPainting(g2)
+                if (hovered && located != null) {
+                    g2.color = JBUI.CurrentTheme.ActionButton.hoverBackground()
+                    val arc = JBUI.scale(6)
+                    g2.fillRoundRect(0, 0, width, height, arc, arc)
+                }
+                // Dimmed as a whole while the file is missing, so "announced" reads differently from "ready".
+                val enabled = located != null
+                val icon = if (enabled) ICON else disabledIcon(ICON)
+                icon.paintIcon(this, g2, PADDING, (height - icon.iconHeight) / 2)
+
+                g2.font = font
+                g2.color = if (enabled) UIUtil.getLabelForeground() else DISABLED_TEXT
+                val metrics = g2.fontMetrics
+                val textX = PADDING + ICON.iconWidth + GAP
+                g2.drawString(text(), textX, (height - metrics.height) / 2 + metrics.ascent)
+
+                val arrow = if (enabled) ARROW else disabledIcon(ARROW)
+                arrow.paintIcon(this, g2, width - PADDING - arrow.iconWidth, (height - arrow.iconHeight) / 2)
+            } finally {
+                g2.dispose()
+            }
+        }
+
+        private fun openDefault() {
+            val path = located ?: return
+            val label = ref.name ?: TestoBundle.message("testo.report.editor.name")
+            if (!TestoReportViewer.open(project, path, label)) browseReport(path)
+        }
+
+        private fun showMenu() {
+            val group = DefaultActionGroup(
+                buildList {
+                    if (TestoReportViewer.isAvailable) {
+                        add(item("testo.report.open.webview", AllIcons.Actions.Preview, Mode.WEB_VIEW))
+                    }
+                    add(item("testo.report.open.browser", AllIcons.Nodes.PpWeb, Mode.BROWSER))
+                    add(item("testo.report.copy.path", AllIcons.Actions.Copy, Mode.COPY_PATH))
+                }
+            )
+            JBPopupFactory.getInstance()
+                .createActionGroupPopup(
+                    null,
+                    group,
+                    DataManager.getInstance().getDataContext(this),
+                    JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
+                    true,
+                    ActionPlaces.TOOLBAR,
+                )
+                .showUnderneathOf(this)
+        }
+
+        private fun item(key: String, icon: Icon, mode: Mode) =
+            ReportTargetAction(TestoBundle.message(key), icon, mode, { ref }, project, mapToLocal)
     }
 
     private companion object {
-        private val LOG = com.intellij.openapi.diagnostic.logger<TestoReportAction>()
+        private const val REFRESH_MS = 500
+
+        private val ICON: Icon = AllIcons.General.IndentDetected
+        private val ARROW: Icon = AllIcons.General.LinkDropTriangle
+
+        // Read at paint time, never cached: the scale changes with the monitor the IDE was dragged to.
+        private val PADDING get() = JBUI.scale(5)
+        private val GAP get() = JBUI.scale(4)
+
+        private val DISABLED_TEXT = JBColor.namedColor("Label.disabledForeground", JBColor(0x8C8C8C, 0x6F737A))
+
+        private val LOG = logger<TestoReportsAction>()
     }
 }
 
-/** What a click does; [DEFAULT] is the WebView with the browser as its fallback. */
-private enum class Mode { DEFAULT, WEB_VIEW, BROWSER, COPY_PATH }
+/** The platform's own greying, so a disabled cell matches every other disabled control in the row. */
+private fun disabledIcon(icon: Icon): Icon = IconLoader.getDisabledIcon(icon)
 
-/** The dropdown: the other ways to open the primary report, plus one entry per extra report when a run wrote several. */
-private class ReportMenu(
-    private val reports: TestoReportStore,
-    private val project: Project,
-    private val mapToLocal: (String) -> String?,
-) : ActionGroup(), DumbAware {
-
-    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
-
-    override fun getChildren(e: AnActionEvent?): Array<AnAction> {
-        val primary = reports.primary()
-        return buildList {
-            if (TestoReportViewer.isAvailable) {
-                add(item("testo.report.open.webview", AllIcons.Actions.Preview, Mode.WEB_VIEW) { primary })
-            }
-            add(item("testo.report.open.browser", AllIcons.Nodes.PpWeb, Mode.BROWSER) { primary })
-            add(item("testo.report.copy.path", AllIcons.Actions.Copy, Mode.COPY_PATH) { primary })
-            // Viewable only, and only when there is a choice to make: a data document or a coverage report is announced
-            // too, and neither belongs behind "open this page".
-            reports.viewable().filter { it != primary }.forEach { ref ->
-                add(
-                    ReportTargetAction(
-                        ref.name ?: ref.format.uppercase(),
-                        AllIcons.General.IndentDetected,
-                        Mode.DEFAULT,
-                        { ref },
-                        project,
-                        mapToLocal,
-                    )
-                )
-            }
-        }.toTypedArray()
-    }
-
-    private fun item(key: String, icon: Icon, mode: Mode, target: () -> TestoReportRef?) =
-        ReportTargetAction(TestoBundle.message(key), icon, mode, target, project, mapToLocal)
-}
+/** What a menu entry does; [WEB_VIEW] falls back to the browser where JCEF is unavailable. */
+private enum class Mode { WEB_VIEW, BROWSER, COPY_PATH }
 
 private class ReportTargetAction(
     text: String,
     icon: Icon?,
     private val mode: Mode,
-    private val target: () -> TestoReportRef?,
+    private val target: () -> TestoReportRef,
     private val project: Project,
     private val mapToLocal: (String) -> String?,
 ) : AnAction(text, null, icon), DumbAware {
@@ -144,19 +297,18 @@ private class ReportTargetAction(
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabledAndVisible = target()?.let { resolveReport(it, project, mapToLocal) } != null
+        e.presentation.isEnabledAndVisible = resolveReport(target(), project, mapToLocal) != null
     }
 
     override fun actionPerformed(e: AnActionEvent) {
-        val ref = target() ?: return
+        val ref = target()
+        // Re-resolved rather than remembered: the report may have been deleted since the menu was drawn.
         val path = resolveReport(ref, project, mapToLocal) ?: return
         val label = ref.name ?: TestoBundle.message("testo.report.editor.name")
         when (mode) {
             Mode.BROWSER -> browseReport(path)
             Mode.COPY_PATH -> CopyPasteManager.getInstance().setContents(StringSelection(path.toString()))
-            // Without JCEF a tab could only say as much, so the report opens where it can actually be read.
-            Mode.WEB_VIEW, Mode.DEFAULT ->
-                if (!TestoReportViewer.open(project, path, label)) browseReport(path)
+            Mode.WEB_VIEW -> if (!TestoReportViewer.open(project, path, label)) browseReport(path)
         }
     }
 }
@@ -172,7 +324,8 @@ private fun browseReport(path: Path) = BrowserUtil.browse(path.toUri())
 /**
  * The announced report as a local file, or `null` while none of the candidates exists.
  *
- * Touches the filesystem — callers must be off the EDT.
+ * Touches the filesystem. Called from the cell's timer on the EDT — three `stat`s twice a second, which is the price of
+ * noticing that the file has appeared without anything announcing it.
  */
 internal fun resolveReport(ref: TestoReportRef, project: Project, mapToLocal: (String) -> String?): Path? =
     // The mapper is the PHP plugin's, over a path it may know nothing about: whatever it throws must not take the
