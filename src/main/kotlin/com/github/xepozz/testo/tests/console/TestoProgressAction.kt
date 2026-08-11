@@ -122,7 +122,9 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                     targets.clear()
                     // Reports are deliberately not cleared here: a report is announced before the first test, so this
                     // may well run after the announcement and would throw it away. A re-run writes the same path, and
-                    // the store replaces by path, so nothing stale survives anyway.
+                    // the store replaces by path, so nothing stale survives anyway. Their buttons do go back to
+                    // disabled, though — the file on disk is the *previous* run's until this one ends.
+                    reports.noteRunStarted()
                     clock.clear()
                     clock.noteStart()
                     exitCode.set(null)
@@ -152,13 +154,17 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         })
 
         // The verdict follows the process, not the tree: a run that dies before reporting anything is still red, and
-        // a run killed mid-flight stops the clock even though onTestingFinished never came.
+        // a run killed mid-flight stops the clock even though onTestingFinished never came. The report buttons wait for
+        // the same event — an announced report is only worth looking for once nothing is writing it any more.
         handler?.addProcessListener(object : ProcessListener {
             override fun processTerminated(event: ProcessEvent) {
                 exitCode.set(event.exitCode)
                 clock.noteFinish()
+                reports.noteRunFinished()
             }
         })
+        // A run short enough to be over before this wiring lands gets no processTerminated at all.
+        if (handler?.isProcessTerminated == true) reports.noteRunFinished()
     }
 
     /**

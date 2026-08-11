@@ -4,6 +4,7 @@ import com.github.xepozz.testo.tests.console.TestoReportRef
 import com.github.xepozz.testo.tests.console.TestoReportStore
 import com.github.xepozz.testo.tests.console.reportPathCandidates
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import java.nio.file.Path
@@ -121,6 +122,22 @@ class TestoReportStoreTest {
 
         assertEquals(1, store.all().size)
         assertEquals("second", store.primary()!!.name)
+    }
+
+    @Test
+    fun aRunIsUnfinishedUntilItsProcessSaysOtherwise() {
+        // What keeps the button disabled: the announced path holds the previous run's report until this run ends.
+        val store = TestoReportStore()
+        store.note(ref("/tmp/index.html"))
+        assertFalse(store.runFinished)
+
+        store.noteRunFinished()
+        assertTrue(store.runFinished)
+
+        // A second session in the same console starts over, keeping the reports it was told about.
+        store.noteRunStarted()
+        assertFalse(store.runFinished)
+        assertEquals(1, store.all().size)
     }
 
     @Test

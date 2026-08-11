@@ -481,6 +481,11 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `testSuiteFinished` is past the point where the platform still feeds the converter: such a line reaches neither our
   branch nor the console, it simply vanishes. So Testo announces a report when it *starts* writing it, and each cell
   polls for the file twice a second — which is also how a deleted report turns its button off again.
+- **No cell looks at the disk before the process exits** (`TestoReportStore.runFinished`, set from the process listener
+  in `TestoProgressAction.attachTo`). A report is announced at the start of the run over the path the *previous* run
+  wrote to, so an earlier check enabled the button on that run's report. `onTestingStarted` puts the flag back for a
+  second session in the same console, and a run already over by the time the listener lands is caught by
+  `isProcessTerminated`.
 - **JCEF is declared twice and still never trusted.** On 262 it is the bundled `com.intellij.modules.jcef` plugin
   (`<depends optional>` + `jcef.xml`), on 252 a module inside the monolith (v2 `<dependencies><module>`); compiling
   against it proves nothing about runtime visibility. `TestoReportViewer.isAvailable` therefore asks by **reflection**:

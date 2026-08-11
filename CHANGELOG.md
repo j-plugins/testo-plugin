@@ -8,8 +8,10 @@
 
 - Report buttons at the right end of the test toolbar, past the run summary — one per report Testo announces with
   `##teamcity[testoReport format='html' path='…' relativePath='…' name='…' schemaVersion='…']`, labelled with the name
-  the announcement carries. A run that writes no report shows no button; a report announced but not yet written shows a
-  disabled one, saying so on hover; it lights up when the file appears and goes back to disabled if the file is removed.
+  the announcement carries. A run that writes no report shows no button; an announced report shows a disabled one for
+  as long as the run lasts, saying so on hover; it lights up once the process has exited with the file in place, and
+  goes back to disabled if the file is removed. The file is deliberately not looked for any earlier — a report is
+  announced as Testo starts writing it, over the path the previous run wrote to.
 - Clicking a button opens the report in an editor tab rendered by JCEF; the arrow on it offers the external browser and
   copying the report's path. Reopening an already-open report reloads it, so the tab shows the run that just finished
   rather than the one it was opened for.

@@ -47,8 +47,9 @@ import javax.swing.Timer
  * report, and an arrow for the other ways to open it — and, being one right-aligned action rather than an expanded
  * group, it actually lands to the right of the summary instead of among the buttons on the left.
  *
- * States, in the order a run walks through them: no announcement, no button; announced but not yet written, a disabled
- * button; the file appears, the button lights up; the file is deleted, it goes back to disabled.
+ * States, in the order a run walks through them: no announcement, no button; announced, a disabled button for as long
+ * as the run lasts; the process exits with the file there, the button lights up; the file is deleted, it goes back to
+ * disabled.
  */
 class TestoReportsAction(
     private val reports: TestoReportStore,
@@ -178,15 +179,19 @@ class TestoReportsAction(
 
         /** Re-resolves the file, which is what moves the cell between enabled and disabled. */
         fun refresh() {
-            val found = resolveReport(ref, project, mapToLocal)
+            // Not while the run is going: the report is announced as Testo starts writing it, over the path the
+            // previous run wrote to — so a check now would light the button up on a report that belongs to that run.
+            val finished = reports.runFinished
+            val found = if (finished) resolveReport(ref, project, mapToLocal) else null
             val changed = found != located
             located = found
             cursor = if (found == null) Cursor.getDefaultCursor() else Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-            toolTipText = when (found) {
-                null -> TestoBundle.message("testo.report.action.description.pending")
-                else -> TestoBundle.message("testo.report.action.description", found.toString())
+            toolTipText = when {
+                found != null -> TestoBundle.message("testo.report.action.description", found.toString())
+                finished -> TestoBundle.message("testo.report.action.description.pending")
+                else -> TestoBundle.message("testo.report.action.description.running")
             }
-            val digest = "report=${ref.path} resolved=$found"
+            val digest = "report=${ref.path} finished=$finished resolved=$found"
             if (digest != lastLogged) {
                 lastLogged = digest
                 LOG.info("Testo report button: $digest")
