@@ -1,5 +1,7 @@
 package com.github.xepozz.testo
 
+import com.github.xepozz.testo.tests.console.ReportOpenWay
+import com.github.xepozz.testo.tests.console.TestoReportAutoOpen
 import com.github.xepozz.testo.tests.console.TestoReportRef
 import com.github.xepozz.testo.tests.console.TestoReportStore
 import com.github.xepozz.testo.tests.console.isReportOf
@@ -170,6 +172,65 @@ class TestoReportStoreTest {
     @Test
     fun aMissingReportIsNoReport() {
         assertFalse(isReportOf(Path.of("no", "such", "report.html"), writtenAfter = 0))
+    }
+
+    @Test
+    fun aDeferredOpenBelongsToTheRunItWasClickedIn() {
+        val store = TestoReportStore()
+        store.noteRunStarted(1_000)
+        store.armAutoOpen("html/Report", ReportOpenWay.BROWSER, true)
+        assertTrue(store.isAutoOpenArmed("html/Report", ReportOpenWay.BROWSER))
+        assertFalse(store.isAutoOpenArmed("html/Other", ReportOpenWay.BROWSER))
+
+        // The next run must not inherit a click nothing replayed — a stopped run leaves its arm behind.
+        store.noteRunStarted(2_000)
+        assertFalse(store.isAutoOpenArmed("html/Report", ReportOpenWay.BROWSER))
+    }
+
+    @Test
+    fun theWaysOfOpeningAreIndependentFlags() {
+        // Disarming the WebView must leave the browser's checkmark exactly where it was, and vice versa.
+        val store = TestoReportStore()
+        store.armAutoOpen("html/Report", ReportOpenWay.WEB_VIEW, true)
+        store.armAutoOpen("html/Report", ReportOpenWay.BROWSER, true)
+
+        store.armAutoOpen("html/Report", ReportOpenWay.WEB_VIEW, false)
+        assertFalse(store.isAutoOpenArmed("html/Report", ReportOpenWay.WEB_VIEW))
+        assertTrue(store.isAutoOpenArmed("html/Report", ReportOpenWay.BROWSER))
+    }
+
+    @Test
+    fun theMuteIsOneFlagOverEveryWayAndTakesThisRunsClicksBack() {
+        val store = TestoReportStore()
+        store.armAutoOpen("html/Report", ReportOpenWay.WEB_VIEW, true)
+        store.armAutoOpen("html/Report", ReportOpenWay.BROWSER, true)
+
+        store.muteAutoOpen("html/Report", true)
+        assertTrue(store.isAutoOpenMuted("html/Report"))
+        assertFalse(store.isAutoOpenArmed("html/Report", ReportOpenWay.WEB_VIEW))
+        assertFalse(store.isAutoOpenArmed("html/Report", ReportOpenWay.BROWSER))
+
+        // Arming again is the newer word — the mute must not survive it and silently swallow the open.
+        store.armAutoOpen("html/Report", ReportOpenWay.WEB_VIEW, true)
+        assertFalse(store.isAutoOpenMuted("html/Report"))
+    }
+
+    @Test
+    fun aMuteBelongsToTheRunItWasClickedIn() {
+        // Muting silences a standing project- or application-wide choice for this run alone: the next run must
+        // auto-open again without the checkmark ever having moved.
+        val store = TestoReportStore()
+        store.muteAutoOpen("html/Report", true)
+
+        store.noteRunStarted(2_000)
+        assertFalse(store.isAutoOpenMuted("html/Report"))
+    }
+
+    @Test
+    fun theAutoOpenKeyIsTheFormatAndTheName() {
+        // The report's identity across runs: the path changes with the execution environment, these do not.
+        assertEquals("html/Testo HTML report", TestoReportAutoOpen.keyOf(ref("/tmp/x.html", name = "Testo HTML report")))
+        assertEquals("html/", TestoReportAutoOpen.keyOf(ref("/tmp/x.html")))
     }
 
     @Test

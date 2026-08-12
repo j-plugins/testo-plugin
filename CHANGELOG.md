@@ -8,14 +8,24 @@
 
 - Report buttons at the right end of the test toolbar, past the run summary — one per report Testo announces with
   `##teamcity[testoReport format='html' path='…' relativePath='…' name='…' schemaVersion='…']`, labelled with the name
-  the announcement carries. A run that writes no report shows no button; an announced report shows a disabled one for
-  as long as the run lasts, saying so on hover; it lights up once the process has exited with the file in place, and
-  goes back to disabled if the file is removed. The file is deliberately not looked for any earlier — a report is
-  announced as Testo starts writing it, over the path the previous run wrote to. A file older than the run itself is
-  not offered either, so stopping a run leaves the button disabled rather than opening the previous report.
-- Clicking a button opens the report in an editor tab rendered by JCEF; the arrow on it offers the external browser and
-  copying the report's path. Reopening an already-open report reloads it, so the tab shows the run that just finished
-  rather than the one it was opened for.
+  the announcement carries. A run that writes no report shows no button. The report counts as delivered once the
+  process has exited with the file in place and no older than the run — deliberately not any earlier, since a report is
+  announced as Testo starts writing it, over the path the previous run wrote to; so stopping a run never opens the
+  previous run's report.
+- Clicking a button opens the report in an editor tab rendered by JCEF; the arrow on it offers the external browser,
+  showing the file in the file manager, and copying the report's path. Reopening an already-open report reloads it, so
+  the tab shows the run that just finished rather than the one it was opened for.
+- The button is live the whole time: a click before the report is delivered is kept and replayed once the run delivers
+  the file, marked by the button's icon turning green and by the *Open When This Run Finishes* checkmark
+  under the arrow's *Open in WebView* / *Open in Browser* entries. A second click un-presses it — every way of opening
+  is silenced for this run alone, while the standing project- and application-wide checkmarks stay put; pressed again,
+  they resume, and with none of them checked the press schedules the WebView for this run. The icon's colour tells
+  the report's state — grey with nothing to open, blue with the run's report on disk, green with an open scheduled —
+  and the tooltip spells it out: still being written, delivered, or never written in this run.
+- Those entries also take a standing choice: *Always Open in This Project* or *Always Open in Every Project*, remembered
+  per report format and name, opening the report the chosen way as each run delivers it. Every checkmark stands on its
+  own — the WebView's and the browser's don't steal from each other, and both checked opens the report both ways.
+  Checked after the report already arrived, it starts with the next run rather than popping the current one open.
 - Only reports the button can show as a page are offered. Everything else Testo announces is kept, ready for formats the
   plugin will handle differently.
 - The announced path is absolute inside the *execution* environment, so it is looked for through the PHP path mapper

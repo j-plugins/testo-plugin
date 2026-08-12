@@ -72,6 +72,14 @@ data class TestoReportRef(
 class TestoReportStore {
     private val reports = LinkedHashMap<String, TestoReportRef>()
 
+    // The deferred opens of the current run (see AutoOpenScope.THIS_RUN): (TestoReportAutoOpen.keyOf, way) pairs,
+    // each its own flag — arming one way must not take another way's back.
+    private val autoOpenThisRun = HashSet<Pair<String, ReportOpenWay>>()
+
+    // Reports the user clicked back off for this run alone — one flag over every way of opening: a standing
+    // project- or application-wide choice must neither fire nor be unchecked. Guarded by autoOpenThisRun's lock.
+    private val autoOpenMuted = HashSet<String>()
+
     /**
      * Whether the process that writes these reports has exited.
      *
@@ -97,6 +105,12 @@ class TestoReportStore {
     fun noteRunStarted(now: Long = System.currentTimeMillis()) {
         runFinished = false
         runStartedAt = now - now % 1000
+        // A deferred open — and a mute over the standing choices — belongs to the run it was clicked in; a run
+        // stopped before its report fired must not open the next run's, and a muted run must not mute the next.
+        synchronized(autoOpenThisRun) {
+            autoOpenThisRun.clear()
+            autoOpenMuted.clear()
+        }
     }
 
     fun noteRunFinished() {
@@ -107,10 +121,43 @@ class TestoReportStore {
         synchronized(reports) { reports[ref.path] = ref }
     }
 
+    /** The deferred open the user asked for during this run. Arming lifts the report's mute — it is the newer word. */
+    fun armAutoOpen(key: String, way: ReportOpenWay, armed: Boolean) {
+        synchronized(autoOpenThisRun) {
+            if (armed) {
+                autoOpenThisRun.add(key to way)
+                autoOpenMuted.remove(key)
+            } else {
+                autoOpenThisRun.remove(key to way)
+            }
+        }
+    }
+
+    fun isAutoOpenArmed(key: String, way: ReportOpenWay): Boolean =
+        synchronized(autoOpenThisRun) { key to way in autoOpenThisRun }
+
+    /** Muting also takes this run's own clicks back: they are what is being un-pressed, when no standing choice is. */
+    fun muteAutoOpen(key: String, muted: Boolean) {
+        synchronized(autoOpenThisRun) {
+            if (muted) {
+                autoOpenMuted.add(key)
+                autoOpenThisRun.removeAll { it.first == key }
+            } else {
+                autoOpenMuted.remove(key)
+            }
+        }
+    }
+
+    fun isAutoOpenMuted(key: String): Boolean = synchronized(autoOpenThisRun) { key in autoOpenMuted }
+
     fun clear() {
         runFinished = false
         runStartedAt = 0
         synchronized(reports) { reports.clear() }
+        synchronized(autoOpenThisRun) {
+            autoOpenThisRun.clear()
+            autoOpenMuted.clear()
+        }
     }
 
     fun all(): List<TestoReportRef> = synchronized(reports) { reports.values.toList() }

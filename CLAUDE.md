@@ -153,6 +153,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoNodeIndex.kt       # SMTestProxy → nodeId, off the platform's own node events
 │   │   ├── TestoProgressAction.kt  # right-aligned toolbar summary: ring, fraction, status counters, elapsed
 │   │   ├── TestoReportStore.kt     # reports announced by `##teamcity[testoReport …]` + where to look for them
+│   │   ├── TestoReportAutoOpen.kt  # when a report opens on its own: this-run arm / project / application scopes
 │   │   ├── TestoReportAction.kt    # right-aligned panel of hand-drawn report buttons (WebView / browser / copy)
 │   │   ├── TestoTestTreeDecorator.kt        # wraps the tree's cell renderer: status icons + description tooltips
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
@@ -392,9 +393,11 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
 
 10. **Generated reports** — Testo announces each report with the non-standard `##teamcity[testoReport …]`;
     `TestoReportStore` keeps them, and `TestoReportsAction` draws one button per viewable report past the run summary,
-    labelled with the announced name, opening it in a JCEF tab (`ui/TestoReportEditor.kt`) or the external browser. Its
-    four states are: not announced (no button), announced without a file (disabled), file present (enabled), file gone
-    (disabled again). The spec for the report itself lives in the Testo repository (`docs/spec/html-report.md`).
+    labelled with the announced name, opening it in a JCEF tab (`ui/TestoReportEditor.kt`) or the external browser. The
+    button is always enabled: with the file delivered a click opens it, before that it is kept as a deferred open and
+    replayed when the run delivers the file — marked by a clock badge on the icon, with the tooltip carrying the state.
+    `TestoReportAutoOpen` keeps that arm and the standing per-project/per-application auto-open choices, keyed by the
+    report's format + name. The spec for the report itself lives in the Testo repository (`docs/spec/html-report.md`).
 
 ## Implementation notes & gotchas
 
