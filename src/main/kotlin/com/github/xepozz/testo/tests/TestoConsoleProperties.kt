@@ -48,7 +48,6 @@ class TestoConsoleProperties(
 
     val targetStore = TestoTargetStore(nodeIndex)
 
-    // Reports Testo announced this run; empty unless the run had a report reporter configured.
     val reportStore = TestoReportStore()
 
     val progressAction = TestoProgressAction()
@@ -105,9 +104,7 @@ class TestoConsoleProperties(
         arrayOf(
             com.github.xepozz.testo.tests.console.TestoLogLevelFilterAction(levelFilter),
             *(super.createImportActions() ?: emptyArray()),
-            // Both are right-aligned, and the toolbar lays that group out from the right edge inwards — so the one
-            // listed first ends up furthest right. The report buttons therefore go before the run summary here to sit
-            // past it on screen.
+            // Right-aligned actions are laid out from the right edge inwards: listed first = furthest right.
             reportsAction,
             progressAction,
         )

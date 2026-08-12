@@ -1,5 +1,3 @@
-<!-- Loaded only when the bundled JCEF plugin (com.intellij.modules.jcef) is present, which is how 262 ships it.
-     Deliberately empty of extensions: the point is the dependency itself, which puts JCEF's classloader among ours so
-     the report tab can reach JBCefBrowser. The report FileEditorProvider stays in the main descriptor — it mentions no
-     JCEF type, and its editor is only ever created once TestoReportViewer.isAvailable has said yes. -->
+<!-- Loaded only when the bundled JCEF plugin is present (262). Deliberately empty: the dependency itself is what
+     puts JCEF's classloader among ours so the report tab can reach JBCefBrowser. -->
 <idea-plugin/>

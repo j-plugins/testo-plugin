@@ -69,8 +69,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
     /** What the tree is narrowed to right now; `null` means no filter of ours is applied. */
     private var selected: TestoTestStatus? = null
 
-    /** Whether the results form has announced the end of a session — what makes the next start a new run, not a late
-     * event of this one. EDT-only, like the listener that maintains it. */
+    /** Whether the results form has announced the end of a session; makes the next start a new run. EDT-only. */
     private var formFinished = false
 
     override fun getActionUpdateThread() = ActionUpdateThread.EDT
@@ -105,7 +104,6 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         console.properties.addListener(TestConsoleProperties.HIDE_PASSED_TESTS, onToggle)
         console.properties.addListener(TestConsoleProperties.HIDE_IGNORED_TEST, onToggle)
         // Called from the augmenter's processStarted, so this is as close to the real start as the plugin can get.
-        // The reports take the same mark: it is what tells this run's report from the one already at that path.
         clock.noteStart()
         reports.noteRunStarted()
 
@@ -114,18 +112,15 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                 // Only on a second session in the same console: wiping on every announcement would throw away what
                 // the converter already reported for this run, since it reads the stream before the platform.
                 //
-                // The gate is this form's own finish, not clock.isFinished(): a short run exits before the platform has
-                // worked through its output buffer, so processTerminated stops the clock and *then* this arrives — and
-                // restarting the clock there left it running forever, with no event left to stop it. The form's two
-                // events are strictly ordered per session, so they can tell a new run from a late announcement.
+                // Gated on the form's own finish, not clock.isFinished(): a short run exits before the platform has
+                // worked through its output buffer, and restarting the clock on that late event left it running
+                // forever. The form's two events are strictly ordered per session.
                 if (formFinished) {
                     formFinished = false
                     store.clear()
                     targets.clear()
-                    // Reports are deliberately not cleared here: a report is announced before the first test, so this
-                    // may well run after the announcement and would throw it away. A re-run writes the same path, and
-                    // the store replaces by path, so nothing stale survives anyway. Their buttons do go back to
-                    // disabled, though — the file on disk is the *previous* run's until this one ends.
+                    // Not cleared: a report is announced before the first test, so this may run after the
+                    // announcement. A re-run writes the same path and the store replaces by path anyway.
                     reports.noteRunStarted()
                     clock.clear()
                     clock.noteStart()
@@ -156,8 +151,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         })
 
         // The verdict follows the process, not the tree: a run that dies before reporting anything is still red, and
-        // a run killed mid-flight stops the clock even though onTestingFinished never came. The report buttons wait for
-        // the same event — an announced report is only worth looking for once nothing is writing it any more.
+        // a run killed mid-flight stops the clock even though onTestingFinished never came.
         handler?.addProcessListener(object : ProcessListener {
             override fun processTerminated(event: ProcessEvent) {
                 exitCode.set(event.exitCode)
@@ -639,12 +633,8 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 }
 
 /**
- * The x-advance of each character with digits set tabularly: every digit takes the widest digit's slot, everything
- * else its own width.
- *
- * The counters tick several times a second, and in a proportional font every digit runs at its own width — measured
- * as-is, the whole row jitters. Over these slots the width moves only when a digit is added (9 → 10), a jump that
- * reads as growth rather than noise.
+ * The x-advance of each character with digits set tabularly: every digit takes the widest digit's slot. Keeps the
+ * row from jittering as counters tick in a proportional font — the width moves only when a digit is added (9 → 10).
  */
 internal fun tabularAdvances(text: String, widthOf: (Char) -> Int): IntArray {
     val slot = ('0'..'9').maxOf(widthOf)

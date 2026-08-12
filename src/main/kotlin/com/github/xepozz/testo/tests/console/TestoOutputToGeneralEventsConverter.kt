@@ -43,8 +43,7 @@ class TestoOutputToGeneralEventsConverter(
 
     override fun process(text: String, outputType: Key<*>) {
         if (runnerVersion == null) runnerVersion = TestoProtocolGate.parseVersion(text)
-        // The second route to an announcement: the platform parses a line only when it *starts* with the message, so
-        // one behind a colour escape or an unterminated line reaches it as plain text. The store dedups by path.
+        // Second route: a message behind a colour escape never reaches parseServiceMessage. The store dedups by path.
         TestoReportRef.fromServiceMessageLine(text)?.let { reportStore.note(it) }
         super.process(text, outputType)
     }

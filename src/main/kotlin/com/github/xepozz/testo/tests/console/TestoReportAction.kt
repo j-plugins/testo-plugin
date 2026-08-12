@@ -40,15 +40,9 @@ import javax.swing.JPanel
 import javax.swing.Timer
 
 /**
- * The report buttons at the far right of the test toolbar, past the run summary — one per report Testo announced.
- *
- * Hand-drawn, like the run summary beside it: no platform widget gives icon, name, a click that opens the report and an
- * arrow for the other ways to open it, and an expanded `ActionGroup` loses [RightAlignedToolbarAction] on its children.
- *
- * A cell always looks and acts enabled; what the click does is decided by whether the file is there yet. Present, fresh
- * and the process exited — it opens; otherwise the click is kept as a deferred open, replayed once the run delivers the
- * file (see [TestoReportAutoOpen]). A scheduled open wears a clock badge on the cell's icon, and the tooltip tells the
- * rest: writing, delivered, or never written in this run.
+ * The report buttons at the far right of the test toolbar — one per report Testo announced. Hand-drawn like the run
+ * summary beside it: an expanded `ActionGroup` loses [RightAlignedToolbarAction] on its children. A click before the
+ * report is delivered is kept as a deferred open and replayed once it is (see [TestoReportAutoOpen]).
  */
 class TestoReportsAction(
     private val reports: TestoReportStore,
@@ -66,25 +60,20 @@ class TestoReportsAction(
 
     override fun createCustomComponent(presentation: Presentation, place: String): JComponent = ReportsPanel()
 
-    /**
-     * One cell per announced report, polled rather than subscribed: the store is written by the converter off the
-     * process's thread, and whether the file exists yet changes without anything telling us.
-     */
+    /** One cell per announced report, polled: whether the file exists yet changes without anything telling us. */
     private inner class ReportsPanel : JPanel() {
         private val cells = LinkedHashMap<String, ReportCell>()
         private val timer = Timer(REFRESH_MS) { tick() }
 
         init {
             isOpaque = false
-            // Laid out by hand, like the run summary: a LayoutManager caches size requirements, and this row is
-            // re-measured whenever a report appears or its name changes.
+            // Laid out by hand, like the run summary: a LayoutManager caches size requirements.
             layout = null
-            // The left inset holds the separator that parts the reports from the run summary.
             border = JBUI.Borders.empty(0, 10, 0, 4)
             isVisible = false
         }
 
-        // A platform Separator can't sit here: it is not right-aligned, so it would land among the left buttons.
+        // The separator fencing the reports off; a platform Separator is not right-aligned and would land elsewhere.
         override fun paintComponent(g: Graphics) {
             super.paintComponent(g)
             g.color = JBColor.border()
@@ -131,7 +120,6 @@ class TestoReportsAction(
 
         private fun tick() {
             val announced = reports.viewable()
-            // Cells follow the announcements: added when a report shows up, dropped if the store is ever cleared.
             announced.forEach { ref ->
                 cells.getOrPut(ref.path) { ReportCell(ref).also { add(it) } }.ref = ref
             }
@@ -141,8 +129,7 @@ class TestoReportsAction(
             cells.values.forEach { it.refresh() }
             isVisible = cells.isNotEmpty()
 
-            // Only when the row itself changed shape — a cell that merely lit up repaints itself, and this runs
-            // twice a second for as long as the tab is open.
+            // Re-laid out only when the row changed shape — this runs twice a second.
             val width = preferredSize.width
             if (width != laidOutWidth) {
                 laidOutWidth = width
@@ -158,20 +145,17 @@ class TestoReportsAction(
         private var located: Path? = null
         private var runWasFinished = false
         private var willAutoOpen = false
-        // The run whose report this cell has already handed to maybeAutoOpen, so one run opens it at most once —
-        // a report deleted and rewritten within the run must not pop the viewer open again.
+        // The run this cell has already auto-opened for, so one run opens the report at most once.
         private var autoOpenedRun = -1L
         // A fresh cell has no tooltip yet, so the first refresh must go through however little has changed.
         private var refreshed = false
         private var hovered = false
 
-        // Asked for per paint: a font set once on a raw JComponent outlives a zoom, since there is no UI delegate to
-        // reinstall it, and the cell would keep the size it was built at.
+        // Asked for per paint: a font set once on a raw JComponent outlives a zoom (no UI delegate reinstalls it).
         override fun getFont(): Font = UIUtil.getLabelFont()
 
         init {
             isOpaque = false
-            // Always the hand: a cell whose file is not there yet still takes the click, as a deferred open.
             cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
             addMouseListener(object : MouseAdapter() {
                 override fun mouseEntered(e: MouseEvent) {
@@ -198,17 +182,14 @@ class TestoReportsAction(
 
         private fun arrowZone(): Int = ARROW.iconWidth + GAP + PADDING
 
-        /** Re-resolves the file, which is what moves the cell between lit and dimmed. */
         fun refresh() {
-            // Not while the run is going: the report is announced as Testo starts writing it, over the path the
-            // previous run wrote to — so a check now would light the button up on a report that belongs to that run.
+            // Not while the run is going: a report is announced as Testo starts writing it, over the path the
+            // previous run wrote to — a check now would offer that run's file.
             val finished = reports.runFinished
             val found = if (finished) resolveReport(ref, project, mapToLocal, reports.runStartedAt) else null
             maybeAutoOpen(found, finished)
-            // Scheduled only while the run still goes: what remains scheduled after it (a stopped run's arm) has
-            // nothing left to fire it, and must not keep wearing the colour of a promise.
             val willOpen = !finished && TestoReportAutoOpen.decide(project, reports, ref).isNotEmpty()
-            // Tooltip and repaint only on a real change: this runs twice a second for as long as the tab is open.
+            // Tooltip and repaint only on a real change: this runs twice a second.
             if (refreshed && found == located && finished == runWasFinished && willOpen == willAutoOpen) return
             refreshed = true
             located = found
@@ -224,7 +205,6 @@ class TestoReportsAction(
         }
 
         /**
-         * The deferred click: the first time this run's report is there, every standing choice opens it its own way.
          * Marked per run whether a choice exists or not, so checking "always open" *after* the report arrived starts
          * with the next run instead of popping this one open under the user.
          */
@@ -233,7 +213,6 @@ class TestoReportsAction(
             autoOpenedRun = reports.runStartedAt
             val key = TestoReportAutoOpen.keyOf(ref)
             TestoReportAutoOpen.decide(project, reports, ref).forEach { way ->
-                // The run's own arm is one-shot; a project- or application-wide choice stays for the next run.
                 reports.armAutoOpen(key, way, false)
                 open(way, found)
             }
@@ -258,8 +237,6 @@ class TestoReportsAction(
                     val arc = JBUI.scale(6)
                     g2.fillRoundRect(0, 0, width, height, arc, arc)
                 }
-                // Grey while there is nothing to open, blue once this run's report is on disk, green while the run
-                // still goes but an auto-open stands scheduled.
                 val icon = when {
                     located != null -> READY_ICON
                     willAutoOpen -> SCHEDULED_ICON
@@ -294,9 +271,8 @@ class TestoReportsAction(
         }
 
         /**
-         * The button un-pressed and pressed again. Un-pressing silences every way of opening for this run behind one
-         * flag — the standing checkmarks stay put; pressing back lifts the flag so they resume, and with none of them
-         * checked it schedules the one thing a bare press can mean: the WebView, for this run.
+         * Un-pressing mutes every way of opening for this run without unchecking the standing choices; pressing back
+         * lifts the mute, and with nothing standing it arms the default way for this run.
          */
         private fun toggleScheduled() {
             val key = TestoReportAutoOpen.keyOf(ref)
@@ -364,10 +340,7 @@ class TestoReportsAction(
     }
 }
 
-/**
- * "Open in …" as a perform group: clicking the entry opens the report — or arms its way's deferred open while there
- * is nothing to open yet — and its submenu chooses when the report opens on its own.
- */
+/** "Open in …" as a perform group: the click opens (or arms), the submenu chooses when to open unasked. */
 private class OpenReportGroup(
     text: String,
     icon: Icon,
@@ -416,8 +389,7 @@ private class AutoOpenToggle(
         TestoReportAutoOpen.isSet(scope, project, reports, key(), way)
 
     override fun setSelected(e: AnActionEvent, state: Boolean) {
-        // Checking this-run goes through openOrArm, so a choice over a report already delivered opens it right away
-        // instead of arming a click nothing is left to replay.
+        // Via openOrArm, so a this-run choice over a report already delivered opens it right away.
         if (state && scope == AutoOpenScope.THIS_RUN) {
             openOrArm(way)
         } else {
@@ -428,7 +400,6 @@ private class AutoOpenToggle(
     private fun key(): String = TestoReportAutoOpen.keyOf(target())
 }
 
-/** Shows the report in the file manager, named whatever this OS calls it — "Show in Explorer", "Reveal in Finder". */
 private class RevealReportAction(
     private val target: () -> TestoReportRef,
     private val project: Project,
@@ -444,9 +415,7 @@ private class RevealReportAction(
     }
 
     override fun actionPerformed(e: AnActionEvent) {
-        // Re-resolved rather than remembered: the report may have been deleted since the menu was drawn.
-        val path = resolve() ?: return
-        RevealFileAction.openFile(path)
+        RevealFileAction.openFile(resolve() ?: return)
     }
 
     private fun resolve(): Path? = resolveReport(target(), project, mapToLocal, reports.runStartedAt)
@@ -466,7 +435,7 @@ private class CopyReportPathAction(
     }
 
     override fun actionPerformed(e: AnActionEvent) {
-        // Re-resolved rather than remembered: the report may have been deleted since the menu was drawn.
+        // Re-resolved: the report may have been deleted since the menu was drawn.
         val path = resolve() ?: return
         CopyPasteManager.getInstance().setContents(StringSelection(path.toString()))
     }
@@ -474,28 +443,17 @@ private class CopyReportPathAction(
     private fun resolve(): Path? = resolveReport(target(), project, mapToLocal, reports.runStartedAt)
 }
 
-/**
- * Hands the report to the external browser.
- *
- * Through `Path.toUri()`, not `browse(File)`: the latter goes by way of the Windows path, whose separators come out
- * percent-encoded — `file:///D:/%5Cgit%5C…`, which no browser resolves. `toUri()` yields `file:///D:/git/…`.
- */
+// Via toUri(), not browse(File): the latter percent-encodes Windows separators and no browser resolves the result.
 private fun browseReport(path: Path) = BrowserUtil.browse(path.toUri())
 
-/**
- * The announced report as a local file this run wrote, or `null` while there is none.
- *
- * Touches the filesystem. Called from the cell's timer on the EDT — three `stat`s twice a second, which is the price of
- * noticing that the file has appeared without anything announcing it.
- */
+/** The announced report as a local file this run wrote, or `null` while there is none. Touches the filesystem. */
 internal fun resolveReport(
     ref: TestoReportRef,
     project: Project,
     mapToLocal: (String) -> String?,
     writtenAfter: Long,
 ): Path? =
-    // The mapper is the PHP plugin's, over a path it may know nothing about: whatever it throws must not take the
-    // toolbar's update with it.
+    // The PHP plugin's mapper may throw over a path it does not know; that must not take the toolbar with it.
     reportPathCandidates(ref, project.basePath) { runCatching { mapToLocal(it) }.getOrNull() }
         .asSequence()
         .mapNotNull { runCatching { Path.of(it) }.getOrNull() }

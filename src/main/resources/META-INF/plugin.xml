@@ -8,11 +8,8 @@
     <depends>com.jetbrains.php</depends>
     <depends optional="true" config-file="coverage.xml">com.intellij.modules.coverage</depends>
 
-    <!-- JCEF, for the report tab. Only 262 needs the declaration: there it is the bundled com.intellij.modules.jcef
-         plugin, whose classes reach us only through this dependency. On 252 JCEF is part of the monolith and visible
-         without one — its module (intellij.platform.ui.jcef) does not exist there, so naming it in <dependencies> would
-         be a missing *mandatory* dependency and the 252 build would not load at all. Optional, and not load-bearing: if
-         JCEF stays invisible, TestoReportViewer.isAvailable says so and reports open in the browser instead. -->
+    <!-- JCEF, for the report tab. Must stay an optional depends: the module form (intellij.platform.ui.jcef in
+         <dependencies>) is mandatory and does not exist on 252, where JCEF is part of the monolith. -->
     <depends optional="true" config-file="jcef.xml">com.intellij.modules.jcef</depends>
 
     <resource-bundle>messages.TestoBundle</resource-bundle>
@@ -38,7 +35,6 @@
         <iconProvider
                 implementation="com.github.xepozz.testo.ui.TestoIconProvider"/>
 
-        <!-- Shows a generated Testo report in a JCEF tab. Only ever accepts our own TestoReportVirtualFile. -->
         <fileEditorProvider
                 implementation="com.github.xepozz.testo.ui.TestoReportFileEditorProvider"/>
 

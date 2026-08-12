@@ -9,7 +9,6 @@ import java.nio.file.Path
  * forwards it (see [TestoOutputToGeneralEventsConverter]).
  */
 data class TestoReportRef(
-    /** `html` today; kept so a future format can be told apart rather than guessed from the extension. */
     val format: String,
     /** Absolute inside the *execution* environment — under a remote interpreter or a container, not a host path. */
     val path: String,
@@ -18,12 +17,7 @@ data class TestoReportRef(
     val name: String?,
     val schemaVersion: String?,
 ) {
-    /**
-     * Whether this is a report the button can show as a page.
-     *
-     * Testo announces every report it writes, and not all are pages — a data document for external tooling has nothing
-     * to open in a browser. Such formats are kept for handling of their own, not offered here.
-     */
+    /** Whether the button can show this report as a page; the rest (data documents, coverage) is kept, not offered. */
     val isViewable: Boolean get() = VIEWABLE_FORMATS.any { format.equals(it, ignoreCase = true) }
 
     companion object {
@@ -34,11 +28,9 @@ data class TestoReportRef(
         private const val MESSAGE_NAME = "testoReport"
 
         /**
-         * The message read straight off raw output, or `null` when it holds none.
-         *
-         * The platform parses a line only when it *starts* with `##teamcity[`, so anything in front of it (a colour
-         * escape, output not terminated by a newline) leaves the announcement to reach the console as plain text. Hence
-         * the scan for the message anywhere in the text; the store deduplicates by path when both routes deliver.
+         * The message read straight off raw output, or `null` when it holds none. The platform parses a line only
+         * when it *starts* with `##teamcity[`, so one behind a colour escape reaches the console as plain text —
+         * hence the scan anywhere in the line; the store dedups by path when both routes deliver.
          */
         fun fromServiceMessageLine(line: String): TestoReportRef? {
             val start = line.indexOf("##teamcity[$MESSAGE_NAME")
@@ -49,7 +41,7 @@ data class TestoReportRef(
             return fromAttributes(parseServiceMessageAttributes(body))
         }
 
-        /** `null` when the message carries no `path`, which is the one attribute nothing can be done without. */
+        /** `null` when the message carries no `path`. */
         fun fromAttributes(attributes: Map<String, String>): TestoReportRef? {
             val path = attributes["path"]?.takeIf { it.isNotBlank() } ?: return null
             return TestoReportRef(
@@ -64,39 +56,31 @@ data class TestoReportRef(
 }
 
 /**
- * The reports of the current run, in announcement order.
- *
- * Written by the converter off the process's output thread and read by the toolbar button on the EDT, hence the lock.
- * Keyed by path: a re-announced report replaces its earlier entry instead of stacking up.
+ * The reports of the current run, in announcement order. Written by the converter off the process's output thread and
+ * read by the toolbar on the EDT, hence the locks; keyed by path, so a re-announced report replaces its entry.
  */
 class TestoReportStore {
     private val reports = LinkedHashMap<String, TestoReportRef>()
 
-    // The deferred opens of the current run (see AutoOpenScope.THIS_RUN): (TestoReportAutoOpen.keyOf, way) pairs,
-    // each its own flag — arming one way must not take another way's back.
+    // This run's deferred opens: (TestoReportAutoOpen.keyOf, way) pairs, each an independent flag.
     private val autoOpenThisRun = HashSet<Pair<String, ReportOpenWay>>()
 
-    // Reports the user clicked back off for this run alone — one flag over every way of opening: a standing
-    // project- or application-wide choice must neither fire nor be unchecked. Guarded by autoOpenThisRun's lock.
+    // Reports clicked back off for this run alone — one flag over every way; the standing choices stay checked.
     private val autoOpenMuted = HashSet<String>()
 
     /**
-     * Whether the process that writes these reports has exited.
-     *
-     * Nothing is looked for on disk before it has: a report is announced when Testo *starts* writing it, and it is
-     * written to the same path every run — so a file check while the run is going finds the previous run's report and
-     * offers it as this one's. Volatile: set from the process's thread, read by the toolbar on the EDT.
+     * Whether the process that writes these reports has exited. Nothing is looked for on disk before it has: a report
+     * is announced when Testo *starts* writing it, over the same path every run, so an earlier check finds the
+     * previous run's file.
      */
     @Volatile
     var runFinished: Boolean = false
         private set
 
     /**
-     * When the current run began, floored to a whole second.
-     *
-     * A report older than this is the *previous* run's: the path is the same every run, so a run stopped before Testo
-     * wrote its report leaves the old file in place. Floored because a filesystem that keeps mtime by the second would
-     * otherwise date a report written moments after the start before it.
+     * When the current run began, floored to a whole second — a filesystem keeping mtime by the second would
+     * otherwise date a report written moments after the start before it. A report older than this is the previous
+     * run's, left in place by a run stopped before its reporter ran.
      */
     @Volatile
     var runStartedAt: Long = 0
@@ -105,8 +89,7 @@ class TestoReportStore {
     fun noteRunStarted(now: Long = System.currentTimeMillis()) {
         runFinished = false
         runStartedAt = now - now % 1000
-        // A deferred open — and a mute over the standing choices — belongs to the run it was clicked in; a run
-        // stopped before its report fired must not open the next run's, and a muted run must not mute the next.
+        // Arms and mutes belong to the run they were clicked in.
         synchronized(autoOpenThisRun) {
             autoOpenThisRun.clear()
             autoOpenMuted.clear()
@@ -121,7 +104,7 @@ class TestoReportStore {
         synchronized(reports) { reports[ref.path] = ref }
     }
 
-    /** The deferred open the user asked for during this run. Arming lifts the report's mute — it is the newer word. */
+    /** Arming lifts the report's mute — it is the newer word. */
     fun armAutoOpen(key: String, way: ReportOpenWay, armed: Boolean) {
         synchronized(autoOpenThisRun) {
             if (armed) {
@@ -136,7 +119,7 @@ class TestoReportStore {
     fun isAutoOpenArmed(key: String, way: ReportOpenWay): Boolean =
         synchronized(autoOpenThisRun) { key to way in autoOpenThisRun }
 
-    /** Muting also takes this run's own clicks back: they are what is being un-pressed, when no standing choice is. */
+    /** Muting also takes this run's own arms back. */
     fun muteAutoOpen(key: String, muted: Boolean) {
         synchronized(autoOpenThisRun) {
             if (muted) {
@@ -162,18 +145,14 @@ class TestoReportStore {
 
     fun all(): List<TestoReportRef> = synchronized(reports) { reports.values.toList() }
 
-    /** Every report the button can show, in announcement order. */
     fun viewable(): List<TestoReportRef> = all().filter { it.isViewable }
 
-    /** What the button opens: the last viewable report announced, since that is the one this run wrote last. */
     fun primary(): TestoReportRef? = viewable().lastOrNull()
 }
 
 /**
- * `key='value'` pairs up to the closing `]`, with TeamCity's escaping undone.
- *
- * A hand-rolled reader rather than the platform's parser, because this runs on text the platform has already declined
- * to parse. Values are single-quoted and `|` escapes; anything malformed is skipped rather than thrown over.
+ * `key='value'` pairs up to the closing `]`, with TeamCity's escaping undone. Hand-rolled because this runs on text
+ * the platform has already declined to parse; anything malformed is skipped rather than thrown over.
  */
 internal fun parseServiceMessageAttributes(body: String): Map<String, String> {
     val attributes = LinkedHashMap<String, String>()
@@ -217,11 +196,8 @@ private fun unescapeServiceMessageChar(escaped: Char): String = when (escaped) {
 }
 
 /**
- * Where the announced report might sit on this machine, best guess first.
- *
- * The mapper leads: it is the only candidate that knows about deployment, and for a local interpreter it answers with
- * the path itself anyway. The raw path follows for the plain local run, and the project-relative form is the last
- * resort — it is what survives when the execution environment's filesystem has nothing in common with the host's.
+ * Where the announced report might sit on this machine, best guess first: the deployment mapper, the raw path, then
+ * `relativePath` under the project root — the one that survives when the run's filesystem shares nothing with the host.
  */
 fun reportPathCandidates(
     ref: TestoReportRef,

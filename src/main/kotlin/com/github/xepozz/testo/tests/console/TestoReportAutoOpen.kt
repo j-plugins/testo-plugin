@@ -3,20 +3,15 @@ package com.github.xepozz.testo.tests.console
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.project.Project
 
-/** How a report is opened: the JCEF editor tab, or handed to the external browser. */
 enum class ReportOpenWay { WEB_VIEW, BROWSER }
 
 /** How long an auto-open choice lives. */
 enum class AutoOpenScope { THIS_RUN, PROJECT, APPLICATION }
 
 /**
- * When a report opens without being clicked.
- *
- * Every (way, scope) pair is its own independent flag — checking the browser does not uncheck the WebView, and both
- * checked opens the report both ways. The flags are keyed by the report's format and name — its identity across runs,
- * since the path changes with the execution environment. THIS_RUN lives in the run's own [TestoReportStore] and is
- * what a click on a button whose report is still being written arms; the other two persist through
- * [PropertiesComponent].
+ * When a report opens without being clicked. Every (way, scope) pair is an independent flag, keyed by the report's
+ * format and name — its identity across runs, since the path changes with the execution environment. THIS_RUN lives
+ * in the run's own [TestoReportStore]; the other two persist through [PropertiesComponent].
  */
 object TestoReportAutoOpen {
     fun keyOf(ref: TestoReportRef): String = "${ref.format}/${ref.name.orEmpty()}"
@@ -43,10 +38,7 @@ object TestoReportAutoOpen {
         }
     }
 
-    /**
-     * The ways this report should open on its own, each granted by any scope — unless the report is muted, the
-     * button un-pressed: one flag silences every way for this run without unchecking any standing choice.
-     */
+    /** The ways this report should open on its own — none while muted, whatever any scope grants otherwise. */
     fun decide(project: Project, store: TestoReportStore, ref: TestoReportRef): Set<ReportOpenWay> {
         val key = keyOf(ref)
         if (store.isAutoOpenMuted(key)) return emptySet()

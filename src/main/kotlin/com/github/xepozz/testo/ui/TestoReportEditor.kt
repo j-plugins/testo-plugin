@@ -24,13 +24,8 @@ import javax.swing.JComponent
 import javax.swing.SwingConstants
 
 /**
- * An editor tab showing a generated Testo report in JCEF.
- *
- * A tab rather than a tool window so it can be split, kept alongside the code and closed like any other file. The
- * platform's own `HTMLEditorProvider` would have done this, but it is `@ApiStatus.Internal` — hence the light file plus
- * provider below, which is all public API.
- *
- * The report opens over `file://`, so it must not fetch its data: see the report spec in the Testo repository.
+ * An editor tab showing a generated Testo report in JCEF, over `file://`. The platform's own `HTMLEditorProvider`
+ * is `@ApiStatus.Internal` — hence the light file plus provider below, which is all public API.
  */
 class TestoReportVirtualFile(val reportPath: Path, label: String) : LightVirtualFile(label) {
     init {
@@ -42,8 +37,7 @@ class TestoReportVirtualFile(val reportPath: Path, label: String) : LightVirtual
 
 class TestoReportFileEditor(private val file: TestoReportVirtualFile) : UserDataHolderBase(), FileEditor {
 
-    // Null when the IDE runs without JCEF. The action checks TestoReportViewer.isAvailable before opening a tab, so
-    // this is only the belt-and-braces path — and it is why the failure is swallowed rather than thrown at the editor.
+    // Null when the IDE runs without JCEF; the action checks TestoReportViewer.isAvailable before opening a tab.
     private val browser: JBCefBrowser? = runCatching {
         if (JBCefApp.isSupported()) JBCefBrowser.createBuilder().setUrl(file.reportUrl).build() else null
     }.getOrNull()
@@ -73,11 +67,8 @@ class TestoReportFileEditor(private val file: TestoReportVirtualFile) : UserData
     override fun removePropertyChangeListener(listener: PropertyChangeListener) = Unit
 
     /**
-     * Re-reads the report from disk — what a second click on the toolbar button means after a new run.
-     *
-     * Through `loadURL`, not `cefBrowser.reloadIgnoreCache()`: `CefBrowser` lives in `org.cef`, which the platform
-     * artifact does not put on the compile classpath — it compiles only against a JDK that happens to bundle JCEF, and
-     * CI's does not. `JBCefBrowser` is the module we do depend on, and navigating to the same `file://` URL re-reads it.
+     * Re-reads the report from disk. Through `loadURL`, not `cefBrowser.reloadIgnoreCache()`: `org.cef` is not on the
+     * compile classpath (only `com.intellij.ui.jcef` is), and navigating to the same `file://` URL re-reads it anyway.
      */
     fun reload() {
         browser?.loadURL(file.reportUrl)
@@ -100,18 +91,13 @@ class TestoReportFileEditorProvider : FileEditorProvider, DumbAware {
 }
 
 object TestoReportViewer {
-    // One light file per report path, so re-opening the same report returns to its tab instead of stacking up new ones
-    // — FileEditorManager keys tabs by VirtualFile identity, not by equality.
+    // One light file per report path: FileEditorManager keys tabs by VirtualFile identity, not by equality.
     private val files = ConcurrentHashMap<String, TestoReportVirtualFile>()
 
     /**
-     * Whether a report can be shown in a tab at all.
-     *
-     * Asked by reflection, and that is the point: JCEF may be absent outright (module not visible, unsupported
-     * architecture, a remote-dev backend), and a *named* reference to `JBCefApp` in a method body throws
-     * `NoClassDefFoundError` when that body's class is verified — before any `try` around the call can catch it. That is
-     * what took the toolbar's whole action group down. Nothing else in this plugin mentions a JCEF type outside a class
-     * that loads only once this has answered `true`.
+     * Asked by reflection on purpose: JCEF may be absent outright, and a *named* reference to `JBCefApp` throws
+     * `NoClassDefFoundError` when the enclosing class is verified — before any `try` can catch it. No JCEF type may
+     * be mentioned outside a class that loads only after this answers `true`.
      */
     val isAvailable: Boolean by lazy {
         val supported = runCatching {

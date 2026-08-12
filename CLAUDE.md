@@ -36,8 +36,7 @@ Dependabot bumps these regularly — read the files rather than trusting this ta
 `phpstorm-remote-interpreter`, `php.codeception`, `php.behat`, `gherkin`, `xepozz.ide.introspector`
 (+ `hackathon.indices.viewer` on 252 only — it has no 262 build).
 `platformBundledModules`: `intellij.platform.coverage`, `intellij.spellchecker` (+ `intellij.platform.smRunner`,
-`intellij.platform.testRunner`, `intellij.platform.ui.jcef` on 262, which split them out of the monolith — asking for
-the JCEF module by name on 252 fails to resolve).
+`intellij.platform.testRunner`, `intellij.platform.ui.jcef` on 262, which split them out of the monolith).
 
 ### Two build variants (`phpApi`)
 
@@ -392,12 +391,10 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
    (failed line + text), two console foldings, and `PhpBacktraceFileFilter` for hyperlinks in raw output.
 
 10. **Generated reports** — Testo announces each report with the non-standard `##teamcity[testoReport …]`;
-    `TestoReportStore` keeps them, and `TestoReportsAction` draws one button per viewable report past the run summary,
-    labelled with the announced name, opening it in a JCEF tab (`ui/TestoReportEditor.kt`) or the external browser. The
-    button is always enabled: with the file delivered a click opens it, before that it is kept as a deferred open and
-    replayed when the run delivers the file — marked by a clock badge on the icon, with the tooltip carrying the state.
-    `TestoReportAutoOpen` keeps that arm and the standing per-project/per-application auto-open choices, keyed by the
-    report's format + name. The spec for the report itself lives in the Testo repository (`docs/spec/html-report.md`).
+    `TestoReportStore` keeps them, `TestoReportsAction` draws one button per viewable report, opening it in a JCEF tab
+    (`ui/TestoReportEditor.kt`) or the browser. A click before the report is delivered defers the open;
+    `TestoReportAutoOpen` holds the auto-open choices (this run / project / application), keyed by format + name.
+    The report spec lives in the Testo repository (`docs/spec/html-report.md`).
 
 ## Implementation notes & gotchas
 
@@ -474,42 +471,14 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `ConfigurationFile`, no config file, non-empty `group`) trips the platform's "Configuration file is not
   specified" `RuntimeConfigurationError`, though Testo needs no config file. The error is matched by message
   text (`PhpBundle`), so a platform rewording fails closed — the validation error merely comes back.
-- **The report buttons are drawn by hand, inside one right-aligned action.** Every platform widget failed a requirement:
-  a toolbar button shows the icon alone (text becomes a tooltip), `SplitButtonAction` paints its own component and drops
-  the text, `ComboBoxAction` turns the first click into a dropdown, and an expanded `ActionGroup` loses
-  `RightAlignedToolbarAction` — its children land among the buttons on the left. So `TestoReportsAction` owns a panel of
-  cells, the way `TestoProgressAction` does; RunTab snapshots the toolbar's actions, so the panel must exist from the
-  start and hide itself while it has no cells.
-- **A report must be announced while the run is still going, not once it is written.** Everything after the root
-  `testSuiteFinished` is past the point where the platform still feeds the converter: such a line reaches neither our
-  branch nor the console, it simply vanishes. So Testo announces a report when it *starts* writing it, and each cell
-  polls for the file twice a second — which is also how a deleted report turns its button off again.
-- **The announcement is read twice, as a service message and off the raw text.** The platform parses a line only when it
-  *starts* with `##teamcity[`, so anything in front of it (a colour escape) would lose the report;
-  `TestoReportRef.fromServiceMessageLine` scans for it anywhere and the store deduplicates by path.
-- **No cell looks at the disk before the process exits** (`TestoReportStore.runFinished`, set from the process listener
-  in `TestoProgressAction.attachTo`). A report is announced at the start of the run over the path the *previous* run
-  wrote to, so an earlier check enabled the button on that run's report. `onTestingStarted` puts the flag back for a
-  second session in the same console, and a run already over by the time the listener lands is caught by
-  `isProcessTerminated`.
-- **A report also has to be newer than the run** (`TestoReportStore.runStartedAt`, floored to a whole second for
-  filesystems that keep mtime by the second). The path is the same every run, so a run that was stopped — or that died
-  before its reporter ran — leaves the previous report in place, and the process having exited says nothing about who
-  wrote that file.
-- **JCEF is declared for 262 only, and still never trusted.** There it is the bundled `com.intellij.modules.jcef`
-  plugin (`<depends optional>` + `jcef.xml`); on 252 it is part of the monolith and visible without a declaration. Its
-  262 module `intellij.platform.ui.jcef` must never go in `<dependencies>`: that form is mandatory and the module does
-  not exist on 252, so the 252 build would not load at all. Compiling against JCEF proves nothing about runtime
-  visibility, so `TestoReportViewer.isAvailable` asks by **reflection** — a named reference to `JBCefApp` throws
-  `NoClassDefFoundError` when the enclosing method's class is verified, before any `try` can catch it. No JCEF type may
-  be mentioned outside a class that loads only after `isAvailable` answers true, and none outside `com.intellij.ui.jcef`
-  at all: `org.cef` is absent from the compile classpath.
-- **The report tab is our own `FileEditorProvider`, not the platform's `HTMLEditorProvider`** — that one is
-  `@ApiStatus.Internal`. It accepts nothing but `TestoReportVirtualFile`, and `TestoReportViewer` keeps one such file
-  per path so re-opening a report returns to its tab (the platform keys tabs by identity, not equality) and reloads it.
-- **A report path is resolved with `pathMapper.getLocalPath`, never `getLocalFile`** — the file was written moments
-  before the message arrived and the VFS need not know it yet. `relativePath` under the project root is the last
-  candidate, and the only one that works when the run's filesystem shares nothing with the host's.
+- **A report is announced when Testo *starts* writing it** — output after the root `testSuiteFinished` never reaches
+  the converter — so the file is polled, no earlier than process exit and only accepting mtime no older than the run:
+  the path is the same every run, and a stopped run leaves the previous report in place.
+- **JCEF: only `<depends optional>` on `com.intellij.modules.jcef`.** The module form (`intellij.platform.ui.jcef` in
+  `<dependencies>`) is mandatory and absent on 252 — that build would not load at all. `TestoReportViewer.isAvailable`
+  asks by reflection: a named `JBCefApp` reference throws `NoClassDefFoundError` at class verification, before any
+  `try`. No JCEF type outside classes that load after it answers true, and nothing from `org.cef` — it is not on the
+  compile classpath.
 
 ## Testing
 
