@@ -8,14 +8,12 @@
     <depends>com.jetbrains.php</depends>
     <depends optional="true" config-file="coverage.xml">com.intellij.modules.coverage</depends>
 
-    <!-- JCEF, for the report tab, declared twice because the two supported platforms ship it differently: on 262 it is
-         the bundled com.intellij.modules.jcef plugin (optional here, so an IDE without it still loads us), on 252 it is
-         a module inside the monolith and only the v2 form can name it. Neither is load-bearing: if JCEF stays invisible
-         anyway, TestoReportViewer.isAvailable says so and reports open in the browser instead. -->
+    <!-- JCEF, for the report tab. Only 262 needs the declaration: there it is the bundled com.intellij.modules.jcef
+         plugin, whose classes reach us only through this dependency. On 252 JCEF is part of the monolith and visible
+         without one — its module (intellij.platform.ui.jcef) does not exist there, so naming it in <dependencies> would
+         be a missing *mandatory* dependency and the 252 build would not load at all. Optional, and not load-bearing: if
+         JCEF stays invisible, TestoReportViewer.isAvailable says so and reports open in the browser instead. -->
     <depends optional="true" config-file="jcef.xml">com.intellij.modules.jcef</depends>
-    <dependencies>
-        <module name="intellij.platform.ui.jcef"/>
-    </dependencies>
 
     <resource-bundle>messages.TestoBundle</resource-bundle>
 

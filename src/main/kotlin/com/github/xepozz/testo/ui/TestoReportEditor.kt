@@ -72,9 +72,15 @@ class TestoReportFileEditor(private val file: TestoReportVirtualFile) : UserData
 
     override fun removePropertyChangeListener(listener: PropertyChangeListener) = Unit
 
-    /** Re-reads the report from disk — what a second click on the toolbar button means after a new run. */
+    /**
+     * Re-reads the report from disk — what a second click on the toolbar button means after a new run.
+     *
+     * Through `loadURL`, not `cefBrowser.reloadIgnoreCache()`: `CefBrowser` lives in `org.cef`, which the platform
+     * artifact does not put on the compile classpath — it compiles only against a JDK that happens to bundle JCEF, and
+     * CI's does not. `JBCefBrowser` is the module we do depend on, and navigating to the same `file://` URL re-reads it.
+     */
     fun reload() {
-        browser?.cefBrowser?.reloadIgnoreCache()
+        browser?.loadURL(file.reportUrl)
     }
 
     override fun dispose() {

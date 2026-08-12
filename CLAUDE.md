@@ -481,17 +481,22 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `testSuiteFinished` is past the point where the platform still feeds the converter: such a line reaches neither our
   branch nor the console, it simply vanishes. So Testo announces a report when it *starts* writing it, and each cell
   polls for the file twice a second — which is also how a deleted report turns its button off again.
+- **The announcement is read twice, as a service message and off the raw text.** The platform parses a line only when it
+  *starts* with `##teamcity[`, so anything in front of it (a colour escape) would lose the report;
+  `TestoReportRef.fromServiceMessageLine` scans for it anywhere and the store deduplicates by path.
 - **No cell looks at the disk before the process exits** (`TestoReportStore.runFinished`, set from the process listener
   in `TestoProgressAction.attachTo`). A report is announced at the start of the run over the path the *previous* run
   wrote to, so an earlier check enabled the button on that run's report. `onTestingStarted` puts the flag back for a
   second session in the same console, and a run already over by the time the listener lands is caught by
   `isProcessTerminated`.
-- **JCEF is declared twice and still never trusted.** On 262 it is the bundled `com.intellij.modules.jcef` plugin
-  (`<depends optional>` + `jcef.xml`), on 252 a module inside the monolith (v2 `<dependencies><module>`); compiling
-  against it proves nothing about runtime visibility. `TestoReportViewer.isAvailable` therefore asks by **reflection**:
-  a named reference to `JBCefApp` throws `NoClassDefFoundError` when the *enclosing* method's class is verified, before
-  any `try` around the call can catch it — which is how one absent class took down the whole toolbar action group. No
-  JCEF type may be mentioned outside a class that loads only after `isAvailable` answers true.
+- **JCEF is declared for 262 only, and still never trusted.** There it is the bundled `com.intellij.modules.jcef`
+  plugin (`<depends optional>` + `jcef.xml`); on 252 it is part of the monolith and visible without a declaration. Its
+  262 module `intellij.platform.ui.jcef` must never go in `<dependencies>`: that form is mandatory and the module does
+  not exist on 252, so the 252 build would not load at all. Compiling against JCEF proves nothing about runtime
+  visibility, so `TestoReportViewer.isAvailable` asks by **reflection** — a named reference to `JBCefApp` throws
+  `NoClassDefFoundError` when the enclosing method's class is verified, before any `try` can catch it. No JCEF type may
+  be mentioned outside a class that loads only after `isAvailable` answers true, and none outside `com.intellij.ui.jcef`
+  at all: `org.cef` is absent from the compile classpath.
 - **The report tab is our own `FileEditorProvider`, not the platform's `HTMLEditorProvider`** — that one is
   `@ApiStatus.Internal`. It accepts nothing but `TestoReportVirtualFile`, and `TestoReportViewer` keeps one such file
   per path so re-opening a report returns to its tab (the platform keys tabs by identity, not equality) and reloads it.

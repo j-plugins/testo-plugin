@@ -21,10 +21,8 @@ data class TestoReportRef(
     /**
      * Whether this is a report the button can show as a page.
      *
-     * Testo announces every report it writes, and they are not all pages: a data document for external tooling, or a
-     * coverage report, has nothing to open in a browser. Formats the plugin can do something *else* with get their own
-     * handling — a coverage report, for instance, is an opportunity to fill the Coverage tool window without re-running
-     * under coverage — and until then they are simply not what this button offers.
+     * Testo announces every report it writes, and not all are pages — a data document for external tooling has nothing
+     * to open in a browser. Such formats are kept for handling of their own, not offered here.
      */
     val isViewable: Boolean get() = VIEWABLE_FORMATS.any { format.equals(it, ignoreCase = true) }
 
@@ -36,12 +34,11 @@ data class TestoReportRef(
         private const val MESSAGE_NAME = "testoReport"
 
         /**
-         * The message read straight off a line of output, or `null` when the line holds none.
+         * The message read straight off raw output, or `null` when it holds none.
          *
-         * The converter also sees it as a parsed `ServiceMessage`, but only if the platform recognised the line —
-         * anything in front of `##teamcity[` (a colour escape, output not terminated by a newline) and it is handed to
-         * the console as plain text instead. So the line is scanned for the message anywhere in it, and the store
-         * deduplicates by path when both routes deliver.
+         * The platform parses a line only when it *starts* with `##teamcity[`, so anything in front of it (a colour
+         * escape, output not terminated by a newline) leaves the announcement to reach the console as plain text. Hence
+         * the scan for the message anywhere in the text; the store deduplicates by path when both routes deliver.
          */
         fun fromServiceMessageLine(line: String): TestoReportRef? {
             val start = line.indexOf("##teamcity[$MESSAGE_NAME")

@@ -27,7 +27,6 @@ class TestoOutputToGeneralEventsConverter(
     override fun setProcessor(processor: GeneralTestEventsProcessor?) {
         super.setProcessor(processor)
         processor?.let { nodes.attachTo(it) }
-        LOG.info("Testo converter attached (processor=${processor?.javaClass?.simpleName})")
     }
 
     /** Version off the banner, kept only to name it in the too-old notification. */
@@ -44,6 +43,9 @@ class TestoOutputToGeneralEventsConverter(
 
     override fun process(text: String, outputType: Key<*>) {
         if (runnerVersion == null) runnerVersion = TestoProtocolGate.parseVersion(text)
+        // The second route to an announcement: the platform parses a line only when it *starts* with the message, so
+        // one behind a colour escape or an unterminated line reaches it as plain text. The store dedups by path.
+        TestoReportRef.fromServiceMessageLine(text)?.let { reportStore.note(it) }
         super.process(text, outputType)
     }
 
@@ -114,12 +116,8 @@ class TestoOutputToGeneralEventsConverter(
                 }
             }
 
-            // Testo's own message, naming a report of this run. It has to arrive while the run is still going — once the
-            // root suite closes the platform stops feeding this converter — so Testo announces a report when it starts
-            // writing it, and the button waits for the file to appear. Not forwarded, for the same reason as
-            // buildProblem: the platform would echo the raw line into the console.
+            // Testo's own message, naming a report of this run. Not forwarded, for the same reason as buildProblem.
             TESTO_REPORT -> {
-                LOG.info("Testo report announced (service message): $attrs")
                 TestoReportRef.fromAttributes(attrs)?.let { reportStore.note(it) }
                 return
             }
@@ -228,7 +226,5 @@ class TestoOutputToGeneralEventsConverter(
         private const val TEST_IGNORED = "testIgnored"
         private const val BUILD_PROBLEM = "buildProblem"
         private const val TESTO_REPORT = "testoReport"
-
-        private val LOG = com.intellij.openapi.diagnostic.logger<TestoOutputToGeneralEventsConverter>()
     }
 }

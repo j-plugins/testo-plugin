@@ -13,7 +13,6 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.actionSystem.RightAlignedToolbarAction
 import com.intellij.openapi.actionSystem.ex.CustomComponentAction
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -41,15 +40,11 @@ import javax.swing.Timer
 /**
  * The report buttons at the far right of the test toolbar, past the run summary — one per report Testo announced.
  *
- * Hand-drawn, for the same reasons the run summary beside it is: a plain toolbar button shows the icon alone (the text
- * survives only as a tooltip), `SplitButtonAction` paints its own component and drops the text entirely, and
- * `ComboBoxAction` turns every click into a dropdown. Only a custom component gives icon, name, a click that opens the
- * report, and an arrow for the other ways to open it — and, being one right-aligned action rather than an expanded
- * group, it actually lands to the right of the summary instead of among the buttons on the left.
+ * Hand-drawn, like the run summary beside it: no platform widget gives icon, name, a click that opens the report and an
+ * arrow for the other ways to open it, and an expanded `ActionGroup` loses [RightAlignedToolbarAction] on its children.
  *
- * States, in the order a run walks through them: no announcement, no button; announced, a disabled button for as long
- * as the run lasts; the process exits with the file there, the button lights up; the file is deleted, it goes back to
- * disabled.
+ * A run walks the cells through four states: not announced (no button), announced (disabled for as long as the run
+ * lasts), the process exits with the file there (enabled), the file is deleted (disabled again).
  */
 class TestoReportsAction(
     private val reports: TestoReportStore,
@@ -133,12 +128,14 @@ class TestoReportsAction(
             cells.values.forEach { it.refresh() }
             isVisible = cells.isNotEmpty()
 
+            // Only when the row itself changed shape — a cell that merely lit up repaints itself, and this runs
+            // twice a second for as long as the tab is open.
             val width = preferredSize.width
             if (width != laidOutWidth) {
                 laidOutWidth = width
                 revalidate()
+                repaint()
             }
-            repaint()
         }
     }
 
@@ -146,8 +143,10 @@ class TestoReportsAction(
     private inner class ReportCell(ref: TestoReportRef) : JComponent() {
         var ref: TestoReportRef = ref
         private var located: Path? = null
+        private var runWasFinished = false
+        // A fresh cell has no tooltip yet, so the first refresh must go through however little has changed.
+        private var refreshed = false
         private var hovered = false
-        private var lastLogged: String? = null
 
         // Asked for per paint: a font set once on a raw JComponent outlives a zoom, since there is no UI delegate to
         // reinstall it, and the cell would keep the size it was built at.
@@ -183,20 +182,18 @@ class TestoReportsAction(
             // previous run wrote to — so a check now would light the button up on a report that belongs to that run.
             val finished = reports.runFinished
             val found = if (finished) resolveReport(ref, project, mapToLocal) else null
-            val changed = found != located
+            // Cursor and tooltip only on a real change: setCursor repaints the pointer, and this runs twice a second.
+            if (refreshed && found == located && finished == runWasFinished) return
+            refreshed = true
             located = found
+            runWasFinished = finished
             cursor = if (found == null) Cursor.getDefaultCursor() else Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
             toolTipText = when {
                 found != null -> TestoBundle.message("testo.report.action.description", found.toString())
                 finished -> TestoBundle.message("testo.report.action.description.pending")
                 else -> TestoBundle.message("testo.report.action.description.running")
             }
-            val digest = "report=${ref.path} finished=$finished resolved=$found"
-            if (digest != lastLogged) {
-                lastLogged = digest
-                LOG.info("Testo report button: $digest")
-            }
-            if (changed) repaint()
+            repaint()
         }
 
         override fun getPreferredSize(): Dimension {
@@ -279,8 +276,6 @@ class TestoReportsAction(
         private val GAP get() = JBUI.scale(4)
 
         private val DISABLED_TEXT = JBColor.namedColor("Label.disabledForeground", JBColor(0x8C8C8C, 0x6F737A))
-
-        private val LOG = logger<TestoReportsAction>()
     }
 }
 

@@ -3,7 +3,6 @@ package com.github.xepozz.testo.tests.console
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.intellij.execution.ExecutionListener
 import com.intellij.execution.ExecutorRegistry
-import com.intellij.ide.ActivityTracker
 import com.intellij.execution.process.OSProcessHandler
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.runners.ExecutionEnvironment
@@ -45,15 +44,7 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             // The run's history XML is written on a background task after the process ends, so nudge the lens a couple
             // of times across the save window. Once the index sees the new file it re-invalidates the lens itself; the
             // first nudge that lands after the save is what makes the just-run test's lens appear (no IDE restart).
-            //
-            // The same nudges re-ask the toolbar about the report button: a report is announced when Testo starts
-            // writing it, so the file itself usually lands only around now, and without an activity bump nothing would
-            // re-run the action's update until the user touches something.
-            val refresh = Runnable {
-                TestoHistoryIndex.refreshLens(project)
-                ActivityTracker.getInstance().inc()
-            }
-            ActivityTracker.getInstance().inc()
+            val refresh = Runnable { TestoHistoryIndex.refreshLens(project) }
             EdtScheduledExecutorService.getInstance().schedule(refresh, 1500, java.util.concurrent.TimeUnit.MILLISECONDS)
             EdtScheduledExecutorService.getInstance().schedule(refresh, 4000, java.util.concurrent.TimeUnit.MILLISECONDS)
         }
