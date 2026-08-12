@@ -428,7 +428,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         override fun getPreferredSize(): Dimension {
             if (!isVisible) return Dimension(0, 0)
             val metrics = getFontMetrics(font)
-            val textWidth = if (text.isEmpty()) 0 else metrics.stringWidth(text)
+            val textWidth = if (text.isEmpty()) 0 else tabularAdvances(text) { metrics.charWidth(it) }.sum()
             val gap = if (leadingWidth > 0 && textWidth > 0) GAP else 0
             val height = maxOf(icon?.iconHeight ?: 0, metrics.height, JBUI.scale(16)) + JBUI.scale(4)
             return Dimension(PADDING * 2 + leadingWidth + gap + textWidth, height)
@@ -453,8 +453,15 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                     g2.color = UIUtil.getLabelForeground()
                     g2.font = font
                     val metrics = g2.fontMetrics
-                    val x = PADDING + leadingWidth + (if (leadingWidth > 0) GAP else 0)
-                    g2.drawString(text, x, (height - metrics.height) / 2 + metrics.ascent)
+                    var x = PADDING + leadingWidth + (if (leadingWidth > 0) GAP else 0)
+                    val y = (height - metrics.height) / 2 + metrics.ascent
+                    // Char by char, each digit centered in its tabular slot (see tabularAdvances) — so the label
+                    // after the digits sits still while they tick. Kerning is lost, which digits never had.
+                    val advances = tabularAdvances(text) { metrics.charWidth(it) }
+                    text.forEachIndexed { i, ch ->
+                        g2.drawString(ch.toString(), x + (advances[i] - metrics.charWidth(ch)) / 2, y)
+                        x += advances[i]
+                    }
                 }
             } finally {
                 g2.dispose()
@@ -629,6 +636,19 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
         internal fun formatFactor(factor: Double): String = String.format(Locale.ROOT, "%.1f", factor)
     }
+}
+
+/**
+ * The x-advance of each character with digits set tabularly: every digit takes the widest digit's slot, everything
+ * else its own width.
+ *
+ * The counters tick several times a second, and in a proportional font every digit runs at its own width — measured
+ * as-is, the whole row jitters. Over these slots the width moves only when a digit is added (9 → 10), a jump that
+ * reads as growth rather than noise.
+ */
+internal fun tabularAdvances(text: String, widthOf: (Char) -> Int): IntArray {
+    val slot = ('0'..'9').maxOf(widthOf)
+    return IntArray(text.length) { i -> if (text[i].isDigit()) slot else widthOf(text[i]) }
 }
 
 /**

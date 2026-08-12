@@ -32,6 +32,11 @@
   first, then as-is, then as `relativePath` under the project root — which is what makes a report written inside a
   container or behind a remote interpreter reachable.
 
+### Fixed
+
+- The toolbar run summary no longer jitters in width as its counters tick: digits are set in tabular slots, so the
+  row grows only when a count gains a digit.
+
 ## [2026.4.262] - 2026-08-10
 
 ### Added
