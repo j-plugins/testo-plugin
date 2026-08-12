@@ -245,14 +245,16 @@ class TestoReportStoreTest {
 
     @Test
     fun mappedPathIsTriedFirstThenTheRawOneThenTheProjectRelativeForm() {
+        // The mapper's answer must not spell the project-relative form: on an OS whose separator matches the
+        // announcement's, the two candidates would be one string and the dedup would fold them.
         val candidates = reportPathCandidates(
             ref("/app/runtime/report/index.html", relativePath = "runtime/report/index.html"),
             projectBasePath = "/home/me/project",
-        ) { "/home/me/project/runtime/report/index.html" }
+        ) { "/home/me/mapped/runtime/report/index.html" }
 
         assertEquals(
             listOf(
-                "/home/me/project/runtime/report/index.html",
+                "/home/me/mapped/runtime/report/index.html",
                 "/app/runtime/report/index.html",
                 Path.of("/home/me/project", "runtime/report/index.html").toString(),
             ),
