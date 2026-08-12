@@ -2,12 +2,15 @@ package com.github.xepozz.testo
 
 import com.github.xepozz.testo.tests.console.TestoReportRef
 import com.github.xepozz.testo.tests.console.TestoReportStore
+import com.github.xepozz.testo.tests.console.isReportOf
 import com.github.xepozz.testo.tests.console.reportPathCandidates
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.FileTime
 import org.junit.Test
 
 /**
@@ -138,6 +141,35 @@ class TestoReportStoreTest {
         store.noteRunStarted()
         assertFalse(store.runFinished)
         assertEquals(1, store.all().size)
+    }
+
+    @Test
+    fun theRunStartIsFlooredToAWholeSecond() {
+        // A filesystem that keeps mtime by the second would date a report written moments after the start before it.
+        val store = TestoReportStore()
+        store.noteRunStarted(1_700_000_123_456)
+
+        assertEquals(1_700_000_123_000, store.runStartedAt)
+    }
+
+    @Test
+    fun aFileLeftByAnEarlierRunIsNotThisRunsReport() {
+        // What a stopped run leaves behind: Testo is killed before rewriting the report, so the path still holds the
+        // previous one.
+        val file = Files.createTempFile("testo-report", ".html")
+        try {
+            Files.setLastModifiedTime(file, FileTime.fromMillis(1_000))
+
+            assertFalse(isReportOf(file, writtenAfter = 2_000))
+            assertTrue(isReportOf(file, writtenAfter = 1_000))
+        } finally {
+            Files.deleteIfExists(file)
+        }
+    }
+
+    @Test
+    fun aMissingReportIsNoReport() {
+        assertFalse(isReportOf(Path.of("no", "such", "report.html"), writtenAfter = 0))
     }
 
     @Test

@@ -181,7 +181,7 @@ class TestoReportsAction(
             // Not while the run is going: the report is announced as Testo starts writing it, over the path the
             // previous run wrote to — so a check now would light the button up on a report that belongs to that run.
             val finished = reports.runFinished
-            val found = if (finished) resolveReport(ref, project, mapToLocal) else null
+            val found = if (finished) resolveReport(ref, project, mapToLocal, reports.runStartedAt) else null
             // Cursor and tooltip only on a real change: setCursor repaints the pointer, and this runs twice a second.
             if (refreshed && found == located && finished == runWasFinished) return
             refreshed = true
@@ -262,7 +262,7 @@ class TestoReportsAction(
         }
 
         private fun item(key: String, icon: Icon, mode: Mode) =
-            ReportTargetAction(TestoBundle.message(key), icon, mode, { ref }, project, mapToLocal)
+            ReportTargetAction(TestoBundle.message(key), icon, mode, { ref }, project, mapToLocal, reports)
     }
 
     private companion object {
@@ -292,18 +292,19 @@ private class ReportTargetAction(
     private val target: () -> TestoReportRef,
     private val project: Project,
     private val mapToLocal: (String) -> String?,
+    private val reports: TestoReportStore,
 ) : AnAction(text, null, icon), DumbAware {
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabledAndVisible = resolveReport(target(), project, mapToLocal) != null
+        e.presentation.isEnabledAndVisible = resolve() != null
     }
 
     override fun actionPerformed(e: AnActionEvent) {
         val ref = target()
         // Re-resolved rather than remembered: the report may have been deleted since the menu was drawn.
-        val path = resolveReport(ref, project, mapToLocal) ?: return
+        val path = resolve() ?: return
         val label = ref.name ?: TestoBundle.message("testo.report.editor.name")
         when (mode) {
             Mode.BROWSER -> browseReport(path)
@@ -311,6 +312,8 @@ private class ReportTargetAction(
             Mode.WEB_VIEW -> if (!TestoReportViewer.open(project, path, label)) browseReport(path)
         }
     }
+
+    private fun resolve(): Path? = resolveReport(target(), project, mapToLocal, reports.runStartedAt)
 }
 
 /**
@@ -322,15 +325,25 @@ private class ReportTargetAction(
 private fun browseReport(path: Path) = BrowserUtil.browse(path.toUri())
 
 /**
- * The announced report as a local file, or `null` while none of the candidates exists.
+ * The announced report as a local file this run wrote, or `null` while there is none.
  *
  * Touches the filesystem. Called from the cell's timer on the EDT — three `stat`s twice a second, which is the price of
  * noticing that the file has appeared without anything announcing it.
  */
-internal fun resolveReport(ref: TestoReportRef, project: Project, mapToLocal: (String) -> String?): Path? =
+internal fun resolveReport(
+    ref: TestoReportRef,
+    project: Project,
+    mapToLocal: (String) -> String?,
+    writtenAfter: Long,
+): Path? =
     // The mapper is the PHP plugin's, over a path it may know nothing about: whatever it throws must not take the
     // toolbar's update with it.
     reportPathCandidates(ref, project.basePath) { runCatching { mapToLocal(it) }.getOrNull() }
         .asSequence()
         .mapNotNull { runCatching { Path.of(it) }.getOrNull() }
-        .firstOrNull { runCatching { Files.isRegularFile(it) }.getOrDefault(false) }
+        .firstOrNull { isReportOf(it, writtenAfter) }
+
+/** A file left by an earlier run reads as this one's, since the path never changes — hence the timestamp. */
+internal fun isReportOf(path: Path, writtenAfter: Long): Boolean = runCatching {
+    Files.isRegularFile(path) && Files.getLastModifiedTime(path).toMillis() >= writtenAfter
+}.getOrDefault(false)

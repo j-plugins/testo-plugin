@@ -105,7 +105,9 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         console.properties.addListener(TestConsoleProperties.HIDE_PASSED_TESTS, onToggle)
         console.properties.addListener(TestConsoleProperties.HIDE_IGNORED_TEST, onToggle)
         // Called from the augmenter's processStarted, so this is as close to the real start as the plugin can get.
+        // The reports take the same mark: it is what tells this run's report from the one already at that path.
         clock.noteStart()
+        reports.noteRunStarted()
 
         viewer.addEventsListener(object : TestResultsViewer.EventsListener {
             override fun onTestingStarted(viewer: TestResultsViewer) {

@@ -83,8 +83,20 @@ class TestoReportStore {
     var runFinished: Boolean = false
         private set
 
-    fun noteRunStarted() {
+    /**
+     * When the current run began, floored to a whole second.
+     *
+     * A report older than this is the *previous* run's: the path is the same every run, so a run stopped before Testo
+     * wrote its report leaves the old file in place. Floored because a filesystem that keeps mtime by the second would
+     * otherwise date a report written moments after the start before it.
+     */
+    @Volatile
+    var runStartedAt: Long = 0
+        private set
+
+    fun noteRunStarted(now: Long = System.currentTimeMillis()) {
         runFinished = false
+        runStartedAt = now - now % 1000
     }
 
     fun noteRunFinished() {
@@ -97,6 +109,7 @@ class TestoReportStore {
 
     fun clear() {
         runFinished = false
+        runStartedAt = 0
         synchronized(reports) { reports.clear() }
     }
 

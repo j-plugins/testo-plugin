@@ -489,6 +489,10 @@ Non-obvious constraints already paid for in blood — read before touching the r
   wrote to, so an earlier check enabled the button on that run's report. `onTestingStarted` puts the flag back for a
   second session in the same console, and a run already over by the time the listener lands is caught by
   `isProcessTerminated`.
+- **A report also has to be newer than the run** (`TestoReportStore.runStartedAt`, floored to a whole second for
+  filesystems that keep mtime by the second). The path is the same every run, so a run that was stopped — or that died
+  before its reporter ran — leaves the previous report in place, and the process having exited says nothing about who
+  wrote that file.
 - **JCEF is declared for 262 only, and still never trusted.** There it is the bundled `com.intellij.modules.jcef`
   plugin (`<depends optional>` + `jcef.xml`); on 252 it is part of the monolith and visible without a declaration. Its
   262 module `intellij.platform.ui.jcef` must never go in `<dependencies>`: that form is mandatory and the module does

@@ -11,7 +11,8 @@
   the announcement carries. A run that writes no report shows no button; an announced report shows a disabled one for
   as long as the run lasts, saying so on hover; it lights up once the process has exited with the file in place, and
   goes back to disabled if the file is removed. The file is deliberately not looked for any earlier — a report is
-  announced as Testo starts writing it, over the path the previous run wrote to.
+  announced as Testo starts writing it, over the path the previous run wrote to. A file older than the run itself is
+  not offered either, so stopping a run leaves the button disabled rather than opening the previous report.
 - Clicking a button opens the report in an editor tab rendered by JCEF; the arrow on it offers the external browser and
   copying the report's path. Reopening an already-open report reloads it, so the tab shows the run that just finished
   rather than the one it was opened for.
