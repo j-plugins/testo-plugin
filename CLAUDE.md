@@ -36,7 +36,7 @@ Dependabot bumps these regularly — read the files rather than trusting this ta
 `phpstorm-remote-interpreter`, `php.codeception`, `php.behat`, `gherkin`, `xepozz.ide.introspector`
 (+ `hackathon.indices.viewer` on 252 only — it has no 262 build).
 `platformBundledModules`: `intellij.platform.coverage`, `intellij.spellchecker` (+ `intellij.platform.smRunner`,
-`intellij.platform.testRunner` on 262, which split them out of the monolith).
+`intellij.platform.testRunner`, `intellij.platform.ui.jcef` on 262, which split them out of the monolith).
 
 ### Two build variants (`phpApi`)
 
@@ -151,6 +151,9 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoTargetStore.kt     # rerun targets of the current run, keyed by node id
 │   │   ├── TestoNodeIndex.kt       # SMTestProxy → nodeId, off the platform's own node events
 │   │   ├── TestoProgressAction.kt  # right-aligned toolbar summary: ring, fraction, status counters, elapsed
+│   │   ├── TestoReportStore.kt     # reports announced by `##teamcity[testoReport …]` + where to look for them
+│   │   ├── TestoReportAutoOpen.kt  # when a report opens on its own: this-run arm / project / application scopes
+│   │   ├── TestoReportAction.kt    # right-aligned panel of hand-drawn report buttons (WebView / browser / copy)
 │   │   ├── TestoTestTreeDecorator.kt        # wraps the tree's cell renderer: status icons + description tooltips
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
@@ -180,6 +183,7 @@ src/main/kotlin/com/github/xepozz/testo/
 └── ui/
     ├── TestoIconProvider.kt                 # Testo-marked icons for PHP test files
     ├── TestoHistoryCodeVisionProvider.kt    # "Show history" lens above each test
+    ├── TestoReportEditor.kt                 # JCEF editor tab for a generated report (light file + provider)
     └── TestoStackTraceConsoleFolding.kt     # folds `[internal function]` frame runs
 
 src/main/resources/
@@ -386,6 +390,12 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
 9. **Navigation & output cleanup** — `TestoTestLocator` (click a node → source), `TestoStackTraceParser`
    (failed line + text), two console foldings, and `PhpBacktraceFileFilter` for hyperlinks in raw output.
 
+10. **Generated reports** — Testo announces each report with the non-standard `##teamcity[testoReport …]`;
+    `TestoReportStore` keeps them, `TestoReportsAction` draws one button per viewable report, opening it in a JCEF tab
+    (`ui/TestoReportEditor.kt`) or the browser. A click before the report is delivered defers the open;
+    `TestoReportAutoOpen` holds the auto-open choices (this run / project / application), keyed by format + name.
+    The report spec lives in the Testo repository (`docs/spec/html-report.md`).
+
 ## Implementation notes & gotchas
 
 Non-obvious constraints already paid for in blood — read before touching the relevant area.
@@ -461,6 +471,14 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `ConfigurationFile`, no config file, non-empty `group`) trips the platform's "Configuration file is not
   specified" `RuntimeConfigurationError`, though Testo needs no config file. The error is matched by message
   text (`PhpBundle`), so a platform rewording fails closed — the validation error merely comes back.
+- **A report is announced when Testo *starts* writing it** — output after the root `testSuiteFinished` never reaches
+  the converter — so the file is polled, no earlier than process exit and only accepting mtime no older than the run:
+  the path is the same every run, and a stopped run leaves the previous report in place.
+- **JCEF: only `<depends optional>` on `com.intellij.modules.jcef`.** The module form (`intellij.platform.ui.jcef` in
+  `<dependencies>`) is mandatory and absent on 252 — that build would not load at all. `TestoReportViewer.isAvailable`
+  asks by reflection: a named `JBCefApp` reference throws `NoClassDefFoundError` at class verification, before any
+  `try`. No JCEF type outside classes that load after it answers true, and nothing from `org.cef` — it is not on the
+  compile classpath.
 
 ## Testing
 

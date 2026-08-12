@@ -69,6 +69,9 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
     /** What the tree is narrowed to right now; `null` means no filter of ours is applied. */
     private var selected: TestoTestStatus? = null
 
+    /** Whether the results form has announced the end of a session; makes the next start a new run. EDT-only. */
+    private var formFinished = false
+
     override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
     override fun actionPerformed(e: AnActionEvent) = Unit
@@ -84,6 +87,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         store: TestoStatusStore,
         clock: TestoRunTimings,
         targets: TestoTargetStore,
+        reports: TestoReportStore,
         handler: ProcessHandler?,
     ) {
         val viewer = console.resultsViewer
@@ -101,14 +105,23 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         console.properties.addListener(TestConsoleProperties.HIDE_IGNORED_TEST, onToggle)
         // Called from the augmenter's processStarted, so this is as close to the real start as the plugin can get.
         clock.noteStart()
+        reports.noteRunStarted()
 
         viewer.addEventsListener(object : TestResultsViewer.EventsListener {
             override fun onTestingStarted(viewer: TestResultsViewer) {
                 // Only on a second session in the same console: wiping on every announcement would throw away what
                 // the converter already reported for this run, since it reads the stream before the platform.
-                if (clock.isFinished()) {
+                //
+                // Gated on the form's own finish, not clock.isFinished(): a short run exits before the platform has
+                // worked through its output buffer, and restarting the clock on that late event left it running
+                // forever. The form's two events are strictly ordered per session.
+                if (formFinished) {
+                    formFinished = false
                     store.clear()
                     targets.clear()
+                    // Not cleared: a report is announced before the first test, so this may run after the
+                    // announcement. A re-run writes the same path and the store replaces by path anyway.
+                    reports.noteRunStarted()
                     clock.clear()
                     clock.noteStart()
                     exitCode.set(null)
@@ -133,6 +146,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                 // The only safe moment to read the tree: nothing appends to it any more.
                 runCatching { store.recountFrom(viewer.testsRootNode) }
                 clock.noteFinish()
+                formFinished = true
             }
         })
 
@@ -142,8 +156,11 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
             override fun processTerminated(event: ProcessEvent) {
                 exitCode.set(event.exitCode)
                 clock.noteFinish()
+                reports.noteRunFinished()
             }
         })
+        // A run short enough to be over before this wiring lands gets no processTerminated at all.
+        if (handler?.isProcessTerminated == true) reports.noteRunFinished()
     }
 
     /**
@@ -405,7 +422,7 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
         override fun getPreferredSize(): Dimension {
             if (!isVisible) return Dimension(0, 0)
             val metrics = getFontMetrics(font)
-            val textWidth = if (text.isEmpty()) 0 else metrics.stringWidth(text)
+            val textWidth = if (text.isEmpty()) 0 else tabularAdvances(text) { metrics.charWidth(it) }.sum()
             val gap = if (leadingWidth > 0 && textWidth > 0) GAP else 0
             val height = maxOf(icon?.iconHeight ?: 0, metrics.height, JBUI.scale(16)) + JBUI.scale(4)
             return Dimension(PADDING * 2 + leadingWidth + gap + textWidth, height)
@@ -430,8 +447,15 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                     g2.color = UIUtil.getLabelForeground()
                     g2.font = font
                     val metrics = g2.fontMetrics
-                    val x = PADDING + leadingWidth + (if (leadingWidth > 0) GAP else 0)
-                    g2.drawString(text, x, (height - metrics.height) / 2 + metrics.ascent)
+                    var x = PADDING + leadingWidth + (if (leadingWidth > 0) GAP else 0)
+                    val y = (height - metrics.height) / 2 + metrics.ascent
+                    // Char by char, each digit centered in its tabular slot (see tabularAdvances) — so the label
+                    // after the digits sits still while they tick. Kerning is lost, which digits never had.
+                    val advances = tabularAdvances(text) { metrics.charWidth(it) }
+                    text.forEachIndexed { i, ch ->
+                        g2.drawString(ch.toString(), x + (advances[i] - metrics.charWidth(ch)) / 2, y)
+                        x += advances[i]
+                    }
                 }
             } finally {
                 g2.dispose()
@@ -606,6 +630,15 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
 
         internal fun formatFactor(factor: Double): String = String.format(Locale.ROOT, "%.1f", factor)
     }
+}
+
+/**
+ * The x-advance of each character with digits set tabularly: every digit takes the widest digit's slot. Keeps the
+ * row from jittering as counters tick in a proportional font — the width moves only when a digit is added (9 → 10).
+ */
+internal fun tabularAdvances(text: String, widthOf: (Char) -> Int): IntArray {
+    val slot = ('0'..'9').maxOf(widthOf)
+    return IntArray(text.length) { i -> if (text[i].isDigit()) slot else widthOf(text[i]) }
 }
 
 /**

@@ -95,7 +95,14 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             ) { key -> props.channelStore.description(key) }
             // Persist each test's channel output into proxy metainfo so an imported-history run can rebuild the tabs.
             TestoChannelHistory.subscribeMetainfoWriter(project, console, props.channelStore)
-            props.progressAction.attachTo(console, props.statusStore, props.runTimings, props.targetStore, handler)
+            props.progressAction.attachTo(
+                console,
+                props.statusStore,
+                props.runTimings,
+                props.targetStore,
+                props.reportStore,
+                handler,
+            )
             hideStatusLine(console)
         }
 

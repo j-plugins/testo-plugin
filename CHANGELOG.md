@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- Report buttons on the test toolbar — one per report Testo announces, opening it in a JCEF tab or the browser.
+- A report can open on its own once the run delivers it: armed by a click during the run, or standing per project /
+  every project, independently per way of opening.
+- The report menu also shows the file in the file manager and copies its path.
+- Reports written behind a remote interpreter or in a container are reached through the PHP path mapper.
+
+### Fixed
+
+- The toolbar run summary no longer jitters in width as its counters tick.
+
 ## [2026.4.262] - 2026-08-10
 
 ### Added

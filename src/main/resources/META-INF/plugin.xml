@@ -8,6 +8,10 @@
     <depends>com.jetbrains.php</depends>
     <depends optional="true" config-file="coverage.xml">com.intellij.modules.coverage</depends>
 
+    <!-- JCEF, for the report tab. Must stay an optional depends: the module form (intellij.platform.ui.jcef in
+         <dependencies>) is mandatory and does not exist on 252, where JCEF is part of the monolith. -->
+    <depends optional="true" config-file="jcef.xml">com.intellij.modules.jcef</depends>
+
     <resource-bundle>messages.TestoBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
@@ -30,6 +34,9 @@
                 implementation="com.github.xepozz.testo.references.TestFunctionImplicitUsageProvider"/>
         <iconProvider
                 implementation="com.github.xepozz.testo.ui.TestoIconProvider"/>
+
+        <fileEditorProvider
+                implementation="com.github.xepozz.testo.ui.TestoReportFileEditorProvider"/>
 
         <codeInsight.daemonBoundCodeVisionProvider
                 implementationClass="com.github.xepozz.testo.ui.TestoHistoryCodeVisionProvider"/>

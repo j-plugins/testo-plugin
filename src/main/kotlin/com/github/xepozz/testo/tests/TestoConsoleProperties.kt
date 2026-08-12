@@ -6,6 +6,8 @@ import com.github.xepozz.testo.tests.console.LogLevelFilter
 import com.github.xepozz.testo.tests.console.TestoNodeIndex
 import com.github.xepozz.testo.tests.console.TestoOutputToGeneralEventsConverter
 import com.github.xepozz.testo.tests.console.TestoProgressAction
+import com.github.xepozz.testo.tests.console.TestoReportStore
+import com.github.xepozz.testo.tests.console.TestoReportsAction
 import com.github.xepozz.testo.tests.console.TestoRunTimings
 import com.github.xepozz.testo.tests.console.TestoStatusStore
 import com.github.xepozz.testo.tests.console.TestoTargetStore
@@ -46,7 +48,12 @@ class TestoConsoleProperties(
 
     val targetStore = TestoTargetStore(nodeIndex)
 
+    val reportStore = TestoReportStore()
+
     val progressAction = TestoProgressAction()
+
+    // getLocalPath, not getLocalFile: the report was written moments ago and the VFS may not know the file yet.
+    val reportsAction = TestoReportsAction(reportStore, project) { pathMapper.getLocalPath(it) }
 
     // Guards the channel-tab install: set once whoever wires the tabs first (the run-path ExecutionListener or the
     // debug runner, which installs them directly), so the other side is a no-op instead of a double install.
@@ -65,6 +72,7 @@ class TestoConsoleProperties(
             runTimings,
             targetStore,
             nodeIndex,
+            reportStore,
         )
 
     override fun getTestStackTraceParser(url: String, proxy: SMTestProxy, project: Project) =
@@ -96,7 +104,8 @@ class TestoConsoleProperties(
         arrayOf(
             com.github.xepozz.testo.tests.console.TestoLogLevelFilterAction(levelFilter),
             *(super.createImportActions() ?: emptyArray()),
-            // Last, though the order hardly matters: the widget is right-aligned and lands past everything anyway.
+            // Right-aligned actions are laid out from the right edge inwards: listed first = furthest right.
+            reportsAction,
             progressAction,
         )
 }

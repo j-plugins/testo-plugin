@@ -20,6 +20,7 @@ class TestoOutputToGeneralEventsConverter(
     private val timings: TestoRunTimings,
     private val targetStore: TestoTargetStore,
     private val nodes: TestoNodeIndex,
+    private val reportStore: TestoReportStore,
 ) : OutputToGeneralTestEventsConverter(testFrameworkName, consoleProperties) {
 
     /** Hooked the moment the platform hands the processor over, which is before any output is read. */
@@ -42,6 +43,8 @@ class TestoOutputToGeneralEventsConverter(
 
     override fun process(text: String, outputType: Key<*>) {
         if (runnerVersion == null) runnerVersion = TestoProtocolGate.parseVersion(text)
+        // Second route: a message behind a colour escape never reaches parseServiceMessage. The store dedups by path.
+        TestoReportRef.fromServiceMessageLine(text)?.let { reportStore.note(it) }
         super.process(text, outputType)
     }
 
@@ -110,6 +113,12 @@ class TestoOutputToGeneralEventsConverter(
                         store.appendOutput(key, "\n$text\n", "stderr")
                     }
                 }
+            }
+
+            // Testo's own message, naming a report of this run. Not forwarded, for the same reason as buildProblem.
+            TESTO_REPORT -> {
+                TestoReportRef.fromAttributes(attrs)?.let { reportStore.note(it) }
+                return
             }
 
             BUILD_PROBLEM -> {
@@ -215,5 +224,6 @@ class TestoOutputToGeneralEventsConverter(
         private const val TEST_FAILED = "testFailed"
         private const val TEST_IGNORED = "testIgnored"
         private const val BUILD_PROBLEM = "buildProblem"
+        private const val TESTO_REPORT = "testoReport"
     }
 }

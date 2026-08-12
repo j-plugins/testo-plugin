@@ -624,7 +624,7 @@ object TestoChannelsUi {
                     if (released) return@Runnable
                     // Consecutive format-less messages from the same channel/test fold into one canvas: append to the
                     // previous card's editor instead of stacking another card.
-                    val mergeKey = if (fileType == null) "${chunk.channel} $leafLabel" else null
+                    val mergeKey = if (fileType == null) "${chunk.channel}\u0000$leafLabel" else null
                     val target = if (mergeKey != null && mergeKey == lastMergeKey) {
                         lastEditor?.takeUnless { it.isDisposed }
                     } else {
