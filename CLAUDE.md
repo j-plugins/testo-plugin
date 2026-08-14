@@ -40,20 +40,20 @@ Dependabot bumps these regularly — read the files rather than trusting this ta
 
 ### Two build variants (`phpApi`)
 
-PHP moved its coverage classes from `com.jetbrains.php.phpunit.coverage` to `com.intellij.php.coverage` in 2026.2, and
-no single artifact can reference both (`<idea-version>` inside an optional descriptor is ignored, and there is no module
-that exists only on ≤261 to gate on). So every platform-dependent property in `gradle.properties` is declared twice with
-an API suffix and selected by `phpApi`:
+The plugin ships as two artifacts because the platform since/until ranges and a few bundled modules differ across
+2025.2 and 2026.2 (jcef / smRunner / testRunner split out of the monolith on 262). So every platform-dependent property
+in `gradle.properties` is declared twice with an API suffix and selected by `phpApi`:
 
 ```bash
 ./gradlew buildPlugin                # 262: platform 2026.2, since 262, no untilBuild
 ./gradlew buildPlugin -PphpApi=252   # 252: platform 2025.2, since 252, until 261.*
 ```
 
-The only source difference is `src/php252/kotlin` vs `src/php262/kotlin`, each holding one file of `typealias`es
-(`PhpCoverageRunner`, `PhpCoverageSuite`, `PhpUnitCoverageEngine`, `PhpUnitCoverageRunner`) pointing at whichever package
-is current. `src/main/kotlin/.../coverage/` imports none of them — the aliases live in its own package. The enum
-`PhpUnitCoverageEngine.CoverageEngine` did **not** move and is still imported directly from `com.jetbrains.php`.
+**The two artifacts no longer differ in source** — coverage runs on 100 % public platform API (`coverage/`, see
+"Generated reports" / the `coverage/` tree), so the old `src/php252/kotlin` vs `src/php262/kotlin` typealias split is
+gone. `phpApi` is now purely a build selector (platform version, since/until, per-platform modules). The enum
+`PhpUnitCoverageEngine.CoverageEngine` (the Xdebug/PCOV driver) is the one PHP coverage symbol still used and did **not**
+move — it is imported directly from `com.jetbrains.php`.
 
 Each variant is published as `<pluginVersion>.<phpApi>` (e.g. `2026.3.1.252` / `2026.3.1.262`). The Marketplace keys
 uploads by version and rejects a second upload carrying a version it already has, so the two builds *must not* share
