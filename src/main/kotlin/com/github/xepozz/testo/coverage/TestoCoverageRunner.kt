@@ -2,6 +2,7 @@ package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.coverage.format.CoverageParseException
 import com.github.xepozz.testo.coverage.format.parseCoverageReport
+import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
 import com.intellij.coverage.CoverageEngine
 import com.intellij.coverage.CoverageLoadErrorReporter
 import com.intellij.coverage.CoverageLoadingResult
@@ -36,6 +37,7 @@ class TestoCoverageRunner : CoverageRunner() {
         return try {
             val report = parseCoverageReport(sessionDataFile.toPath(), suite?.format)
             suite?.applyParsed(report.hasBranches, report.perTest)
+            suite?.project?.let { TestoCoverageByTestIndex.getInstance(it).update(report.perTest) }
             SuccessCoverageLoadingResult(report.toProjectData())
         } catch (e: CoverageParseException) {
             LOG.warn("Failed to load Testo coverage from $sessionDataFile", e)

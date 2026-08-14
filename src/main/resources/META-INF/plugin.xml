@@ -40,6 +40,8 @@
 
         <codeInsight.daemonBoundCodeVisionProvider
                 implementationClass="com.github.xepozz.testo.ui.TestoHistoryCodeVisionProvider"/>
+        <codeInsight.daemonBoundCodeVisionProvider
+                implementationClass="com.github.xepozz.testo.ui.TestoCoverageByTestCodeVisionProvider"/>
 
         <!--        <notificationGroup-->
         <!--                id="Testo"-->
