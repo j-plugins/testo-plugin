@@ -69,7 +69,15 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
 
         val profileState = runConfiguration.getState(env, command, null) ?: return null
         val executionResult = profileState.execute(env.executor, this) ?: return null
-        CoverageHelper.attachToProcess(runConfiguration, executionResult.processHandler, env.runnerSettings)
+        try {
+            CoverageHelper.attachToProcess(runConfiguration, executionResult.processHandler, env.runnerSettings)
+        } catch (e: Throwable) {
+            // A stale coverage suite (often another plugin's, e.g. PhpUnit's) whose file is gone breaks the platform's
+            // coverage init before our code runs. The tests already launched — surface a one-click cleanup instead of
+            // failing the run with an internal error.
+            if (!TestoStaleCoverageGuard.isStaleCoverageFailure(e)) throw e
+            TestoStaleCoverageGuard.notifyStaleCoverage(runConfiguration.project)
+        }
         return RunContentBuilder(executionResult, env).showRunContent(env.contentToReuse)
     }
 
