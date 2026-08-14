@@ -1,6 +1,8 @@
 <idea-plugin>
     <extensions defaultExtensionNs="com.intellij">
         <coverageEngine implementation="com.github.xepozz.testo.coverage.TestoCoverageEngine"/>
+        <coverageRunner implementation="com.github.xepozz.testo.coverage.TestoCoverageRunner"/>
         <programRunner implementation="com.github.xepozz.testo.coverage.TestoCoverageProgramRunner"/>
+        <projectService serviceImplementation="com.github.xepozz.testo.coverage.TestoCoverageAnnotator"/>
     </extensions>
 </idea-plugin>

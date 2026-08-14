@@ -1,68 +1,101 @@
 package com.github.xepozz.testo.coverage
 
+import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
+import com.intellij.coverage.CoverageHelper
+import com.intellij.coverage.CoverageRunnerData
+import com.intellij.execution.ExecutionException
+import com.intellij.execution.configurations.ConfigurationInfoProvider
 import com.intellij.execution.configurations.RunProfile
-import com.intellij.execution.configurations.RuntimeConfigurationError
 import com.intellij.execution.configurations.RunProfileState
+import com.intellij.execution.configurations.RunnerSettings
+import com.intellij.execution.configurations.RuntimeConfigurationError
+import com.intellij.execution.configurations.coverage.CoverageEnabledConfiguration
 import com.intellij.execution.runners.ExecutionEnvironment
+import com.intellij.execution.runners.GenericProgramRunner
+import com.intellij.execution.runners.RunContentBuilder
+import com.intellij.execution.ui.RunContentDescriptor
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.remote.RemoteSdkAdditionalData
+import com.intellij.util.PathMappingSettings
+import com.intellij.util.PathUtil
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
+import com.jetbrains.php.config.commandLine.PhpCommandSettingsBuilder
 import com.jetbrains.php.config.interpreters.PhpInterpreter
 import com.jetbrains.php.debug.xdebug.options.XdebugConfigurationOptionsManager
 import com.jetbrains.php.phpunit.coverage.PhpUnitCoverageEngine.CoverageEngine
 import com.jetbrains.php.run.PhpConfigurationOption
-import com.jetbrains.php.run.PhpRunConfigurationHolder
+import com.jetbrains.php.run.remote.PhpRemoteInterpreterManager
 
-open class TestoCoverageProgramRunner : PhpCoverageRunner() {
+/**
+ * Runs a Testo configuration under the Coverage executor. Extends the public [GenericProgramRunner] instead of the
+ * internal `com.intellij.php.coverage.PhpCoverageRunner`: [doExecute] reproduces that base's Xdebug flow (resolve the
+ * IDE-managed report path, build the command, attach the platform to the process so it loads coverage on termination
+ * via [TestoCoverageRunner]) on public PHP execution API alone.
+ */
+open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
     companion object {
         const val EXECUTOR_ID: String = "Coverage"
         const val RUNNER_ID: String = "TestoCoverageRunner"
     }
 
-    override fun canRun(executorId: String, profile: RunProfile) =
-        executorId == EXECUTOR_ID && profile is TestoRunConfiguration
-
-    // Pass the IDE-managed report path to the CLI (mirrors PhpUnit's createCoverageArguments) so Testo writes the Clover
-    // XML exactly where the IDE reads it back. `targetCoverage` is the remote-mapped path derived from
-    // CoverageEnabledConfiguration.getCoverageFilePath() by PhpCoverageRunner. Testo exposes `--coverage-clover=<file>`
-    // (Symfony Console, VALUE_REQUIRED). Fall back to the bare `--coverage` when no path is provided.
-    override fun createCoverageArguments(targetCoverage: String?) =
-        if (targetCoverage.isNullOrEmpty()) mutableListOf("--coverage")
-        else mutableListOf("--coverage-clover=$targetCoverage")
-
     override fun getRunnerId(): String = RUNNER_ID
 
-    override fun createState(
-        env: ExecutionEnvironment,
-        interpreter: PhpInterpreter,
-        runConfigurationHolder: PhpRunConfigurationHolder<*>,
-        coverageArguments: MutableList<String>,
-        localCoverage: String,
-        targetCoverage: String
-    ): RunProfileState? {
-        val runConfiguration = runConfigurationHolder.runConfiguration as TestoRunConfiguration
+    override fun canRun(executorId: String, profile: RunProfile): Boolean =
+        executorId == EXECUTOR_ID && profile is TestoRunConfiguration
+
+    // The Coverage executor needs CoverageRunnerData so the platform threads RunnerSettings through to attachToProcess.
+    override fun createConfigurationData(settingsProvider: ConfigurationInfoProvider): RunnerSettings = CoverageRunnerData()
+
+    override fun doExecute(state: RunProfileState, env: ExecutionEnvironment): RunContentDescriptor? {
+        FileDocumentManager.getInstance().saveAllDocuments()
+        val runConfiguration = env.runProfile as? TestoRunConfiguration
+            ?: throw ExecutionException("Coverage is not supported for the selected run profile.")
+        val interpreter = runConfiguration.interpreter
+            ?: throw ExecutionException(PhpCommandSettingsBuilder.getInterpreterNotFoundError())
+
+        val coverageConfiguration = CoverageEnabledConfiguration.getOrCreate(runConfiguration)
+        val localCoverage = coverageConfiguration.coverageFilePath
+        val targetCoverage = localCoverage?.takeIf { it.isNotEmpty() }?.let { toTargetPath(runConfiguration, interpreter, it) }
 
         val command = createTestoCoverageCommand(
             runConfiguration,
             interpreter,
-            coverageArguments,
+            createCoverageArguments(targetCoverage),
             localCoverage,
             targetCoverage,
         )
-
         runConfiguration.checkConfiguration()
-        return runConfiguration.getState(env, command, null)
+
+        val profileState = runConfiguration.getState(env, command, null) ?: return null
+        val executionResult = profileState.execute(env.executor, this) ?: return null
+        CoverageHelper.attachToProcess(runConfiguration, executionResult.processHandler, env.runnerSettings)
+        return RunContentBuilder(executionResult, env).showRunContent(env.contentToReuse)
+    }
+
+    // Kept as clover by default; the format→flag map covers the other writers for the "Show coverage" path (arch §5).
+    fun createCoverageArguments(targetCoverage: String?): List<String> =
+        coverageArgumentsFor(CoverageFormat.CLOVER, targetCoverage)
+
+    fun coverageArgumentsFor(format: CoverageFormat, targetCoverage: String?): List<String> {
+        if (targetCoverage.isNullOrEmpty()) return listOf("--coverage")
+        return when (format) {
+            CoverageFormat.CLOVER -> listOf("--coverage-clover=$targetCoverage")
+            CoverageFormat.COBERTURA -> listOf("--coverage-cobertura=$targetCoverage")
+            CoverageFormat.PHPUNIT_XML -> listOf("--coverage-xml=$targetCoverage")
+        }
     }
 
     fun createTestoCoverageCommand(
         runConfiguration: TestoRunConfiguration,
         interpreter: PhpInterpreter,
         coverageArguments: List<String>,
-        localCoverage: String,
-        targetCoverage: String
+        localCoverage: String?,
+        targetCoverage: String?,
     ): PhpCommandSettings {
         val command = runConfiguration.createCommand(
             interpreter,
-            mutableMapOf<String, String>(),
+            mutableMapOf(),
             coverageArguments.toMutableList(),
             true,
         )
@@ -81,5 +114,24 @@ open class TestoCoverageProgramRunner : PhpCoverageRunner() {
         setAdditionalMapping(localCoverage, targetCoverage, command)
 
         return command
+    }
+
+    private fun setAdditionalMapping(localCoverage: String?, targetCoverage: String?, command: PhpCommandSettings) {
+        if (!localCoverage.isNullOrEmpty() && !targetCoverage.isNullOrEmpty()) {
+            command.setAdditionalMapping(
+                PathMappingSettings.PathMapping(PathUtil.getParentPath(localCoverage), PathUtil.getParentPath(targetCoverage)),
+            )
+        }
+    }
+
+    // Local interpreter: the report path is the same on both sides. Remote: map it into the execution environment.
+    private fun toTargetPath(runConfiguration: TestoRunConfiguration, interpreter: PhpInterpreter, localCoverage: String): String {
+        val data = interpreter.phpSdkAdditionalData
+        if (data is RemoteSdkAdditionalData) {
+            PhpRemoteInterpreterManager.getInstance()?.let { manager ->
+                return manager.createPathMappings(runConfiguration.project, data).convertToRemote(localCoverage)
+            }
+        }
+        return localCoverage
     }
 }
