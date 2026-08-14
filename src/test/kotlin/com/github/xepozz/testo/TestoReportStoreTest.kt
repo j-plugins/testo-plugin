@@ -38,6 +38,21 @@ class TestoReportStoreTest {
         assertEquals("Testo HTML report", ref.name)
         assertEquals("1", ref.schemaVersion)
         assertTrue(ref.isViewable)
+        assertFalse(ref.isCoverage)
+    }
+
+    @Test
+    fun coverageFormatsAreRecognizedAndNotViewable() {
+        fun ref(format: String) = TestoReportRef.fromAttributes(mapOf("format" to format, "path" to "/tmp/r"))!!
+
+        for (format in listOf("clover", "cobertura", "phpunit-xml")) {
+            val ref = ref(format)
+            assertTrue(format, ref.isCoverage)
+            assertFalse(format, ref.isViewable)
+            assertEquals(format, com.github.xepozz.testo.coverage.format.CoverageFormat.fromId(format), ref.coverageFormat)
+        }
+        assertFalse(ref("html").isCoverage)
+        assertNull(ref("html").coverageFormat)
     }
 
     @Test

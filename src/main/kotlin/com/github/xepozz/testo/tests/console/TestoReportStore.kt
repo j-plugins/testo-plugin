@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.tests.console
 
+import com.github.xepozz.testo.coverage.format.CoverageFormat
 import java.nio.file.Path
 
 /**
@@ -19,6 +20,11 @@ data class TestoReportRef(
 ) {
     /** Whether the button can show this report as a page; the rest (data documents, coverage) is kept, not offered. */
     val isViewable: Boolean get() = VIEWABLE_FORMATS.any { format.equals(it, ignoreCase = true) }
+
+    /** A coverage report — clover / cobertura / phpunit-xml — that the "Show coverage" button can apply without a rerun. */
+    val coverageFormat: CoverageFormat? get() = CoverageFormat.fromId(format)
+
+    val isCoverage: Boolean get() = coverageFormat != null
 
     companion object {
         const val FORMAT_HTML: String = "html"
@@ -146,6 +152,8 @@ class TestoReportStore {
     fun all(): List<TestoReportRef> = synchronized(reports) { reports.values.toList() }
 
     fun viewable(): List<TestoReportRef> = all().filter { it.isViewable }
+
+    fun coverage(): List<TestoReportRef> = all().filter { it.isCoverage }
 
     fun primary(): TestoReportRef? = viewable().lastOrNull()
 }
