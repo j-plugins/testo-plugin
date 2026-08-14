@@ -11,8 +11,14 @@ import java.nio.file.Path
 
 /**
  * Loads an already-written Testo coverage report into the IDE with no process launch (architecture §10): build a suite
- * bound to the report through our runner, tell it the format, and hand it to the platform, which reads the file via
+ * bound to the report through our engine, tell it the format, and hand it to the platform, which reads the file via
  * [TestoCoverageRunner.loadCoverageData], opens the Coverage tool window and applies [TestoCoverageAnnotator].
+ *
+ * The suite is **not** registered with [CoverageDataManager] (no `addCoverageSuite`/`addExternalCoverageSuite`): those
+ * persist it into `workspace.xml`, and the platform's reload then crashes on Windows when the saved absolute report
+ * path no longer exists — `readDataFileProviderAttribute` falls back to `Path.of(systemPath, absolutePath)`, which
+ * throws `InvalidPathException` on the second drive letter and breaks *all* coverage init. A gathered-but-unregistered
+ * suite shows the same annotation, updates the per-test index, and never persists — the report is transient anyway.
  *
  * Returns false when the coverage module is absent (the runner is registered only by `coverage.xml`); the format falls
  * back to sniffing when unknown. Call on the EDT — `coverageGathered` opens UI.
@@ -21,20 +27,12 @@ fun applyTestoCoverage(project: Project, name: String?, format: CoverageFormat?,
     val runner = CoverageRunner.getInstance(TestoCoverageRunner::class.java) ?: return false
     val manager = CoverageDataManager.getInstance(project)
     val timestamp = runCatching { Files.getLastModifiedTime(dataFile).toMillis() }.getOrDefault(0L)
-    val suite = manager.addCoverageSuite(
-        name ?: "Testo coverage",
-        // The File ctor is the one present on both 252 and 262 — Path was added only on 262.
-        DefaultCoverageFileProvider(dataFile.toFile()),
-        null,
-        timestamp,
-        null,
-        runner,
-        false,
-        false,
-    ) ?: return false
-    // A TestoCoverageSuite carries the format the runner reads; if the platform handed back something else the runner
-    // sniffs the file instead, so either way the load succeeds.
-    (suite as? TestoCoverageSuite)?.format = format ?: detectCoverageFormat(dataFile) ?: CoverageFormat.CLOVER
+    // The File ctor is the one present on both 252 and 262 — Path was added only on 262.
+    val provider = DefaultCoverageFileProvider(dataFile.toFile())
+    val suite = TestoCoverageEngine.INSTANCE
+        .createCoverageSuite(name ?: "Testo coverage", project, runner, provider, timestamp) as? TestoCoverageSuite
+        ?: return false
+    suite.format = format ?: detectCoverageFormat(dataFile) ?: CoverageFormat.CLOVER
     manager.coverageGathered(suite)
     return true
 }
