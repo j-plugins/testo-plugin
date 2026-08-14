@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns="https://schema.phpunit.de/coverage/1.0">
+  <file name="MultipleResult.php" path="plugin/data/src">
+    <totals>
+      <lines total="2" executed="2" percent="100.00"/>
+    </totals>
+    <coverage>
+      <line nr="25">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="30">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+    </coverage>
+  </file>
+</phpunit>
