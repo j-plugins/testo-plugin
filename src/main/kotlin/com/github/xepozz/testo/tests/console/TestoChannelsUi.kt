@@ -1073,13 +1073,18 @@ object TestoChannelsUi {
 
         // Prefix the aggregate's per-test header (a hyperlink to the test) with the Testo icon. Console output is
         // buffered, so the editor offset only resolves once it is flushed — hence performWhenNoDeferredOutput.
+        // Live chunks arrive off the EDT (test-reader thread), but performWhenNoDeferredOutput asserts EDT — hop first.
         private fun addTestoIconInlay(view: ConsoleViewImpl, offset: Int) {
-            view.performWhenNoDeferredOutput {
-                val editor = view.editor as? EditorEx ?: return@performWhenNoDeferredOutput
-                if (offset in 0..editor.document.textLength) {
-                    editor.inlayModel.addInlineElement(offset, false, TestoIconInlayRenderer)
+            val app = ApplicationManager.getApplication()
+            val task = Runnable {
+                view.performWhenNoDeferredOutput {
+                    val editor = view.editor as? EditorEx ?: return@performWhenNoDeferredOutput
+                    if (offset in 0..editor.document.textLength) {
+                        editor.inlayModel.addInlineElement(offset, false, TestoIconInlayRenderer)
+                    }
                 }
             }
+            if (app.isDispatchThread) task.run() else app.invokeLater(task)
         }
 
         private fun ensureInstalled(): JBEditorTabs? {

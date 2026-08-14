@@ -15,6 +15,8 @@ import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.actionSystem.RightAlignedToolbarAction
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.actionSystem.ex.CustomComponentAction
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -150,6 +152,8 @@ class TestoReportsAction(
         // A fresh cell has no tooltip yet, so the first refresh must go through however little has changed.
         private var refreshed = false
         private var hovered = false
+        // A background resolve is in flight; ticks skip while it is, so a slow resolve doesn't stack up tasks.
+        private var resolving = false
 
         // Asked for per paint: a font set once on a raw JComponent outlives a zoom (no UI delegate reinstalls it).
         override fun getFont(): Font = UIUtil.getLabelFont()
@@ -186,7 +190,31 @@ class TestoReportsAction(
             // Not while the run is going: a report is announced as Testo starts writing it, over the path the
             // previous run wrote to — a check now would offer that run's file.
             val finished = reports.runFinished
-            val found = if (finished) resolveReport(ref, project, mapToLocal, reports.runStartedAt) else null
+            if (!finished) {
+                applyResolved(null, false)
+                return
+            }
+            // resolveReport goes through the PHP path mapper, whose getLocalPath hits the file index — a slow operation
+            // forbidden on the EDT, and this runs off a Swing timer on the EDT. Resolve on a pool thread, apply on the EDT.
+            if (resolving) return
+            resolving = true
+            val startedAt = reports.runStartedAt
+            val cellRef = ref
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val found = resolveReport(cellRef, project, mapToLocal, startedAt)
+                ApplicationManager.getApplication().invokeLater(
+                    {
+                        resolving = false
+                        // A rerun may have started while this resolved; applying then would auto-open the previous
+                        // run's report and mark the new run as already opened. Drop it — the next tick sees the run.
+                        if (reports.runStartedAt == startedAt && reports.runFinished) applyResolved(found, true)
+                    },
+                    ModalityState.any(),
+                ) { project.isDisposed }
+            }
+        }
+
+        private fun applyResolved(found: Path?, finished: Boolean) {
             maybeAutoOpen(found, finished)
             val willOpen = !finished && TestoReportAutoOpen.decide(project, reports, ref).isNotEmpty()
             // Tooltip and repaint only on a real change: this runs twice a second.

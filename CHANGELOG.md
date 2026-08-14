@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- The channel console no longer throws an EDT-threading error while streaming live output into an aggregate tab.
+- The report buttons no longer trigger a "slow operations on EDT" error: report paths now resolve off the UI thread.
+
 ## [2026.5.262] - 2026-08-12
 
 ### Added
