@@ -370,6 +370,7 @@ class TestoReportsAction(
         private var runWasFinished = false
         private var refreshed = false
         private var hovered = false
+        private var resolving = false
 
         override fun getFont(): Font = UIUtil.getLabelFont()
 
@@ -389,7 +390,29 @@ class TestoReportsAction(
 
         fun refresh() {
             val finished = reports.runFinished
-            val found = if (finished) resolveCoverageDataFile(ref, project, mapToLocal, reports.runStartedAt) else null
+            if (!finished) {
+                applyResolved(null, false)
+                return
+            }
+            // resolveCoverageDataFile goes through the PHP path mapper and touches the filesystem — forbidden on the
+            // EDT, and this runs off a Swing timer on the EDT. Resolve on a pooled thread, apply back on the EDT.
+            if (resolving) return
+            resolving = true
+            val startedAt = reports.runStartedAt
+            val cellRef = ref
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val found = resolveCoverageDataFile(cellRef, project, mapToLocal, startedAt)
+                ApplicationManager.getApplication().invokeLater(
+                    {
+                        resolving = false
+                        if (reports.runStartedAt == startedAt && reports.runFinished) applyResolved(found, true)
+                    },
+                    ModalityState.any(),
+                ) { project.isDisposed }
+            }
+        }
+
+        private fun applyResolved(found: Path?, finished: Boolean) {
             if (refreshed && found == located && finished == runWasFinished) return
             refreshed = true
             located = found
