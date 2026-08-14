@@ -152,7 +152,6 @@ class TestoReportsAction(
         // A fresh cell has no tooltip yet, so the first refresh must go through however little has changed.
         private var refreshed = false
         private var hovered = false
-        // A background resolve is in flight; ticks skip while it is, so a slow resolve doesn't stack up tasks.
         private var resolving = false
 
         // Asked for per paint: a font set once on a raw JComponent outlives a zoom (no UI delegate reinstalls it).
@@ -195,7 +194,7 @@ class TestoReportsAction(
                 return
             }
             // resolveReport goes through the PHP path mapper, whose getLocalPath hits the file index — a slow operation
-            // forbidden on the EDT, and this runs off a Swing timer on the EDT. Resolve on a pool thread, apply on the EDT.
+            // forbidden on the EDT, and this runs off a Swing timer on the EDT.
             if (resolving) return
             resolving = true
             val startedAt = reports.runStartedAt
