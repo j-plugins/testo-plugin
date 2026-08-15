@@ -3,7 +3,9 @@ package com.github.xepozz.testo.coverage.editor
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.format.TestId
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
+import com.github.xepozz.testo.coverage.perTest.TestoCoveringTestsLauncher
 import com.github.xepozz.testo.coverage.perTest.TestoTestIdentityMapper
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.editor.colors.TextAttributesKey
@@ -22,12 +24,15 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.panels.VerticalLayout
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
+import java.awt.FlowLayout
 import java.awt.Graphics
 import java.awt.Rectangle
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.awt.event.MouseMotionAdapter
+import javax.swing.JButton
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
 
@@ -92,10 +97,26 @@ internal class TestoCoverageGutterRenderer(
         list.cellRenderer = SimpleListCellRenderer.create<TestId>("") { "${it.fqcn.trimStart('\\')}::${it.method}" }
         list.selectedIndex = 0
         list.visibleRowCount = minOf(tests.size, 8)
+        // A plain JBList tracks the keyboard only; the row under the pointer is highlighted by the list wrappers the
+        // platform's own chooser popups are built from, which a hand-assembled panel does not go through.
+        list.addMouseMotionListener(object : MouseMotionAdapter() {
+            override fun mouseMoved(e: MouseEvent) {
+                list.locationToIndex(e.point).takeIf { it >= 0 }?.let { list.selectedIndex = it }
+            }
+        })
+
+        val runAll = JButton(
+            TestoBundle.message("testo.coverage.editor.popup.run.all", tests.size),
+            AllIcons.Toolwindows.ToolWindowRunWithCoverage,
+        )
 
         val panel = JPanel(BorderLayout())
         panel.add(header, BorderLayout.NORTH)
         panel.add(JBScrollPane(list), BorderLayout.CENTER)
+        panel.add(JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(10), JBUI.scale(4))).apply {
+            isOpaque = false
+            add(runAll)
+        }, BorderLayout.SOUTH)
 
         val popup = JBPopupFactory.getInstance()
             .createComponentPopupBuilder(panel, list)
@@ -120,12 +141,23 @@ internal class TestoCoverageGutterRenderer(
                 if (e.keyCode == KeyEvent.VK_ENTER) navigateSelected()
             }
         })
+        runAll.addActionListener {
+            popup.cancel()
+            TestoCoveringTestsLauncher.run(
+                project,
+                tests,
+                TestoCoveringTestsLauncher.runName(lineSubject(), tests.size),
+            )
+        }
         popup.show(at)
     }
 
     override fun getTooltipText(): String = statusText()
 
     override fun getAccessibleName(): String = TestoBundle.message("testo.coverage.editor.accessible.name")
+
+    /** How the run names itself: `Foo.php:42`, the line the tests were read off. */
+    private fun lineSubject(): String = "${filePath.substringAfterLast('/')}:${lineData.lineNumber}"
 
     private fun coveringTests(): List<TestId> =
         TestoCoverageByTestIndex.getInstance(project).data()

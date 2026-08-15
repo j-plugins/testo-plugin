@@ -10,7 +10,16 @@
 - A Coverage run applies everything it produced on its own, one report per format, without a click.
 - The Coverage button on the test toolbar gathers every announced report under one click, with a checkbox per report.
 - The Coverage panel gained expand/collapse, a switch for the editor highlighting, badges naming the report formats
-  behind the shown coverage, and a column counting the tests that cover each file.
+  behind the shown coverage (kept at the right end of the toolbar), and a narrow column counting the tests that cover
+  each file.
+- *Run Covering Tests* on the Coverage panel runs, with coverage, the tests that cover the selected row — a file's own
+  tests, or every test under a directory.
+- *Select Opened File* on the Coverage panel selects the file open in the editor, which the platform's *Always select
+  opened element* never managed to do in a file-based coverage view.
+- A gutter icon on every covered method, function and class runs exactly the tests that cover it, with coverage;
+  the Coverage panel has a switch for those icons.
+- The popup on a covered line highlights the row under the pointer and ends with a button running all of that line's
+  covering tests.
 - Every run is archived — its output, its reports and the parameters it ran with — and replays from the *Test History*
   button as a full Testo console: channels, statuses, report buttons and that run's own coverage.
 - *Show history* above a test replays the newest archived run containing that test and selects its node.

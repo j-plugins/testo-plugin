@@ -105,7 +105,15 @@ src/main/kotlin/com/github/xepozz/testo/
 │
 ├── coverage/                       # optional, enabled via META-INF/coverage.xml
 │   ├── TestoCoverageEngine.kt      # PhpUnitCoverageEngine subclass + suite/enabled-configuration
-│   └── TestoCoverageProgramRunner.kt  # --coverage-clover=<IDE-managed path>, Xdebug/PCOV toggling
+│   ├── TestoCoverageProgramRunner.kt  # --coverage-* flags on the IDE-managed paths, Xdebug/PCOV toggling
+│   ├── TestoCoverageRunner.kt      # loads a report into ProjectData + the per-test index
+│   ├── TestoCoverageAnnotator.kt   # per-file/dir percentages behind the Coverage view's columns
+│   ├── TestoCoverageViewExtension.kt  # the view's columns (Branches, Tests) and its extra toolbar
+│   ├── TestoCoverageViewActions.kt    # those toolbar actions: highlight, gutters, run covering, badges
+│   ├── TestoCoverageSelectOpenedFile.kt  # our own "select the opened file" (the platform's cannot work here)
+│   ├── editor/                     # the editor side: stripes, the line popup, the covering-tests gutter
+│   ├── format/                     # clover / cobertura / coverage-xml parsers → one model
+│   └── perTest/                    # which test touched which line: index, keys, identity, launcher
 │
 ├── index/
 │   ├── TestoDataProvidersIndex.kt  # FileBasedIndex: provider name → {class, method, providerFqn}
@@ -227,8 +235,8 @@ src/test/testData/mixin, rename # PHP fixtures for PSI-backed tests
 `com.jetbrains.php` namespace: `testFrameworkType` (`TestoFrameworkType`), `composerConfigClient`
 (`TestoComposerConfig`).
 
-`META-INF/coverage.xml` (optional, `com.intellij.modules.coverage`) adds `coverageEngine` + the coverage
-`programRunner`.
+`META-INF/coverage.xml` (optional, `com.intellij.modules.coverage`) adds `coverageEngine`, `coverageRunner`, the
+coverage `programRunner`, the annotator service and the *Run covering tests* `codeInsight.lineMarkerProvider`.
 
 `projectListeners`: `TestoConsoleAugmenter` on `ExecutionListener` — the only hook where the PHP-built test console
 can be reached to install the channel tabs.
@@ -480,6 +488,18 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `ExecutorRegistryImpl` sorting them into `RunContextGroupMore` unless the `executor.actions.submenu` registry key
   is off. That key is global and the actions are shared instances, so a copy of *Run with Coverage* at the popup's
   own level only duplicates the submenu entry — tried in the test tree's popup and reverted.
+- **The Coverage view's *Always select opened element* cannot work for a file-based view.** It hands
+  `CoverageViewExtension.getElementToSelect` the PSI *leaf* under the caret and then looks for a tree node whose value
+  equals it, while every node here holds a `PsiFile` or a `PsiDirectory` — so nothing ever matches (PhpStorm's own
+  coverage has the same dead button). That mapper, the view's select call and its tree are all `@ApiStatus.Internal`,
+  and overriding the mapper fails `verifyPlugin`. Hence `TestoCoverageSelectOpenedFile`: our own toggle, which follows
+  the editor off the message bus and walks the tree with `TreeUtil.promiseSelect`. The tree is reached through the
+  toolbar's target component, handed over from the action's `update`.
+- **The Coverage view's tree has no extensible context menu** — `CoverageView.createPopupGroup` is private, built
+  inline, and holds `EditSource` alone. Anything acting on the selected row goes on the toolbar instead
+  (`createExtraToolbarActions`, `@Experimental`) and reads the selection as `CommonDataKeys.NAVIGATABLE`.
+- **A column's width comes from `getPercentage(column, rootNode)`**, so a column whose values are not percentages must
+  still answer there — the *Tests* column returns its count, or the view sizes it for "100% (1234/1234)".
 - **`ConsoleFolding` instances are shared across consoles** and get no per-console reset; both foldings track
   state in a `ThreadLocal` and clear it on the first non-frame line.
 - **Debug installs channel tabs itself** (`TestoDebugRunner`): the augmenter's descriptor lookup misses debug

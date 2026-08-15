@@ -62,6 +62,18 @@ class TestoPerTestCoverageTest {
     }
 
     @Test
+    fun testsUnderTakesAFileAloneAndADirectoryWhole() {
+        val data = data()
+        assertEquals(setOf(test), data.testsUnder(interceptor, isDirectory = false))
+        // A directory is the union over everything beneath it, however deep — and its own key is not a file key.
+        assertEquals(setOf(test), data.testsUnder("D:/git/testo/testo/plugin/data", isDirectory = true))
+        assertEquals(emptySet<TestId>(), data.testsUnder("D:/git/testo/testo/plugin/data", isDirectory = false))
+        assertEquals(emptySet<TestId>(), data.testsUnder("D:/git/testo/testo/plugin/other", isDirectory = true))
+        // A prefix that is not a path segment must not match: ".../data" may not swallow ".../database".
+        assertEquals(emptySet<TestId>(), data.testsUnder("D:/git/testo/testo/plugin/dat", isDirectory = true))
+    }
+
+    @Test
     fun filterSelectorHasLeadingBackslashOnce() {
         val mapper = TestoTestIdentityMapper.getInstance()
         assertEquals(

@@ -5,6 +5,7 @@ import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.coverage.format.TestId
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageKeys
+import com.github.xepozz.testo.coverage.perTest.testsUnder
 import com.intellij.coverage.CoverageBundle
 import com.intellij.coverage.CoverageSuitesBundle
 import com.intellij.coverage.view.DirectoryCoverageViewExtension
@@ -26,6 +27,10 @@ class TestoCoverageViewExtension(
     private val annotator: TestoCoverageAnnotator,
     suitesBundle: CoverageSuitesBundle,
 ) : DirectoryCoverageViewExtension(project, annotator, suitesBundle) {
+    // Where the Tests column ended up, or -1 when it is not shown — the view asks for column values by index.
+    private var testsColumn = -1
+    private var tests: TestsColumnInfo? = null
+
     override fun createColumnInfos(): Array<ColumnInfo<*, *>> {
         val columns = mutableListOf<ColumnInfo<*, *>>(
             ElementColumnInfo(),
@@ -35,24 +40,39 @@ class TestoCoverageViewExtension(
             val name = TestoBundle.message("testo.coverage.view.column.branches")
             columns.add(PercentageCoverageColumnInfo(BRANCHES_COLUMN, name, mySuitesBundle))
         }
+        testsColumn = -1
+        tests = null
         if (hasPerTestData()) {
             val testsByFile = TestoCoverageByTestIndex.getInstance(project).data().testsByFile()
-            if (testsByFile.isNotEmpty()) columns.add(TestsColumnInfo(testsByFile))
+            if (testsByFile.isNotEmpty()) {
+                tests = TestsColumnInfo(testsByFile)
+                testsColumn = columns.size
+                columns.add(tests!!)
+            }
         }
         return columns.toTypedArray()
     }
 
     override fun getPercentage(columnIdx: Int, node: AbstractTreeNode<*>): String? {
+        // Also what the view sizes a column by, off the root node — so the Tests column must answer with a count and
+        // not fall through to the percentage string, which would size it for "100% (1234/1234)".
+        if (columnIdx == testsColumn) return tests?.valueOf(node)
         if (columnIdx != BRANCHES_COLUMN) return super.getPercentage(columnIdx, node)
         val file = extractFile(node) ?: return null
         return annotator.getBranchCoverageInformationString(file, mySuitesBundle)
     }
 
+
     // @Experimental (not @Internal) — the one public seam into the view's toolbar; verified present on 252 and 262.
+    // The tree's context menu is not a seam: `CoverageView.createPopupGroup` is private and holds `EditSource` alone,
+    // so "run the covering tests of this row" is offered from the toolbar, acting on the selection.
     override fun createExtraToolbarActions(): List<AnAction> = listOf(
         com.github.xepozz.testo.tests.console.TestoTreeExpandAction(),
         com.github.xepozz.testo.tests.console.TestoTreeCollapseAction(),
+        TestoSelectOpenedFileAction(project),
         TestoCoverageHighlightToggleAction(project),
+        TestoCoveringTestsGutterToggleAction(project),
+        TestoRunCoveringTestsAction(project),
         TestoCoverageFormatBadgesAction(mySuitesBundle),
     )
 
@@ -77,11 +97,7 @@ class TestoCoverageViewExtension(
             val key = TestoCoverageKeys.normalize(file.path)
             if (!file.isDirectory) return testsByFile[key]?.size
             return dirCounts.getOrPut(key) {
-                val prefix = "$key/"
-                testsByFile.entries.asSequence()
-                    .filter { it.key.startsWith(prefix) }
-                    .flatMapTo(HashSet()) { it.value }
-                    .size
+                TestoCoverageByTestIndex.getInstance(project).data().testsUnder(key, isDirectory = true).size
             }
         }
     }

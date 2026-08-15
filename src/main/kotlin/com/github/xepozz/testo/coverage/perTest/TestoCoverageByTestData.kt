@@ -28,6 +28,19 @@ interface TestoCoverageByTestData {
     }
 }
 
+/**
+ * Every test that touched [path] — the file's own set, or, for a directory, the union over everything beneath it.
+ * [isDirectory] is passed rather than probed so callers holding a VFS or a PSI item both fit.
+ */
+fun TestoCoverageByTestData.testsUnder(path: String, isDirectory: Boolean): Set<TestId> {
+    val key = TestoCoverageKeys.normalize(path)
+    if (!isDirectory) return testsByFile()[key] ?: emptySet()
+    val prefix = "$key/"
+    return testsByFile().entries.asSequence()
+        .filter { it.key.startsWith(prefix) }
+        .flatMapTo(LinkedHashSet()) { it.value }
+}
+
 internal class MapCoverageByTestData(
     private val byLine: Map<SourceRef, Set<TestId>>,
     private val byTest: Map<TestId, Set<SourceRef>>,
