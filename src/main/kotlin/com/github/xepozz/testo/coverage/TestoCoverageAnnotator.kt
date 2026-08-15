@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.coverage.editor.TestoCoverageEditorHighlighter
 import com.github.xepozz.testo.coverage.format.LineTotals
 import com.intellij.coverage.BaseCoverageAnnotator
 import com.intellij.coverage.CoverageDataManager
@@ -52,6 +53,9 @@ class TestoCoverageAnnotator(project: Project) : RemappingCoverageAnnotator(proj
             indexedData = null
             index = Index(emptyMap(), emptyMap(), emptyMap())
         }
+        // The one hook that fires on closeSuitesBundle too (no CoverageSuiteListener event exists for a close), and the
+        // earliest coverage activity of a session — so it both installs the editor highlighter and clears it.
+        TestoCoverageEditorHighlighter.getInstance(project).install()
     }
 
     override fun getFileCoverageInformationString(
