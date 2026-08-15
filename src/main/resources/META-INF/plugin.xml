@@ -152,6 +152,11 @@
                     class="com.github.xepozz.testo.tests.actions.TestoRerunStyleMirrorAction"/>
             <action id="Testo.RerunStyle.Split"
                     class="com.github.xepozz.testo.tests.actions.TestoRerunStyleSplitAction"/>
+            <separator/>
+            <action id="Testo.RunHistory"
+                    class="com.github.xepozz.testo.runs.TestoRunHistoryAction"/>
+            <group id="Testo.RunRetention"
+                   class="com.github.xepozz.testo.runs.TestoRunRetentionGroup"/>
         </group>
         <action id="Testo.AddSkippedPath"
                 class="com.github.xepozz.testo.tests.actions.TestoAddSkippedPathAction"

@@ -1,6 +1,9 @@
 package com.github.xepozz.testo.tests.console
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.runs.TestoRunRecording
+import com.github.xepozz.testo.runs.TestoRunStore
+import com.intellij.execution.process.ProcessOutputType
 import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.execution.testframework.TestConsoleProperties
 import com.intellij.execution.testframework.sm.runner.GeneralTestEventsProcessor
@@ -41,11 +44,33 @@ class TestoOutputToGeneralEventsConverter(
     /** Hint by node id, for the channel store alone: it keys a description like the output it belongs to. */
     private val hintByNodeId = HashMap<String, String>()
 
+    private val testoProperties: com.github.xepozz.testo.tests.TestoConsoleProperties?
+        get() = consoleProperties as? com.github.xepozz.testo.tests.TestoConsoleProperties
+
     override fun process(text: String, outputType: Key<*>) {
         if (runnerVersion == null) runnerVersion = TestoProtocolGate.parseVersion(text)
         // Second route: a message behind a colour escape never reaches parseServiceMessage. The store dedups by path.
         TestoReportRef.fromServiceMessageLine(text)?.let { reportStore.note(it) }
+        recordChunk(text, outputType)
         super.process(text, outputType)
+    }
+
+    // The converter is the one place every output chunk flows through, from the very first byte (the console attaches
+    // before startNotify) — so the run archive records here rather than off a ProcessListener added later.
+    private fun recordChunk(text: String, outputType: Key<*>) {
+        val props = testoProperties ?: return
+        if (props.replayMode) return
+        val recording = props.recording ?: synchronized(props) {
+            props.recording ?: runCatching {
+                TestoRunStore.getInstance(props.project).beginRun(props.configuration.name, props.executor.id)
+            }.getOrNull()?.also { props.recording = it }
+        } ?: return
+        val stream = when {
+            ProcessOutputType.isStderr(outputType) -> TestoRunRecording.STDERR
+            ProcessOutputType.isStdout(outputType) -> TestoRunRecording.STDOUT
+            else -> TestoRunRecording.SYSTEM
+        }
+        runCatching { recording.appendChunk(stream, text) }
     }
 
     override fun processServiceMessage(message: ServiceMessage, visitor: ServiceMessageVisitor) {
@@ -76,6 +101,8 @@ class TestoOutputToGeneralEventsConverter(
                     if (location != null) {
                         store.rememberLocation(name, location)
                         if (nodeId != null) hintByNodeId[nodeId] = location
+                        // What the archive is looked up by: which tests this run holds ("Show history" asks that).
+                        testoProperties?.recording?.noteLocation(location)
                     }
                     val metainfo = attrs["metainfo"]
                     if (!metainfo.isNullOrBlank()) store.setDescription(descriptionKey(attrs), metainfo)

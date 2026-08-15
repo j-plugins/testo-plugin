@@ -1,36 +1,74 @@
 package com.github.xepozz.testo.coverage
 
+import com.github.xepozz.testo.coverage.format.CoverageFormat
+import com.github.xepozz.testo.tests.run.TestoRunnerSettings
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.nio.file.Path
 
 /**
- * Pure-logic tests for [TestoCoverageProgramRunner.createCoverageArguments] — the CLI-flag mapping that decides between
- * `--coverage-clover=<path>` and the bare `--coverage`. The override is protected, so the test extends the runner to
- * reach it (no platform state is needed to call the pure String? -> List<String> mapping). Also pins the public
- * runner/executor id constants referenced by plugin.xml.
+ * Pure-logic tests for the Coverage run's CLI-flag mapping: which formats the settings enable, the local path each one
+ * writes to, and the flag spelling. The methods are on the runner, so the test extends it (no platform state needed).
+ * Also pins the public runner/executor id constants referenced by plugin.xml.
  */
 class TestoCoverageArgumentsTest : TestoCoverageProgramRunner() {
 
+    private val base = "/tmp/report@cfg.xml"
+
     @Test
-    fun nonEmptyPathProducesCloverFlag() {
-        assertEquals(listOf("--coverage-clover=/tmp/report@cfg.xml"), createCoverageArguments("/tmp/report@cfg.xml"))
+    fun defaultsRequestCoberturaAndCoverageXmlButNotClover() {
+        val flags = coverageFlagLocalPaths(TestoRunnerSettings(), base)
+        assertEquals(
+            listOf(
+                CoverageFormat.COBERTURA to "/tmp/report@cfg-cobertura.xml",
+                CoverageFormat.COVERAGE_XML to "/tmp/report@cfg-coverage-xml",
+            ),
+            flags,
+        )
     }
 
     @Test
-    fun nullPathFallsBackToBareCoverage() {
-        assertEquals(listOf("--coverage"), createCoverageArguments(null))
+    fun everyFormatEnabledYieldsThreeFlags() {
+        val settings = TestoRunnerSettings(coverageClover = true)
+        val flags = coverageFlagLocalPaths(settings, base)
+        assertEquals(
+            listOf("--coverage-clover=/tmp/report@cfg-clover.xml"),
+            flags.filter { it.first == CoverageFormat.CLOVER }.map { coverageFlagFor(it.first, it.second) },
+        )
+        assertEquals(3, flags.size)
     }
 
     @Test
-    fun emptyPathFallsBackToBareCoverage() {
-        assertEquals(listOf("--coverage"), createCoverageArguments(""))
+    fun noBasePathMeansNoFlags() {
+        assertTrue(coverageFlagLocalPaths(TestoRunnerSettings(), null).isEmpty())
+        assertTrue(coverageFlagLocalPaths(TestoRunnerSettings(), "").isEmpty())
     }
 
     @Test
-    fun pathWithSpacesIsKeptVerbatimInSingleArgument() {
-        val args = createCoverageArguments("/path with space/r.xml")
-        assertEquals(1, args.size)
-        assertEquals("--coverage-clover=/path with space/r.xml", args[0])
+    fun everyFormatDisabledMeansNoFlags() {
+        val settings = TestoRunnerSettings(coverageCobertura = false, coverageXml = false)
+        assertTrue(coverageFlagLocalPaths(settings, base).isEmpty())
+    }
+
+    @Test
+    fun pathWithSpacesIsKeptVerbatimInSingleFlag() {
+        assertEquals(
+            "--coverage-cobertura=/path with space/r-cobertura.xml",
+            coverageFlagFor(CoverageFormat.COBERTURA, "/path with space/r-cobertura.xml"),
+        )
+    }
+
+    @Test
+    fun flagDataFilesPointAtIndexXmlForCoverageXml() {
+        val files = flagLocalDataFiles(
+            listOf(
+                CoverageFormat.COBERTURA to "/tmp/r-cobertura.xml",
+                CoverageFormat.COVERAGE_XML to "/tmp/r-coverage-xml",
+            )
+        )
+        assertEquals(Path.of("/tmp/r-cobertura.xml"), files[0])
+        assertEquals(Path.of("/tmp/r-coverage-xml/index.xml"), files[1])
     }
 
     @Test

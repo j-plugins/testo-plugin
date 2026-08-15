@@ -54,6 +54,14 @@ class TestoPerTestCoverageTest {
     }
 
     @Test
+    fun testsByFileGroupsDistinctTestsUnderNormalizedKeys() {
+        val byFile = data().testsByFile()
+        assertEquals(setOf(test), byFile[TestoCoverageKeys.normalize(interceptor)])
+        assertEquals(setOf(test), byFile[TestoCoverageKeys.normalize(multipleResult)])
+        assertTrue(TestoCoverageByTestData.of(null).testsByFile().isEmpty())
+    }
+
+    @Test
     fun filterSelectorHasLeadingBackslashOnce() {
         val mapper = TestoTestIdentityMapper.getInstance()
         assertEquals(

@@ -3,34 +3,33 @@ package com.github.xepozz.testo.ui
 import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.isTestoFile
+import com.github.xepozz.testo.runs.replayNewestRun
+import com.github.xepozz.testo.runs.replayNewestRunWithTest
 import com.github.xepozz.testo.tests.TestoTestRunLineMarkerProvider
+import com.github.xepozz.testo.tests.console.TestoHistoryIndex
 import com.intellij.codeInsight.codeVision.CodeVisionAnchorKind
 import com.intellij.codeInsight.codeVision.CodeVisionEntry
 import com.intellij.codeInsight.codeVision.CodeVisionRelativeOrdering
 import com.intellij.codeInsight.codeVision.ui.model.ClickableTextCodeVisionEntry
 import com.intellij.codeInsight.hints.InlayHintsUtils
 import com.intellij.codeInsight.hints.codeVision.CodeVisionProviderBase
-import com.intellij.execution.TestStateStorage
-import com.intellij.execution.testframework.sm.TestHistoryConfiguration
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
-import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.SmartPointerManager
 import com.intellij.psi.SyntaxTraverser
 import com.jetbrains.php.lang.psi.elements.Function
 import java.awt.event.MouseEvent
-import java.io.File
 
 /**
  * Code Vision lens shown next to every Testo test method/function in the PHP editor,
  * right where the green gutter run icons live.
  *
- * v1: the lens reads "Show history" and is shown only for tests that already have a stored
- * run result. Clicking it re-opens the latest Testo test-run history session in the Run
- * tool window. The pass/total (N/M) count is intentionally NOT computed yet — see [historyHint].
+ * The lens reads "Show history" and is shown only for tests the run archive
+ * ([com.github.xepozz.testo.runs.TestoRunStore]) holds; clicking it replays the newest archived run containing that
+ * test into a full Testo run tab. The pass/total (N/M) count is intentionally NOT computed yet — see [historyHint].
  */
 class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
 
@@ -54,19 +53,17 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
     override fun getHint(element: PsiElement, file: PsiFile): String? {
         val function = element as? Function ?: return null
         val url = TestoTestRunLineMarkerProvider.getLocationHint(function)
-        // Show the lens only when a saved run actually contains this test. (The last status survives in
-        // TestStateStorage even after the run XML is pruned, so storage alone would show a lens that opens nothing.)
-        if (!com.github.xepozz.testo.tests.console.TestoHistoryIndex.contains(file.project, url)) return null
+        // Show the lens only for a test some archived run can replay.
+        if (!TestoHistoryIndex.contains(file.project, url)) return null
         return historyHint(url)
     }
 
     /**
-     * The lens label for a test that has stored history.
+     * The lens label for a test that has an archived run.
      *
-     * v1 returns the plain "Show history" action label. This is the single hook to enable the
-     * N/M (passed/total) count later: read aggregated results for [url] (e.g. via
-     * [TestStateStorage] / the imported SMTRunner tree) and return something like
-     * "$passed/$total passed — Show history". Returning null hides the lens.
+     * v1 returns the plain "Show history" action label. This is the single hook to enable the N/M (passed/total)
+     * count later: the archive already carries each run's per-status tally, so this could read the newest run holding
+     * [url] and return something like "$passed/$total passed — Show history". Returning null hides the lens.
      */
     @Suppress("UNUSED_PARAMETER")
     private fun historyHint(url: String): String? = "Show history"
@@ -74,8 +71,8 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
     override fun handleClick(editor: Editor, element: PsiElement, event: MouseEvent?) {
         val function = element as? Function ?: return openLatestHistory(element.project)
         val url = TestoTestRunLineMarkerProvider.getLocationHint(function)
-        // Open the most recent run that actually contains this test (not just the globally latest) and select its node.
-        com.github.xepozz.testo.tests.console.openTestoHistoryForTest(element.project, url)
+        // The most recent run that actually holds this test, not merely the globally latest one.
+        replayNewestRunWithTest(element.project, url)
     }
 
     /**
@@ -104,7 +101,7 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
                     onClick,
                     TestoIcons.TESTO,
                     hint,
-                    "Open the latest test run history",
+                    "Replay the newest archived run containing this test",
                 )
             )
         }
@@ -112,30 +109,11 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
     }
 
     companion object {
-        /**
-         * Re-open the most recent Testo test-run history session in the Run tool window.
-         *
-         * Mirrors [com.intellij.execution.testframework.sm.runner.history.actions.ImportTestsGroup]:
-         * resolve every recorded history file under the project history root, keep the existing
-         * ones, and import the most recently modified XML. openTestoHistory recreates the run
-         * configuration from the XML and opens the SM test tree tab (on our own console properties).
-         */
-        fun openLatestHistory(project: Project) {
-            val historyRoot = TestStateStorage.getTestHistoryRoot(project)
-            val latest = TestHistoryConfiguration.getInstance(project).files
-                .map { File(historyRoot, it) }
-                .filter { it.exists() }
-                .maxByOrNull { it.lastModified() }
-                ?: return // No history yet — getHint already hid the lens, so this is just defensive.
-
-            val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(latest) ?: return
-            // Build the imported console on our own properties so its toolbar matches a live run (see openTestoHistory).
-            com.github.xepozz.testo.tests.console.openTestoHistory(project, virtualFile)
-        }
+        /** Re-open the most recent archived Testo run in the Run tool window. */
+        fun openLatestHistory(project: Project) = replayNewestRun(project)
     }
 }
 
-// Refresh note: this provider is DaemonBound, so lenses recompute with the daemon. To refresh
-// immediately after a run finishes (so the lens appears as soon as the first result is stored),
-// subscribe to SMTRunnerEventsListener.TEST_STATUS / run completion and call
-// DaemonCodeAnalyzer.getInstance(project).restart(). Skipped in v1 to keep the change small.
+// Refresh note: this provider is DaemonBound, so lenses recompute with the daemon — which a test run never triggers
+// (it touches no PHP source). TestoRunArchiver forces the pass through TestoHistoryIndex.refreshLens the moment a run
+// is archived, which is what makes a just-run test's lens appear without an IDE restart.

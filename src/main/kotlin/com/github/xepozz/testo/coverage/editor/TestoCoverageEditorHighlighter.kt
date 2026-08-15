@@ -52,6 +52,15 @@ class TestoCoverageEditorHighlighter(private val project: Project) : Disposable 
     private var shownIndex: Map<String, ClassData> = emptyMap()
     private val annotated = HashMap<Document, AnnotatedDocument>()
 
+    /** The user's "highlight in editor" switch (the Coverage view toolbar) — suite events keep firing, we just sit out. */
+    var highlightingEnabled: Boolean = true
+        private set
+
+    fun setHighlightingEnabled(value: Boolean) {
+        highlightingEnabled = value
+        refresh()
+    }
+
     private class AnnotatedDocument(val highlighters: MutableList<RangeHighlighter>, val listenerDisposable: Disposable)
 
     /** Idempotent; safe off the EDT. Registers the suite/editor listeners once and reconciles the current state. */
@@ -85,7 +94,7 @@ class TestoCoverageEditorHighlighter(private val project: Project) : Disposable 
         val bundle = CoverageDataManager.getInstance(project).activeSuites()
             .firstOrNull { it.coverageEngine is TestoCoverageEngine }
         val gen = ++generation
-        if (bundle == null) {
+        if (bundle == null || !highlightingEnabled) {
             clearAll()
             return
         }

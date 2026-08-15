@@ -17,6 +17,9 @@ interface TestoCoverageByTestData {
     fun linesOfTest(testId: TestId): Set<SourceRef>
     fun allTests(): Set<TestId>
 
+    /** Every covered file key → the distinct tests that touched it; the substrate of the view's "Tests" column. */
+    fun testsByFile(): Map<String, Set<TestId>>
+
     companion object {
         val EMPTY: TestoCoverageByTestData = MapCoverageByTestData(emptyMap(), emptyMap())
 
@@ -29,6 +32,10 @@ internal class MapCoverageByTestData(
     private val byLine: Map<SourceRef, Set<TestId>>,
     private val byTest: Map<TestId, Set<SourceRef>>,
 ) : TestoCoverageByTestData {
+
+    private val byFile: Map<String, Set<TestId>> = buildMap<String, MutableSet<TestId>> {
+        for ((ref, tests) in byLine) getOrPut(ref.fileKey) { LinkedHashSet() } += tests
+    }
 
     override fun testsCoveringLine(fileKey: String, line: Int): Set<TestId> =
         byLine[SourceRef(TestoCoverageKeys.normalize(fileKey), line)] ?: emptySet()
@@ -43,6 +50,8 @@ internal class MapCoverageByTestData(
     override fun linesOfTest(testId: TestId): Set<SourceRef> = byTest[testId] ?: emptySet()
 
     override fun allTests(): Set<TestId> = byTest.keys
+
+    override fun testsByFile(): Map<String, Set<TestId>> = byFile
 
     companion object {
         fun from(perTest: PerTestCoverage): MapCoverageByTestData {

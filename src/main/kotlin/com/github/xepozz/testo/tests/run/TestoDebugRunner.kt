@@ -79,6 +79,12 @@ class TestoDebugRunner : PhpTestDebugRunner<TestoRunConfiguration>(TestoRunConfi
             // The run path wires the channel tabs via TestoConsoleAugmenter (an ExecutionListener), but its
             // descriptor lookup misses the debug session, so install them directly here while we hold the console.
             TestoConsoleAugmenter.installChannels(project, console, properties, processHandler)
+            // Same reason for the run archive: the augmenter's processTerminated never finds this session.
+            processHandler.addProcessListener(object : com.intellij.execution.process.ProcessAdapter() {
+                override fun processTerminated(event: com.intellij.execution.process.ProcessEvent) {
+                    com.github.xepozz.testo.runs.TestoRunArchiver.finalizeRun(project, properties)
+                }
+            })
 
             val debugSession = XDebuggerManager.getInstance(project).startSession(env, object : XDebugProcessStarter() {
                 override fun start(session: XDebugSession): XDebugProcess {

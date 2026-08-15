@@ -259,6 +259,24 @@ class TestoReportStoreTest {
     }
 
     @Test
+    fun coverageChecksDefaultOnSurviveRerunsAndFallWithClear() {
+        val store = TestoReportStore()
+        assertTrue(store.isCoverageChecked("/tmp/clover.xml"))
+
+        store.setCoverageChecked("/tmp/clover.xml", false)
+        store.noteRunStarted(1_000)   // a rerun keeps the choice — it is about the report, not the run
+        assertFalse(store.isCoverageChecked("/tmp/clover.xml"))
+        assertTrue(store.isCoverageChecked("/tmp/cobertura.xml"))
+
+        store.setCoverageChecked("/tmp/clover.xml", true)
+        assertTrue(store.isCoverageChecked("/tmp/clover.xml"))
+
+        store.setCoverageChecked("/tmp/clover.xml", false)
+        store.clear()
+        assertTrue(store.isCoverageChecked("/tmp/clover.xml"))
+    }
+
+    @Test
     fun mappedPathIsTriedFirstThenTheRawOneThenTheProjectRelativeForm() {
         // The mapper's answer must not spell the project-relative form: on an OS whose separator matches the
         // announcement's, the two candidates would be one string and the dedup would fold them.

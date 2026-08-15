@@ -1,59 +1,56 @@
 package com.github.xepozz.testo.tests.console
 
+import com.github.xepozz.testo.runs.TestoRunStore
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.hints.codeVision.ModificationStampUtil
-import com.intellij.execution.TestStateStorage
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.project.Project
-import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Cached set of every test locationUrl present in the project's saved run-history XML files, so the "Show history" lens
- * can be shown only for tests that actually have saved history. A test's last status survives in [TestStateStorage]
- * long after its run XML is pruned from the 10-file history, so checking storage alone would show the lens for tests
- * whose history is gone.
+ * Cached set of every test location the project's archived runs hold, so the "Show history" lens is shown only for
+ * tests some archive can actually replay. The source is the run archive ([TestoRunStore]) — the platform's own history
+ * XMLs are not consulted: a lens click replays our archive, so the two would disagree the moment either side rotates.
  *
- * The index is rebuilt on a pooled thread whenever the history files' newest timestamp changes (i.e. after a new run is
- * saved), then triggers a daemon restart so the lenses recompute. [contains] never blocks: it returns the last good
- * answer while a rebuild is in flight.
+ * The index is rebuilt on a pooled thread and never blocks: [contains] answers from the last snapshot while a rebuild
+ * is in flight. It is invalidated by exactly one event — an archived run becoming complete
+ * ([com.github.xepozz.testo.runs.TestoRunArchiver], which also prunes) — so the lookup itself touches no filesystem.
  */
 internal object TestoHistoryIndex {
-    private val locationUrl = Regex("locationUrl=\"([^\"]*)\"")
-    private data class Snapshot(val stamp: Long, val urls: Set<String>)
+    private data class Snapshot(val generation: Long, val urls: Set<String>)
+
+    private val generation = AtomicLong()
     private val cache = ConcurrentHashMap<String, Snapshot>()
     private val building = ConcurrentHashMap.newKeySet<String>()
 
-    /** True if some saved run history contains [url] (an exact node locationUrl, or a dataset under that method). */
+    /** The archive changed: rebuild on the next lookup. */
+    fun invalidate() {
+        generation.incrementAndGet()
+    }
+
+    /** True if some archived run contains [url] (an exact test location, or a test declared under it). */
     fun contains(project: Project, url: String): Boolean {
         val key = project.locationHash
-        val files = historyFiles(project)
-        val stamp = files.maxOfOrNull { it.lastModified() } ?: 0L
-        val snap = cache[key]
-        if (snap == null || snap.stamp != stamp) scheduleRebuild(project, key, files, stamp)
-        val urls = (if (snap?.stamp == stamp) snap else cache[key])?.urls ?: return false
+        val current = generation.get()
+        val snapshot = cache[key]
+        if (snapshot == null || snapshot.generation != current) scheduleRebuild(project, key, current)
+        val urls = snapshot?.urls ?: cache[key]?.urls ?: return false
         return url in urls || urls.any { it.startsWith(url) }
     }
 
-    // List the history directory directly rather than TestHistoryConfiguration.files: a just-saved run's file lands on
-    // disk before it is registered there, and we want the lens to appear as soon as the run is written.
-    private fun historyFiles(project: Project): List<File> =
-        TestStateStorage.getTestHistoryRoot(project).listFiles { f -> f.isFile && f.name.endsWith(".xml") }?.toList()
-            ?: emptyList()
-
-    private fun scheduleRebuild(project: Project, key: String, files: List<File>, stamp: Long) {
+    private fun scheduleRebuild(project: Project, key: String, generation: Long) {
         if (!building.add(key)) return
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
+                if (project.isDisposed) return@executeOnPooledThread
+                val store = TestoRunStore.getInstance(project)
                 val urls = HashSet<String>()
-                files.forEach { f ->
-                    runCatching { locationUrl.findAll(f.readText()).forEach { urls.add(it.groupValues[1]) } }
-                }
-                // Only restart the daemon when the lenses would actually change. A rebuild also runs on the very first
-                // lookup and whenever a history file's timestamp moves without its contents mattering; restarting then
-                // interrupts an in-flight highlighting pass for nothing.
-                val previous = cache.put(key, Snapshot(stamp, urls))?.urls ?: emptySet()
+                store.listRuns().forEach { (dir, _) -> urls.addAll(store.readLocations(dir)) }
+                // Only restart the daemon when the lenses would actually change: a rebuild also runs on the very first
+                // lookup, and restarting then interrupts an in-flight highlighting pass for nothing.
+                val previous = cache.put(key, Snapshot(generation, urls))?.urls ?: emptySet()
                 if (previous != urls) refreshLens(project)
             } finally {
                 building.remove(key)

@@ -4,35 +4,56 @@ import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.coverage.format.detectCoverageFormat
 import com.intellij.coverage.CoverageDataManager
 import com.intellij.coverage.CoverageRunner
+import com.intellij.coverage.CoverageSuite
+import com.intellij.coverage.CoverageSuitesBundle
 import com.intellij.coverage.DefaultCoverageFileProvider
 import com.intellij.openapi.project.Project
 import java.nio.file.Files
 import java.nio.file.Path
 
+/** One already-written coverage report to load: how Testo announced it plus where it landed on this machine. */
+data class TestoCoverageReport(val name: String?, val format: CoverageFormat?, val dataFile: Path)
+
 /**
- * Loads an already-written Testo coverage report into the IDE with no process launch (architecture §10): build a suite
- * bound to the report through our engine, tell it the format, and hand it to the platform, which reads the file via
- * [TestoCoverageRunner.loadCoverageData], opens the Coverage tool window and applies [TestoCoverageAnnotator].
+ * Loads already-written Testo coverage reports into the IDE with no process launch (architecture §10): one suite per
+ * report, all in **one** [CoverageSuitesBundle] handed to [CoverageDataManager.chooseSuitesBundle] — the platform then
+ * reads each file via [TestoCoverageRunner.loadCoverageData], merges the `ProjectData`s, opens the Coverage tool window
+ * and applies [TestoCoverageAnnotator]. `chooseSuitesBundle` rather than `coverageGathered`: the bundle's composition
+ * is the user's checkbox choice, not something the replace/merge option dialog should renegotiate.
  *
- * The suite is **not** registered with [CoverageDataManager] (no `addCoverageSuite`/`addExternalCoverageSuite`): those
- * persist it into `workspace.xml`, and the platform's reload then crashes on Windows when the saved absolute report
+ * The suites are **not** registered with [CoverageDataManager] (no `addCoverageSuite`/`addExternalCoverageSuite`): those
+ * persist into `workspace.xml`, and the platform's reload then crashes on Windows when the saved absolute report
  * path no longer exists — `readDataFileProviderAttribute` falls back to `Path.of(systemPath, absolutePath)`, which
- * throws `InvalidPathException` on the second drive letter and breaks *all* coverage init. A gathered-but-unregistered
- * suite shows the same annotation, updates the per-test index, and never persists — the report is transient anyway.
+ * throws `InvalidPathException` on the second drive letter and breaks *all* coverage init. A chosen-but-unregistered
+ * bundle shows the same annotation, updates the per-test index, and never persists — the reports are transient anyway.
  *
- * Returns false when the coverage module is absent (the runner is registered only by `coverage.xml`); the format falls
- * back to sniffing when unknown. Call on the EDT — `coverageGathered` opens UI.
+ * Returns false when the coverage module is absent (the runner is registered only by `coverage.xml`) or no report was
+ * given; the format falls back to sniffing when unknown. Call on the EDT — `chooseSuitesBundle` opens UI.
  */
-fun applyTestoCoverage(project: Project, name: String?, format: CoverageFormat?, dataFile: Path): Boolean {
+fun applyTestoCoverage(project: Project, reports: List<TestoCoverageReport>): Boolean {
+    if (reports.isEmpty()) return false
     val runner = CoverageRunner.getInstance(TestoCoverageRunner::class.java) ?: return false
-    val manager = CoverageDataManager.getInstance(project)
-    val timestamp = runCatching { Files.getLastModifiedTime(dataFile).toMillis() }.getOrDefault(0L)
-    // The File ctor is the one present on both 252 and 262 — Path was added only on 262.
-    val provider = DefaultCoverageFileProvider(dataFile.toFile())
-    val suite = TestoCoverageEngine.INSTANCE
-        .createCoverageSuite(name ?: "Testo coverage", project, runner, provider, timestamp) as? TestoCoverageSuite
-        ?: return false
-    suite.format = format ?: detectCoverageFormat(dataFile) ?: CoverageFormat.CLOVER
-    manager.coverageGathered(suite)
+    val suites = reports.mapNotNull { report ->
+        val timestamp = runCatching { Files.getLastModifiedTime(report.dataFile).toMillis() }.getOrDefault(0L)
+        // The File ctor is the one present on both 252 and 262 — Path was added only on 262.
+        val provider = DefaultCoverageFileProvider(report.dataFile.toFile())
+        val suite = TestoCoverageEngine.INSTANCE
+            .createCoverageSuite(report.name ?: "Testo coverage", project, runner, provider, timestamp) as? TestoCoverageSuite
+            ?: return@mapNotNull null
+        suite.format = report.format ?: detectCoverageFormat(report.dataFile) ?: CoverageFormat.CLOVER
+        suite
+    }
+    if (suites.isEmpty()) return false
+    CoverageDataManager.getInstance(project).chooseSuitesBundle(CoverageSuitesBundle(suites.toTypedArray<CoverageSuite>()))
     return true
 }
+
+/** Closes the active Testo bundle, if any — the "no reports checked" state. */
+fun closeTestoCoverage(project: Project) {
+    val manager = CoverageDataManager.getInstance(project)
+    manager.activeSuites().filter { it.coverageEngine is TestoCoverageEngine }.forEach { manager.closeSuitesBundle(it) }
+}
+
+/** Whether a Testo coverage bundle is currently applied. */
+fun isTestoCoverageActive(project: Project): Boolean =
+    CoverageDataManager.getInstance(project).activeSuites().any { it.coverageEngine is TestoCoverageEngine }

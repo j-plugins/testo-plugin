@@ -122,6 +122,43 @@ class TestoRunTimingsTest {
     }
 
     @Test
+    fun marksAreReadBackAsRecorded() {
+        val timings = TestoRunTimings()
+        timings.noteStart(at = 5)
+        timings.noteTestStarted(at = 6)
+        timings.noteTestFinished("a", durationMs = 1, at = 7)
+        timings.noteFinish(at = 8)
+
+        assertEquals(TestoRunTimings.Marks(5, 6, 7, 8), timings.marks())
+    }
+
+    @Test
+    fun restoredMarksOutliveEverythingAReplayReports() {
+        val timings = TestoRunTimings()
+        timings.restore(TestoRunTimings.Marks(startedAt = 1_000, firstTestAt = 1_400, lastTestAt = 2_100, finishedAt = 2_600))
+        // A replay re-reports the whole run with today's clock, and the results form announces a fresh session.
+        timings.noteStart(at = 9_000)
+        timings.noteTestStarted(at = 9_100)
+        timings.noteTestFinished("a", durationMs = 300, at = 9_200)
+        timings.noteFinish(at = 9_300)
+        timings.clear()
+
+        val spans = timings.snapshot(now = 50_000)
+        assertTrue(spans.finished)
+        assertEquals(1_600, spans.totalMs)
+        assertEquals(400, spans.startupMs)
+        assertEquals(700, spans.testsMs)
+        // The duration is the test's own figure, so it still counts — it is no reading of the replay's clock.
+        assertEquals(300, spans.summedTestsMs)
+    }
+
+    @Test
+    fun anArchiveWithoutMarksIsRecognizedAsEmpty() {
+        assertTrue(TestoRunTimings.Marks().isEmpty)
+        assertFalse(TestoRunTimings.Marks(startedAt = 1).isEmpty)
+    }
+
+    @Test
     fun clearForgetsTheWholeRun() {
         val timings = TestoRunTimings()
         timings.noteStart(at = 0)

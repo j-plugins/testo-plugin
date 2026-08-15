@@ -28,6 +28,17 @@ class TestoRunnerSettings(
 
     @Attribute("testo_type")
     var testoType: String = "",
+
+    // Which coverage reports a Coverage run requests via CLI flags. Clover is off by default: cobertura carries
+    // everything clover does plus branch data. coverage-xml adds the per-test overlay.
+    @Attribute("coverage_clover")
+    var coverageClover: Boolean = false,
+
+    @Attribute("coverage_cobertura")
+    var coverageCobertura: Boolean = true,
+
+    @Attribute("coverage_xml")
+    var coverageXml: Boolean = true,
 ) : PhpTestRunnerSettings() {
     /** Group names to run, one `--group` flag each. A name is opaque: whatever the `#[Group]` attribute spells. */
     @get:XCollection(propertyElementName = "groups", style = XCollection.Style.v2)
@@ -107,6 +118,9 @@ class TestoRunnerSettings(
                 runnerSettings.repeat = settings.repeat
                 runnerSettings.parallel = settings.parallel
                 runnerSettings.testoType = settings.testoType
+                runnerSettings.coverageClover = settings.coverageClover
+                runnerSettings.coverageCobertura = settings.coverageCobertura
+                runnerSettings.coverageXml = settings.coverageXml
                 runnerSettings.migrateLegacyNames()
             }
 

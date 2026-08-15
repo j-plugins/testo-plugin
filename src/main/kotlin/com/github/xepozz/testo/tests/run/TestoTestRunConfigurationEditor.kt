@@ -4,6 +4,7 @@ import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.SimpleListCellRenderer
+import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.RightGap
@@ -35,6 +36,16 @@ class TestoTestRunConfigurationEditor(
                 else -> engine?.name ?: ""
             }
         }
+    }
+    private val coverageCloverBox = JBCheckBox("Clover")
+    private val coverageCoberturaBox = JBCheckBox("Cobertura")
+    private val coverageXmlBox = JBCheckBox("coverage-xml")
+
+    // Held disabled until Testo grows a level flag (cobertura already raises the level to Branch on its own).
+    private val coverageLevelField = ComboBox(arrayOf("Line", "Branch", "Path")).apply {
+        selectedItem = "Line"
+        isEnabled = false
+        toolTipText = "Coverage level selection is not supported by Testo yet"
     }
 
     private val myMainPanel = panel {
@@ -104,6 +115,24 @@ class TestoTestRunConfigurationEditor(
             }
                 .layout(RowLayout.PARENT_GRID)
                 .rowComment("Engine used to collect code coverage")
+
+            row {
+                label("Coverage reports")
+                    .gap(RightGap.COLUMNS)
+                cell(coverageCloverBox)
+                cell(coverageCoberturaBox)
+                cell(coverageXmlBox)
+            }
+                .layout(RowLayout.PARENT_GRID)
+                .rowComment("Reports a Coverage run requests: --coverage-clover / --coverage-cobertura / --coverage-xml; all are applied together")
+
+            row {
+                label("Coverage level")
+                    .gap(RightGap.COLUMNS)
+                cell(coverageLevelField)
+            }
+                .layout(RowLayout.PARENT_GRID)
+                .rowComment("Not supported by Testo yet; Cobertura raises the level to Branch on its own")
         }
     }
 
@@ -120,6 +149,9 @@ class TestoTestRunConfigurationEditor(
         repeatField.addChangeListener { listener() }
         parallelField.addChangeListener { listener() }
         coverageEngineField.addActionListener { listener() }
+        coverageCloverBox.addActionListener { listener() }
+        coverageCoberturaBox.addActionListener { listener() }
+        coverageXmlBox.addActionListener { listener() }
     }
 
     override fun createEditor(): JComponent = myMainPanel
@@ -133,6 +165,9 @@ class TestoTestRunConfigurationEditor(
                 || (repeatField.value as Int) != runner.repeat
                 || (parallelField.value as Int) != runner.parallel
                 || coverageEngineField.selectedItem != runner.coverageEngine
+                || coverageCloverBox.isSelected != runner.coverageClover
+                || coverageCoberturaBox.isSelected != runner.coverageCobertura
+                || coverageXmlBox.isSelected != runner.coverageXml
                 || parentEditor.isSpecificallyModified
     }
 
@@ -145,6 +180,9 @@ class TestoTestRunConfigurationEditor(
         repeatField.value = runnerSettings.repeat
         parallelField.value = runnerSettings.parallel
         coverageEngineField.selectedItem = runnerSettings.coverageEngine
+        coverageCloverBox.isSelected = runnerSettings.coverageClover
+        coverageCoberturaBox.isSelected = runnerSettings.coverageCobertura
+        coverageXmlBox.isSelected = runnerSettings.coverageXml
 
         parentEditor.javaClass.declaredMethods.find { it.name == "resetEditorFrom" && it.parameterCount == 1 }?.let {
             it.isAccessible = true
@@ -175,6 +213,9 @@ class TestoTestRunConfigurationEditor(
         runnerSettings.repeat = repeatField.value as? Int ?: 0
         runnerSettings.parallel = parallelField.value as? Int ?: 0
         runnerSettings.coverageEngine = coverageEngineField.selectedItem as? CoverageEngine ?: CoverageEngine.XDEBUG
+        runnerSettings.coverageClover = coverageCloverBox.isSelected
+        runnerSettings.coverageCobertura = coverageCoberturaBox.isSelected
+        runnerSettings.coverageXml = coverageXmlBox.isSelected
     }
 
     companion object {

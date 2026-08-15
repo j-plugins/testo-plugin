@@ -4,10 +4,24 @@
 
 ## [Unreleased]
 
+### Added
+
+- The run configuration chooses which coverage reports a Coverage run asks Testo for: Clover, Cobertura, coverage-xml.
+- A Coverage run applies everything it produced on its own, one report per format, without a click.
+- The Coverage button on the test toolbar gathers every announced report under one click, with a checkbox per report.
+- The Coverage panel gained expand/collapse, a switch for the editor highlighting, badges naming the report formats
+  behind the shown coverage, and a column counting the tests that cover each file.
+- Every run is archived — its output, its reports and the parameters it ran with — and replays from the *Test History*
+  button as a full Testo console: channels, statuses, report buttons and that run's own coverage.
+- *Show history* above a test replays the newest archived run containing that test and selects its node.
+- How many archived runs to keep is set in *Tools | Testo*; the history list clears itself from its own menu.
+- *Expand All* / *Collapse All* now sit on the toolbar itself rather than inside its overflow menu.
+
 ### Fixed
 
 - The channel console no longer throws an EDT-threading error while streaming live output into an aggregate tab.
 - The report buttons no longer trigger a "slow operations on EDT" error: report paths now resolve off the UI thread.
+- The elapsed time in the run summary no longer counts up forever when a run ends before the toolbar is wired.
 
 ## [2026.5.262] - 2026-08-12
 

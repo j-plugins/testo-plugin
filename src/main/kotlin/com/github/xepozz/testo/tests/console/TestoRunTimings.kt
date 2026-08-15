@@ -33,6 +33,16 @@ class TestoRunTimings {
             get() = if (testsMs > 0 && summedTestsMs > 0) summedTestsMs.toDouble() / testsMs else null
     }
 
+    /** The four marks of a run, as the archive stores them. `0` is "never happened". */
+    data class Marks(
+        val startedAt: Long = 0,
+        val firstTestAt: Long = 0,
+        val lastTestAt: Long = 0,
+        val finishedAt: Long = 0,
+    ) {
+        val isEmpty: Boolean get() = startedAt == 0L
+    }
+
     private val lock = Any()
     private val durationByKey = HashMap<String, Long>()
 
@@ -42,15 +52,19 @@ class TestoRunTimings {
     private var lastTestAt: Long? = null
     private var finishedAt: Long? = null
 
+    /** Set by [restore]: the marks belong to a run that already happened, so nothing may move them. */
+    private var frozen = false
+
     fun noteStart(at: Long = System.currentTimeMillis()) {
         synchronized(lock) {
+            if (frozen) return
             startedAt = at
             finishedAt = null
         }
     }
 
     fun noteTestStarted(at: Long = System.currentTimeMillis()) {
-        synchronized(lock) { if (firstTestAt == null) firstTestAt = at }
+        synchronized(lock) { if (!frozen && firstTestAt == null) firstTestAt = at }
     }
 
     /**
@@ -59,14 +73,37 @@ class TestoRunTimings {
      */
     fun noteTestFinished(key: String, durationMs: Long?, at: Long = System.currentTimeMillis()) {
         synchronized(lock) {
-            lastTestAt = at
+            // The duration is the test's own reported figure, not a wall-clock reading, so it is right even on a
+            // replay — only the mark is refused there.
+            if (!frozen) lastTestAt = at
             durationMs?.let { durationByKey[key] = it }
         }
     }
 
     /** The end of the run. The first caller wins: testing finishing and the process exiting are the same moment. */
     fun noteFinish(at: Long = System.currentTimeMillis()) {
-        synchronized(lock) { if (finishedAt == null) finishedAt = at }
+        synchronized(lock) { if (!frozen && finishedAt == null) finishedAt = at }
+    }
+
+    fun marks(): Marks = synchronized(lock) {
+        Marks(startedAt ?: 0, firstTestAt ?: 0, lastTestAt ?: 0, finishedAt ?: 0)
+    }
+
+    /**
+     * Pin the clock to an archived run's marks and stop accepting new ones.
+     *
+     * A replay re-reports the whole run through the same converter, so every mark would otherwise be restamped with
+     * today's clock — the toolbar would show how long the *replay* took, and (since the replay can finish before the
+     * toolbar is even wired) often show it counting forever.
+     */
+    fun restore(marks: Marks) {
+        synchronized(lock) {
+            frozen = true
+            startedAt = marks.startedAt.takeIf { it > 0 }
+            firstTestAt = marks.firstTestAt.takeIf { it > 0 }
+            lastTestAt = marks.lastTestAt.takeIf { it > 0 }
+            finishedAt = marks.finishedAt.takeIf { it > 0 }
+        }
     }
 
     fun isFinished(): Boolean = synchronized(lock) { finishedAt != null }
@@ -90,6 +127,8 @@ class TestoRunTimings {
 
     fun clear() {
         synchronized(lock) {
+            // A frozen clock shows a run that is over; the results form announcing a fresh session must not wipe it.
+            if (frozen) return
             durationByKey.clear()
             startedAt = null
             firstTestAt = null

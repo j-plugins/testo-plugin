@@ -52,12 +52,38 @@ class TestoConsoleProperties(
 
     val progressAction = TestoProgressAction()
 
+    // The run being archived (runs.TestoRunStore) — created lazily by the converter on the first output chunk,
+    // finalized by TestoRunArchiver on process termination. Null on replays and before any output.
+    @Volatile
+    var recording: com.github.xepozz.testo.runs.TestoRunRecording? = null
+
+    /** True on a replayed archive: the converter must not re-record the stream, the archiver must not re-archive it. */
+    var replayMode = false
+
+    // The process command line, as the console header shows it. Captured when the channel tabs are installed (the one
+    // place holding the ProcessHandler) and archived, so a replay can reprint the header of the run it replays.
+    @Volatile
+    var commandLine: String? = null
+
+    // A replay's console answers this profile as its "configuration". The platform's addToHistory saves a run into its
+    // own history only for a real RunConfiguration — the throwaway configuration a replay is built on must stay hidden,
+    // or every replay would spawn a new platform-history entry (and re-write per-test states).
+    var replayProfile: com.intellij.execution.configurations.RunProfile? = null
+
+    /** Replay's report resolution: announced path → this run's captured copy. Null on live runs. */
+    var reportPathOverride: ((String) -> String?)? = null
+
     // getLocalPath, not getLocalFile: the report was written moments ago and the VFS may not know the file yet.
-    val reportsAction = TestoReportsAction(reportStore, project) { pathMapper.getLocalPath(it) }
+    val reportsAction = TestoReportsAction(reportStore, project) { path ->
+        reportPathOverride?.invoke(path) ?: pathMapper.getLocalPath(path)
+    }
 
     // Guards the channel-tab install: set once whoever wires the tabs first (the run-path ExecutionListener or the
     // debug runner, which installs them directly), so the other side is a no-op instead of a double install.
     var channelsInstalled = false
+
+    override fun getConfiguration(): com.intellij.execution.configurations.RunProfile =
+        replayProfile ?: super.getConfiguration()
 
     override fun createTestEventsConverter(
         testFrameworkName: String,
@@ -103,7 +129,13 @@ class TestoConsoleProperties(
     public override fun createImportActions(): Array<com.intellij.openapi.actionSystem.AnAction> =
         arrayOf(
             com.github.xepozz.testo.tests.console.TestoLogLevelFilterAction(levelFilter),
-            *(super.createImportActions() ?: emptyArray()),
+            // The platform keeps its own expand/collapse in the toolbar's overflow group; on a test tree they are used
+            // constantly, so ours sit on the visible row.
+            com.github.xepozz.testo.tests.console.TestoTreeExpandAction(),
+            com.github.xepozz.testo.tests.console.TestoTreeCollapseAction(),
+            // Deliberately not super's: that array is where the platform's own "Test History" comes from, and its
+            // entries open a saved XML through the import machinery — a console that is none of ours.
+            com.github.xepozz.testo.runs.TestoRunHistoryGroup(project),
             // Right-aligned actions are laid out from the right edge inwards: listed first = furthest right.
             reportsAction,
             progressAction,

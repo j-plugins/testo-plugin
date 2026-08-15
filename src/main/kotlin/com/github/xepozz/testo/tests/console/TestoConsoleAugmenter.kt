@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.tests.console
 
+import com.github.xepozz.testo.runs.TestoRunArchiver
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.intellij.execution.ExecutionListener
 import com.intellij.execution.ExecutorRegistry
@@ -11,7 +12,6 @@ import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.execution.ui.RunContentManager
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
-import com.intellij.util.concurrency.EdtScheduledExecutorService
 import com.intellij.util.text.DateFormatUtil
 
 // The console is built by the PHP test framework, so processStarted is the first point we can reach it.
@@ -21,17 +21,13 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             val descriptor = findDescriptor(executorId, handler) ?: return@invokeLater
             val console = descriptor.executionConsole as? SMTRunnerConsoleView ?: return@invokeLater
             val props = console.properties
-            val importProfile = env.runProfile as? TestoImportRunProfile
             when {
-                // Live run: build the channel UI and start stamping per-test channel output onto proxy metainfo.
+                // Live run — and a replayed archive, which runs on the same properties, so it gets the same UI.
                 props is TestoConsoleProperties -> installChannels(project, console, props, handler)
-                // Our "Show history" lens import: detected by our own run profile (no dependency on the internal
-                // ImportedTestConsoleProperties), carrying the clicked test's url so its node gets pre-selected.
-                importProfile != null -> TestoChannelHistory.installForImport(project, console, importProfile.targetUrl)
                 // Platform "Import Test Results" (the history clock dropdown) of a Testo run: an imported console with no
                 // Testo run profile. Recognized by class name so we keep no compile-time tie to the internal
-                // ImportedTestConsoleProperties; rebuild channels from metainfo just the same (no clicked test to select).
-                isImportedConsole(props) -> TestoChannelHistory.installForImport(project, console, null)
+                // ImportedTestConsoleProperties; rebuild channels from the metainfo the run stored on each proxy.
+                isImportedConsole(props) -> TestoChannelHistory.installForImport(project, console)
             }
         }
     }
@@ -40,13 +36,10 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
         ApplicationManager.getApplication().invokeLater {
             val descriptor = findDescriptor(executorId, handler) ?: return@invokeLater
             val console = descriptor.executionConsole as? SMTRunnerConsoleView ?: return@invokeLater
-            if (console.properties !is TestoConsoleProperties) return@invokeLater
-            // The run's history XML is written on a background task after the process ends, so nudge the lens a couple
-            // of times across the save window. Once the index sees the new file it re-invalidates the lens itself; the
-            // first nudge that lands after the save is what makes the just-run test's lens appear (no IDE restart).
-            val refresh = Runnable { TestoHistoryIndex.refreshLens(project) }
-            EdtScheduledExecutorService.getInstance().schedule(refresh, 1500, java.util.concurrent.TimeUnit.MILLISECONDS)
-            EdtScheduledExecutorService.getInstance().schedule(refresh, 4000, java.util.concurrent.TimeUnit.MILLISECONDS)
+            val props = console.properties as? TestoConsoleProperties ?: return@invokeLater
+            // Close the run archive: reports are on disk by process exit, and the archiver is idempotent across the
+            // debug runner's own hook. It refreshes the "Show history" lens itself, once the archive is complete.
+            TestoRunArchiver.finalizeRun(project, props)
         }
     }
 
@@ -124,13 +117,17 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
         // so the channel UI renders this as the first line of the "All" tab instead.
         private fun captureHeader(props: TestoConsoleProperties, handler: ProcessHandler) {
             val commandLine = (handler as? OSProcessHandler)?.commandLine ?: return
+            props.commandLine = commandLine
+            props.channelStore.setHeader(runHeader(commandLine, System.currentTimeMillis()))
+        }
+
+        /** The first lines of the "All" tab. Shared with a replay, which reprints the archived run's own header. */
+        fun runHeader(commandLine: String, at: Long): List<ChannelOutputStore.Chunk> {
             // DateFormatUtil emits a narrow no-break space (U+202F) before AM/PM on modern JDKs, which renders as a
             // tofu box in the channel editor; normalize it (and NBSP) to a plain space.
-            val startedAt = DateFormatUtil.formatTimeWithSeconds(System.currentTimeMillis())
+            val startedAt = DateFormatUtil.formatTimeWithSeconds(at)
                 .replace(' ', ' ').replace(' ', ' ')
-            props.channelStore.setHeader(
-                listOf(ChannelOutputStore.Chunk("$commandLine\nTesting started at $startedAt\n\n", null))
-            )
+            return listOf(ChannelOutputStore.Chunk("$commandLine\nTesting started at $startedAt\n\n", null))
         }
     }
 }

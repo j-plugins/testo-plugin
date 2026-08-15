@@ -30,9 +30,10 @@ internal fun ExecutionEnvironment.testoRunProfile(): RunProfile? =
     when (val profile = runProfile) {
         is TestoRunConfiguration -> profile
         is WrappingRunConfiguration<*> -> profile.peer as? TestoRunConfiguration
-        // An imported Testo history tab — recognize it so the rerun split button shows there too. Its rerun runs the
-        // original reconstructed configuration.
-        is com.github.xepozz.testo.tests.console.TestoImportRunProfile -> profile.testoConfiguration as? TestoRunConfiguration
+        // A replayed archive: rerun runs the configuration the archived run was started with, restored from its
+        // manifest. (An archive that predates that recording restores a bare template — it reruns nothing useful,
+        // but nothing destructive either.)
+        is com.github.xepozz.testo.runs.TestoRunReplayProfile -> profile.testoConfiguration
         else -> null
     }
 

@@ -57,44 +57,56 @@ internal object TestoChannelHistory {
     }
 
     /**
-     * Wire an imported-history console: once the replayed tree is fully built, decode every proxy's metainfo into the
-     * store and install the channel UI. Called when the augmenter sees a `TestoImportRunProfile` run tab.
-     *
-     * We poll instead of subscribing to `SMTRunnerEventsListener`: the augmenter only hands us the console after
-     * `processStarted`, by which point a small import may have already replayed and fired (and missed) its events,
-     * leaving the channels empty even though the tree shows. Polling for a stable node count is immune to that race and
-     * never double-decodes (a single pass over the finished tree).
+     * Wire a console built by the platform's own "Import Test Results": once its tree is built, decode every proxy's
+     * metainfo into a fresh store and install the channel UI. Our own history goes through the run archive instead
+     * (`com.github.xepozz.testo.runs`), which replays the real stream and needs none of this.
      */
-    fun installForImport(project: Project, console: SMTRunnerConsoleView, targetUrl: String?) {
+    fun installForImport(project: Project, console: SMTRunnerConsoleView) {
         // The platform builds the imported console, so there is no shared delegate state. Rebuild the channels from the
         // metainfo the run stored into each proxy, into a fresh store + level filter.
         val store = ChannelOutputStore()
         val levelFilter = LogLevelFilter()
+        whenTreeStable(console) { root ->
+            root?.let { forEachDescendant(it) { proxy -> decode(store, levelFilter, proxy) } }
+            // Pass the root so install() renders the whole imported tree's aggregate immediately, independent of the
+            // async JTree selection (which is often still null at this instant).
+            TestoChannelsUi.install(console, store, levelFilter, project, console, root)
+        }
+    }
+
+    /**
+     * Select the node of [url] once the tree has finished building — for a replayed archive, where the tree is still
+     * filling while the recorded output streams in.
+     */
+    fun selectWhenReady(console: SMTRunnerConsoleView, url: String) {
+        whenTreeStable(console) { root -> root?.let { select(console, it, url) } }
+    }
+
+    /**
+     * Run [action] with the results tree once it has stopped growing (stable and non-empty), or after ~10s with
+     * whatever is there. We poll rather than subscribe to `SMTRunnerEventsListener`: a short run can finish replaying
+     * before we are handed the console, and its events are then already fired and missed.
+     */
+    private fun whenTreeStable(console: SMTRunnerConsoleView, action: (SMTestProxy?) -> Unit) {
         val alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, console)
         var lastCount = -1
         fun poll(attempt: Int) {
             val root = (console.resultsViewer as? SMTestRunnerResultsForm)?.testsRootNode
             val count = root?.let { countDescendants(it) } ?: 0
-            // Install once the tree has stopped growing (stable, non-empty), or give up after ~10s and show what we have.
             if ((count > 0 && count == lastCount) || attempt >= 200) {
-                root?.let { forEachDescendant(it) { proxy -> decode(store, levelFilter, proxy) } }
-                // Pass the root so install() renders the whole imported tree's aggregate immediately, independent of the
-                // async JTree selection (which is often still null at this instant).
-                TestoChannelsUi.install(console, store, levelFilter, project, console, root)
-                // If "Show history" was clicked on a specific test, select its node so the user lands on that test.
-                if (targetUrl != null && root != null) {
-                    val match = findByLocationUrl(root, targetUrl)
-                    val form = console.resultsViewer as? SMTestRunnerResultsForm
-                    if (match != null && form != null) {
-                        ApplicationManager.getApplication().invokeLater { form.selectAndNotify(match) }
-                    }
-                }
+                action(root)
                 return
             }
             lastCount = count
             alarm.addRequest({ poll(attempt + 1) }, 50)
         }
         alarm.addRequest({ poll(0) }, 0)
+    }
+
+    private fun select(console: SMTRunnerConsoleView, root: SMTestProxy, url: String) {
+        val form = console.resultsViewer as? SMTestRunnerResultsForm ?: return
+        val match = findByLocationUrl(root, url) ?: return
+        ApplicationManager.getApplication().invokeLater { form.selectAndNotify(match) }
     }
 
     private fun countDescendants(node: SMTestProxy): Int {

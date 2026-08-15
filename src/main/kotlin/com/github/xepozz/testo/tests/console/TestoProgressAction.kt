@@ -159,8 +159,12 @@ class TestoProgressAction : AnAction(), CustomComponentAction, RightAlignedToolb
                 reports.noteRunFinished()
             }
         })
-        // A run short enough to be over before this wiring lands gets no processTerminated at all.
-        if (handler?.isProcessTerminated == true) reports.noteRunFinished()
+        // A run short enough to be over before this wiring lands gets no processTerminated at all — and then nothing
+        // else would ever stop the clock, which counts up for as long as the tab is open.
+        if (handler?.isProcessTerminated == true) {
+            reports.noteRunFinished()
+            clock.noteFinish()
+        }
     }
 
     /**

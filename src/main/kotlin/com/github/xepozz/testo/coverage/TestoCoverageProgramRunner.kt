@@ -1,10 +1,14 @@
 package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.coverage.format.CoverageFormat
+import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
-import com.intellij.coverage.CoverageHelper
+import com.github.xepozz.testo.tests.run.TestoRunnerSettings
 import com.intellij.coverage.CoverageRunnerData
 import com.intellij.execution.ExecutionException
+import com.intellij.execution.process.ProcessAdapter
+import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.configurations.ConfigurationInfoProvider
 import com.intellij.execution.configurations.RunProfile
 import com.intellij.execution.configurations.RunProfileState
@@ -54,37 +58,60 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
         val interpreter = runConfiguration.interpreter
             ?: throw ExecutionException(PhpCommandSettingsBuilder.getInterpreterNotFoundError())
 
+        // Kept for its IDE-managed base path alone — loading no longer goes through CoverageHelper.
         val coverageConfiguration = CoverageEnabledConfiguration.getOrCreate(runConfiguration)
         val localCoverage = coverageConfiguration.coverageFilePath
-        val targetCoverage = localCoverage?.takeIf { it.isNotEmpty() }?.let { toTargetPath(runConfiguration, interpreter, it) }
+        val settings = runConfiguration.testoSettings.getTestoRunnerSettings()
+        val flags = coverageFlagLocalPaths(settings, localCoverage)
+        val coverageArguments = when {
+            // No base path (runner missing) or every report unchecked: a bare --coverage still makes any
+            // testo.php-configured writer collect, and the announce path picks the reports up.
+            flags.isEmpty() -> listOf("--coverage")
+            else -> flags.map { (format, local) ->
+                coverageFlagFor(format, toTargetPath(runConfiguration, interpreter, local))
+            }
+        }
 
         val command = createTestoCoverageCommand(
             runConfiguration,
             interpreter,
-            createCoverageArguments(targetCoverage),
+            coverageArguments,
             localCoverage,
-            targetCoverage,
+            localCoverage?.takeIf { it.isNotEmpty() }?.let { toTargetPath(runConfiguration, interpreter, it) },
         )
         runConfiguration.checkConfiguration()
 
         val profileState = runConfiguration.getState(env, command, null) ?: return null
         val executionResult = profileState.execute(env.executor, this) ?: return null
 
-        CoverageHelper.attachToProcess(runConfiguration, executionResult.processHandler, env.runnerSettings)
+        // The platform's CoverageHelper loads exactly one file; a Testo run can produce several reports (flags plus
+        // testo.php writers), so termination triggers our own merged apply instead.
+        val flagDataFiles = flagLocalDataFiles(flags)
+        executionResult.processHandler.addProcessListener(object : ProcessAdapter() {
+            override fun processTerminated(event: ProcessEvent) {
+                val props = (executionResult.executionConsole as? SMTRunnerConsoleView)?.properties
+                    as? TestoConsoleProperties ?: return
+                autoApplyCoverage(runConfiguration.project, props, flagDataFiles)
+            }
+        })
         return RunContentBuilder(executionResult, env).showRunContent(env.contentToReuse)
     }
 
-    // Kept as clover by default; the format→flag map covers the other writers for the "Show coverage" path (arch §5).
-    fun createCoverageArguments(targetCoverage: String?): List<String> =
-        coverageArgumentsFor(CoverageFormat.CLOVER, targetCoverage)
-
-    fun coverageArgumentsFor(format: CoverageFormat, targetCoverage: String?): List<String> {
-        if (targetCoverage.isNullOrEmpty()) return listOf("--coverage")
-        return when (format) {
-            CoverageFormat.CLOVER -> listOf("--coverage-clover=$targetCoverage")
-            CoverageFormat.COBERTURA -> listOf("--coverage-cobertura=$targetCoverage")
-            CoverageFormat.COVERAGE_XML -> listOf("--coverage-xml=$targetCoverage")
+    /** The enabled formats with the local file/directory each one writes, derived from the IDE-managed base path. */
+    fun coverageFlagLocalPaths(settings: TestoRunnerSettings, localCoverage: String?): List<Pair<CoverageFormat, String>> {
+        if (localCoverage.isNullOrEmpty()) return emptyList()
+        val stem = localCoverage.removeSuffix(".xml")
+        return buildList {
+            if (settings.coverageClover) add(CoverageFormat.CLOVER to "$stem-clover.xml")
+            if (settings.coverageCobertura) add(CoverageFormat.COBERTURA to "$stem-cobertura.xml")
+            if (settings.coverageXml) add(CoverageFormat.COVERAGE_XML to "$stem-coverage-xml")
         }
+    }
+
+    fun coverageFlagFor(format: CoverageFormat, targetCoverage: String): String = when (format) {
+        CoverageFormat.CLOVER -> "--coverage-clover=$targetCoverage"
+        CoverageFormat.COBERTURA -> "--coverage-cobertura=$targetCoverage"
+        CoverageFormat.COVERAGE_XML -> "--coverage-xml=$targetCoverage"
     }
 
     fun createTestoCoverageCommand(

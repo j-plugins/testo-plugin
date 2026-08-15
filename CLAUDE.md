@@ -141,9 +141,8 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoLogLevelFilterAction.kt     # toolbar dropdown for the filter
 │   │   ├── TestoChannelsUi.kt      # the tabbed channel view (~1150 lines) + testoDisplayName()
 │   │   ├── TestoConsoleAugmenter.kt         # ExecutionListener that installs the channel tabs
-│   │   ├── TestoChannelHistory.kt  # channel output ⇄ SMTestProxy.metainfo (survives history export)
-│   │   ├── TestoHistoryImport.kt   # "Show history": import a saved run onto our own console properties
-│   │   ├── TestoHistoryIndex.kt    # which locationUrls exist in saved history XMLs (+ lens refresh)
+│   │   ├── TestoChannelHistory.kt  # channel output ⇄ SMTestProxy.metainfo (platform import) + tree-ready polling
+│   │   ├── TestoHistoryIndex.kt    # which test locations the run archive holds (+ lens refresh)
 │   │   ├── TestoTestStatus.kt      # the 8 cases of Testo\Core\Value\Status: wire name, icon, label
 │   │   ├── TestoStatusStore.kt     # per-test status/assertions + the tally the toolbar summary renders
 │   │   ├── TestoRunTimings.kt      # start/first test/last test/finish marks + summed test durations
@@ -154,6 +153,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoReportStore.kt     # reports announced by `##teamcity[testoReport …]` + where to look for them
 │   │   ├── TestoReportAutoOpen.kt  # when a report opens on its own: this-run arm / project / application scopes
 │   │   ├── TestoReportAction.kt    # right-aligned panel of hand-drawn report buttons (WebView / browser / copy)
+│   │   ├── TestoTreeToolbarActions.kt       # expand/collapse for the test tree and the Coverage view alike
 │   │   ├── TestoTestTreeDecorator.kt        # wraps the tree's cell renderer: status icons + description tooltips
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
@@ -179,6 +179,15 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │
 │   └── runAnything/
 │       └── TestoRunAnythingProvider.kt      # "testo <command>" in Run Anything
+│
+├── runs/                           # the run archive: every run replayable, reports kept beside it
+│   ├── TestoRunStore.kt            # project service: archive root, listing, reading, retention
+│   ├── TestoRunRecording.kt        # one live run being written (output.log framing, tests.txt, run.json)
+│   ├── TestoRunManifest.kt         # run.json: executor, timings, per-status tally, captured reports
+│   ├── TestoRunArchiver.kt         # finalizes a run: captures reports, writes the manifest, prunes
+│   ├── TestoRunReplayProfile.kt    # replays an archive through the live console properties
+│   ├── TestoRunHistoryGroup.kt     # the "Test History" toolbar button, replacing the platform's
+│   └── TestoRunHistoryActions.kt   # Tools | Testo: history chooser + retention; the lens's lookups
 │
 └── ui/
     ├── TestoIconProvider.kt                 # Testo-marked icons for PHP test files
@@ -368,10 +377,12 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
    `TestoRunTimings` splits the run into startup / tests / post-processing for the hover and sums the `duration`
    attributes beside them, which concurrency pushes past the window the tests ran in.
 
-4. **Run history** — three cooperating pieces: `TestoChannelHistory` round-trips channel output through
-   `SMTestProxy.metainfo` (the only per-test datum the platform's history XML preserves), `TestoHistoryIndex` knows
-   which tests appear in saved history files, and `TestoHistoryCodeVisionProvider` shows a clickable
-   *Show history* lens that imports the newest run containing that specific test and selects its node.
+4. **Run history** (`runs/`) — every run is archived under the IDE system dir as its raw teamcity output
+   (`output.log`), a manifest (`run.json`: executor, per-status tally, captured reports) and the report files
+   themselves; `tests.txt` lists the test locations it holds. `TestoRunReplayProfile` feeds that stream back through
+   the live console, so a replayed run has the whole Testo UI. `TestoHistoryIndex` answers which tests the archive
+   holds, and `TestoHistoryCodeVisionProvider` shows a *Show history* lens that replays the newest run containing
+   that specific test and selects its node. Retention is the plugin's own (`Tools | Testo`).
 
 5. **Rerun toolbar** — two user-selectable styles (`Tools | Testo`): `MIRROR_AWARE` (three executor-pinned buttons
    that hide whichever duplicates the platform Rerun) and `SPLIT_BUTTON` (default; one split button, platform Rerun
@@ -435,12 +446,26 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **`TestoHistoryIndex.refreshLens` uses the internal `ModificationStampUtil`** to force code-vision recomputation
   after a run; a test run never touches PHP source, so neither `DaemonCodeAnalyzer.restart()` nor
   `invalidateProvider` alone re-runs `getHint`. Wrapped in `runCatching`.
-- **Imported history needs our own console properties.** `ImportedTestConsoleProperties` does not delegate
-  `createImportActions`, so `TestoHistoryImport` reconstructs the import on `TestoImportedConsoleProperties`
-  to keep the log-level filter button. Import wiring polls for a stable node count instead of subscribing —
-  a small import can finish replaying before the augmenter hands us the console.
+- **History is replayed, not imported.** The platform's import forces `ImportedTestConsoleProperties` and
+  `ImportedToGeneralTestEventsConverter`, so neither our console nor our converter runs — an imported tab is a
+  PHPUnit-looking tree with none of our toolbar. Replaying the archived teamcity stream through the *live*
+  properties (`TestoRunReplayProfile`) rebuilds everything instead, because every store is filled by the converter.
+  A replay is kept from acting like a run by three switches: `replayMode` (no re-recording), `getConfiguration()`
+  answering the replay profile (the platform's `addToHistory` saves only for a real `RunConfiguration`), and
+  `reportStore.startedAtOverride` (the captured report copies must pass the mtime-vs-start gate).
+- **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to
+  `SMTRunnerEventsListener`: a short run finishes replaying before the augmenter hands us the console, so the
+  events are already fired and missed.
 - **The log-level filter is added via `createImportActions`, not `appendAdditionalActions`** — the latter is routed
   into the gear submenu and would not survive the RunTab toolbar snapshot.
+- **`createImportActions` deliberately does not call `super`.** That array is the *only* source of the "Test History"
+  button above the test tree (`ToolbarPanel` adds nothing else of its own): `SMTRunnerConsoleProperties` returns
+  `ImportTestsGroup` + `ImportTestsFromFileAction` there, both opening a saved XML through the platform import — a
+  console with none of our UI. We return `TestoRunHistoryGroup` instead, which lists the run archive and replays it.
+  Actions without `RunTab.PREFERRED_PLACE = MORE_GROUP` land on the visible toolbar row, so no experimental key is
+  needed. Dropping `super` also drops the platform's "Import Test Results from file" from Testo tabs. The same array
+  is how expand/collapse reach the visible row — the platform keeps its own pair inside the overflow group, and
+  nothing can move or remove them (`ToolbarPanel` builds those groups inline, with no ids and no extension point).
 - **`ConsoleFolding` instances are shared across consoles** and get no per-console reset; both foldings track
   state in a `ThreadLocal` and clear it on the first non-frame line.
 - **Debug installs channel tabs itself** (`TestoDebugRunner`): the augmenter's descriptor lookup misses debug
