@@ -4,6 +4,7 @@ import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoHistoryIndex
 import com.intellij.icons.AllIcons
+import com.intellij.ide.actions.RevealFileAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionGroup
@@ -20,6 +21,7 @@ import com.intellij.openapi.fileChooser.FileSaverDescriptor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.actionSystem.KeepPopupOnPerform
+import java.nio.file.Files
 import java.nio.file.Path
 
 /**
@@ -35,7 +37,7 @@ class TestoReplayGroup(
 ) : ActionGroup(
     TestoBundle.messagePointer("testo.runs.replay.group"),
     TestoBundle.messagePointer("testo.runs.replay.group.description"),
-    { AllIcons.Actions.Play_forward },
+    { AllIcons.Toolwindows.ToolWindowRun },
 ), DumbAware {
 
     init {
@@ -44,19 +46,31 @@ class TestoReplayGroup(
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
+    // The same icon this run wears in the history list, so the button says what kind of run the tab holds.
+    override fun update(e: AnActionEvent) {
+        e.presentation.icon = runKindIcon(runKindOf(executorId()))
+    }
+
     override fun getChildren(e: AnActionEvent?): Array<AnAction> = arrayOf(
         Separator.create(TestoBundle.message("testo.runs.replay.retention.title")),
         RetentionOption(RunRetention.AUTO, "testo.runs.replay.keep"),
         RetentionOption(RunRetention.DISCARD, "testo.runs.replay.discard"),
         RetentionOption(RunRetention.LOCKED, "testo.runs.replay.lock"),
-        // The two file gestures are one pair — a run leaves as a zip and comes back as one.
+        // The file gestures are one block — a run leaves as a zip, comes back as one, and lies on disk meanwhile.
         Separator.getInstance(),
         ExportAction(),
         ImportAction(),
+        RevealAction(),
     )
 
     /** This tab's run directory: the archive a history tab replays, or the one a live run is being recorded into. */
     private fun runDir(): Path? = props.currentRunDir()
+
+    /** What this tab's run was started as: the archived executor on a history tab, the live one otherwise. */
+    private fun executorId(): String =
+        (props.replayProfile as? TestoRunReplayProfile)?.executorId
+            ?: props.recording?.executorId
+            ?: props.executor.id
 
     private inner class ExportAction : AnAction(
         TestoBundle.message("testo.runs.replay.export"),
@@ -126,6 +140,24 @@ class TestoReplayGroup(
         }
     }
 
+    /** The run's own directory in the file manager — its output, its manifest and the reports captured beside them. */
+    private inner class RevealAction : AnAction(
+        RevealFileAction.getActionName(),
+        null,
+        AllIcons.Nodes.Folder,
+    ), DumbAware {
+        override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isVisible = RevealFileAction.isSupported()
+            e.presentation.isEnabled = runDir()?.let { Files.isDirectory(it) } == true
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            RevealFileAction.openDirectory(runDir() ?: return)
+        }
+    }
+
     /** One of the three retention choices — exclusive, so picking one is the whole gesture. */
     private inner class RetentionOption(
         private val retention: RunRetention,
@@ -156,9 +188,11 @@ class TestoReplayGroup(
             }
         }
 
+        // The manifest first: once it is written it is the truth, and clearing the history rewrites it behind this
+        // tab's back. The recording only answers for a run that has not been archived yet.
         private fun current(): RunRetention =
-            props.recording?.retention
-                ?: runDir()?.let { TestoRunStore.getInstance(project).retentionOf(it) }
+            runDir()?.let { TestoRunStore.getInstance(project).retentionOf(it) }
+                ?: props.recording?.retention
                 ?: RunRetention.AUTO
     }
 

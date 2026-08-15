@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.runs
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoHistoryIndex
 import com.intellij.CommonBundle
 import com.intellij.icons.AllIcons
@@ -29,8 +30,8 @@ import java.nio.file.Path
  */
 class TestoRunHistoryGroup(
     private val project: Project,
-    /** The archive this tab is showing, so the list can say which entry the user is already looking at. */
-    private val currentRunDir: () -> Path? = { null },
+    /** This tab's own run, so the list can say which entry the user is looking at and spare it when cleared. */
+    private val props: TestoConsoleProperties,
 ) : ActionGroup(
     TestoBundle.messagePointer("testo.runs.history.group"),
     TestoBundle.messagePointer("testo.runs.history.group.description"),
@@ -46,7 +47,7 @@ class TestoRunHistoryGroup(
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
         if (e == null || project.isDisposed) return EMPTY_ARRAY
         val runs = TestoRunStore.getInstance(project).listRuns()
-        val current = runCatching { currentRunDir()?.toAbsolutePath()?.normalize() }.getOrNull()
+        val current = runCatching { props.currentRunDir()?.toAbsolutePath()?.normalize() }.getOrNull()
         return buildList<AnAction> {
             if (runs.isEmpty()) add(NoRuns())
             runs.forEach { (dir, manifest) ->
@@ -55,7 +56,7 @@ class TestoRunHistoryGroup(
             add(Separator.getInstance())
             // How much of this list is kept belongs with the list itself, not in a menu three clicks away.
             add(TestoRunRetentionGroup())
-            add(ClearHistory(project, currentRunDir))
+            add(ClearHistory(project, props))
         }.toTypedArray()
     }
 
@@ -89,7 +90,7 @@ class TestoRunHistoryGroup(
      */
     private class ClearHistory(
         private val project: Project,
-        private val currentRunDir: () -> Path?,
+        private val props: TestoConsoleProperties,
     ) : AnAction(
         TestoBundle.message("testo.runs.history.clear"),
         null,
@@ -111,10 +112,18 @@ class TestoRunHistoryGroup(
                 Messages.getWarningIcon(),
             )
             if (choice != KEEP_LOCKED && choice != DELETE_ALL) return
-            val current = runCatching { currentRunDir() }.getOrNull()
+            val current = runCatching { props.currentRunDir() }.getOrNull()
             ApplicationManager.getApplication().executeOnPooledThread {
                 if (project.isDisposed) return@executeOnPooledThread
-                TestoRunStore.getInstance(project).clearHistory(keepLocked = choice == KEEP_LOCKED, spare = current)
+                val store = TestoRunStore.getInstance(project)
+                store.clearHistory(keepLocked = choice == KEEP_LOCKED, spare = current)
+                // A run still being recorded has no manifest to rewrite, so the choice is put on the recording — which
+                // is also what the archiver will write out. A finished run answers from its manifest instead.
+                props.recording?.let { recording ->
+                    if (store.retentionOf(recording.dir) == null && recording.dir == current) {
+                        recording.retention = RunRetention.DISCARD
+                    }
+                }
                 // Every lens was answered off the archive that just went away.
                 TestoHistoryIndex.invalidate()
                 TestoHistoryIndex.refreshLens(project)

@@ -140,14 +140,14 @@ class TestoConsoleProperties(
             com.github.xepozz.testo.runs.TestoReplayGroup(project, this),
             // Deliberately not super's: that array is where the platform's own "Test History" comes from, and its
             // entries open a saved XML through the import machinery — a console that is none of ours.
-            com.github.xepozz.testo.runs.TestoRunHistoryGroup(project) { currentRunDir() },
+            com.github.xepozz.testo.runs.TestoRunHistoryGroup(project, this),
             com.intellij.openapi.actionSystem.Separator.getInstance(),
             // The platform keeps its own expand/collapse in the toolbar's overflow group; on a test tree they are used
-            // constantly, so ours sit on the visible row (and the platform's are taken out of the overflow below).
+            // constantly, so ours sit on the visible row. The platform's stay where they are: `ToolbarPanel` copies
+            // both of its groups into arrays before `RunTab` rebuilds the toolbar from them, so nothing the platform
+            // put there can be moved or removed afterwards.
             com.github.xepozz.testo.tests.console.TestoTreeCollapseAction(),
             com.github.xepozz.testo.tests.console.TestoTreeExpandAction(),
-            // Invisible: it is here only to reach the toolbar it is added to. See TestoToolbarLayoutAction.
-            com.github.xepozz.testo.tests.console.TestoToolbarLayoutAction(),
             reportsAction,
             progressAction,
         )

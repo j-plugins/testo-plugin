@@ -130,8 +130,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoRerunFailedTestsAction.kt   # failed leaves → explicit --filter list
 │   │   ├── TestoRerunWithExecutorAction.kt  # rerun in Run/Debug/Coverage + split button
 │   │   ├── TestoRerunStyle.kt               # MIRROR_AWARE vs SPLIT_BUTTON toolbar styles
-│   │   ├── TestoRunCommandAction.kt         # "Run Testo <command>" (Run Anything)
-│   │   └── TestoTestTreeRunContextGroup.kt  # coverage + modify config, lifted out of the popup's submenu
+│   │   └── TestoRunCommandAction.kt         # "Run Testo <command>" (Run Anything)
 │   │
 │   ├── console/                    # the channel console subsystem (largest area)
 │   │   ├── TestoOutputToGeneralEventsConverter.kt  # reads channel/level/icon/color off SM messages
@@ -155,7 +154,6 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoReportAutoOpen.kt  # when a report opens on its own: this-run arm / project / application scopes
 │   │   ├── TestoReportAction.kt    # right-aligned panel of hand-drawn report buttons (WebView / browser / copy)
 │   │   ├── TestoTreeToolbarActions.kt       # expand/collapse for the test tree and the Coverage view alike
-│   │   ├── TestoToolbarLayout.kt            # moves the platform's sort popup into the toolbar's overflow group
 │   │   ├── TestoTestTreeDecorator.kt        # wraps the tree's cell renderer: status icons + description tooltips
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
@@ -189,7 +187,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoRunArchiver.kt         # finalizes a run: captures reports, writes the manifest, prunes
 │   ├── TestoRunReplayProfile.kt    # replays an archive through the live console properties
 │   ├── TestoRunArchive.kt          # a run as one zip: export, import (zip-slip guarded), export file name
-│   ├── TestoReplayGroup.kt         # toolbar "Replay": keep-discard-lock + export/import, for this tab's run
+│   ├── TestoReplayGroup.kt         # toolbar "Replay": keep-discard-lock + export/import/reveal, for this tab's run
 │   ├── TestoRunHistoryGroup.kt     # the "Test History" toolbar button, replacing the platform's
 │   └── TestoRunHistoryActions.kt   # run kind icons + summaries, the retention submenu, the lens's lookups
 │
@@ -472,18 +470,16 @@ Non-obvious constraints already paid for in blood — read before touching the r
   only builds `ExportTestResultsAction` for a real `RunConfiguration`). The same array is how expand/collapse reach
   the visible row. The array is laid out right-to-left (listed first = furthest right), which is the only control
   over placement there — everything in it lands after the platform's own actions.
-- **`TestoToolbarLayoutAction` rearranges the platform's toolbar from inside it.** `ToolbarPanel` builds the sort
-  popup and the overflow group inline — no ids, no extension point, no `CustomActionsSchema` entry — and hands a
-  snapshot of the visible group to `RunTab`, so the group the user sees is reachable only from an action sitting in
-  it. This invisible action walks up to the toolbars around it (a bounded number of update passes, then it gives up
-  for good), finds the one whose place is `TestTreeViewToolbar`, and moves the sort popup — with the separator that
-  preceded it — into the overflow group, and the platform's expand/collapse out of it. Matched structurally — a popup
-  group holding `SortByDurationAction`, a group class named `MoreActionGroup`, the expand/collapse icons — so a
-  platform reshuffle makes it a no-op rather than a breakage.
-- **Run with Coverage sits behind the platform's "More Run/Debug" submenu**, and the rule that puts it there is
-  `ExecutorRegistryImpl` sorting every executor but Run and Debug into `RunContextGroupMore`, switched by a global
-  registry key. `TestoTestTreeRunContextGroup` therefore borrows the same actions by id (the coverage executor's
-  `contextActionId`, plus `CreateRunConfiguration`) into the test tree's popup one level up, rather than moving them.
+- **What the platform put on the test toolbar cannot be moved or removed** — the sort popup, the separator after
+  *Show Ignored*, the expand/collapse inside the overflow group. `ToolbarPanel` builds those inline (no ids, no
+  extension point, no `CustomActionsSchema` entry) and then copies both of its groups into `actionsToMerge` /
+  `additionalActionsToMerge`, which is what `RunTab` rebuilds the tab's toolbar from — so mutating the live groups
+  afterwards changes nothing the user sees. An invisible action riding the toolbar was tried and reverted; the only
+  control we have there is our own `createImportActions` array.
+- **Every executor but Run and Debug is hidden behind the "More Run/Debug" submenu** of a run-context popup, by
+  `ExecutorRegistryImpl` sorting them into `RunContextGroupMore` unless the `executor.actions.submenu` registry key
+  is off. That key is global and the actions are shared instances, so a copy of *Run with Coverage* at the popup's
+  own level only duplicates the submenu entry — tried in the test tree's popup and reverted.
 - **`ConsoleFolding` instances are shared across consoles** and get no per-console reset; both foldings track
   state in a `ThreadLocal` and clear it on the first non-frame line.
 - **Debug installs channel tabs itself** (`TestoDebugRunner`): the augmenter's descriptor lookup misses debug

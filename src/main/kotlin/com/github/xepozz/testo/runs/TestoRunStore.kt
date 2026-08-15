@@ -46,7 +46,8 @@ class TestoRunStore(private val project: Project) {
         .filter { it.second.retention != RunRetention.DISCARD }
         .sortedByDescending { it.second.startedAt }
 
-    fun retentionOf(dir: Path): RunRetention = readManifest(dir)?.retention ?: RunRetention.AUTO
+    /** The archived run's retention, or null while the run is still in flight — its choice rides on the recording. */
+    fun retentionOf(dir: Path): RunRetention? = readManifest(dir)?.retention
 
     /** Rewrites the manifest's retention. A run still in flight has none yet — that choice rides on the recording. */
     fun setRetention(dir: Path, retention: RunRetention) {
