@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.coverage.format.LineTotals
 import com.intellij.coverage.BaseCoverageAnnotator
 import com.intellij.coverage.CoverageDataManager
 import com.intellij.coverage.CoverageSuitesBundle
@@ -108,23 +109,44 @@ class TestoCoverageAnnotator(project: Project) : RemappingCoverageAnnotator(proj
         synchronized(lock) {
             // RemappingCoverageAnnotator can swap the suite's data for a remapped copy, so compare identity, not content.
             if (indexedData !== data) {
-                index = buildIndex(data)
+                index = buildIndex(data, lineTotalsOf(bundle))
                 indexedData = data
             }
             return index
         }
     }
 
-    private fun buildIndex(data: ProjectData): Index {
+    private fun lineTotalsOf(bundle: CoverageSuitesBundle): Map<String, LineTotals> =
+        bundle.suites.filterIsInstance<TestoCoverageSuite>().flatMap { it.lineTotals.entries }.associate { it.toPair() }
+
+    private fun buildIndex(data: ProjectData, lineTotals: Map<String, LineTotals>): Index {
         val files = HashMap<String, BaseCoverageAnnotator.FileCoverageInfo>()
-        val dirs = HashMap<String, BaseCoverageAnnotator.DirCoverageInfo>()
         val branches = HashMap<String, BranchStat>()
         for ((path, classData) in data.classes) {
+            // Data we did not build ourselves can hold a line-less ClassData, and fileInfoForCoveredFile NPEs on one.
+            if (classData.lines == null) continue
             val info = fileInfoForCoveredFile(classData) ?: continue
             val filePath = key(path)
             files[filePath] = info
-            val branchStat = branchStatFor(classData)
-            if (branchStat != null) branches[filePath] = branchStat
+            branchStatFor(classData)?.let { branches[filePath] = it }
+        }
+        // Reported tallies win over the lines in the data, and add the files that have no covered line at all.
+        for ((path, totals) in lineTotals) {
+            files[key(path)] = BaseCoverageAnnotator.FileCoverageInfo().apply {
+                totalLineCount = totals.total
+                coveredLineCount = totals.executed
+            }
+        }
+        return Index(files, aggregateDirs(files, branches), branches)
+    }
+
+    private fun aggregateDirs(
+        files: Map<String, BaseCoverageAnnotator.FileCoverageInfo>,
+        branches: MutableMap<String, BranchStat>,
+    ): Map<String, BaseCoverageAnnotator.DirCoverageInfo> {
+        val dirs = HashMap<String, BaseCoverageAnnotator.DirCoverageInfo>()
+        for ((filePath, info) in files) {
+            val branchStat = branches[filePath]
             var dir = filePath.substringBeforeLast('/', "")
             while (dir.isNotEmpty()) {
                 val aggregate = dirs.getOrPut(dir) { BaseCoverageAnnotator.DirCoverageInfo() }
@@ -142,7 +164,7 @@ class TestoCoverageAnnotator(project: Project) : RemappingCoverageAnnotator(proj
                 dir = dir.substringBeforeLast('/', "")
             }
         }
-        return Index(files, dirs, branches)
+        return dirs
     }
 
     private fun branchStatFor(classData: ClassData): BranchStat? {

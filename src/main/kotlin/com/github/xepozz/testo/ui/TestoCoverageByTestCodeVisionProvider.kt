@@ -32,7 +32,7 @@ import java.awt.event.MouseEvent
  *
  * This is the public-API answer to "how many tests cover this" (arch §9): the native `CoverageEngine.getTestsForLine`
  * gutter is `@ApiStatus.Internal` and cannot be used by a third-party plugin, so the same data drives our own lens.
- * The lens is empty (hidden) until a `phpunit-xml` coverage run has populated the index.
+ * The lens is empty (hidden) until a `coverage-xml` coverage run has populated the index.
  */
 class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
 

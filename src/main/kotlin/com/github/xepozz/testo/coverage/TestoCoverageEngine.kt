@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.coverage.format.CoverageFormat
+import com.github.xepozz.testo.coverage.format.LineTotals
 import com.github.xepozz.testo.coverage.format.PerTestCoverage
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.coverage.CoverageAnnotator
@@ -36,6 +37,15 @@ class TestoCoverageEnabledConfiguration(
 class TestoCoverageSuite : BaseCoverageSuite {
     var format: CoverageFormat = CoverageFormat.CLOVER
     var perTest: PerTestCoverage? = null
+
+    /**
+     * Per-file line tallies keyed like the `ClassData` entries, for reports that state how many executable lines a file
+     * has without saying which they are (coverage-xml). Counting the `ProjectData` lines would call every such file
+     * fully covered, since only executed lines are in there.
+     */
+    var lineTotals: Map<String, LineTotals> = emptyMap()
+        private set
+
     private var branchCoverage: Boolean = false
 
     constructor() : super()
@@ -48,9 +58,10 @@ class TestoCoverageSuite : BaseCoverageSuite {
         timeStamp: Long,
     ) : super(name, project, coverageRunner, fileProvider, timeStamp)
 
-    fun applyParsed(hasBranches: Boolean, perTest: PerTestCoverage?) {
+    fun applyParsed(hasBranches: Boolean, perTest: PerTestCoverage?, lineTotals: Map<String, LineTotals>) {
         this.branchCoverage = hasBranches
         this.perTest = perTest
+        this.lineTotals = lineTotals
     }
 
     override fun isBranchCoverage(): Boolean = branchCoverage

@@ -83,7 +83,7 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
         return when (format) {
             CoverageFormat.CLOVER -> listOf("--coverage-clover=$targetCoverage")
             CoverageFormat.COBERTURA -> listOf("--coverage-cobertura=$targetCoverage")
-            CoverageFormat.PHPUNIT_XML -> listOf("--coverage-xml=$targetCoverage")
+            CoverageFormat.COVERAGE_XML -> listOf("--coverage-xml=$targetCoverage")
         }
     }
 

@@ -79,13 +79,13 @@ class CoverageParserTest {
         assertTrue(report.hasBranches)   // the interceptor class does; sanity that the flag tracks any branch line
     }
 
-    // ---- coverage-xml (phpunit-xml) -------------------------------------------------------------------------------
+    // ---- coverage-xml ---------------------------------------------------------------------------------------------
 
     @Test
-    fun phpUnitXmlBuildsPerTestIndexBothDirections() {
-        val report = parseCoverageReport(dir.resolve("coverage-xml"), CoverageFormat.PHPUNIT_XML)
+    fun coverageXmlBuildsPerTestIndexBothDirections() {
+        val report = parseCoverageReport(dir.resolve("coverage-xml"), CoverageFormat.COVERAGE_XML)
 
-        assertEquals(CoverageFormat.PHPUNIT_XML, report.format)
+        assertEquals(CoverageFormat.COVERAGE_XML, report.format)
         assertFalse(report.hasBranches)
         assertNotNull(report.perTest)
         val perTest = report.perTest!!
@@ -101,8 +101,8 @@ class CoverageParserTest {
     }
 
     @Test
-    fun phpUnitXmlEmitsOnlyExecutedLinesAndKeepsEmptyFiles() {
-        val report = parseCoverageReport(dir.resolve("coverage-xml"), CoverageFormat.PHPUNIT_XML)
+    fun coverageXmlEmitsOnlyExecutedLinesAndKeepsEmptyFiles() {
+        val report = parseCoverageReport(dir.resolve("coverage-xml"), CoverageFormat.COVERAGE_XML)
 
         assertEquals(setOf(interceptor, multipleResult, dataCross), report.files.map { it.filePath }.toSet())
         assertTrue(report.file(interceptor).lines.all { it.hits == 1 })   // overlay: executed lines only
@@ -110,8 +110,24 @@ class CoverageParserTest {
         assertNull(report.perTest!!.byLine[SourceLine(interceptor, 70)]) // uncovered line absent from the overlay
     }
 
+    /** `<totals>` is the only place the format says how many executable lines a file has — see [LineTotals]. */
     @Test
-    fun phpUnitXmlAcceptsIndexFileDirectly() {
+    fun coverageXmlReadsPerFileLineTotals() {
+        val report = parseCoverageReport(dir.resolve("coverage-xml"), CoverageFormat.COVERAGE_XML)
+
+        assertEquals(LineTotals(124, 58), report.file(interceptor).totals)
+        assertEquals(LineTotals(2, 2), report.file(multipleResult).totals)
+        assertEquals(LineTotals(2, 0), report.file(dataCross).totals)   // no covered line, still 2 executable ones
+    }
+
+    @Test
+    fun cloverAndCoberturaCarryNoTotals() {
+        assertTrue(parseCoverageReport(dir.resolve("clover.xml")).files.all { it.totals == null })
+        assertTrue(parseCoverageReport(dir.resolve("cobertura.xml")).files.all { it.totals == null })
+    }
+
+    @Test
+    fun coverageXmlAcceptsIndexFileDirectly() {
         val viaDir = parseCoverageReport(dir.resolve("coverage-xml"))
         val viaFile = parseCoverageReport(dir.resolve("coverage-xml/index.xml"))
         assertEquals(viaDir.files.map { it.filePath }.toSet(), viaFile.files.map { it.filePath }.toSet())
@@ -123,8 +139,8 @@ class CoverageParserTest {
     fun detectsEachFormat() {
         assertEquals(CoverageFormat.CLOVER, detectCoverageFormat(dir.resolve("clover.xml")))
         assertEquals(CoverageFormat.COBERTURA, detectCoverageFormat(dir.resolve("cobertura.xml")))
-        assertEquals(CoverageFormat.PHPUNIT_XML, detectCoverageFormat(dir.resolve("coverage-xml")))
-        assertEquals(CoverageFormat.PHPUNIT_XML, detectCoverageFormat(dir.resolve("coverage-xml/index.xml")))
+        assertEquals(CoverageFormat.COVERAGE_XML, detectCoverageFormat(dir.resolve("coverage-xml")))
+        assertEquals(CoverageFormat.COVERAGE_XML, detectCoverageFormat(dir.resolve("coverage-xml/index.xml")))
     }
 
     @Test

@@ -45,7 +45,7 @@ class TestoReportStoreTest {
     fun coverageFormatsAreRecognizedAndNotViewable() {
         fun ref(format: String) = TestoReportRef.fromAttributes(mapOf("format" to format, "path" to "/tmp/r"))!!
 
-        for (format in listOf("clover", "cobertura", "phpunit-xml")) {
+        for (format in listOf("clover", "cobertura", "coverage-xml")) {
             val ref = ref(format)
             assertTrue(format, ref.isCoverage)
             assertFalse(format, ref.isViewable)

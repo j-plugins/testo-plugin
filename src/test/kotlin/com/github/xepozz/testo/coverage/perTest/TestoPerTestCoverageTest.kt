@@ -19,7 +19,7 @@ class TestoPerTestCoverageTest {
     private val test = TestId("Tests\\Data\\Unit\\Internal\\DataProviderInterceptorTest", "collectsResultsFromAllProviders")
 
     private fun data() = TestoCoverageByTestData.of(
-        parseCoverageReport(Path.of("src/test/testData/coverage/coverage-xml"), CoverageFormat.PHPUNIT_XML).perTest,
+        parseCoverageReport(Path.of("src/test/testData/coverage/coverage-xml"), CoverageFormat.COVERAGE_XML).perTest,
     )
 
     @Test

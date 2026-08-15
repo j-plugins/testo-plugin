@@ -18,9 +18,11 @@ import com.intellij.rt.coverage.data.ProjectData
 fun ParsedReport.toProjectData(keyFor: (String) -> String = { it }): ProjectData {
     val projectData = ProjectData()
     for (file in files) {
-        val classData = projectData.getOrCreateClassData(keyFor(file.filePath))
         val executable = file.lines.filter { it.line >= 0 }
+        // No entry at all rather than one with null lines: coverage-xml lists files it has no covered line for, and
+        // the platform reads `ClassData.getLines()` without a null check.
         if (executable.isEmpty()) continue
+        val classData = projectData.getOrCreateClassData(keyFor(file.filePath))
         val lines = arrayOfNulls<LineData>(executable.maxOf { it.line } + 1)
         for (lc in executable) {
             val lineData = LineData(lc.line, null)

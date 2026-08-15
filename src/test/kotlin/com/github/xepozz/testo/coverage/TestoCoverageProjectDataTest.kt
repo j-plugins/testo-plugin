@@ -7,6 +7,7 @@ import com.github.xepozz.testo.coverage.format.LineCoverage
 import com.github.xepozz.testo.coverage.format.ParsedReport
 import com.github.xepozz.testo.coverage.format.parseCoverageReport
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import java.nio.file.Path
 
@@ -65,6 +66,21 @@ class TestoCoverageProjectDataTest {
         assertEquals(1, cls.getLineData(12).status)
         assertEquals(BranchPair(2, 1), cls.getLineData(12).branchData.let { BranchPair(it.totalBranches, it.coveredBranches) })
         assertEquals(0, cls.getLineData(13).status)   // hits==0 wins over branch data -> uncovered
+    }
+
+    /** coverage-xml lists files it recorded no covered line for; a `ClassData` without lines makes the platform NPE. */
+    @Test
+    fun fileWithoutExecutableLinesGetsNoClassData() {
+        val report = ParsedReport(
+            CoverageFormat.COVERAGE_XML,
+            listOf(FileCoverage("/empty.php", emptyList()), FileCoverage("/x.php", listOf(LineCoverage(3, hits = 1)))),
+            hasBranches = false,
+            perTest = null,
+        )
+        val data = report.toProjectData()
+
+        assertNull(data.getClassData("/empty.php"))
+        assertEquals(setOf("/x.php"), data.classes.keys)
     }
 
     private data class BranchPair(val total: Int, val covered: Int)

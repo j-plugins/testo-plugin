@@ -37,11 +37,13 @@ class TestoCoverageRunner : CoverageRunner() {
         val suite = baseCoverageSuite as? TestoCoverageSuite
         return try {
             val report = parseCoverageReport(sessionDataFile.toPath(), suite?.format)
-            suite?.applyParsed(report.hasBranches, report.perTest)
             suite?.project?.let { TestoCoverageByTestIndex.getInstance(it).update(report.perTest) }
             // Key each ClassData by the resolved VirtualFile path so it matches how TestoCoverageAnnotator looks files up.
             val lfs = LocalFileSystem.getInstance()
-            val projectData = report.toProjectData { path -> lfs.findFileByPath(path)?.path ?: path }
+            val resolvePath = { path: String -> lfs.findFileByPath(path)?.path ?: path }
+            val projectData = report.toProjectData(resolvePath)
+            val lineTotals = report.files.mapNotNull { file -> file.totals?.let { resolvePath(file.filePath) to it } }
+            suite?.applyParsed(report.hasBranches, report.perTest, lineTotals.toMap())
             LOG.info("Testo coverage loaded: ${report.format} ${projectData.classes.size} files from $sessionDataFile")
             SuccessCoverageLoadingResult(projectData)
         } catch (e: CoverageParseException) {

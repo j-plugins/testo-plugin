@@ -584,7 +584,7 @@ private fun browseReport(path: Path) = BrowserUtil.browse(path.toUri())
 
 /**
  * The coverage data file this run wrote — the report file itself for clover/cobertura, or `<dir>/index.xml` for
- * phpunit-xml (a directory the platform's file provider cannot consume) — or `null` while there is none yet.
+ * coverage-xml (a directory the platform's file provider cannot consume) — or `null` while there is none yet.
  */
 internal fun resolveCoverageDataFile(
     ref: TestoReportRef,
@@ -592,11 +592,11 @@ internal fun resolveCoverageDataFile(
     mapToLocal: (String) -> String?,
     writtenAfter: Long,
 ): Path? {
-    val phpunit = ref.coverageFormat == CoverageFormat.PHPUNIT_XML
+    val coverageXml = ref.coverageFormat == CoverageFormat.COVERAGE_XML
     return reportPathCandidates(ref, project.basePath) { runCatching { mapToLocal(it) }.getOrNull() }
         .asSequence()
         .mapNotNull { runCatching { Path.of(it) }.getOrNull() }
-        .map { if (phpunit && !it.fileName?.toString().equals("index.xml", ignoreCase = true)) it.resolve("index.xml") else it }
+        .map { if (coverageXml && !it.fileName?.toString().equals("index.xml", ignoreCase = true)) it.resolve("index.xml") else it }
         .firstOrNull { isReportOf(it, writtenAfter) }
 }
 

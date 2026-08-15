@@ -14,15 +14,15 @@ interface TestoCoverageParser {
  * element. `null` only when the path is unreadable or nothing matches.
  */
 fun detectCoverageFormat(reportPath: Path): CoverageFormat? {
-    if (Files.isDirectory(reportPath)) return CoverageFormat.PHPUNIT_XML
-    if (reportPath.fileName?.toString().equals("index.xml", ignoreCase = true)) return CoverageFormat.PHPUNIT_XML
+    if (Files.isDirectory(reportPath)) return CoverageFormat.COVERAGE_XML
+    if (reportPath.fileName?.toString().equals("index.xml", ignoreCase = true)) return CoverageFormat.COVERAGE_XML
     val root = try {
         readXmlRoot(reportPath)
     } catch (_: Exception) {
         return null
     }
     return when {
-        root.tagName == "phpunit" -> CoverageFormat.PHPUNIT_XML
+        root.tagName == "phpunit" -> CoverageFormat.COVERAGE_XML
         root.tagName == "coverage" && (root.hasAttribute("line-rate") || root.childElements("packages").isNotEmpty()) ->
             CoverageFormat.COBERTURA
         root.tagName == "coverage" -> CoverageFormat.CLOVER
@@ -37,7 +37,7 @@ fun parseCoverageReport(reportPath: Path, format: CoverageFormat? = null): Parse
     val parser = when (resolved) {
         CoverageFormat.CLOVER -> CloverCoverageParser
         CoverageFormat.COBERTURA -> CoberturaCoverageParser
-        CoverageFormat.PHPUNIT_XML -> PhpUnitXmlCoverageParser
+        CoverageFormat.COVERAGE_XML -> CoverageXmlParser
     }
     return parser.parse(reportPath)
 }

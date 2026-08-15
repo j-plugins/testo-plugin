@@ -21,7 +21,7 @@ data class TestoReportRef(
     /** Whether the button can show this report as a page; the rest (data documents, coverage) is kept, not offered. */
     val isViewable: Boolean get() = VIEWABLE_FORMATS.any { format.equals(it, ignoreCase = true) }
 
-    /** A coverage report — clover / cobertura / phpunit-xml — that the "Show coverage" button can apply without a rerun. */
+    /** A coverage report — clover / cobertura / coverage-xml — that the "Show coverage" button can apply without a rerun. */
     val coverageFormat: CoverageFormat? get() = CoverageFormat.fromId(format)
 
     val isCoverage: Boolean get() = coverageFormat != null

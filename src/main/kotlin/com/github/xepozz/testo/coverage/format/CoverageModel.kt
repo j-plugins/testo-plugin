@@ -7,7 +7,7 @@ package com.github.xepozz.testo.coverage.format
 enum class CoverageFormat(val id: String) {
     CLOVER("clover"),
     COBERTURA("cobertura"),
-    PHPUNIT_XML("phpunit-xml");
+    COVERAGE_XML("coverage-xml");
 
     companion object {
         fun fromId(id: String?): CoverageFormat? = entries.firstOrNull { it.id.equals(id, ignoreCase = true) }
@@ -37,8 +37,14 @@ data class BranchCoverage(val covered: Int, val total: Int)
 
 data class LineCoverage(val line: Int, val hits: Int, val branch: BranchCoverage? = null)
 
+/**
+ * A file's own line tally, reported by coverage-xml even for files it lists no covered line for. It is the only place
+ * that format states how many executable lines a file has: [LineCoverage] covers the executed ones alone.
+ */
+data class LineTotals(val total: Int, val executed: Int)
+
 /** One source file's coverage. [filePath] is the resolved absolute path, forward-slashed, ready to normalize (arch §6). */
-data class FileCoverage(val filePath: String, val lines: List<LineCoverage>)
+data class FileCoverage(val filePath: String, val lines: List<LineCoverage>, val totals: LineTotals? = null)
 
 /**
  * The per-test overlay carried only by coverage-xml: which tests touched which source lines, both directions. Keyed by
