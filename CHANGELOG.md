@@ -18,6 +18,11 @@
 - *Expand All* / *Collapse All* now sit on the toolbar itself rather than inside its overflow menu, and the sort
   button moves the other way, into that menu.
 - A tab opened from the history reruns with the executor the archived run used: a coverage run reruns with coverage.
+- A *Replay* button on the test toolbar exports the run as a single archive and imports one back, and says what the
+  history may do with it: keep it, drop it, or lock it so retention never touches it.
+- Every report a run announces is archived with it — an HTML report travels with its assets — so a replayed run opens
+  its own reports rather than whatever the latest run left behind.
+- The history list marks the run the tab is showing in bold, and puts a lock on the locked ones.
 
 ### Fixed
 

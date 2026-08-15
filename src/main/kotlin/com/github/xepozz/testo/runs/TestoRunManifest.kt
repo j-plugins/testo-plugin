@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.runs
 
 import com.github.xepozz.testo.tests.console.TestoRunTimings
+import com.google.gson.annotations.SerializedName
 
 /**
  * One report of an archived run, as announced by `##teamcity[testoReport …]` plus where its captured copy sits.
@@ -14,6 +15,19 @@ data class StoredReport(
     val relativePath: String? = null,
     val stored: String? = null,
 )
+
+/** What retention is allowed to do with an archived run. Chosen per run, from the tab's *Replay* group. */
+enum class RunRetention {
+    /** The default: kept until the newest-N rotation drops it. */
+    AUTO,
+
+    /** Dropped at the next prune, and hidden from the history at once. */
+    DISCARD,
+
+    /** Never rotated out, and left alone by "clear history": the user locked this one. */
+    @SerializedName(value = "LOCKED", alternate = ["PINNED"])
+    LOCKED,
+}
 
 /**
  * `run.json` — the metadata of one archived run. Written once at run end; its presence is what marks a run directory
@@ -38,6 +52,7 @@ data class TestoRunManifest(
      * what the run summary renders (and breaks into startup / tests / post-processing).
      */
     val timings: TestoRunTimings.Marks = TestoRunTimings.Marks(),
+    val retention: RunRetention = RunRetention.AUTO,
     /** [com.github.xepozz.testo.tests.console.TestoTestStatus.wireName] → how many tests ended that way. */
     val statuses: Map<String, Int> = emptyMap(),
     val reports: List<StoredReport> = emptyList(),

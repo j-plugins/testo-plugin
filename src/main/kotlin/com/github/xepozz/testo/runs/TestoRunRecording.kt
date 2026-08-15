@@ -26,6 +26,10 @@ class TestoRunRecording internal constructor(
     private val finishing = AtomicBoolean()
     private val locations = LinkedHashSet<String>()
 
+    /** What the tab's *Replay* group says to do with this run once it is archived. */
+    @Volatile
+    var retention: RunRetention = RunRetention.AUTO
+
     val reportsDir: Path get() = dir.resolve(REPORTS_DIR)
 
     fun appendChunk(stream: Int, text: String) {

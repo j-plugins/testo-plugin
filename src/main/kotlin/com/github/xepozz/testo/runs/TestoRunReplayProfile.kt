@@ -48,7 +48,8 @@ import javax.swing.Icon
  */
 internal class TestoRunReplayProfile(
     private val project: Project,
-    private val runDir: Path,
+    /** The archive this tab shows — what the tab's *Replay* group exports, pins or throws away. */
+    val runDir: Path,
     private val manifest: TestoRunManifest,
     /** The test the "Show history" lens was clicked on: its node is selected once the replayed tree is built. */
     private val targetUrl: String? = null,
@@ -63,8 +64,7 @@ internal class TestoRunReplayProfile(
      * console still needs a configuration to be built from).
      */
     val testoConfiguration: TestoRunConfiguration by lazy {
-        val configuration = TestoRunConfigurationType.INSTANCE
-            .createTemplateConfiguration(project) as TestoRunConfiguration
+        val configuration = TestoRunConfigurationType.INSTANCE.createTemplateConfiguration(project)
         manifest.configuration.takeIf { it.isNotBlank() }?.let { xml ->
             runCatching { configuration.readExternal(JDOMUtil.load(xml)) }
                 .onFailure { LOG.warn("Failed to restore the run configuration of $runDir", it) }
@@ -154,9 +154,9 @@ internal class TestoRunReplayProfile(
             .mapNotNull { report ->
                 val stored = report.stored ?: return@mapNotNull null
                 val format = CoverageFormat.fromId(report.format) ?: return@mapNotNull null
-                val captured = runDir.resolve(stored)
-                // coverage-xml is a directory; the loader consumes its index.
-                val dataFile = if (format == CoverageFormat.COVERAGE_XML) captured.resolve("index.xml") else captured
+                // The manifest names the report's entry file, which is what the loader consumes — for coverage-xml
+                // that is the index.xml inside the captured directory.
+                val dataFile = runDir.resolve(stored)
                 if (!Files.exists(dataFile)) null else format to TestoCoverageReport(report.name, format, dataFile)
             }
             // One per format: a CLI-flag report and a testo.php-configured one of the same format hold the same run's

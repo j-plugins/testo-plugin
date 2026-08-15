@@ -8,6 +8,7 @@ import com.github.xepozz.testo.tests.console.TestoHistoryIndex
 import com.github.xepozz.testo.tests.console.TestoReportRef
 import com.github.xepozz.testo.tests.console.TestoRunTimings
 import com.github.xepozz.testo.tests.console.resolveCoverageDataFile
+import com.github.xepozz.testo.tests.console.resolveReport
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
@@ -39,8 +40,10 @@ internal object TestoRunArchiver {
                 recording.closeOutput()
                 val mapToLocal: (String) -> String? = { runCatching { props.pathMapper.getLocalPath(it) }.getOrNull() }
                 val writtenAfter = props.reportStore.runStartedAt
-                // Only what survives the one-per-format dedup is copied: it is the report the run actually applied,
-                // and a replay reads the archive as the whole truth about this run's coverage.
+                // Every report the run announced is kept — the archive is what a replay reads instead of the log, and
+                // an HTML report is as much part of a run as its coverage. The one exception is a coverage report that
+                // lost the one-per-format dedup: it is the same run's data under a second path, and it is the loser
+                // the applied bundle already ignored.
                 val resolved = props.reportStore.coverage().mapNotNull { ref ->
                     resolveCoverageDataFile(ref, project, mapToLocal, writtenAfter)?.let { ref to it }
                 }
@@ -48,7 +51,11 @@ internal object TestoRunArchiver {
                 val winners = dedupeCoverageByFormat(resolved, flagKeys).toMap()
                 val usedNames = HashSet<String>()
                 val reports = props.reportStore.all().map { ref ->
-                    val stored = winners[ref]?.let { capture(recording, ref, it, usedNames) }
+                    val local = when {
+                        ref.isCoverage -> winners[ref]
+                        else -> resolveReport(ref, project, mapToLocal, writtenAfter)
+                    }
+                    val stored = local?.let { capture(recording, ref, it, usedNames) }
                     StoredReport(ref.format, ref.name, ref.path, ref.relativePath, stored)
                 }
                 recording.writeLocations()
@@ -62,6 +69,7 @@ internal object TestoRunArchiver {
                         startedAt = recording.startedAt,
                         finishedAt = finishedAt,
                         timings = runMarks(props, recording, finishedAt),
+                        retention = recording.retention,
                         statuses = props.statusStore.counts().entries.associate { it.key.wireName to it.value },
                         reports = reports,
                     )
@@ -102,26 +110,32 @@ internal object TestoRunArchiver {
             }.onFailure { LOG.warn("Failed to serialize the Testo run configuration", it) }.getOrNull()
         }.orEmpty()
 
-    /** Returns the run-dir-relative location of the captured copy, or null when the copy failed. */
+    /**
+     * Copies one report into the run's `reports/`, and returns the run-dir-relative path of its **entry** (what the
+     * announcement pointed at) — or null when the copy failed. A report laid out as a directory travels whole; the
+     * entry inside it is what the manifest names, so a replay can hand that straight to the report button.
+     */
     private fun capture(recording: TestoRunRecording, ref: TestoReportRef, local: Path, usedNames: MutableSet<String>): String? =
         runCatching {
             Files.createDirectories(recording.reportsDir)
-            val format = ref.coverageFormat
-            if (format == CoverageFormat.COVERAGE_XML) {
-                // `local` is the directory's index.xml — the report is the whole directory.
-                val name = uniqueName(format.id, "", usedNames)
+            val name = uniqueName(capturedReportName(reportStem(ref), local), usedNames)
+            if (isDirectoryReport(local)) {
                 copyDirectory(local.parent, recording.reportsDir.resolve(name))
-                "${TestoRunRecording.REPORTS_DIR}/$name"
+                "${TestoRunRecording.REPORTS_DIR}/$name/${local.fileName}"
             } else {
-                val name = uniqueName(format?.id ?: "report", ".xml", usedNames)
                 Files.copy(local, recording.reportsDir.resolve(name), StandardCopyOption.REPLACE_EXISTING)
                 "${TestoRunRecording.REPORTS_DIR}/$name"
             }
         }.onFailure { LOG.warn("Failed to capture report ${ref.path} of ${ref.format}", it) }.getOrNull()
 
-    // Two reports of one format can coexist (a CLI flag beside a testo.php writer) — both are captured.
-    private fun uniqueName(stem: String, extension: String, used: MutableSet<String>): String {
-        var candidate = "$stem$extension"
+    private fun reportStem(ref: TestoReportRef): String =
+        (ref.coverageFormat?.id ?: ref.format).replace(Regex("[^A-Za-z0-9._-]+"), "-").trim('-').ifEmpty { "report" }
+
+    // Two reports can want one name (a CLI flag beside a testo.php writer, or two of an unknown format).
+    private fun uniqueName(name: String, used: MutableSet<String>): String {
+        val stem = name.substringBeforeLast('.', name)
+        val extension = name.substringAfterLast('.', "").let { if (it.isEmpty()) "" else ".$it" }
+        var candidate = name
         var index = 2
         while (!used.add(candidate)) candidate = "$stem-${index++}$extension"
         return candidate

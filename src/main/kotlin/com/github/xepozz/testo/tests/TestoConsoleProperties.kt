@@ -85,6 +85,10 @@ class TestoConsoleProperties(
     override fun getConfiguration(): com.intellij.execution.configurations.RunProfile =
         replayProfile ?: super.getConfiguration()
 
+    /** The archive this tab stands for: the one a history tab replays, or the one a live run is recorded into. */
+    fun currentRunDir(): java.nio.file.Path? =
+        (replayProfile as? com.github.xepozz.testo.runs.TestoRunReplayProfile)?.runDir ?: recording?.dir
+
     override fun createTestEventsConverter(
         testFrameworkName: String,
         consoleProperties: TestConsoleProperties,
@@ -132,9 +136,11 @@ class TestoConsoleProperties(
             // the log-level filter sits at the right end of the group, expand/collapse at its left, next to the
             // separator that follows Show Passed / Show Ignored.
             com.github.xepozz.testo.tests.console.TestoLogLevelFilterAction(levelFilter),
+            // This run's own archive: export it, decide what retention may do with it, load an exported one.
+            com.github.xepozz.testo.runs.TestoReplayGroup(project, this),
             // Deliberately not super's: that array is where the platform's own "Test History" comes from, and its
             // entries open a saved XML through the import machinery — a console that is none of ours.
-            com.github.xepozz.testo.runs.TestoRunHistoryGroup(project),
+            com.github.xepozz.testo.runs.TestoRunHistoryGroup(project) { currentRunDir() },
             com.intellij.openapi.actionSystem.Separator.getInstance(),
             // The platform keeps its own expand/collapse in the toolbar's overflow group; on a test tree they are used
             // constantly, so ours sit on the visible row (and the platform's are taken out of the overflow below).

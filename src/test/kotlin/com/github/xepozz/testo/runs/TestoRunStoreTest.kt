@@ -99,6 +99,13 @@ class TestoRunStoreTest {
     }
 
     @Test
+    fun theOlderSpellingOfALockedRunStillReads() {
+        // The choice was called "pinned" before it was called "locked"; archives written then must not lose it.
+        val parsed = gson.fromJson("""{"v":3,"retention":"PINNED"}""", TestoRunManifest::class.java)
+        assertEquals(RunRetention.LOCKED, parsed.retention)
+    }
+
+    @Test
     fun malformedManifestParsesToNullNotThrow() {
         assertNull(runCatching { gson.fromJson("{not json", TestoRunManifest::class.java) }.getOrNull())
     }

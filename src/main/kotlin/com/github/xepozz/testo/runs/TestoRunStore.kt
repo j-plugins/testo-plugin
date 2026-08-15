@@ -37,10 +37,56 @@ class TestoRunStore(private val project: Project) {
         return TestoRunRecording(dir, configurationName, executorId, startedAt)
     }
 
-    /** Complete runs (manifest present), newest first. Touches the filesystem — call off the EDT. */
+    /**
+     * Complete runs (manifest present) the user has not thrown away, newest first. Touches the filesystem — call off
+     * the EDT.
+     */
     fun listRuns(): List<Pair<Path, TestoRunManifest>> = runDirectories()
         .mapNotNull { dir -> readManifest(dir)?.let { dir to it } }
+        .filter { it.second.retention != RunRetention.DISCARD }
         .sortedByDescending { it.second.startedAt }
+
+    fun retentionOf(dir: Path): RunRetention = readManifest(dir)?.retention ?: RunRetention.AUTO
+
+    /** Rewrites the manifest's retention. A run still in flight has none yet — that choice rides on the recording. */
+    fun setRetention(dir: Path, retention: RunRetention) {
+        val manifest = readManifest(dir) ?: return
+        runCatching { writeManifest(dir, manifest.copy(retention = retention)) }
+            .onFailure { LOG.warn("Failed to set retention of $dir", it) }
+    }
+
+    /**
+     * Unpacks an exported run into the archive and returns it. The directory is named after the run it holds, so it
+     * sorts with the rest; the manifest is what decides the zip was one of ours at all.
+     */
+    fun importRun(zip: Path): Pair<Path, TestoRunManifest>? {
+        val staging = root().resolve("import-${System.currentTimeMillis()}")
+        return runCatching {
+            unzipRunDirectory(zip, staging)
+            val manifest = readManifest(staging) ?: run {
+                FileUtil.delete(staging)
+                return null
+            }
+            val target = freeDirectory(manifest)
+            Files.move(staging, target)
+            target to manifest
+        }.onFailure {
+            LOG.warn("Failed to import a Testo run from $zip", it)
+            runCatching { FileUtil.delete(staging) }
+        }.getOrNull()
+    }
+
+    private fun freeDirectory(manifest: TestoRunManifest): Path {
+        val stem = "${manifest.startedAt}-${FileUtil.sanitizeFileName(manifest.configurationName)}"
+        var candidate = root().resolve(stem)
+        var index = 2
+        while (candidate.exists()) candidate = root().resolve("$stem-${index++}")
+        return candidate
+    }
+
+    private fun writeManifest(dir: Path, manifest: TestoRunManifest) {
+        Files.writeString(dir.resolve(TestoRunRecording.MANIFEST_FILE), gson.toJson(manifest), StandardCharsets.UTF_8)
+    }
 
     fun readManifest(dir: Path): TestoRunManifest? = runCatching {
         val file = dir.resolve(TestoRunRecording.MANIFEST_FILE)
@@ -72,22 +118,41 @@ class TestoRunStore(private val project: Project) {
     fun prune() {
         val keep = retentionLimit()
         val now = System.currentTimeMillis()
-        val complete = ArrayList<Pair<Path, Long>>()
+        val rotating = ArrayList<Pair<Path, Long>>()
         for (dir in runDirectories()) {
             val manifest = readManifest(dir)
-            if (manifest != null) {
-                complete += dir to manifest.startedAt
-            } else if (now - startedAtOf(dir) > INCOMPLETE_GRACE_MS) {
-                // A directory that never got its manifest: the run crashed or the IDE died mid-write.
-                delete(dir)
+            when {
+                manifest == null ->
+                    // A directory that never got its manifest: the run crashed or the IDE died mid-write.
+                    if (now - startedAtOf(dir) > INCOMPLETE_GRACE_MS) delete(dir)
+                // Thrown away by hand — it goes whatever its age, and the locked ones never do.
+                manifest.retention == RunRetention.DISCARD -> delete(dir)
+                manifest.retention == RunRetention.LOCKED -> Unit
+                else -> rotating += dir to manifest.startedAt
             }
         }
-        complete.sortedByDescending { it.second }.drop(keep).forEach { delete(it.first) }
+        rotating.sortedByDescending { it.second }.drop(keep).forEach { delete(it.first) }
     }
 
-    /** Drops every archived run of this project. Touches the filesystem — call off the EDT. */
-    fun clear() {
-        runDirectories().forEach { delete(it) }
+    /**
+     * Clears the history. Touches the filesystem — call off the EDT.
+     *
+     * @param keepLocked leave [RunRetention.LOCKED] runs where they are.
+     * @param spare the run a tab is currently showing: it is marked [RunRetention.DISCARD] rather than deleted, so the
+     *        open tab keeps the files it is built on — it leaves the history now and the disk at the next prune, and
+     *        setting *Keep* on that tab brings it back.
+     */
+    fun clearHistory(keepLocked: Boolean, spare: Path?) {
+        val spared = spare?.let { runCatching { it.toAbsolutePath().normalize() }.getOrNull() }
+        for (dir in runDirectories()) {
+            val retention = retentionOf(dir)
+            if (keepLocked && retention == RunRetention.LOCKED) continue
+            if (dir.toAbsolutePath().normalize() == spared) {
+                setRetention(dir, RunRetention.DISCARD)
+                continue
+            }
+            delete(dir)
+        }
     }
 
     private fun runDirectories(): List<Path> = runCatching {

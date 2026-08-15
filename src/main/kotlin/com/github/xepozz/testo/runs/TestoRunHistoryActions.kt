@@ -17,6 +17,7 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.ColoredListCellRenderer
+import com.intellij.ui.LayeredIcon
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.util.text.DateFormatUtil
 import java.nio.file.Path
@@ -68,7 +69,7 @@ class TestoRunHistoryAction : AnAction(TestoBundle.message("testo.runs.history.a
             hasFocus: Boolean,
         ) {
             val manifest = value.second
-            icon = runKindIcon(runKindOf(manifest.executorId))
+            icon = runHistoryIcon(manifest)
             append(manifest.configurationName.ifEmpty { value.first.fileName.toString() })
             append(" — ${DateFormatUtil.formatDateTime(manifest.startedAt)}", SimpleTextAttributes.GRAYED_ATTRIBUTES)
             append("   ${runResultSummary(manifest)}", SimpleTextAttributes.GRAYED_ATTRIBUTES)
@@ -110,9 +111,18 @@ internal fun runKindOf(executorId: String?): TestoRunKind = when (executorId) {
 }
 
 internal fun runKindIcon(kind: TestoRunKind): Icon = when (kind) {
-    TestoRunKind.COVERAGE -> AllIcons.General.RunWithCoverage
+    // The tool window's own icon rather than the shield-and-arrow one: it is the plainer shape, and the lock overlay
+    // has room to sit on it.
+    TestoRunKind.COVERAGE -> AllIcons.Toolwindows.ToolWindowCoverage
     TestoRunKind.DEBUG -> AllIcons.Actions.StartDebugger
     TestoRunKind.RUN -> AllIcons.Actions.Execute
+}
+
+/** The history entry's icon: what the run was, wearing a lock when the user locked it out of the rotation. */
+internal fun runHistoryIcon(manifest: TestoRunManifest): Icon {
+    val base = runKindIcon(runKindOf(manifest.executorId))
+    if (manifest.retention != RunRetention.LOCKED) return base
+    return LayeredIcon.layeredIcon { arrayOf(base, AllIcons.Nodes.Locked) }
 }
 
 /** How the run ended, as the history list spells it: "145 total, 42 failed". */

@@ -187,6 +187,8 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoRunManifest.kt         # run.json: executor, timings, per-status tally, captured reports
 │   ├── TestoRunArchiver.kt         # finalizes a run: captures reports, writes the manifest, prunes
 │   ├── TestoRunReplayProfile.kt    # replays an archive through the live console properties
+│   ├── TestoRunArchive.kt          # a run as one zip: export, import (zip-slip guarded), export file name
+│   ├── TestoReplayGroup.kt         # toolbar "Replay": export / keep-discard-pin / import, for this tab's run
 │   ├── TestoRunHistoryGroup.kt     # the "Test History" toolbar button, replacing the platform's
 │   └── TestoRunHistoryActions.kt   # Tools | Testo: history chooser + retention; the lens's lookups
 │
