@@ -9,25 +9,26 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.Constraints
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.PlatformCoreDataKeys
+import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.project.DumbAware
 import com.intellij.util.ui.UIUtil
 import java.awt.Container
 import javax.swing.JComponent
 
 /**
- * Rearranges the test toolbar the platform built: the sort popup moves into the overflow ("burger") group, and the
- * platform's own expand/collapse leave it — ours sit on the visible row now
- * ([com.github.xepozz.testo.tests.TestoConsoleProperties.createImportActions]).
+ * Rearranges the test toolbar the platform built: the sort popup moves into the overflow ("burger") group along with
+ * the separator that used to precede it, and the platform's own expand/collapse leave that group — ours sit on the
+ * visible row now ([com.github.xepozz.testo.tests.TestoConsoleProperties.createImportActions]).
  *
  * There is no seam for this. `ToolbarPanel` creates both groups inline, with no action ids, no extension point and no
  * `CustomActionsSchema` entry, and hands a snapshot of the visible one to `RunTab` — so the only handle on the group
  * the user actually sees is from *inside* it. Hence this: an invisible action that rides the same toolbar and, the
- * first few times it is asked to update, walks the toolbars around it and moves the two things.
+ * first few times it is asked to update, walks the toolbars around it looking for the one the test tree owns.
  *
- * Deliberately best-effort, and matched structurally rather than by name — a popup group holding
- * `SortByDurationAction`, a group whose class is `MoreActionGroup`, actions wearing the expand/collapse icons — so it
- * survives translation and renaming, and does nothing at all (rather than breaking the toolbar) once the platform's
- * layout changes shape.
+ * Deliberately best-effort. The toolbar is found by its place, its contents matched structurally — a popup group
+ * holding `SortByDurationAction`, a group whose class is `MoreActionGroup`, actions wearing the expand/collapse icons
+ * — so this survives translation and renaming, and does nothing at all (rather than breaking the toolbar) once the
+ * platform's layout changes shape.
  */
 internal class TestoToolbarLayoutAction : AnAction(), DumbAware {
 
@@ -48,7 +49,9 @@ internal class TestoToolbarLayoutAction : AnAction(), DumbAware {
         while (ancestor != null && hops < ANCESTOR_LIMIT) {
             (ancestor as? JComponent)?.let { root ->
                 UIUtil.uiTraverser(root).traverse().forEach { candidate ->
-                    if (candidate is ActionToolbar && rearrange(candidate)) done = true
+                    if (candidate is ActionToolbar && candidate.place == TEST_TREE_TOOLBAR_PLACE) {
+                        if (rearrange(candidate.actionGroup)) done = true
+                    }
                 }
             }
             ancestor = ancestor.parent
@@ -58,25 +61,31 @@ internal class TestoToolbarLayoutAction : AnAction(), DumbAware {
 
     override fun actionPerformed(e: AnActionEvent) = Unit
 
-    /** True once this toolbar has been rearranged — i.e. it was the one holding the platform's groups. */
-    private fun rearrange(toolbar: ActionToolbar): Boolean = runCatching {
-        val group = actionGroupOf(toolbar) ?: return false
-        val more = find(group, 0) { it.javaClass.simpleName == MORE_GROUP } as? DefaultActionGroup ?: return false
-        moveSortIntoMoreGroup(group, more)
+    /** True once this toolbar's group has been rearranged — i.e. it held the platform's groups and now does not. */
+    private fun rearrange(group: ActionGroup): Boolean = runCatching {
+        val root = group as? DefaultActionGroup ?: return false
+        val more = root.getChildActionsOrStubs()
+            .filterIsInstance<DefaultActionGroup>()
+            .firstOrNull { it.javaClass.simpleName == MORE_GROUP }
+            ?: return false
+        val moved = moveSortIntoMoreGroup(root, more)
         dropExpandCollapse(more)
-        true
+        moved
     }.getOrDefault(false)
 
-    /** The toolbar's group, read by name: the accessor lives on the implementation, which is not ours to reference. */
-    private fun actionGroupOf(toolbar: ActionToolbar): ActionGroup? =
-        runCatching { toolbar.javaClass.getMethod("getActionGroup").invoke(toolbar) as? ActionGroup }.getOrNull()
-
-    private fun moveSortIntoMoreGroup(root: ActionGroup, more: DefaultActionGroup) {
-        val sort = find(root, 0) { it is ActionGroup && it.isPopup && holds(it, SORT_MARKER) } ?: return
-        val owner = parentOf(root, sort, 0) as? DefaultActionGroup ?: return
-        if (owner === more) return
-        owner.remove(sort)
+    /**
+     * Moves the sort popup into [more], taking the separator in front of it along: that separator was there to part
+     * the two toggles from the sort button, and with the button gone it would only fence off our own actions.
+     */
+    private fun moveSortIntoMoreGroup(root: DefaultActionGroup, more: DefaultActionGroup): Boolean {
+        val children = root.getChildActionsOrStubs()
+        val index = children.indexOfFirst { it is ActionGroup && it.isPopup && holds(it, SORT_MARKER) }
+        if (index < 0) return false
+        children.getOrNull(index - 1)?.takeIf { it is Separator }?.let { root.remove(it) }
+        val sort = children[index]
+        root.remove(sort)
         more.add(sort, Constraints.FIRST)
+        return true
     }
 
     private fun dropExpandCollapse(more: DefaultActionGroup) {
@@ -85,37 +94,18 @@ internal class TestoToolbarLayoutAction : AnAction(), DumbAware {
             .forEach { more.remove(it) }
     }
 
-    private fun holds(group: ActionGroup, markerClassName: String): Boolean =
-        children(group).any { it.javaClass.simpleName == markerClassName }
-
-    private fun find(group: ActionGroup, depth: Int, predicate: (AnAction) -> Boolean): AnAction? {
-        if (depth > DEPTH_LIMIT) return null
-        for (child in children(group)) {
-            if (predicate(child)) return child
-            if (child is ActionGroup) find(child, depth + 1, predicate)?.let { return it }
-        }
-        return null
-    }
-
-    private fun parentOf(group: ActionGroup, child: AnAction, depth: Int): ActionGroup? {
-        if (depth > DEPTH_LIMIT) return null
-        for (candidate in children(group)) {
-            if (candidate === child) return group
-            if (candidate is ActionGroup) parentOf(candidate, child, depth + 1)?.let { return it }
-        }
-        return null
-    }
-
     // Only the groups we can read without asking: `ActionGroup.getChildren` is @OverrideOnly, so calling it is out —
     // and every group on this path is a DefaultActionGroup anyway (`RunTab.ToolbarActionGroup` copies its delegate's
     // children into itself). Stubs are fine: everything matched here is a real instance the toolbar was built with.
-    private fun children(group: ActionGroup): Array<AnAction> =
-        (group as? DefaultActionGroup)?.getChildActionsOrStubs() ?: AnAction.EMPTY_ARRAY
+    private fun holds(group: ActionGroup, markerClassName: String): Boolean =
+        (group as? DefaultActionGroup)?.getChildActionsOrStubs()
+            ?.any { it.javaClass.simpleName == markerClassName } == true
 
     private companion object {
+        // The place ToolbarPanel creates its toolbar under. A literal there too — the platform exposes no constant.
+        private const val TEST_TREE_TOOLBAR_PLACE = "TestTreeViewToolbar"
         private const val MORE_GROUP = "MoreActionGroup"
         private const val SORT_MARKER = "SortByDurationAction"
-        private const val DEPTH_LIMIT = 3
         private const val ANCESTOR_LIMIT = 12
         private const val MAX_ATTEMPTS = 20
 

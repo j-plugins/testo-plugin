@@ -7,8 +7,8 @@ import com.github.xepozz.testo.coverage.applyTestoCoverage
 import com.github.xepozz.testo.coverage.closeTestoCoverage
 import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.tests.TestoConsoleProperties
-import com.github.xepozz.testo.tests.console.TestoChannelHistory
 import com.github.xepozz.testo.tests.console.TestoConsoleAugmenter
+import com.github.xepozz.testo.tests.console.TestoReplaySelection
 import com.github.xepozz.testo.tests.console.TestoReportRef
 import com.github.xepozz.testo.tests.console.TestoRunTimings
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
@@ -103,7 +103,7 @@ internal class TestoRunReplayProfile(
                         feed(handler)
                         applyArchivedCoverage()
                         val url = targetUrl ?: return@executeOnPooledThread
-                        (console as? SMTRunnerConsoleView)?.let { TestoChannelHistory.selectWhenReady(it, url) }
+                        (console as? SMTRunnerConsoleView)?.let { TestoReplaySelection.selectWhenReady(it, url) }
                     }
                 }
             })

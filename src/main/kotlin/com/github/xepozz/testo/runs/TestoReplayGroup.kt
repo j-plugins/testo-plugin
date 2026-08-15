@@ -45,12 +45,13 @@ class TestoReplayGroup(
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
     override fun getChildren(e: AnActionEvent?): Array<AnAction> = arrayOf(
-        ExportAction(),
         Separator.create(TestoBundle.message("testo.runs.replay.retention.title")),
         RetentionOption(RunRetention.AUTO, "testo.runs.replay.keep"),
         RetentionOption(RunRetention.DISCARD, "testo.runs.replay.discard"),
         RetentionOption(RunRetention.LOCKED, "testo.runs.replay.lock"),
+        // The two file gestures are one pair — a run leaves as a zip and comes back as one.
         Separator.getInstance(),
+        ExportAction(),
         ImportAction(),
     )
 

@@ -155,8 +155,13 @@
             <separator/>
             <action id="Testo.RunHistory"
                     class="com.github.xepozz.testo.runs.TestoRunHistoryAction"/>
-            <group id="Testo.RunRetention"
-                   class="com.github.xepozz.testo.runs.TestoRunRetentionGroup"/>
+        </group>
+
+        <!-- Run with Coverage and Modify Run Configuration are inside the platform's "More Run/Debug" submenu; on a
+             test tree they are everyday actions, so they are offered on the popup's own level as well. -->
+        <group id="Testo.TestTreeRunContext"
+               class="com.github.xepozz.testo.tests.actions.TestoTestTreeRunContextGroup">
+            <add-to-group group-id="TestTreePopupMenu" anchor="after" relative-to-action="RunContextGroup"/>
         </group>
         <action id="Testo.AddSkippedPath"
                 class="com.github.xepozz.testo.tests.actions.TestoAddSkippedPathAction"

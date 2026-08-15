@@ -130,7 +130,8 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoRerunFailedTestsAction.kt   # failed leaves → explicit --filter list
 │   │   ├── TestoRerunWithExecutorAction.kt  # rerun in Run/Debug/Coverage + split button
 │   │   ├── TestoRerunStyle.kt               # MIRROR_AWARE vs SPLIT_BUTTON toolbar styles
-│   │   └── TestoRunCommandAction.kt         # "Run Testo <command>" (Run Anything)
+│   │   ├── TestoRunCommandAction.kt         # "Run Testo <command>" (Run Anything)
+│   │   └── TestoTestTreeRunContextGroup.kt  # coverage + modify config, lifted out of the popup's submenu
 │   │
 │   ├── console/                    # the channel console subsystem (largest area)
 │   │   ├── TestoOutputToGeneralEventsConverter.kt  # reads channel/level/icon/color off SM messages
@@ -141,7 +142,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoLogLevelFilterAction.kt     # toolbar dropdown for the filter
 │   │   ├── TestoChannelsUi.kt      # the tabbed channel view (~1150 lines) + testoDisplayName()
 │   │   ├── TestoConsoleAugmenter.kt         # ExecutionListener that installs the channel tabs
-│   │   ├── TestoChannelHistory.kt  # channel output ⇄ SMTestProxy.metainfo (platform import) + tree-ready polling
+│   │   ├── TestoReplaySelection.kt # selects a test's node once the replayed tree stops growing
 │   │   ├── TestoHistoryIndex.kt    # which test locations the run archive holds (+ lens refresh)
 │   │   ├── TestoTestStatus.kt      # the 8 cases of Testo\Core\Value\Status: wire name, icon, label
 │   │   ├── TestoStatusStore.kt     # per-test status/assertions + the tally the toolbar summary renders
@@ -188,9 +189,9 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoRunArchiver.kt         # finalizes a run: captures reports, writes the manifest, prunes
 │   ├── TestoRunReplayProfile.kt    # replays an archive through the live console properties
 │   ├── TestoRunArchive.kt          # a run as one zip: export, import (zip-slip guarded), export file name
-│   ├── TestoReplayGroup.kt         # toolbar "Replay": export / keep-discard-pin / import, for this tab's run
+│   ├── TestoReplayGroup.kt         # toolbar "Replay": keep-discard-lock + export/import, for this tab's run
 │   ├── TestoRunHistoryGroup.kt     # the "Test History" toolbar button, replacing the platform's
-│   └── TestoRunHistoryActions.kt   # Tools | Testo: history chooser + retention; the lens's lookups
+│   └── TestoRunHistoryActions.kt   # run kind icons + summaries, the retention submenu, the lens's lookups
 │
 └── ui/
     ├── TestoIconProvider.kt                 # Testo-marked icons for PHP test files
@@ -430,9 +431,8 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **`TestoNodeIndex` makes an id-keyed store readable from the tree.** `SMTestProxy` does not carry the id, but
   `SMTRunnerEventsListener.onTestStarted(proxy, nodeId, parentNodeId)` hands both out together. Hooked from
   `TestoOutputToGeneralEventsConverter.setProcessor`, before any output is read. Writes never consult it.
-- **Channel storage keys still go through `ChannelOutputStore.keyFor(name)`** and so inherit the name collision.
-  They cannot move to node ids: an imported history run has none, and `TestoChannelHistory` rebuilds its tabs from
-  the saved XML.
+- **Channel storage keys still go through `ChannelOutputStore.keyFor(name)`** and so inherit the name collision:
+  the channel UI is looked up by test name, which is all a tab has when the selection changes.
 - **`TestoChannelsUi` reaches `TestResultsPanel.myConsole` by reflection** — there is no public accessor. It
   degrades gracefully (logs a warning, no channel tabs) if the field disappears.
 - **The tree has one filter slot, shared with *Show passed* / *Show ignored*.** `TestoProgressAction.applyFilter` is
@@ -466,16 +466,24 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `ImportTestsGroup` + `ImportTestsFromFileAction` there, both opening a saved XML through the platform import — a
   console with none of our UI. We return `TestoRunHistoryGroup` instead, which lists the run archive and replays it.
   Actions without `RunTab.PREFERRED_PLACE = MORE_GROUP` land on the visible toolbar row, so no experimental key is
-  needed. Dropping `super` also drops the platform's "Import Test Results from file" from Testo tabs. The same array
-  is how expand/collapse reach the visible row. The array is laid out right-to-left (listed first = furthest right),
-  which is the only control over placement there — everything in it lands after the platform's own actions.
+  needed. Dropping `super` also drops the platform's "Import Test Results from file" from Testo tabs — deliberate:
+  our own export/import is the *Replay* group, and the platform's counterpart opens a console with none of our UI.
+  Its export half is gone for the same reason (`getConfiguration()` answers the replay profile, and `ToolbarPanel`
+  only builds `ExportTestResultsAction` for a real `RunConfiguration`). The same array is how expand/collapse reach
+  the visible row. The array is laid out right-to-left (listed first = furthest right), which is the only control
+  over placement there — everything in it lands after the platform's own actions.
 - **`TestoToolbarLayoutAction` rearranges the platform's toolbar from inside it.** `ToolbarPanel` builds the sort
   popup and the overflow group inline — no ids, no extension point, no `CustomActionsSchema` entry — and hands a
   snapshot of the visible group to `RunTab`, so the group the user sees is reachable only from an action sitting in
   it. This invisible action walks up to the toolbars around it (a bounded number of update passes, then it gives up
-  for good) and moves the sort popup into the overflow group and the platform's expand/collapse out of it. Matched
-  structurally — a popup group holding `SortByDurationAction`, a group class named `MoreActionGroup`, the
-  expand/collapse icons — so a platform reshuffle makes it a no-op rather than a breakage.
+  for good), finds the one whose place is `TestTreeViewToolbar`, and moves the sort popup — with the separator that
+  preceded it — into the overflow group, and the platform's expand/collapse out of it. Matched structurally — a popup
+  group holding `SortByDurationAction`, a group class named `MoreActionGroup`, the expand/collapse icons — so a
+  platform reshuffle makes it a no-op rather than a breakage.
+- **Run with Coverage sits behind the platform's "More Run/Debug" submenu**, and the rule that puts it there is
+  `ExecutorRegistryImpl` sorting every executor but Run and Debug into `RunContextGroupMore`, switched by a global
+  registry key. `TestoTestTreeRunContextGroup` therefore borrows the same actions by id (the coverage executor's
+  `contextActionId`, plus `CreateRunConfiguration`) into the test tree's popup one level up, rather than moving them.
 - **`ConsoleFolding` instances are shared across consoles** and get no per-console reset; both foldings track
   state in a `ThreadLocal` and clear it on the first non-frame line.
 - **Debug installs channel tabs itself** (`TestoDebugRunner`): the augmenter's descriptor lookup misses debug

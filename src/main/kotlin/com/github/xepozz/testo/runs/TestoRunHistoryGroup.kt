@@ -46,13 +46,15 @@ class TestoRunHistoryGroup(
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
         if (e == null || project.isDisposed) return EMPTY_ARRAY
         val runs = TestoRunStore.getInstance(project).listRuns()
-        if (runs.isEmpty()) return arrayOf(NoRuns())
         val current = runCatching { currentRunDir()?.toAbsolutePath()?.normalize() }.getOrNull()
         return buildList<AnAction> {
+            if (runs.isEmpty()) add(NoRuns())
             runs.forEach { (dir, manifest) ->
                 add(ReplayRun(project, dir, manifest, dir.toAbsolutePath().normalize() == current))
             }
             add(Separator.getInstance())
+            // How much of this list is kept belongs with the list itself, not in a menu three clicks away.
+            add(TestoRunRetentionGroup())
             add(ClearHistory(project, currentRunDir))
         }.toTypedArray()
     }

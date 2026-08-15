@@ -20,15 +20,9 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
         ApplicationManager.getApplication().invokeLater {
             val descriptor = findDescriptor(executorId, handler) ?: return@invokeLater
             val console = descriptor.executionConsole as? SMTRunnerConsoleView ?: return@invokeLater
-            val props = console.properties
-            when {
-                // Live run — and a replayed archive, which runs on the same properties, so it gets the same UI.
-                props is TestoConsoleProperties -> installChannels(project, console, props, handler)
-                // Platform "Import Test Results" (the history clock dropdown) of a Testo run: an imported console with no
-                // Testo run profile. Recognized by class name so we keep no compile-time tie to the internal
-                // ImportedTestConsoleProperties; rebuild channels from the metainfo the run stored on each proxy.
-                isImportedConsole(props) -> TestoChannelHistory.installForImport(project, console)
-            }
+            // Live run — and a replayed archive, which runs on the same properties, so it gets the same UI.
+            val props = console.properties as? TestoConsoleProperties ?: return@invokeLater
+            installChannels(project, console, props, handler)
         }
     }
 
@@ -43,17 +37,6 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
         }
     }
 
-    // True when the console's properties are (a subclass of) the platform's imported-history properties, matched by FQN
-    // so this carries no bytecode reference to the @ApiStatus.Internal class.
-    private fun isImportedConsole(props: Any?): Boolean {
-        var c: Class<*>? = props?.javaClass
-        while (c != null) {
-            if (c.name == IMPORTED_CONSOLE_PROPERTIES_FQN) return true
-            c = c.superclass
-        }
-        return false
-    }
-
     private fun findDescriptor(executorId: String, handler: ProcessHandler): RunContentDescriptor? {
         val manager = RunContentManager.getInstance(project)
         ExecutorRegistry.getInstance().getExecutorById(executorId)?.let { executor ->
@@ -63,9 +46,6 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
     }
 
     companion object {
-        private const val IMPORTED_CONSOLE_PROPERTIES_FQN =
-            "com.intellij.execution.testframework.sm.runner.history.ImportedTestConsoleProperties"
-
         // Single entry point for wiring the channel tabs, shared by the run-path listener above and the debug runner
         // (which installs them directly because its descriptor isn't registered when processStarted fires). The
         // channelsInstalled flag keeps a second caller for the same console from installing twice.
@@ -86,8 +66,6 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
                 props.statusStore,
                 verdict = props.progressAction::currentVerdict,
             ) { key -> props.channelStore.description(key) }
-            // Persist each test's channel output into proxy metainfo so an imported-history run can rebuild the tabs.
-            TestoChannelHistory.subscribeMetainfoWriter(project, console, props.channelStore)
             props.progressAction.attachTo(
                 console,
                 props.statusStore,

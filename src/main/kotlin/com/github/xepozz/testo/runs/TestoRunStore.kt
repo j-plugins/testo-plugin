@@ -58,17 +58,22 @@ class TestoRunStore(private val project: Project) {
     /**
      * Unpacks an exported run into the archive and returns it. The directory is named after the run it holds, so it
      * sorts with the rest; the manifest is what decides the zip was one of ours at all.
+     *
+     * An imported run comes in locked: it was carried here by hand, often from another machine, and rotation deleting
+     * it after ten local runs would throw away the one copy that exists.
      */
     fun importRun(zip: Path): Pair<Path, TestoRunManifest>? {
         val staging = root().resolve("import-${System.currentTimeMillis()}")
         return runCatching {
             unzipRunDirectory(zip, staging)
-            val manifest = readManifest(staging) ?: run {
+            val imported = readManifest(staging) ?: run {
                 FileUtil.delete(staging)
                 return null
             }
+            val manifest = imported.copy(retention = RunRetention.LOCKED)
             val target = freeDirectory(manifest)
             Files.move(staging, target)
+            writeManifest(target, manifest)
             target to manifest
         }.onFailure {
             LOG.warn("Failed to import a Testo run from $zip", it)

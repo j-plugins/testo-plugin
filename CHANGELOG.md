@@ -15,14 +15,19 @@
   button as a full Testo console: channels, statuses, report buttons and that run's own coverage.
 - *Show history* above a test replays the newest archived run containing that test and selects its node.
 - How many archived runs to keep is set in *Tools | Testo*; the history list clears itself from its own menu.
-- *Expand All* / *Collapse All* now sit on the toolbar itself rather than inside its overflow menu, and the sort
-  button moves the other way, into that menu.
+- *Expand All* / *Collapse All* now sit on the toolbar itself, next to *Show Passed* / *Show Ignored*, and the sort
+  button moves the other way, into the overflow menu.
 - A tab opened from the history reruns with the executor the archived run used: a coverage run reruns with coverage.
 - A *Replay* button on the test toolbar exports the run as a single archive and imports one back, and says what the
   history may do with it: keep it, drop it, or lock it so retention never touches it.
 - Every report a run announces is archived with it — an HTML report travels with its assets — so a replayed run opens
   its own reports rather than whatever the latest run left behind.
-- The history list marks the run the tab is showing in bold, and puts a lock on the locked ones.
+- The history list marks the run the tab is showing in bold, and puts a lock on the locked ones, and each entry wears
+  the icon of what the run was: run, debug or coverage.
+- How many runs the history keeps is set from the history list itself, right above the button that clears it.
+- An imported run comes in locked, so retention never deletes the one copy of a run carried in from elsewhere.
+- The test tree's context menu offers *Run with Coverage* and *Modify Run Configuration* on its own level, instead of
+  only inside the *More Run/Debug* submenu.
 
 ### Fixed
 

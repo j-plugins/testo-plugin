@@ -110,12 +110,12 @@ internal fun runKindOf(executorId: String?): TestoRunKind = when (executorId) {
     else -> TestoRunKind.RUN
 }
 
+// The tool window icons rather than the toolbar ones: they are the plainer shapes, and the lock overlay has room to
+// sit on them.
 internal fun runKindIcon(kind: TestoRunKind): Icon = when (kind) {
-    // The tool window's own icon rather than the shield-and-arrow one: it is the plainer shape, and the lock overlay
-    // has room to sit on it.
     TestoRunKind.COVERAGE -> AllIcons.Toolwindows.ToolWindowCoverage
-    TestoRunKind.DEBUG -> AllIcons.Actions.StartDebugger
-    TestoRunKind.RUN -> AllIcons.Actions.Execute
+    TestoRunKind.DEBUG -> AllIcons.Toolwindows.ToolWindowDebugger
+    TestoRunKind.RUN -> AllIcons.Toolwindows.ToolWindowRun
 }
 
 /** The history entry's icon: what the run was, wearing a lock when the user locked it out of the rotation. */
