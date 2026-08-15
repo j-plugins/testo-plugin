@@ -6,19 +6,19 @@ import com.intellij.rt.coverage.data.LineData
 import com.intellij.rt.coverage.data.ProjectData
 
 /**
- * Builds the platform coverage model from a parsed report, mirroring how PHP's own `PhpCloverXMLOutputParser` populates
- * a [ProjectData]: one `ClassData` per file keyed by the forward-slashed source path (the annotator normalizes and, on
- * Windows, lower-cases both sides itself, so no further normalization here), lines laid out in a number-indexed array.
+ * Builds the platform coverage model from a parsed report: one `ClassData` per file, lines laid out in a
+ * number-indexed array. The key comes from [keyFor], which the runner uses to resolve the report path to the matching
+ * `VirtualFile.getPath()` so [com.github.xepozz.testo.coverage.TestoCoverageAnnotator] can look it up by the same path.
  *
  * Branch data is approximate by construction — Cobertura reports only `covered/total`, not *which* outcomes — so a
  * two-way line becomes a [com.intellij.rt.coverage.data.JumpData] and an n-way line a
  * [com.intellij.rt.coverage.data.SwitchData]; touching the default slot only when fully covered keeps a fully-covered
  * decision line green rather than partial. See `docs/coverage/report-formats.md` §2 and architecture §14.2.
  */
-fun ParsedReport.toProjectData(): ProjectData {
+fun ParsedReport.toProjectData(keyFor: (String) -> String = { it }): ProjectData {
     val projectData = ProjectData()
     for (file in files) {
-        val classData = projectData.getOrCreateClassData(file.filePath)
+        val classData = projectData.getOrCreateClassData(keyFor(file.filePath))
         val executable = file.lines.filter { it.line >= 0 }
         if (executable.isEmpty()) continue
         val lines = arrayOfNulls<LineData>(executable.maxOf { it.line } + 1)

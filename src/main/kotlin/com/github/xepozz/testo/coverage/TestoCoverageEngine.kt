@@ -11,7 +11,6 @@ import com.intellij.coverage.CoverageSuite
 import com.intellij.coverage.CoverageSuitesBundle
 import com.intellij.coverage.BaseCoverageSuite
 import com.intellij.coverage.view.CoverageViewExtension
-import com.intellij.coverage.view.DirectoryCoverageViewExtension
 import com.intellij.execution.configurations.RunConfigurationBase
 import com.intellij.execution.configurations.coverage.CoverageEnabledConfiguration
 import com.intellij.openapi.project.Project
@@ -96,11 +95,13 @@ class TestoCoverageEngine : CoverageEngine() {
 
     override fun acceptedByFilters(psiFile: PsiFile, suite: CoverageSuitesBundle): Boolean = true
 
+    // Must equal the ClassData keys the runner stored (VirtualFile.getPath()): the editor gutter does an exact
+    // getClassData(getQualifiedNames(file)) lookup. canonicalPath resolves symlinks and can diverge from the key.
     override fun getQualifiedNames(sourceFile: PsiFile): Set<String> =
-        sourceFile.virtualFile?.canonicalPath?.let { setOf(it) } ?: emptySet()
+        sourceFile.virtualFile?.path?.let { setOf(it) } ?: emptySet()
 
     override fun createCoverageViewExtension(project: Project, suiteBundle: CoverageSuitesBundle): CoverageViewExtension =
-        DirectoryCoverageViewExtension(project, getCoverageAnnotator(project), suiteBundle)
+        TestoCoverageViewExtension(project, TestoCoverageAnnotator.getInstance(project), suiteBundle)
 
     companion object {
         val INSTANCE = TestoCoverageEngine()

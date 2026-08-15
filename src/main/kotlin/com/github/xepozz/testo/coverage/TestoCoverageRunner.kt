@@ -11,6 +11,7 @@ import com.intellij.coverage.CoverageSuite
 import com.intellij.coverage.FailedCoverageLoadingResult
 import com.intellij.coverage.SuccessCoverageLoadingResult
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.vfs.LocalFileSystem
 import java.io.File
 
 /**
@@ -38,7 +39,11 @@ class TestoCoverageRunner : CoverageRunner() {
             val report = parseCoverageReport(sessionDataFile.toPath(), suite?.format)
             suite?.applyParsed(report.hasBranches, report.perTest)
             suite?.project?.let { TestoCoverageByTestIndex.getInstance(it).update(report.perTest) }
-            SuccessCoverageLoadingResult(report.toProjectData())
+            // Key each ClassData by the resolved VirtualFile path so it matches how TestoCoverageAnnotator looks files up.
+            val lfs = LocalFileSystem.getInstance()
+            val projectData = report.toProjectData { path -> lfs.findFileByPath(path)?.path ?: path }
+            LOG.info("Testo coverage loaded: ${report.format} ${projectData.classes.size} files from $sessionDataFile")
+            SuccessCoverageLoadingResult(projectData)
         } catch (e: CoverageParseException) {
             LOG.warn("Failed to load Testo coverage from $sessionDataFile", e)
             reporter.reportError(e)
