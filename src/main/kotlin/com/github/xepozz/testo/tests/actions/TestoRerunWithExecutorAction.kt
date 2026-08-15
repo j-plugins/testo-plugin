@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.tests.actions
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.runs.TestoRunReplayProfile
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.ExecutionManager
 import com.intellij.execution.ExecutorRegistry
@@ -33,11 +34,51 @@ internal fun ExecutionEnvironment.testoRunProfile(): RunProfile? =
         // A replayed archive: rerun runs the configuration the archived run was started with, restored from its
         // manifest. (An archive that predates that recording restores a bare template — it reruns nothing useful,
         // but nothing destructive either.)
-        is com.github.xepozz.testo.runs.TestoRunReplayProfile -> profile.testoConfiguration
+        is TestoRunReplayProfile -> profile.testoConfiguration
         else -> null
     }
 
 internal fun ExecutionEnvironment.isTestoRunTab(): Boolean = testoRunProfile() != null
+
+/**
+ * The executor a rerun of this tab should use: the tab's own, except on a replayed archive — that tab is opened by the
+ * Run executor whatever it holds, so a rerun there follows the *archived* run instead (a coverage archive reruns with
+ * coverage). Null when the environment names no executor we can run.
+ */
+internal fun ExecutionEnvironment.testoRerunExecutorId(): String? {
+    val archived = (runProfile as? TestoRunReplayProfile)?.executorId
+        ?.takeIf { ExecutorRegistry.getInstance().getExecutorById(it) != null }
+    return archived ?: executor.id
+}
+
+/** Whether this tab is a replayed archive — a rerun there launches the tests rather than replaying the log again. */
+internal fun ExecutionEnvironment.isTestoReplay(): Boolean = runProfile is TestoRunReplayProfile
+
+/**
+ * Launches [target] under [executorId] the way the platform's own executor action does — through
+ * `RunnerAndConfigurationSettings`, so the executor's `RunnerSettings` are attached (e.g. `CoverageRunnerData`, without
+ * which the Coverage tool window never opens).
+ */
+internal fun relaunchTesto(e: AnActionEvent, environment: ExecutionEnvironment, target: RunProfile, executorId: String) {
+    val executor = ExecutorRegistry.getInstance().getExecutorById(executorId) ?: return
+    val settings = settingsFor(environment, target) ?: return
+    val relaunch = ExecutionEnvironmentBuilder.createOrNull(executor, settings)
+        ?.dataContext(e.dataContext)
+        ?.build()
+        ?: return
+    ExecutionManager.getInstance(relaunch.project).restartRunProfile(relaunch)
+}
+
+// Reuse the tab's saved settings when they describe this exact config; for the "rerun failed" clone and a replay's
+// restored configuration (neither lives in RunManager) wrap it in throwaway settings so the RunnerSettings are created.
+private fun settingsFor(environment: ExecutionEnvironment, target: RunProfile): RunnerAndConfigurationSettings? {
+    environment.runnerAndConfigurationSettings
+        ?.takeIf { it.configuration === target }
+        ?.let { return it }
+    val configuration = target as? RunConfiguration ?: return null
+    val factory = configuration.factory ?: return null
+    return RunManager.getInstance(configuration.project).createConfiguration(configuration, factory)
+}
 
 open class TestoRerunWithExecutorAction(
     text: String,
@@ -68,27 +109,7 @@ open class TestoRerunWithExecutorAction(
     override fun actionPerformed(e: AnActionEvent) {
         val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT) ?: return
         val target = environment.testoRunProfile() ?: return
-        val executor = ExecutorRegistry.getInstance().getExecutorById(executorId) ?: return
-        // Build the env from RunnerAndConfigurationSettings, the way the platform executor action does, so the
-        // executor's own RunnerSettings are attached (e.g. CoverageRunnerData — without it the Coverage tool window
-        // never opens).
-        val settings = settingsFor(environment, target) ?: return
-        val relaunch = ExecutionEnvironmentBuilder.createOrNull(executor, settings)
-            ?.dataContext(e.dataContext)
-            ?.build()
-            ?: return
-        ExecutionManager.getInstance(relaunch.project).restartRunProfile(relaunch)
-    }
-
-    // Reuse the tab's saved settings when they describe this exact config; for the "rerun failed" clone (which lives
-    // outside RunManager) wrap it in throwaway settings so the executor's RunnerSettings are still created.
-    private fun settingsFor(environment: ExecutionEnvironment, target: RunProfile): RunnerAndConfigurationSettings? {
-        environment.runnerAndConfigurationSettings
-            ?.takeIf { it.configuration === target }
-            ?.let { return it }
-        val configuration = target as? RunConfiguration ?: return null
-        val factory = configuration.factory ?: return null
-        return RunManager.getInstance(configuration.project).createConfiguration(configuration, factory)
+        relaunchTesto(e, environment, target, executorId)
     }
 }
 
@@ -121,13 +142,33 @@ class TestoRerunCurrentAction : AnAction(), DumbAware {
     override fun update(e: AnActionEvent) {
         val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT)
         e.presentation.isEnabledAndVisible = environment != null
-        if (environment != null) e.presentation.icon = environment.executor.icon ?: AllIcons.Actions.Restart
+        if (environment != null) e.presentation.icon = rerunIcon(environment)
     }
 
-    override fun actionPerformed(e: AnActionEvent) {
-        val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT) ?: return
-        ExecutionManager.getInstance(environment.project).restartRunProfile(environment)
+    override fun actionPerformed(e: AnActionEvent) = rerunCurrent(e)
+}
+
+/** The icon of the executor a rerun would use — the archived one on a replayed tab, this tab's otherwise. */
+internal fun rerunIcon(environment: ExecutionEnvironment): Icon {
+    val executorId = environment.testoRerunExecutorId()
+    return executorId?.let { ExecutorRegistry.getInstance().getExecutorById(it)?.icon }
+        ?: environment.executor.icon
+        ?: AllIcons.Actions.Restart
+}
+
+/**
+ * Restarts what the tab shows. A replayed archive is restarted as the *run* it holds — replaying the recorded log
+ * again would be a no-op the user cannot tell from a rerun that did nothing.
+ */
+internal fun rerunCurrent(e: AnActionEvent) {
+    val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT) ?: return
+    val target = environment.testoRunProfile()
+    val executorId = environment.testoRerunExecutorId()
+    if (environment.isTestoReplay() && target != null && executorId != null) {
+        relaunchTesto(e, environment, target, executorId)
+        return
     }
+    ExecutionManager.getInstance(environment.project).restartRunProfile(environment)
 }
 
 class TestoRerunSplitButtonAction : SplitButtonAction(buildExecutorGroup()) {
@@ -187,11 +228,8 @@ class TestoAwareRerunAction : AnAction(), DumbAware {
             return
         }
         e.presentation.isEnabledAndVisible = true
-        e.presentation.icon = environment.executor.icon ?: AllIcons.Actions.Restart
+        e.presentation.icon = rerunIcon(environment)
     }
 
-    override fun actionPerformed(e: AnActionEvent) {
-        val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT) ?: return
-        ExecutionManager.getInstance(environment.project).restartRunProfile(environment)
-    }
+    override fun actionPerformed(e: AnActionEvent) = rerunCurrent(e)
 }

@@ -532,7 +532,9 @@ class TestoReportsAction(
         private val SCHEDULED_ICON: Icon = IconUtil.colorize(ICON, JBColor(0x59A869, 0x499C54))
 
         // Coverage cell: the normal coverage icon once the report is on disk, greyed while it is still pending.
-        private val COVERAGE_ICON: Icon = AllIcons.General.RunWithCoverage
+        // The Coverage tool window's own icon — the button opens exactly that. (The platform spells it
+        // `ToolWindowCoverage`; there is no `Toolwindows.Coverage`.)
+        private val COVERAGE_ICON: Icon = AllIcons.Toolwindows.ToolWindowCoverage
         private val COVERAGE_PENDING_ICON: Icon = IconLoader.getDisabledIcon(COVERAGE_ICON)
 
         // Read at paint time, never cached: the scale changes with the monitor the IDE was dragged to.

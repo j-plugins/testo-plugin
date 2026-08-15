@@ -9,6 +9,7 @@ import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoChannelHistory
 import com.github.xepozz.testo.tests.console.TestoConsoleAugmenter
+import com.github.xepozz.testo.tests.console.TestoReportRef
 import com.github.xepozz.testo.tests.console.TestoRunTimings
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.github.xepozz.testo.tests.run.TestoRunConfigurationType
@@ -53,6 +54,9 @@ internal class TestoRunReplayProfile(
     private val targetUrl: String? = null,
 ) : RunProfile {
 
+    /** The executor the archived run used — what the tab's rerun button offers, whatever executor opened the replay. */
+    val executorId: String get() = manifest.executorId
+
     /**
      * The archived run's own configuration, restored from the manifest — what the rerun buttons on a replayed tab
      * run. Falls back to a bare template for an archive that predates the recording (nothing to rerun there, but the
@@ -83,12 +87,7 @@ internal class TestoRunReplayProfile(
             val marks = manifest.timings.takeIf { !it.isEmpty }
                 ?: TestoRunTimings.Marks(startedAt = manifest.startedAt, finishedAt = manifest.finishedAt)
             if (!marks.isEmpty) props.runTimings.restore(marks)
-            // The report buttons resolve announced paths through this: the run's own captured copies, not whatever the
-            // next run left at the original path.
-            props.reportPathOverride = { announced ->
-                manifest.reports.firstOrNull { it.path == announced && it.stored != null }
-                    ?.stored?.let { runDir.resolve(it).toAbsolutePath().toString() }
-            }
+            seedReports(props)
             // The command line is not part of the recorded stream (the live run puts it on the channel store, not the
             // process output), so the header is reprinted from the manifest — with the original run's clock.
             manifest.commandLine.takeIf { it.isNotBlank() }?.let { commandLine ->
@@ -120,6 +119,28 @@ internal class TestoRunReplayProfile(
             LOG.warn("Testo run replay failed for $runDir", e)
         } finally {
             handler.destroyProcess()
+        }
+    }
+
+    /**
+     * Fills the report buttons from the archive rather than from the replayed announcements: the recorded log names
+     * paths a later run has since overwritten, while the archive holds this run's own copies. A coverage report with
+     * no copy lost the dedup to one that has it, so it is not offered at all.
+     */
+    private fun seedReports(props: TestoConsoleProperties) {
+        manifest.reports.forEach { report ->
+            val captured = report.stored?.let { runDir.resolve(it).toAbsolutePath().toString() }
+            if (captured == null && CoverageFormat.fromId(report.format) != null) return@forEach
+            props.reportStore.note(
+                TestoReportRef(
+                    format = report.format,
+                    path = captured ?: report.path,
+                    // A captured copy is already a local absolute path; nothing is left to resolve it from.
+                    relativePath = if (captured != null) null else report.relativePath,
+                    name = report.name,
+                    schemaVersion = null,
+                )
+            )
         }
     }
 

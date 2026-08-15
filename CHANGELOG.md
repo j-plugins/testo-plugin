@@ -15,7 +15,9 @@
   button as a full Testo console: channels, statuses, report buttons and that run's own coverage.
 - *Show history* above a test replays the newest archived run containing that test and selects its node.
 - How many archived runs to keep is set in *Tools | Testo*; the history list clears itself from its own menu.
-- *Expand All* / *Collapse All* now sit on the toolbar itself rather than inside its overflow menu.
+- *Expand All* / *Collapse All* now sit on the toolbar itself rather than inside its overflow menu, and the sort
+  button moves the other way, into that menu.
+- A tab opened from the history reruns with the executor the archived run used: a coverage run reruns with coverage.
 
 ### Fixed
 

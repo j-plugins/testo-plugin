@@ -154,6 +154,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoReportAutoOpen.kt  # when a report opens on its own: this-run arm / project / application scopes
 │   │   ├── TestoReportAction.kt    # right-aligned panel of hand-drawn report buttons (WebView / browser / copy)
 │   │   ├── TestoTreeToolbarActions.kt       # expand/collapse for the test tree and the Coverage view alike
+│   │   ├── TestoToolbarLayout.kt            # moves the platform's sort popup into the toolbar's overflow group
 │   │   ├── TestoTestTreeDecorator.kt        # wraps the tree's cell renderer: status icons + description tooltips
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
@@ -464,8 +465,15 @@ Non-obvious constraints already paid for in blood — read before touching the r
   console with none of our UI. We return `TestoRunHistoryGroup` instead, which lists the run archive and replays it.
   Actions without `RunTab.PREFERRED_PLACE = MORE_GROUP` land on the visible toolbar row, so no experimental key is
   needed. Dropping `super` also drops the platform's "Import Test Results from file" from Testo tabs. The same array
-  is how expand/collapse reach the visible row — the platform keeps its own pair inside the overflow group, and
-  nothing can move or remove them (`ToolbarPanel` builds those groups inline, with no ids and no extension point).
+  is how expand/collapse reach the visible row. The array is laid out right-to-left (listed first = furthest right),
+  which is the only control over placement there — everything in it lands after the platform's own actions.
+- **`TestoToolbarLayoutAction` rearranges the platform's toolbar from inside it.** `ToolbarPanel` builds the sort
+  popup and the overflow group inline — no ids, no extension point, no `CustomActionsSchema` entry — and hands a
+  snapshot of the visible group to `RunTab`, so the group the user sees is reachable only from an action sitting in
+  it. This invisible action walks up to the toolbars around it (a bounded number of update passes, then it gives up
+  for good) and moves the sort popup into the overflow group and the platform's expand/collapse out of it. Matched
+  structurally — a popup group holding `SortByDurationAction`, a group class named `MoreActionGroup`, the
+  expand/collapse icons — so a platform reshuffle makes it a no-op rather than a breakage.
 - **`ConsoleFolding` instances are shared across consoles** and get no per-console reset; both foldings track
   state in a `ThreadLocal` and clear it on the first non-frame line.
 - **Debug installs channel tabs itself** (`TestoDebugRunner`): the augmenter's descriptor lookup misses debug

@@ -1,6 +1,8 @@
 package com.github.xepozz.testo.runs
 
+import com.github.xepozz.testo.coverage.dedupeCoverageByFormat
 import com.github.xepozz.testo.coverage.format.CoverageFormat
+import com.github.xepozz.testo.coverage.perTest.TestoCoverageKeys
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoHistoryIndex
 import com.github.xepozz.testo.tests.console.TestoReportRef
@@ -37,12 +39,16 @@ internal object TestoRunArchiver {
                 recording.closeOutput()
                 val mapToLocal: (String) -> String? = { runCatching { props.pathMapper.getLocalPath(it) }.getOrNull() }
                 val writtenAfter = props.reportStore.runStartedAt
+                // Only what survives the one-per-format dedup is copied: it is the report the run actually applied,
+                // and a replay reads the archive as the whole truth about this run's coverage.
+                val resolved = props.reportStore.coverage().mapNotNull { ref ->
+                    resolveCoverageDataFile(ref, project, mapToLocal, writtenAfter)?.let { ref to it }
+                }
+                val flagKeys = props.coverageFlagPaths.map { TestoCoverageKeys.normalize(it.toString()) }.toSet()
+                val winners = dedupeCoverageByFormat(resolved, flagKeys).toMap()
                 val usedNames = HashSet<String>()
                 val reports = props.reportStore.all().map { ref ->
-                    val stored = if (ref.isCoverage) {
-                        resolveCoverageDataFile(ref, project, mapToLocal, writtenAfter)
-                            ?.let { capture(recording, ref, it, usedNames) }
-                    } else null
+                    val stored = winners[ref]?.let { capture(recording, ref, it, usedNames) }
                     StoredReport(ref.format, ref.name, ref.path, ref.relativePath, stored)
                 }
                 recording.writeLocations()

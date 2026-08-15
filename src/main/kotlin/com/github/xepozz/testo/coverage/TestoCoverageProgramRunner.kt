@@ -87,11 +87,12 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
         // The platform's CoverageHelper loads exactly one file; a Testo run can produce several reports (flags plus
         // testo.php writers), so termination triggers our own merged apply instead.
         val flagDataFiles = flagLocalDataFiles(flags)
+        val props = (executionResult.executionConsole as? SMTRunnerConsoleView)?.properties as? TestoConsoleProperties
+        // Handed over rather than kept here: the run archive dedupes the same way, and it only sees the properties.
+        props?.coverageFlagPaths = flagDataFiles
         executionResult.processHandler.addProcessListener(object : ProcessAdapter() {
             override fun processTerminated(event: ProcessEvent) {
-                val props = (executionResult.executionConsole as? SMTRunnerConsoleView)?.properties
-                    as? TestoConsoleProperties ?: return
-                autoApplyCoverage(runConfiguration.project, props, flagDataFiles)
+                autoApplyCoverage(runConfiguration.project, props ?: return, flagDataFiles)
             }
         })
         return RunContentBuilder(executionResult, env).showRunContent(env.contentToReuse)

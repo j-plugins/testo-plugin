@@ -47,10 +47,12 @@ class TestoOutputToGeneralEventsConverter(
     private val testoProperties: com.github.xepozz.testo.tests.TestoConsoleProperties?
         get() = consoleProperties as? com.github.xepozz.testo.tests.TestoConsoleProperties
 
+    private val isReplay: Boolean get() = testoProperties?.replayMode == true
+
     override fun process(text: String, outputType: Key<*>) {
         if (runnerVersion == null) runnerVersion = TestoProtocolGate.parseVersion(text)
         // Second route: a message behind a colour escape never reaches parseServiceMessage. The store dedups by path.
-        TestoReportRef.fromServiceMessageLine(text)?.let { reportStore.note(it) }
+        if (!isReplay) TestoReportRef.fromServiceMessageLine(text)?.let { reportStore.note(it) }
         recordChunk(text, outputType)
         super.process(text, outputType)
     }
@@ -144,7 +146,9 @@ class TestoOutputToGeneralEventsConverter(
 
             // Testo's own message, naming a report of this run. Not forwarded, for the same reason as buildProblem.
             TESTO_REPORT -> {
-                TestoReportRef.fromAttributes(attrs)?.let { reportStore.note(it) }
+                // A replay's reports come from its archive, where they were deduped and captured; the announcements
+                // in the recorded log name paths the next run has since overwritten.
+                if (!isReplay) TestoReportRef.fromAttributes(attrs)?.let { reportStore.note(it) }
                 return
             }
 
