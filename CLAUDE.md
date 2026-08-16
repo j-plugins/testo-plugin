@@ -147,7 +147,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── ChannelOutputStore.kt   # per-test live buffers: all / output / per-channel
 │   │   ├── ChannelIcons.kt         # channel name or icon= hint → platform icon
 │   │   ├── LogLevelFilter.kt       # persisted display-time log-level filter
-│   │   ├── TestoLogLevelFilterAction.kt     # toolbar dropdown for the filter
+│   │   ├── TestoLogLevelFilterAction.kt     # dropdown for the filter, on the console's own vertical toolbar
 │   │   ├── TestoChannelsUi.kt      # the tabbed channel view (~1150 lines) + testoDisplayName()
 │   │   ├── TestoConsoleAugmenter.kt         # ExecutionListener that installs the channel tabs
 │   │   ├── TestoReplaySelection.kt # selects a test's node once the replayed tree stops growing
@@ -468,8 +468,14 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to
   `SMTRunnerEventsListener`: a short run finishes replaying before the augmenter hands us the console, so the
   events are already fired and missed.
-- **The log-level filter is added via `createImportActions`, not `appendAdditionalActions`** — the latter is routed
-  into the gear submenu and would not survive the RunTab toolbar snapshot.
+- **The console's own vertical toolbar is reached through `ActionToolbar.getActionGroup()`.** `TestResultsPanel` takes
+  its console actions as a `protected final AnAction[]` and builds that toolbar once, from
+  `new DefaultActionGroup(myConsoleActions)` — so the array is closed, but the group it was copied into is not. The
+  log-level filter is appended there (after a separator) at install time, then `updateActionsAsync()`. The other seam,
+  `TabInfo.setTabPaneActions` (the entry-point strip at the right edge of the tab row, read off the **selected** tab —
+  so it would have to be set on every tab), was tried and dropped: it costs a row of its own.
+- **Whatever our own `createImportActions` returns must survive the RunTab toolbar snapshot** — `appendAdditionalActions`
+  is routed into the gear submenu instead and would not.
 - **`createImportActions` deliberately does not call `super`.** That array is the *only* source of the "Test History"
   button above the test tree (`ToolbarPanel` adds nothing else of its own): `SMTRunnerConsoleProperties` returns
   `ImportTestsGroup` + `ImportTestsFromFileAction` there, both opening a saved XML through the platform import — a

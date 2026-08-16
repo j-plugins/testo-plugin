@@ -51,6 +51,11 @@
 - The Command field: a test run is always `testo run`, and other subcommands are what *Run Anything* is for.
 - Parallel no longer sends a flag Testo does not have: the field is parked at 1 (no `--parallel`) until it does.
 
+### Changed
+
+- The *Log Levels* filter moved off the test toolbar onto the console's own toolbar, right of the channel tabs, and
+  wears a filter icon.
+
 ### Fixed
 
 - The Test Runner Options help button opens Testo's CLI reference.

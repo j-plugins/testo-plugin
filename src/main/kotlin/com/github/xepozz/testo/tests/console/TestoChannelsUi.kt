@@ -31,6 +31,8 @@ import com.intellij.openapi.editor.highlighter.EditorHighlighterFactory
 import com.intellij.openapi.editor.markup.HighlighterLayer
 import com.intellij.openapi.editor.markup.HighlighterTargetArea
 import com.intellij.openapi.editor.markup.TextAttributes
+import com.intellij.openapi.actionSystem.ActionToolbar
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditor
@@ -1108,11 +1110,28 @@ object TestoChannelsUi {
             })
             addComponentTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, original)
             holder.add(tabbed.component, BorderLayout.CENTER)
+            installLevelFilter(holder)
             holder.revalidate()
             holder.repaint()
             tabs = tabbed
             outputComponent = original
             return tabbed
+        }
+
+        // The log-level filter goes onto the vertical strip already sitting to the right of the output (print, clear,
+        // scroll to end) rather than onto a row of its own: it filters what that area shows, and the strip costs no
+        // extra space. TestResultsPanel wraps its console actions in a plain DefaultActionGroup and keeps no other way
+        // in — the array itself is `protected final`, and the toolbar is built from it once, at construction.
+        private fun installLevelFilter(holder: java.awt.Container) {
+            val toolbar = holder.components.firstNotNullOfOrNull { it as? ActionToolbar }
+            val group = toolbar?.actionGroup as? DefaultActionGroup
+            if (group == null) {
+                thisLogger().warn("Testo log level filter disabled: no console action toolbar beside the output")
+                return
+            }
+            group.addSeparator()
+            group.add(TestoLogLevelFilterAction(levelFilter))
+            toolbar.updateActionsAsync()
         }
 
         companion object {

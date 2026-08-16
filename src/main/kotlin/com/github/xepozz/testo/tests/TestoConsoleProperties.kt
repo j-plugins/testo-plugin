@@ -126,16 +126,15 @@ class TestoConsoleProperties(
 
     override fun isIdBasedTestTree() = true
 
-    // The log-level filter belongs on the test results toolbar's visible row. Adding it here (rather than via
-    // appendAdditionalActions, which the platform routes into the gear submenu) puts it among the primary actions at
-    // construction time — so it survives the snapshot that RunTab merges into the run tab's toolbar, and it shows in
-    // the standalone debug console toolbar too.
+    // Our own actions on the test results toolbar's visible row. Added here (rather than via appendAdditionalActions,
+    // which the platform routes into the gear submenu) they land among the primary actions at construction time — so
+    // they survive the snapshot that RunTab merges into the run tab's toolbar, and show in the standalone debug
+    // console toolbar too.
     public override fun createImportActions(): Array<com.intellij.openapi.actionSystem.AnAction> =
         arrayOf(
             // Laid out from the right edge inwards: listed first = furthest right. So this array reads right to left —
-            // the log-level filter sits at the right end of the group, expand/collapse at its left, next to the
-            // separator that follows Show Passed / Show Ignored.
-            com.github.xepozz.testo.tests.console.TestoLogLevelFilterAction(levelFilter),
+            // the replay group sits at the right end, expand/collapse at its left, next to the separator that follows
+            // Show Passed / Show Ignored.
             // This run's own archive: export it, decide what retention may do with it, load an exported one.
             com.github.xepozz.testo.runs.TestoReplayGroup(project, this),
             // Deliberately not super's: that array is where the platform's own "Test History" comes from, and its

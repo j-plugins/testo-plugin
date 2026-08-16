@@ -1,48 +1,36 @@
 package com.github.xepozz.testo.tests.console
 
 import com.github.xepozz.testo.TestoBundle
-import com.github.xepozz.testo.tests.TestoConsoleProperties
-import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.LangDataKeys
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.project.DumbAware
 
 /**
- * Toolbar dropdown that toggles which log levels the channel consoles show. "All" flips every seen level on/off at once;
+ * Dropdown that toggles which log levels the channel consoles show. "All" flips every seen level on/off at once;
  * each level below has its own checkbox. The menu lists exactly the levels encountered in the current run (ordered by
  * PSR severity), so it grows as new levels arrive. Toggling rebuilds the tabs via [LogLevelFilter.fireChange] — channel
  * tabs left empty by the filter disappear, and re-enabling a level brings them back.
  *
- * Registered statically on the run-tab toolbar (`RunTab.TopToolbar`), so a single shared instance is shown on every run
- * tab; it resolves the current tab's [LogLevelFilter] from the action context and hides itself on non-Testo tabs.
+ * Lives on the console's own vertical toolbar, right of the channel tabs (see [TestoChannelsUi]) — beside the output
+ * it filters, rather than on the test results toolbar which has nothing to do with channel output.
  */
-// explicitFilter is used by the debug runner, whose toolbar context carries no RUN_CONTENT_DESCRIPTOR to resolve from;
-// the statically-registered run-tab instance leaves it null and resolves the filter from the action context instead.
 class TestoLogLevelFilterAction(
-    private val explicitFilter: LogLevelFilter? = null,
+    private val filter: LogLevelFilter,
 ) : ActionGroup(), DumbAware {
     init {
         isPopup = true
-        templatePresentation.icon = AllIcons.Actions.Show
+        templatePresentation.icon = AllIcons.General.Filter
         templatePresentation.text = TestoBundle.message("testo.console.loglevel.filter.title")
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
-    override fun update(e: AnActionEvent) {
-        e.presentation.isEnabledAndVisible = resolveFilter(e) != null
-    }
-
-    private fun resolveFilter(e: AnActionEvent?): LogLevelFilter? = explicitFilter ?: resolveContextFilter(e)
-
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
-        val filter = resolveFilter(e) ?: return AnAction.EMPTY_ARRAY
         val levels = filter.seenLevels().sortedWith(LEVEL_ORDER)
         val children = mutableListOf<AnAction>(AllToggle())
         if (levels.isNotEmpty()) {
@@ -54,9 +42,8 @@ class TestoLogLevelFilterAction(
 
     private inner class AllToggle : ToggleAction(TestoBundle.message("testo.console.loglevel.filter.all")), DumbAware {
         override fun getActionUpdateThread() = ActionUpdateThread.EDT
-        override fun isSelected(e: AnActionEvent) = resolveFilter(e)?.isAllEnabled() ?: true
+        override fun isSelected(e: AnActionEvent) = filter.isAllEnabled()
         override fun setSelected(e: AnActionEvent, state: Boolean) {
-            val filter = resolveFilter(e) ?: return
             if (state) filter.enableAll() else filter.disableAll()
             filter.fireChange()
         }
@@ -64,22 +51,14 @@ class TestoLogLevelFilterAction(
 
     private inner class LevelToggle(private val level: String) : ToggleAction(humanize(level)), DumbAware {
         override fun getActionUpdateThread() = ActionUpdateThread.EDT
-        override fun isSelected(e: AnActionEvent) = resolveFilter(e)?.isHidden(level) == false
+        override fun isSelected(e: AnActionEvent) = !filter.isHidden(level)
         override fun setSelected(e: AnActionEvent, state: Boolean) {
-            val filter = resolveFilter(e) ?: return
             filter.setHidden(level, !state)
             filter.fireChange()
         }
     }
 
     companion object {
-        // Resolve the current run tab's Testo filter from context; null on any non-Testo run tab (hides the button).
-        private fun resolveContextFilter(e: AnActionEvent?): LogLevelFilter? {
-            val descriptor = e?.getData(LangDataKeys.RUN_CONTENT_DESCRIPTOR) ?: return null
-            val console = descriptor.executionConsole as? SMTRunnerConsoleView ?: return null
-            return (console.properties as? TestoConsoleProperties)?.levelFilter
-        }
-
         // PSR-3 severities, most severe first; levels outside this list sort after, alphabetically.
         private val PSR_ORDER = listOf(
             "emergency", "alert", "critical", "error", "warning", "notice", "info", "debug",
