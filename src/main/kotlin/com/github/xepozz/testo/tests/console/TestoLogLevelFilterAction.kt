@@ -16,8 +16,7 @@ import com.intellij.openapi.project.DumbAware
  * PSR severity), so it grows as new levels arrive. Toggling rebuilds the tabs via [LogLevelFilter.fireChange] — channel
  * tabs left empty by the filter disappear, and re-enabling a level brings them back.
  *
- * Lives on the console's own vertical toolbar, right of the channel tabs (see [TestoChannelsUi]) — beside the output
- * it filters, rather than on the test results toolbar which has nothing to do with channel output.
+ * Lives on the console's own vertical toolbar, beside the output it filters (installed by [TestoChannelsUi]).
  */
 class TestoLogLevelFilterAction(
     private val filter: LogLevelFilter,

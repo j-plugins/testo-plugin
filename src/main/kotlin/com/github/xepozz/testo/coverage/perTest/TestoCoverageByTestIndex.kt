@@ -6,12 +6,10 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 
 /**
- * Holds the latest per-test coverage for the project so consumers (the "how many tests cover this" lens, arch §9;
- * later TIA, §8) can read it with no active coverage session. Populated by [com.github.xepozz.testo.coverage.
- * TestoCoverageRunner] when a `coverage-xml` report is loaded.
+ * Holds the latest per-test coverage for the project so consumers can read it with no active coverage session.
+ * Populated by [com.github.xepozz.testo.coverage.TestoCoverageRunner] when a `coverage-xml` report is loaded.
  *
- * In-memory for now — it survives until the IDE closes or the next coverage-xml run replaces it. Cross-restart
- * persistence keyed by report mtime is the open item in architecture §14.4.
+ * In-memory: survives until the IDE closes or the next coverage-xml run replaces it.
  */
 @Service(Service.Level.PROJECT)
 class TestoCoverageByTestIndex {

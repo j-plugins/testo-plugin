@@ -37,7 +37,8 @@ internal object TestoHistoryIndex {
         val snapshot = cache[key]
         if (snapshot == null || snapshot.generation != current) scheduleRebuild(project, key, current)
         val urls = snapshot?.urls ?: cache[key]?.urls ?: return false
-        return url in urls || urls.any { it.startsWith(url) }
+        // `startsWith("$url::")`, not `startsWith(url)`: `…::testPay` must not answer for `…::testPayment`.
+        return url in urls || urls.any { it.startsWith("$url::") }
     }
 
     private fun scheduleRebuild(project: Project, key: String, generation: Long) {

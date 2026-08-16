@@ -405,14 +405,13 @@ class TestoReportsAction(
                 return
             }
             // resolveCoverageDataFile goes through the PHP path mapper and touches the filesystem — forbidden on the
-            // EDT, and this runs off a Swing timer on the EDT. Resolve on a pooled thread, apply back on the EDT.
+            // EDT, and this runs off a Swing timer on the EDT.
             if (resolving) return
             resolving = true
             val startedAt = reports.runStartedAt
-            val snapshot = coverage
             ApplicationManager.getApplication().executeOnPooledThread {
                 val found = LinkedHashMap<String, Path>()
-                for (ref in snapshot) {
+                for (ref in coverage) {
                     resolveCoverageDataFile(ref, project, mapToLocal, startedAt)?.let { found[ref.path] = it }
                 }
                 ApplicationManager.getApplication().invokeLater(

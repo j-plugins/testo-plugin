@@ -9,8 +9,8 @@ import com.jetbrains.php.lang.psi.elements.Method
 
 /**
  * The one place that maps a coverage [TestId] (a `\`-qualified class + method, as coverage-xml spells covering tests)
- * onto Testo's own identities — so navigation (§9) and a future TIA rerun (§8) cannot diverge. A `--filter` selector is
- * a pure string (available with no PSI); the `php_qn://` hint and PSI need the class resolved through [PhpIndex].
+ * onto Testo's own identities — so its consumers cannot diverge. A `--filter` selector is a pure string (available
+ * with no PSI); the `php_qn://` hint and PSI need the class resolved through [PhpIndex].
  */
 interface TestoTestIdentityMapper {
     /** `\Ns\FooTest::method` — the selector Testo's `--filter` accepts (matches TestoRunTarget.filterOf output). */

@@ -8,7 +8,7 @@ import java.nio.file.Path
  * coverage-xml: a directory — an `index.xml` overview plus one XML per source file, in PHPUnit's coverage schema (the
  * root element is still `<phpunit>`). Only executed lines that have covering tests are emitted (a per-test overlay, no
  * uncovered lines), so the per-file `<totals>` is what states a file's line count. Source file for a `<file href>` entry
- * is `<project source>/<href without .xml>`; the per-file XML sits at `<indexDir>/<href>`. See report-formats §3.
+ * is `<project source>/<href without .xml>`; the per-file XML sits at `<indexDir>/<href>`.
  */
 object CoverageXmlParser : TestoCoverageParser {
     override val format = CoverageFormat.COVERAGE_XML

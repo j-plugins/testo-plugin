@@ -67,7 +67,6 @@ class TestoCoverageViewExtension(
         return TestoCoverageByTestIndex.getInstance(project).data().testsUnder(file.path, file.isDirectory).size
     }
 
-
     // @Experimental (not @Internal) — the one public seam into the view's toolbar; verified present on 252 and 262.
     // The tree's context menu is not a seam: `CoverageView.createPopupGroup` is private and holds `EditSource` alone,
     // so "run the covering tests of this row" is offered from the toolbar, acting on the selection.
@@ -86,7 +85,6 @@ class TestoCoverageViewExtension(
     private fun hasPerTestData(): Boolean =
         mySuitesBundle.suites.filterIsInstance<TestoCoverageSuite>().any { it.format == CoverageFormat.COVERAGE_XML }
 
-    /** Distinct covering tests: the file's own set, a directory as the union over the files beneath it. */
     private inner class TestsColumnInfo :
         ColumnInfo<NodeDescriptor<*>, String>(TestoBundle.message("testo.coverage.view.column.tests")) {
         // One row is asked for per repaint and per sort comparison, and a directory means a walk of the whole map.

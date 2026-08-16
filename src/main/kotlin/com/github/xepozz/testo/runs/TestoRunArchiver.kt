@@ -1,7 +1,6 @@
 package com.github.xepozz.testo.runs
 
 import com.github.xepozz.testo.coverage.dedupeCoverageByFormat
-import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageKeys
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoHistoryIndex

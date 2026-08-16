@@ -52,7 +52,7 @@ class TestoCoveringTestsLineMarkerProvider : LineMarkerProvider {
             AllIcons.Toolwindows.ToolWindowRunWithCoverage,
             { label },
             { event, _ ->
-                TestoCoveringTestsPopup.show(project, tests, subject, null, RelativePoint(event))
+                TestoCoveringTestsPopup.show(project, tests, subject, RelativePoint(event))
             },
             GutterIconRenderer.Alignment.LEFT,
             { label },

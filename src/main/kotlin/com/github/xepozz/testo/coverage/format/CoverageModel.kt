@@ -2,7 +2,7 @@ package com.github.xepozz.testo.coverage.format
 
 /**
  * The three coverage report shapes Testo's `plugin/codecov` writes, identified by the `format=` attribute of the
- * `##teamcity[testoReport …]` announce (and by the CLI flag that produced them). See `docs/coverage/report-formats.md`.
+ * `##teamcity[testoReport …]` announce (and by the CLI flag that produced them).
  */
 enum class CoverageFormat(val id: String) {
     CLOVER("clover"),
@@ -32,7 +32,7 @@ data class TestId(val fqcn: String, val method: String) {
 /** A source location as it comes off a report: the file path is resolved+forward-slashed, not yet the platform key. */
 data class SourceLine(val filePath: String, val line: Int)
 
-/** `condition-coverage="P% (covered/total)"` from Cobertura. Identity of *which* branches is unknown (see arch §14.2). */
+/** `condition-coverage="P% (covered/total)"` from Cobertura. Identity of *which* branches is unknown. */
 data class BranchCoverage(val covered: Int, val total: Int)
 
 data class LineCoverage(val line: Int, val hits: Int, val branch: BranchCoverage? = null)
@@ -43,7 +43,7 @@ data class LineCoverage(val line: Int, val hits: Int, val branch: BranchCoverage
  */
 data class LineTotals(val total: Int, val executed: Int)
 
-/** One source file's coverage. [filePath] is the resolved absolute path, forward-slashed, ready to normalize (arch §6). */
+/** One source file's coverage. [filePath] is the resolved absolute path, forward-slashed, ready to normalize. */
 data class FileCoverage(val filePath: String, val lines: List<LineCoverage>, val totals: LineTotals? = null)
 
 /**
@@ -59,7 +59,7 @@ data class PerTestCoverage(
     }
 }
 
-/** The parsed report, format-neutral. Turned into a platform `ProjectData` by the coverage runner (arch §4.1, Phase 2). */
+/** The parsed report, format-neutral. Turned into a platform `ProjectData` by the coverage runner. */
 data class ParsedReport(
     val format: CoverageFormat,
     val files: List<FileCoverage>,

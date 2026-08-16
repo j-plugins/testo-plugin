@@ -4,7 +4,7 @@ import java.nio.file.Path
 
 /**
  * Clover: a single file, line coverage only. `<file name>` is a host-absolute path with backslashes; both covered
- * (`count>=1`) and uncovered (`count=0`) executable lines are emitted. No branch data. See report-formats §1.
+ * (`count>=1`) and uncovered (`count=0`) executable lines are emitted. No branch data.
  */
 object CloverCoverageParser : TestoCoverageParser {
     override val format = CoverageFormat.CLOVER

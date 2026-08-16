@@ -22,8 +22,6 @@ import javax.swing.border.CompoundBorder
 /**
  * A list of names shown as removable tags. A suite or group name is opaque to the toolchain — whatever the CLI is
  * handed is what it selects — so a free-form field had no separator it could safely own; tags remove the question.
- *
- * Names either come from a popup of what the project declares ([suggestions]) or are typed into an inline field.
  */
 class TestoTagsField(
     private val emptyLabel: String,
@@ -90,7 +88,6 @@ class TestoTagsField(
         return button
     }
 
-    /** The no-suggestions half: a name is typed and Enter turns it into a tag, ready for the next one. */
     private fun inlineInput(): JBTextField = JBTextField(INPUT_COLUMNS).apply {
         emptyText.text = addTooltip
         addActionListener {

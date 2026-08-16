@@ -7,9 +7,8 @@ import com.github.xepozz.testo.coverage.format.TestId
 data class SourceRef(val fileKey: String, val line: Int)
 
 /**
- * Read model over coverage-xml's per-test overlay — which tests touched which source lines, both directions. The
- * substrate for "how many tests cover this" (arch §9) and the TIA seam (§8). File keys are normalized on the way in,
- * so callers may pass raw paths.
+ * Read model over coverage-xml's per-test overlay — which tests touched which source lines, both directions.
+ * File keys are normalized on the way in, so callers may pass raw paths.
  */
 interface TestoCoverageByTestData {
     fun testsCoveringLine(fileKey: String, line: Int): Set<TestId>

@@ -2,7 +2,6 @@ package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.coverage.format.LineTotals
-import com.github.xepozz.testo.coverage.format.PerTestCoverage
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.coverage.CoverageAnnotator
 import com.intellij.coverage.CoverageEngine
@@ -31,12 +30,11 @@ class TestoCoverageEnabledConfiguration(
 
 /**
  * Carries the parsed report's format-dependent side-data — the format (which decides the CLI flag and how the runner
- * reads the file), whether it holds branch data, and the coverage-xml per-test overlay for later features (arch §7).
+ * reads the file) and whether it holds branch data.
  * Deletion is a no-op: the report is regenerated at the same IDE-managed path each run, so there is nothing to clean.
  */
 class TestoCoverageSuite : BaseCoverageSuite {
     var format: CoverageFormat = CoverageFormat.CLOVER
-    var perTest: PerTestCoverage? = null
 
     /**
      * Per-file line tallies keyed like the `ClassData` entries, for reports that state how many executable lines a file
@@ -58,9 +56,8 @@ class TestoCoverageSuite : BaseCoverageSuite {
         timeStamp: Long,
     ) : super(name, project, coverageRunner, fileProvider, timeStamp)
 
-    fun applyParsed(hasBranches: Boolean, perTest: PerTestCoverage?, lineTotals: Map<String, LineTotals>) {
+    fun applyParsed(hasBranches: Boolean, lineTotals: Map<String, LineTotals>) {
         this.branchCoverage = hasBranches
-        this.perTest = perTest
         this.lineTotals = lineTotals
     }
 

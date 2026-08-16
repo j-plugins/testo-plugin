@@ -51,7 +51,6 @@ internal fun ExecutionEnvironment.testoRerunExecutorId(): String? {
     return archived ?: executor.id
 }
 
-/** Whether this tab is a replayed archive — a rerun there launches the tests rather than replaying the log again. */
 internal fun ExecutionEnvironment.isTestoReplay(): Boolean = runProfile is TestoRunReplayProfile
 
 /**

@@ -165,7 +165,6 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
         }
     }
 
-    // Local interpreter: the report path is the same on both sides. Remote: map it into the execution environment.
     private fun toTargetPath(runConfiguration: TestoRunConfiguration, interpreter: PhpInterpreter, localCoverage: String): String {
         val data = interpreter.phpSdkAdditionalData
         if (data is RemoteSdkAdditionalData) {

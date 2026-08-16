@@ -202,26 +202,14 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertEquals(listOf<String?>("--group", "!slow"), arguments)
     }
 
-    fun testPrepareArguments_withParallel() {
+    fun testPrepareArguments_parallelNeverEmitted() {
         val settings = TestoRunConfigurationSettings()
         settings.runnerSettings.parallel = 8
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        assertEquals(2, arguments.size)
-        assertEquals("--parallel", arguments[0])
-        assertEquals("8", arguments[1])
-    }
-
-    fun testPrepareArguments_defaultParallel_skipped() {
-        val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.parallel = 1
-        val arguments = mutableListOf<String?>()
-
-        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
-
-        assertTrue("One worker is the default and needs no flag", arguments.isEmpty())
+        assertTrue("Testo's CLI has no --parallel; a legacy value must not break the run", arguments.isEmpty())
     }
 
     /** The coverage-only options belong to the Coverage runner alone and must never reach an ordinary run. */
@@ -246,7 +234,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        assertEquals(10, arguments.size)
+        assertEquals(8, arguments.size)
         assertTrue(arguments.contains("--type"))
         assertTrue(arguments.contains("bench"))
         assertTrue(arguments.contains("--suite"))
@@ -254,8 +242,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertTrue(arguments.contains("--group"))
         assertTrue(arguments.contains("db"))
         assertTrue(arguments.contains("!slow"))
-        assertTrue(arguments.contains("--parallel"))
-        assertTrue(arguments.contains("4"))
+        assertFalse(arguments.contains("--parallel"))
     }
 
     fun testPrepareArguments_withSingleRerunFilter() {
@@ -316,19 +303,16 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         settings.runnerSettings.testoType = "bench"
         settings.runnerSettings.suites = mutableListOf("unit")
         settings.runnerSettings.groups = mutableListOf("fast")
-        settings.runnerSettings.parallel = 2
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        // type comes first, then suite, then group, then parallel
+        // type comes first, then suite, then group
         assertEquals("--type", arguments[0])
         assertEquals("bench", arguments[1])
         assertEquals("--suite", arguments[2])
         assertEquals("unit", arguments[3])
         assertEquals("--group", arguments[4])
         assertEquals("fast", arguments[5])
-        assertEquals("--parallel", arguments[6])
-        assertEquals("2", arguments[7])
     }
 }

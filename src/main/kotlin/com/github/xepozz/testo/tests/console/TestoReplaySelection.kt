@@ -3,7 +3,6 @@ package com.github.xepozz.testo.tests.console
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.testframework.sm.runner.ui.SMTestRunnerResultsForm
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.util.Alarm
 
 /**
@@ -23,7 +22,9 @@ internal object TestoReplaySelection {
      * before we are handed the console, and its events are then already fired and missed.
      */
     private fun whenTreeStable(console: SMTRunnerConsoleView, action: (SMTestProxy?) -> Unit) {
-        val alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, console)
+        // Called from a pooled thread once the feed ends; the tab may have been closed while the log streamed, and
+        // registering an Alarm on a disposed console throws.
+        val alarm = runCatching { Alarm(Alarm.ThreadToUse.SWING_THREAD, console) }.getOrNull() ?: return
         var lastCount = -1
         fun poll(attempt: Int) {
             val root = (console.resultsViewer as? SMTestRunnerResultsForm)?.testsRootNode
@@ -41,7 +42,7 @@ internal object TestoReplaySelection {
     private fun select(console: SMTRunnerConsoleView, root: SMTestProxy, url: String) {
         val form = console.resultsViewer as? SMTestRunnerResultsForm ?: return
         val match = findByLocationUrl(root, url) ?: return
-        ApplicationManager.getApplication().invokeLater { form.selectAndNotify(match) }
+        form.selectAndNotify(match)
     }
 
     private fun countDescendants(node: SMTestProxy): Int {
@@ -57,16 +58,18 @@ internal object TestoReplaySelection {
         }
     }
 
-    // Find the node for a clicked test. Prefer an exact locationUrl match; fall back to a node whose url starts with the
-    // target (a data-provider method whose datasets carry a " with data set #N" suffix), so selecting it shows the
-    // method's aggregate.
+    // Find the node for a clicked test. Prefer an exact locationUrl match; fall back to a node continuing the target
+    // with a delimiter (`#idx`, ` with data set #N`, `::member`) — never with a name character, or `::testPay` would
+    // select `::testPayment`.
     private fun findByLocationUrl(root: SMTestProxy, url: String): SMTestProxy? {
         var prefixMatch: SMTestProxy? = null
         var result: SMTestProxy? = null
         forEachDescendant(root) { proxy ->
             val loc = proxy.locationUrl
             if (loc == url) result = result ?: proxy
-            else if (prefixMatch == null && loc != null && loc.startsWith(url)) prefixMatch = proxy
+            else if (prefixMatch == null && loc != null && loc.length > url.length &&
+                loc.startsWith(url) && loc[url.length] in ":# "
+            ) prefixMatch = proxy
         }
         return result ?: prefixMatch
     }

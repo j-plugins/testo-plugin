@@ -39,11 +39,11 @@ import javax.swing.SwingUtilities
 
 /**
  * The coverage stripe in the editor gutter, drawn by [TestoCoverageEditorHighlighter] — a public-API stand-in for the
- * platform's `CoverageLineMarkerRenderer` (`@ApiStatus.Internal`, arch §4.2). Same geometry: `Position.LEFT`, the
+ * platform's `CoverageLineMarkerRenderer` (`@ApiStatus.Internal`). Same geometry: `Position.LEFT`, the
  * stripe filled with the standard coverage colour keys, so the user's Colors & Fonts settings apply unchanged.
  *
  * A click inside the line-marker area pops the line's story: coverage status, hit count, branch tally (Cobertura),
- * and — when the per-test index holds the line — the covering tests, navigable like the code-vision lens (§9).
+ * and — when the per-test index holds the line — the covering tests, navigable like the code-vision lens.
  */
 internal class TestoCoverageGutterRenderer(
     private val project: Project,
@@ -77,8 +77,7 @@ internal class TestoCoverageGutterRenderer(
         showPopup(RelativePoint(e))
     }
 
-    // The platform coverage popup's shape ("Hits: N" under a toolbar): one metric per row, then the covering tests
-    // right below — a click or Enter navigates. Rows the line has no data for are simply absent.
+    // The platform coverage popup's shape: one metric per row, the covering tests right below.
     private fun showPopup(at: RelativePoint) {
         val header = JPanel(VerticalLayout(JBUI.scale(2)))
         header.border = JBUI.Borders.empty(6, 10)

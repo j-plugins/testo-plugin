@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Paints per-line coverage in the editor gutter off the active Testo suite's `ProjectData` — the plugin's own stand-in
  * for the platform's editor annotator, whose entry point (`CoverageEngine.createSrcFileAnnotator`) is
- * `@ApiStatus.Internal` and closed to third-party engines (arch §4.2). Same primitives the platform uses underneath:
+ * `@ApiStatus.Internal` and closed to third-party engines. Same primitives the platform uses underneath:
  * line highlighters in the document markup model carrying a gutter renderer.
  *
  * Lifecycle: installed lazily from [com.github.xepozz.testo.coverage.TestoCoverageAnnotator.onSuiteChosen] (the first
@@ -63,7 +63,7 @@ class TestoCoverageEditorHighlighter(private val project: Project) : Disposable 
 
     private class AnnotatedDocument(val highlighters: MutableList<RangeHighlighter>, val listenerDisposable: Disposable)
 
-    /** Idempotent; safe off the EDT. Registers the suite/editor listeners once and reconciles the current state. */
+    /** Idempotent; safe off the EDT. */
     fun install() {
         if (installed.compareAndSet(false, true)) {
             CoverageDataManager.getInstance(project).addSuiteListener(object : CoverageSuiteListener {

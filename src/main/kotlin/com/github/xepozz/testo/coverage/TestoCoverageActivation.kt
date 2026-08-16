@@ -16,7 +16,7 @@ import java.nio.file.Path
 data class TestoCoverageReport(val name: String?, val format: CoverageFormat?, val dataFile: Path)
 
 /**
- * Loads already-written Testo coverage reports into the IDE with no process launch (architecture §10): one suite per
+ * Loads already-written Testo coverage reports into the IDE with no process launch: one suite per
  * report, all in **one** [CoverageSuitesBundle] handed to [CoverageDataManager.chooseSuitesBundle] — the platform then
  * reads each file via [TestoCoverageRunner.loadCoverageData], merges the `ProjectData`s, opens the Coverage tool window
  * and applies [TestoCoverageAnnotator]. `chooseSuitesBundle` rather than `coverageGathered`: the bundle's composition

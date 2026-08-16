@@ -26,9 +26,8 @@ fun dedupeCoverageByFormat(
         }
 
 /**
- * The Coverage executor's closing move: once the process exits, resolve every announced coverage report, dedupe by format
- * (flags first), respect the grouped button's checkboxes, and apply the survivors as one merged bundle — the same
- * [applyTestoCoverage] the button uses, no click needed.
+ * On process exit: applies the run's announced coverage reports through the same [applyTestoCoverage] the grouped
+ * button uses, honoring its checkboxes — no click needed.
  */
 internal fun autoApplyCoverage(project: Project, props: TestoConsoleProperties, flagLocalPaths: List<Path>) {
     ApplicationManager.getApplication().executeOnPooledThread {

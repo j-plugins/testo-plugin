@@ -72,7 +72,6 @@ class TestoTestRunConfigurationEditor(
         toolTipText = "Not supported by Testo yet"
     }
 
-    /** Parallel belongs beside the other runner flags, so it is put into the PHP form's own Test Runner options row. */
     private val parallelInjected = injectParallelRow()
 
     private val myMainPanel = panel {
@@ -249,12 +248,9 @@ class TestoTestRunConfigurationEditor(
 
     /**
      * Puts Parallel into the PHP editor's own *Test Runner options* row, where the rest of the runner's flags are.
-     *
-     * That row is a `GridLayoutManager` form built by PhpStorm with exactly one row and no seam to extend — the
-     * editor exposes the whole panel and nothing smaller. The row is found by the label the platform gave it, its
-     * layout is rebuilt with a second row, and its children are re-added with the constraints they already had, so
-     * the label column stays shared and the two rows line up. Anything unexpected and the caller falls back to a
-     * row of our own below the panel; nothing here can leave the form half-built, since the swap is one step.
+     * That row is a one-row `GridLayoutManager` form with no seam to extend — the editor exposes the whole panel and
+     * nothing smaller — so it is found by its label and rebuilt with a second row; re-adding the children with the
+     * constraints they already had keeps the label column shared. Anything unexpected falls back to a row of our own.
      */
     private fun injectParallelRow(): Boolean = runCatching {
         val optionsLabel = findRunnerOptionsLabel(parentEditor.component) ?: return false

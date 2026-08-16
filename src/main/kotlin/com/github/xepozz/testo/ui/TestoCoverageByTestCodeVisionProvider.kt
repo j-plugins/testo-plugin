@@ -31,7 +31,7 @@ import java.awt.event.MouseEvent
  * Code Vision lens on any PHP method/function that Testo's per-test coverage recorded as covered, reading the
  * persistent [TestoCoverageByTestIndex]. Shows "N covering tests"; clicking lists them and navigates to the chosen one.
  *
- * This is the public-API answer to "how many tests cover this" (arch §9): the native `CoverageEngine.getTestsForLine`
+ * This is the public-API answer to "how many tests cover this": the native `CoverageEngine.getTestsForLine`
  * gutter is `@ApiStatus.Internal` and cannot be used by a third-party plugin, so the same data drives our own lens.
  * The lens is empty (hidden) until a `coverage-xml` coverage run has populated the index.
  */

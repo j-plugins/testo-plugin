@@ -10,6 +10,7 @@ import com.intellij.execution.testframework.sm.runner.GeneralTestEventsProcessor
 import com.intellij.execution.testframework.sm.runner.OutputToGeneralTestEventsConverter
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.util.Key
 import jetbrains.buildServer.messages.serviceMessages.ServiceMessage
 import jetbrains.buildServer.messages.serviceMessages.ServiceMessageVisitor
@@ -49,6 +50,8 @@ class TestoOutputToGeneralEventsConverter(
 
     private val isReplay: Boolean get() = testoProperties?.replayMode == true
 
+    private var recordingBroken = false
+
     override fun process(text: String, outputType: Key<*>) {
         if (runnerVersion == null) runnerVersion = TestoProtocolGate.parseVersion(text)
         // Second route: a message behind a colour escape never reaches parseServiceMessage. The store dedups by path.
@@ -59,20 +62,26 @@ class TestoOutputToGeneralEventsConverter(
 
     // The converter is the one place every output chunk flows through, from the very first byte (the console attaches
     // before startNotify) — so the run archive records here rather than off a ProcessListener added later.
+    // A write failure gives up on the whole run's archive: retrying per chunk would attempt IO on every line.
     private fun recordChunk(text: String, outputType: Key<*>) {
         val props = testoProperties ?: return
-        if (props.replayMode) return
+        if (props.replayMode || recordingBroken) return
         val recording = props.recording ?: synchronized(props) {
             props.recording ?: runCatching {
                 TestoRunStore.getInstance(props.project).beginRun(props.configuration.name, props.executor.id)
-            }.getOrNull()?.also { props.recording = it }
+            }.onFailure { giveUpRecording(it) }.getOrNull()?.also { props.recording = it }
         } ?: return
         val stream = when {
             ProcessOutputType.isStderr(outputType) -> TestoRunRecording.STDERR
             ProcessOutputType.isStdout(outputType) -> TestoRunRecording.STDOUT
             else -> TestoRunRecording.SYSTEM
         }
-        runCatching { recording.appendChunk(stream, text) }
+        runCatching { recording.appendChunk(stream, text) }.onFailure { giveUpRecording(it) }
+    }
+
+    private fun giveUpRecording(cause: Throwable) {
+        recordingBroken = true
+        thisLogger().warn("Testo run archive disabled for this run", cause)
     }
 
     override fun processServiceMessage(message: ServiceMessage, visitor: ServiceMessageVisitor) {

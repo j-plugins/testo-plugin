@@ -50,10 +50,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
             arguments.add("--group")
             arguments.add(if (group.startsWith("!")) group else "!$group")
         }
-        if (runner.parallel != 1) {
-            arguments.add("--parallel")
-            arguments.add(runner.parallel.toString())
-        }
+        // No --parallel until Testo's CLI takes it; then 1 = no flag, 0 = bare --parallel (auto), >1 = --parallel N.
         for (filter in runner.rerunFilters) {
             arguments.add("--filter")
             arguments.add(filter)

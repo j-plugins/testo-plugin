@@ -5,7 +5,6 @@ import java.nio.file.Path
 /**
  * Cobertura (`coverage-04`): a single file, line coverage plus branch coverage on decision lines. `filename` is
  * relative to a `<sources>/<source>` root (forward slashes); a branch line carries `condition-coverage="P% (a/b)"`.
- * See report-formats §2.
  */
 object CoberturaCoverageParser : TestoCoverageParser {
     override val format = CoverageFormat.COBERTURA

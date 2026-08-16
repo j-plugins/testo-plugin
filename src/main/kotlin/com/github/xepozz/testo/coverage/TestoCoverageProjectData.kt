@@ -13,7 +13,7 @@ import com.intellij.rt.coverage.data.ProjectData
  * Branch data is approximate by construction — Cobertura reports only `covered/total`, not *which* outcomes — so a
  * two-way line becomes a [com.intellij.rt.coverage.data.JumpData] and an n-way line a
  * [com.intellij.rt.coverage.data.SwitchData]; touching the default slot only when fully covered keeps a fully-covered
- * decision line green rather than partial. See `docs/coverage/report-formats.md` §2 and architecture §14.2.
+ * decision line green rather than partial.
  */
 fun ParsedReport.toProjectData(keyFor: (String) -> String = { it }): ProjectData {
     val projectData = ProjectData()

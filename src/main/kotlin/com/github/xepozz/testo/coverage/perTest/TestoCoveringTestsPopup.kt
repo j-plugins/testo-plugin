@@ -3,7 +3,6 @@ package com.github.xepozz.testo.coverage.perTest
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.format.TestId
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.SimpleListCellRenderer
@@ -21,7 +20,7 @@ internal object TestoCoveringTestsPopup {
 
     private class Row(val test: TestId?, val label: String, val icon: Icon)
 
-    fun show(project: Project, tests: List<TestId>, subject: String, editor: Editor?, at: RelativePoint?) {
+    fun show(project: Project, tests: List<TestId>, subject: String, at: RelativePoint) {
         if (tests.isEmpty()) return
         val rows = buildList {
             add(Row(null, TestoBundle.message("testo.coverage.editor.popup.run.all", tests.size), AllIcons.Actions.RunAll))
@@ -40,6 +39,6 @@ internal object TestoCoveringTestsPopup {
                 TestoCoveringTestsLauncher.run(project, chosen, TestoCoveringTestsLauncher.runName(name, chosen.size))
             }
             .createPopup()
-        if (at != null) popup.show(at) else if (editor != null) popup.showInBestPositionFor(editor)
+        popup.show(at)
     }
 }

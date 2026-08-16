@@ -15,7 +15,7 @@ import kotlin.io.path.isDirectory
 import kotlin.io.path.name
 
 /**
- * The Testo run archive (arch §10a): one directory per run under the IDE system dir, holding the raw teamcity output
+ * The Testo run archive: one directory per run under the IDE system dir, holding the raw teamcity output
  * (`output.log`), the metadata (`run.json`) and the captured report files (`reports/`). The whole console — channels,
  * statuses, node tree, report buttons — is built by parsing that stream, so replaying it through the live converter
  * reconstructs the run exactly; nothing else needs persisting.
@@ -49,7 +49,7 @@ class TestoRunStore(private val project: Project) {
     /** The archived run's retention, or null while the run is still in flight — its choice rides on the recording. */
     fun retentionOf(dir: Path): RunRetention? = readManifest(dir)?.retention
 
-    /** Rewrites the manifest's retention. A run still in flight has none yet — that choice rides on the recording. */
+    /** Rewrites the manifest's retention; a no-op while the run is still in flight. */
     fun setRetention(dir: Path, retention: RunRetention) {
         val manifest = readManifest(dir) ?: return
         runCatching { writeManifest(dir, manifest.copy(retention = retention)) }
@@ -131,7 +131,6 @@ class TestoRunStore(private val project: Project) {
                 manifest == null ->
                     // A directory that never got its manifest: the run crashed or the IDE died mid-write.
                     if (now - startedAtOf(dir) > INCOMPLETE_GRACE_MS) delete(dir)
-                // Thrown away by hand — it goes whatever its age, and the locked ones never do.
                 manifest.retention == RunRetention.DISCARD -> delete(dir)
                 manifest.retention == RunRetention.LOCKED -> Unit
                 else -> rotating += dir to manifest.startedAt
@@ -150,8 +149,11 @@ class TestoRunStore(private val project: Project) {
      */
     fun clearHistory(keepLocked: Boolean, spare: Path?) {
         val spared = spare?.let { runCatching { it.toAbsolutePath().normalize() }.getOrNull() }
+        val now = System.currentTimeMillis()
         for (dir in runDirectories()) {
             val retention = retentionOf(dir)
+            // No manifest yet = possibly another tab's run still being written — same grace as prune().
+            if (retention == null && now - startedAtOf(dir) <= INCOMPLETE_GRACE_MS) continue
             if (keepLocked && retention == RunRetention.LOCKED) continue
             if (dir.toAbsolutePath().normalize() == spared) {
                 setRetention(dir, RunRetention.DISCARD)

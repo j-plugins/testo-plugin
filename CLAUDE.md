@@ -259,11 +259,12 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
 <executablePath> <command> [testRunnerOptions] [runner flags] [--config <file>] [scope flags]
 ```
 
-- `command` — the subcommand, default `run` (editable in the editor's combo box).
+- `command` — the subcommand, always `run` for a test run (other subcommands live in Run Anything).
 - `testRunnerOptions` default to **`-q -n --teamcity`** (`TestoRunConfigurationSettings.createDefault`).
   The `--teamcity` flag is what makes Testo emit the SM service messages this plugin parses.
-- Runner flags from `TestoRunnerSettings` (only emitted when non-empty / > 0): `--type`, `--suite`, `--group`,
-  `--parallel`, plus one `--filter <selector>` per entry in `rerunFilters`. `suites`, `groups`/`excludeGroups` are persisted
+- Runner flags from `TestoRunnerSettings` (only emitted when non-empty): `--type`, `--suite`, `--group`,
+  plus one `--filter <selector>` per entry in `rerunFilters` (no `--parallel` — Testo's CLI does not take it yet).
+  `suites`, `groups`/`excludeGroups` are persisted
   **lists** (`@XCollection`), one `--group` flag each — Testo ORs repeated `--group`s and reads a `!name` prefix as an
   exclusion, which is the only exclusion form its CLI has. A name is opaque: whatever `#[Group]` spells reaches the
   CLI untouched.
@@ -458,92 +459,70 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **`TestoHistoryIndex.refreshLens` uses the internal `ModificationStampUtil`** to force code-vision recomputation
   after a run; a test run never touches PHP source, so neither `DaemonCodeAnalyzer.restart()` nor
   `invalidateProvider` alone re-runs `getHint`. Wrapped in `runCatching`.
-- **History is replayed, not imported.** The platform's import forces `ImportedTestConsoleProperties` and
-  `ImportedToGeneralTestEventsConverter`, so neither our console nor our converter runs — an imported tab is a
-  PHPUnit-looking tree with none of our toolbar. Replaying the archived teamcity stream through the *live*
-  properties (`TestoRunReplayProfile`) rebuilds everything instead, because every store is filled by the converter.
-  A replay is kept from acting like a run by three switches: `replayMode` (no re-recording), `getConfiguration()`
-  answering the replay profile (the platform's `addToHistory` saves only for a real `RunConfiguration`), and
-  `reportStore.startedAtOverride` (the captured report copies must pass the mtime-vs-start gate).
+- **History is replayed, not imported.** The platform's import forces `ImportedTestConsoleProperties` and its own
+  converter, so none of our stores fill — an imported tab is a PHPUnit-looking tree. `TestoRunReplayProfile` feeds
+  the archived teamcity stream through the *live* properties instead. Three switches keep a replay from acting like
+  a run: `replayMode`, `getConfiguration()` answering the replay profile, `reportStore.startedAtOverride`.
 - **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to
   `SMTRunnerEventsListener`: a short run finishes replaying before the augmenter hands us the console, so the
   events are already fired and missed.
-- **The console's own vertical toolbar is reached through `ActionToolbar.getActionGroup()`.** `TestResultsPanel` takes
-  its console actions as a `protected final AnAction[]` and builds that toolbar once, from
-  `new DefaultActionGroup(myConsoleActions)` — so the array is closed, but the group it was copied into is not. The
-  log-level filter is appended there (after a separator) at install time, then `updateActionsAsync()`. The other seam,
-  `TabInfo.setTabPaneActions` (the entry-point strip at the right edge of the tab row, read off the **selected** tab —
-  so it would have to be set on every tab), was tried and dropped: it costs a row of its own.
+- **The console's own vertical toolbar is reached through `ActionToolbar.getActionGroup()`.** `TestResultsPanel`
+  builds it once from a `DefaultActionGroup` copy of its `protected final` actions array — the array is closed, the
+  group is not. The log-level filter is appended there, then `updateActionsAsync()`. The tab-row seam
+  (`TabInfo.setTabPaneActions`, read off the selected tab only) was tried and dropped: it costs a row of its own.
 - **Whatever our own `createImportActions` returns must survive the RunTab toolbar snapshot** — `appendAdditionalActions`
   is routed into the gear submenu instead and would not.
-- **`createImportActions` deliberately does not call `super`.** That array is the *only* source of the "Test History"
-  button above the test tree (`ToolbarPanel` adds nothing else of its own): `SMTRunnerConsoleProperties` returns
-  `ImportTestsGroup` + `ImportTestsFromFileAction` there, both opening a saved XML through the platform import — a
-  console with none of our UI. We return `TestoRunHistoryGroup` instead, which lists the run archive and replays it.
-  Actions without `RunTab.PREFERRED_PLACE = MORE_GROUP` land on the visible toolbar row, so no experimental key is
-  needed. Dropping `super` also drops the platform's "Import Test Results from file" from Testo tabs — deliberate:
-  our own export/import is the *Replay* group, and the platform's counterpart opens a console with none of our UI.
-  Its export half is gone for the same reason (`getConfiguration()` answers the replay profile, and `ToolbarPanel`
-  only builds `ExportTestResultsAction` for a real `RunConfiguration`). The same array is how expand/collapse reach
-  the visible row. The array is laid out right-to-left (listed first = furthest right), which is the only control
-  over placement there — everything in it lands after the platform's own actions.
-- **What the platform put on the test toolbar cannot be moved or removed** — the sort popup, the separator after
-  *Show Ignored*, the expand/collapse inside the overflow group. `ToolbarPanel` builds those inline (no ids, no
-  extension point, no `CustomActionsSchema` entry) and then copies both of its groups into `actionsToMerge` /
-  `additionalActionsToMerge`, which is what `RunTab` rebuilds the tab's toolbar from — so mutating the live groups
-  afterwards changes nothing the user sees. An invisible action riding the toolbar was tried and reverted; the only
-  control we have there is our own `createImportActions` array.
-- **Every executor but Run and Debug is hidden behind the "More Run/Debug" submenu** of a run-context popup, by
-  `ExecutorRegistryImpl` sorting them into `RunContextGroupMore` unless the `executor.actions.submenu` registry key
-  is off. That key is global and the actions are shared instances, so a copy of *Run with Coverage* at the popup's
-  own level only duplicates the submenu entry — tried in the test tree's popup and reverted.
-- **The Coverage view's *Always select opened element* cannot work for a file-based view.** It hands
-  `CoverageViewExtension.getElementToSelect` the PSI *leaf* under the caret and then looks for a tree node whose value
-  equals it, while every node here holds a `PsiFile` or a `PsiDirectory` — so nothing ever matches (PhpStorm's own
-  coverage has the same dead button). That mapper, the view's select call and its tree are all `@ApiStatus.Internal`,
-  and overriding the mapper fails `verifyPlugin`. Hence `TestoCoverageSelectOpenedFile`: our own toggle, which follows
-  the editor off the message bus and walks the tree with `TreeUtil.promiseSelect`. The tree is reached through the
-  toolbar's target component, handed over from the action's `update`.
+- **`createImportActions` deliberately does not call `super`.** Super's entries (`ImportTestsGroup`,
+  `ImportTestsFromFileAction`) open a saved XML through the platform import — a console with none of our UI; the
+  history and *Replay* groups are our counterparts. The array is the only writable seam onto the visible toolbar row
+  (actions land there without `PREFERRED_PLACE`) and is laid out right-to-left: listed first = furthest right, always
+  after the platform's own actions. The platform's export is gone the same way — `ToolbarPanel` builds
+  `ExportTestResultsAction` only for a real `RunConfiguration`, and `getConfiguration()` answers the replay profile.
+- **What the platform put on the test toolbar cannot be moved or removed.** `ToolbarPanel` builds those actions
+  inline (no ids, no extension point, no `CustomActionsSchema` entry) and copies its groups into the arrays `RunTab`
+  rebuilds the toolbar from — mutating the live groups afterwards changes nothing the user sees.
+- **Every executor but Run and Debug is hidden behind the "More Run/Debug" submenu** (`ExecutorRegistryImpl`; the
+  `executor.actions.submenu` registry key is global). The actions are shared instances, so copying *Run with
+  Coverage* into a popup only duplicates the submenu entry — tried in the test tree's popup and reverted.
+- **The Coverage view's *Always select opened element* cannot work for a file-based view**: it matches the PSI *leaf*
+  under the caret against nodes holding `PsiFile`/`PsiDirectory`, so nothing ever matches, and everything involved is
+  `@ApiStatus.Internal`. Hence `TestoCoverageSelectOpenedFile`: our own toggle, following the editor off the message
+  bus and selecting via `TreeUtil.promiseSelect` on the tree taken from the toolbar's target component.
 - **The Coverage view's tree has no extensible context menu** — `CoverageView.createPopupGroup` is private, built
   inline, and holds `EditSource` alone. Anything acting on the selected row goes on the toolbar instead
   (`createExtraToolbarActions`, `@Experimental`) and reads the selection as `CommonDataKeys.NAVIGATABLE`.
-- **A column's width comes from `getPercentage(column, rootNode)`**, so a column whose values are not percentages must
-  still answer there — the *Tests* column returns its count, or the view sizes it for "100% (1234/1234)". The width the
-  user ends up with is then remembered in `CoverageViewManager.StateBean.myColumnSize` (`@Internal`), which wins over
-  the computed one whenever the column count matches.
-- **`CoverageViewExtension` is instantiated three times per view** — `CoverageView`, `CoverageTableModel` and
-  `CoverageViewTreeStructure` each call `createCoverageViewExtension`. Nothing one of them stores in a field is
-  visible to another, so anything `getPercentage` needs must be derived from the bundle, not remembered from
-  `createColumnInfos`.
-- **The editor highlighter is installed from `applyTestoCoverage`, not from the annotator.** `onSuiteChosen` fires only
-  when a bundle is *reloaded or closed* — the first `chooseSuitesBundle` of a session never calls it, so installing
-  there alone left the very first coverage run of an IDE session unpainted until something else forced a refresh.
+- **A column's width comes from `getPercentage(column, rootNode)`** — a non-percentage column must still answer there
+  (the *Tests* column returns its count) or the view sizes it for "100% (1234/1234)". The user's own width then sticks
+  in `CoverageViewManager.StateBean.myColumnSize` whenever the column count matches.
+- **`CoverageViewExtension` is instantiated three times per view** (`CoverageView`, `CoverageTableModel`,
+  `CoverageViewTreeStructure`), so no instance sees another's fields — anything `getPercentage` needs must be derived
+  from the bundle, not remembered from `createColumnInfos`.
+- **The editor highlighter is installed from `applyTestoCoverage`, not from the annotator**: `onSuiteChosen` fires
+  only on reload/close, never on the session's first `chooseSuitesBundle` — which left the first coverage run of an
+  IDE session unpainted.
 - **`ConsoleFolding` instances are shared across consoles** and get no per-console reset; both foldings track
   state in a `ThreadLocal` and clear it on the first non-frame line.
 - **Debug installs channel tabs itself** (`TestoDebugRunner`): the augmenter's descriptor lookup misses debug
   sessions. `TestoConsoleProperties.channelsInstalled` guards against a double install. The debug session also
   gets the `Testo.RerunSplit` action handed to it explicitly, since it does not use `RunTab.TopToolbar`.
-- **Suite and group names are lists everywhere.** `TestoRunnerSettings` persists `suites`, `groups`/`excludeGroups`
-  via `@XCollection` and the editor shows them as tags (`TestoTagsField` — groups pick from what `TestoGroupsIndex`
-  found, suites are typed and added with Enter), so a name is never split on anything: a comma or a space inside one
-  survives. The comma lives only in the pre-list persisted form, and a legacy `suite="x"` becomes a one-item list
-  without being split at all. `migrateLegacyNames` folds an old `group="a,b"` attribute into
-  the list and clears it, and `TestoRunConfigurationSettings.getTestoRunnerSettings` calls it — that is the first
-  point after deserialization every reader goes through. `TestoRunnerSettingsSerializationTest` pins the XML shape.
+- **Suite and group names are lists everywhere.** `TestoRunnerSettings` persists `suites`/`groups`/`excludeGroups`
+  via `@XCollection`, the editor shows them as tags (`TestoTagsField`), and a name is never split on anything — the
+  comma lives only in the legacy persisted form. `migrateLegacyNames` folds that form in, called from
+  `TestoRunConfigurationSettings.getTestoRunnerSettings` — the first point every reader passes after deserialization.
+  `TestoRunnerSettingsSerializationTest` pins the XML shape.
 - **`rerunFilters` is `@Transient`** — it lives only on the throwaway clone a "rerun failed" launch creates, and
   that clone's scope is reset to `ConfigurationFile` so no scope flag narrows the filters away.
 - **`TestoRunConfigurationType.ID` is a pinned literal**, not `::class.simpleName`: renaming the class must not
   invalidate users' saved run configurations.
-- **`TestoDataProvidersIndex.getVersion()`** must be bumped whenever indexing logic or the attribute FQN changes,
-  or stale on-disk indexes silently stay empty.
+- **`getVersion()` of both file-based indexes** (`TestoDataProvidersIndex`, `TestoGroupsIndex`) must be bumped whenever
+  indexing logic changes — for the groups index that includes `TestoRunConfigurationProducer.extractGroupNames`, which
+  it indexes through — or stale on-disk indexes silently stay empty.
 - **The run-configuration editor calls the parent editor's `resetEditorFrom`/`applyEditorTo` reflectively**
   (they are not public on `PhpTestRunConfigurationEditor`) and swallows `ReadOnlyModificationException`.
-- **Parallel is injected into the PHP editor's own form.** `PhpTestRunConfigurationEditor` hands out the whole panel
-  and nothing smaller, and its *Test Runner options* row is a one-row `GridLayoutManager` built by the UI designer, so
-  a row cannot be added to it. `injectParallelRow` finds that row by its label (the bundle string carries a `&`
-  mnemonic the rendered label does not), rebuilds the row's layout with a second row and re-adds the existing children
-  with the constraints `getConstraintsForComponent` gives back — which is what keeps the label column shared, and the
-  two rows aligned. It falls back to a row of our own below the panel, so a PhpStorm form change only moves the field.
+- **Parallel is injected into the PHP editor's own form.** The *Test Runner options* row is a one-row
+  `GridLayoutManager`, so `injectParallelRow` finds it by its label (the bundle string carries a `&` mnemonic the
+  rendered label does not), rebuilds it with a second row and re-adds the children with their own constraints — that
+  keeps the label column shared. Falls back to a row of our own below the panel if the PhpStorm form changes.
 - **`TestoFrameworkType.getComposerPackageNames()` currently returns `arrayOf("php")`**, not `testo/testo` —
   deliberate (the commented-out line records the intent); changing it affects framework auto-detection.
 - **`TestoTestRunLineMarkerProviderInfo.shouldReplace = true`** so Testo's gutter icon wins over PhpStorm's

@@ -53,7 +53,6 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
     override fun getHint(element: PsiElement, file: PsiFile): String? {
         val function = element as? Function ?: return null
         val url = TestoTestRunLineMarkerProvider.getLocationHint(function)
-        // Show the lens only for a test some archived run can replay.
         if (!TestoHistoryIndex.contains(file.project, url)) return null
         return historyHint(url)
     }
@@ -71,7 +70,6 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
     override fun handleClick(editor: Editor, element: PsiElement, event: MouseEvent?) {
         val function = element as? Function ?: return openLatestHistory(element.project)
         val url = TestoTestRunLineMarkerProvider.getLocationHint(function)
-        // The most recent run that actually holds this test, not merely the globally latest one.
         replayNewestRunWithTest(element.project, url)
     }
 

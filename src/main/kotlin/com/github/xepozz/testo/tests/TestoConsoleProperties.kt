@@ -132,19 +132,13 @@ class TestoConsoleProperties(
     // console toolbar too.
     public override fun createImportActions(): Array<com.intellij.openapi.actionSystem.AnAction> =
         arrayOf(
-            // Laid out from the right edge inwards: listed first = furthest right. So this array reads right to left —
-            // the replay group sits at the right end, expand/collapse at its left, next to the separator that follows
-            // Show Passed / Show Ignored.
-            // This run's own archive: export it, decide what retention may do with it, load an exported one.
+            // Laid out from the right edge inwards: listed first = furthest right.
             com.github.xepozz.testo.runs.TestoReplayGroup(project, this),
             // Deliberately not super's: that array is where the platform's own "Test History" comes from, and its
             // entries open a saved XML through the import machinery — a console that is none of ours.
             com.github.xepozz.testo.runs.TestoRunHistoryGroup(project, this),
             com.intellij.openapi.actionSystem.Separator.getInstance(),
-            // The platform keeps its own expand/collapse in the toolbar's overflow group; on a test tree they are used
-            // constantly, so ours sit on the visible row. The platform's stay where they are: `ToolbarPanel` copies
-            // both of its groups into arrays before `RunTab` rebuilds the toolbar from them, so nothing the platform
-            // put there can be moved or removed afterwards.
+            // The platform's own pair is stuck in the overflow group and cannot be moved (see TestoTreeToolbarActions).
             com.github.xepozz.testo.tests.console.TestoTreeCollapseAction(),
             com.github.xepozz.testo.tests.console.TestoTreeExpandAction(),
             reportsAction,

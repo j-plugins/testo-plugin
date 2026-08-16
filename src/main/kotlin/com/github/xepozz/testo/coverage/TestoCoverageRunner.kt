@@ -43,13 +43,9 @@ class TestoCoverageRunner : CoverageRunner() {
             val resolvePath = { path: String -> lfs.findFileByPath(path)?.path ?: path }
             val projectData = report.toProjectData(resolvePath)
             val lineTotals = report.files.mapNotNull { file -> file.totals?.let { resolvePath(file.filePath) to it } }
-            suite?.applyParsed(report.hasBranches, report.perTest, lineTotals.toMap())
+            suite?.applyParsed(report.hasBranches, lineTotals.toMap())
             LOG.info("Testo coverage loaded: ${report.format} ${projectData.classes.size} files from $sessionDataFile")
             SuccessCoverageLoadingResult(projectData)
-        } catch (e: CoverageParseException) {
-            LOG.warn("Failed to load Testo coverage from $sessionDataFile", e)
-            reporter.reportError(e)
-            FailedCoverageLoadingResult(e, true)
         } catch (e: Exception) {
             LOG.warn("Failed to load Testo coverage from $sessionDataFile", e)
             reporter.reportError(e)

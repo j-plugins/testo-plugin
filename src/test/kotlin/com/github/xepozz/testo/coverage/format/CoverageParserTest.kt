@@ -73,10 +73,9 @@ class CoverageParserTest {
     }
 
     @Test
-    fun coberturaWithoutBranchLinesReportsNoBranches() {
-        // MultipleResult + DataCross classes alone carry no branch="true" line.
+    fun coberturaBranchFlagTracksAnyBranchLine() {
         val report = CoberturaCoverageParser.parse(dir.resolve("cobertura.xml"))
-        assertTrue(report.hasBranches)   // the interceptor class does; sanity that the flag tracks any branch line
+        assertTrue(report.hasBranches)
     }
 
     // ---- coverage-xml ---------------------------------------------------------------------------------------------

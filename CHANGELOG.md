@@ -7,67 +7,52 @@
 ### Added
 
 - The run configuration chooses which coverage reports a Coverage run asks Testo for: Clover, Cobertura, coverage-xml.
-- A Coverage run applies everything it produced on its own, one report per format, without a click.
+- A Coverage run applies every report it produced on its own, one per format.
 - The Coverage button on the test toolbar gathers every announced report under one click, with a checkbox per report.
-- The Coverage panel gained expand/collapse, a switch for the editor highlighting, badges naming the report formats
-  behind the shown coverage (kept at the right end of the toolbar), and a narrow column counting the tests that cover
-  each file.
-- *Run Covering Tests* on the Coverage panel runs, with coverage, the tests that cover the selected row — a file's own
-  tests, or every test under a directory.
-- *Select Opened File* on the Coverage panel selects the file open in the editor, which the platform's *Always select
-  opened element* never managed to do in a file-based coverage view.
-- A gutter icon on every covered method, function and class lists the tests that cover it — all of them in one run
-  from the top of the list, or one at a time — and the Coverage panel has a switch for those icons.
-- The popup on a covered line highlights the row under the pointer and ends with a button running all of that line's
-  covering tests.
-- Every run is archived — its output, its reports and the parameters it ran with — and replays from the *Test History*
-  button as a full Testo console: channels, statuses, report buttons and that run's own coverage.
-- *Show history* above a test replays the newest archived run containing that test and selects its node.
-- How many archived runs to keep is set in *Tools | Testo*; the history list clears itself from its own menu.
+- The Coverage panel gained expand/collapse, an editor-highlighting switch, report-format badges, and a column
+  counting the tests that cover each file.
+- *Run Covering Tests* on the Coverage panel runs, with coverage, the tests covering the selected file or directory.
+- *Select Opened File* on the Coverage panel selects the file open in the editor.
+- A gutter icon on every covered method, function and class lists its covering tests, runnable together or one at a
+  time, with a switch on the Coverage panel.
+- The popup on a covered line highlights the row under the pointer and runs all of that line's covering tests.
+- Every run is archived — output, reports and parameters — and replays from *Test History* as a full Testo console.
+- *Show history* above a test replays the newest archived run containing it and selects its node.
+- How many runs the history keeps is set in *Tools | Testo* or from the history list itself, which also clears it.
 - *Expand All* / *Collapse All* now sit on the toolbar itself, next to *Show Passed* / *Show Ignored*.
-- A tab opened from the history reruns with the executor the archived run used: a coverage run reruns with coverage.
-- A *Replay* button on the test toolbar exports the run as a single archive, imports one back, shows the run's own
-  folder in the file manager, and says what the history may do with it: keep it, drop it, or lock it so retention
-  never touches it. The button wears the icon of what the run was — run, debug or coverage.
-- Every report a run announces is archived with it — an HTML report travels with its assets — so a replayed run opens
-  its own reports rather than whatever the latest run left behind.
-- The history list marks the run the tab is showing in bold, and puts a lock on the locked ones, and each entry wears
-  the icon of what the run was: run, debug or coverage.
-- How many runs the history keeps is set from the history list itself, right above the button that clears it.
-- An imported run comes in locked, so retention never deletes the one copy of a run carried in from elsewhere.
-- The run configuration keeps its coverage settings in a group of their own, with the analysis level
-  (`--coverage-level`, or *auto* to leave it to testo.php) and options only a Coverage run adds — benchmarks are kept
-  out of coverage by default.
-- Group and Exclude group are lists of tags, added from the `#[Group]` names the project declares rather than typed
-  with commas.
-- Suite is a list of tags too — typed and added with Enter — and a run may now narrow to several suites at once, one
-  `--suite` flag each. A configuration saved with a single suite keeps it.
-- The run configuration is laid out in groups: Parallel sits under Test Runner Options, then Run Options, Filter and
+- A tab opened from the history reruns with the executor the archived run used.
+- A *Replay* button exports the run as one archive, imports one back, reveals its folder, and sets what the history
+  may do with it: keep, drop or lock.
+- Every report a run announces is archived with it — HTML with its assets — so a replay opens its own reports.
+- The history list bolds the run the tab shows, marks locked runs, and gives each entry the icon of its kind.
+- An imported run comes in locked, so retention never deletes it.
+- The run configuration keeps its coverage settings in a group of their own: the analysis level (`--coverage-level`,
+  or *auto*) and coverage-only options (`--type=!bench` by default).
+- Group and Exclude group are lists of tags, picked from the `#[Group]` names the project declares.
+- Suite is a list of tags too; a run may narrow to several suites at once, one `--suite` flag each.
+- The run configuration is laid out in groups: Parallel under Test Runner Options, then Run Options, Filter and
   Coverage.
 
 ### Removed
 
-- The Repeat field: Testo's command line has no `--repeat`, so it never did anything.
-- The Command field: a test run is always `testo run`, and other subcommands are what *Run Anything* is for.
-- Parallel no longer sends a flag Testo does not have: the field is parked at 1 (no `--parallel`) until it does.
+- The Repeat field — Testo's command line has no `--repeat`.
+- The Command field — a test run is always `testo run`; other subcommands are what *Run Anything* is for.
+- Parallel no longer sends a flag Testo does not have: the field is parked at 1 until it does.
 
 ### Changed
 
-- The *Log Levels* filter moved off the test toolbar onto the console's own toolbar, right of the channel tabs, and
-  wears a filter icon.
+- The *Log Levels* filter moved onto the console's own toolbar, right of the channel tabs, with a filter icon.
 
 ### Fixed
 
 - The Test Runner Options help button opens Testo's CLI reference.
 - The channel console no longer throws an EDT-threading error while streaming live output into an aggregate tab.
-- The report buttons no longer trigger a "slow operations on EDT" error: report paths now resolve off the UI thread.
+- The report buttons no longer trigger a "slow operations on EDT" error.
 - The elapsed time in the run summary no longer counts up forever when a run ends before the toolbar is wired.
-- Clearing the history now shows on the tab of the run it spares: its *Replay* menu says *Do not keep in history*,
-  where it used to keep claiming the run was being kept.
-- The first coverage run of an IDE session paints the editor right away, instead of waiting for something else to
-  refresh the highlighting.
-- Lists of covering tests name the test class without its namespace, which is the same for every row anyway.
-- Excluding a group runs again: it goes out as `--group=!name`, the only form Testo's command line has.
+- Clearing the history updates the *Replay* menu of the run it spares to *Do not keep in history*.
+- The first coverage run of an IDE session paints the editor right away.
+- Lists of covering tests name the test class without its namespace.
+- Excluding a group runs again: it goes out as `--group=!name`.
 
 ## [2026.5.262] - 2026-08-12
 

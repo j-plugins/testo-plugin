@@ -118,7 +118,6 @@ internal fun runKindIcon(kind: TestoRunKind): Icon = when (kind) {
     TestoRunKind.RUN -> AllIcons.Toolwindows.ToolWindowRun
 }
 
-/** The history entry's icon: what the run was, wearing a lock when the user locked it out of the rotation. */
 internal fun runHistoryIcon(manifest: TestoRunManifest): Icon {
     val base = runKindIcon(runKindOf(manifest.executorId))
     if (manifest.retention != RunRetention.LOCKED) return base
@@ -147,8 +146,9 @@ internal fun replayNewestRunWithTest(project: Project, url: String) {
     ApplicationManager.getApplication().executeOnPooledThread {
         if (project.isDisposed) return@executeOnPooledThread
         val store = TestoRunStore.getInstance(project)
+        // `startsWith("$key::")`, not `startsWith(key)`: `…::testPay` must not answer for `…::testPayment`.
         val match = store.listRuns().firstOrNull { (dir, _) ->
-            store.readLocations(dir).any { it == key || it.startsWith(key) }
+            store.readLocations(dir).any { it == key || it.startsWith("$key::") }
         }
         ApplicationManager.getApplication().invokeLater(
             {

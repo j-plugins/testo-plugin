@@ -56,7 +56,6 @@ class TestoReplayGroup(
         RetentionOption(RunRetention.AUTO, "testo.runs.replay.keep"),
         RetentionOption(RunRetention.DISCARD, "testo.runs.replay.discard"),
         RetentionOption(RunRetention.LOCKED, "testo.runs.replay.lock"),
-        // The file gestures are one block — a run leaves as a zip, comes back as one, and lies on disk meanwhile.
         Separator.getInstance(),
         ExportAction(),
         ImportAction(),
