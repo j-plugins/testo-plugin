@@ -6,6 +6,7 @@ import com.github.xepozz.testo.coverage.format.FileCoverage
 import com.github.xepozz.testo.coverage.format.LineCoverage
 import com.github.xepozz.testo.coverage.format.ParsedReport
 import com.github.xepozz.testo.coverage.format.parseCoverageReport
+import com.intellij.rt.coverage.data.ProjectData
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -66,6 +67,24 @@ class TestoCoverageProjectDataTest {
         assertEquals(1, cls.getLineData(12).status)
         assertEquals(BranchPair(2, 1), cls.getLineData(12).branchData.let { BranchPair(it.totalBranches, it.coveredBranches) })
         assertEquals(0, cls.getLineData(13).status)   // hits==0 wins over branch data -> uncovered
+    }
+
+    /**
+     * Several checked reports become one bundle, and the platform merges their `ProjectData`s — line by line, into
+     * fresh `LineData`. Branch data only survives that because ours is written through `fillArrays`, which is what the
+     * merge reads.
+     */
+    @Test
+    fun branchesSurviveTheMergeOfSeveralReports() {
+        val clover = parseCoverageReport(Path.of("src/test/testData/coverage/clover.xml"), CoverageFormat.CLOVER)
+        val cobertura = parseCoverageReport(Path.of("src/test/testData/coverage/cobertura.xml"), CoverageFormat.COBERTURA)
+        val merged = ProjectData()
+        merged.merge(clover.toProjectData())
+        merged.merge(cobertura.toProjectData())
+
+        val line = merged.getClassData(interceptor).getLineData(68)
+        assertEquals(4, line.branchData.totalBranches)
+        assertEquals(3, line.branchData.coveredBranches)
     }
 
     /** coverage-xml lists files it recorded no covered line for; a `ClassData` without lines makes the platform NPE. */

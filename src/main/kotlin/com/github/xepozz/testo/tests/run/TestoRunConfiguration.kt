@@ -60,7 +60,11 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
                 val quoted = groups.joinToString(", ") { "'$it'" }
                 return if (groups.size == 1) "Group $quoted" else "Groups $quoted"
             }
-            if (runner.suite.isNotEmpty()) return "Suite '${runner.suite}'"
+            val suites = runner.suites
+            if (suites.isNotEmpty()) {
+                val quoted = suites.joinToString(", ") { "'$it'" }
+                return if (suites.size == 1) "Suite $quoted" else "Suites $quoted"
+            }
             if (runner.testoType.isNotEmpty()) return "Type '${runner.testoType}'"
         }
 
@@ -113,7 +117,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
 
         return runner.groups.isNotEmpty()
                 || runner.excludeGroups.isNotEmpty()
-                || runner.suite.isNotEmpty()
+                || runner.suites.isNotEmpty()
                 || runner.testoType.isNotEmpty()
                 || runner.rerunFilters.isNotEmpty()
     }
@@ -132,7 +136,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
 
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> {
         val editor = super.getConfigurationEditor() as PhpTestRunConfigurationEditor
-        editor.setRunnerOptionsDocumentation("https://github.com/testo/testo")
+        editor.setRunnerOptionsDocumentation("https://php-testo.github.io/docs/guide/cli-reference")
 
         return TestoTestRunConfigurationEditor(editor, this)
     }

@@ -71,6 +71,17 @@ class TestoRunnerSettingsSerializationTest : TestCase() {
         assertEquals("", restored.legacyExcludeGroup)
     }
 
+    /** A suite name is never split: unlike the group field it never had a separator, and may hold anything. */
+    fun testLegacySingleSuiteBecomesAOneItemList() {
+        val restored = deserialize("""<TestoRunnerSettings suite="Unit, slow" />""")
+
+        restored.migrateLegacyNames()
+
+        assertEquals(listOf("Unit, slow"), restored.suites)
+        assertEquals("", restored.legacySuite)
+        assertFalse("The legacy attribute is gone after a save", serialize(restored).contains("suite=\""))
+    }
+
     fun testMigrationIsIdempotentAndKeepsExistingLists() {
         val settings = TestoRunnerSettings().apply { groups = mutableListOf("db") }
 
@@ -88,6 +99,24 @@ class TestoRunnerSettingsSerializationTest : TestCase() {
 
         assertTrue(xml.contains("<groups>"))
         assertFalse("The legacy attribute is gone after a save: $xml", xml.contains("group=\""))
+    }
+
+    /** A configuration saved before the field existed reads back with the default, benchmarks excluded and all. */
+    fun testCoverageOptionsDefaultSurvivesAnOlderConfiguration() {
+        val restored = deserialize("""<TestoRunnerSettings />""")
+
+        assertEquals("--type=!bench", restored.coverageOptions)
+        assertEquals("auto", restored.coverageLevel)
+        assertFalse("The defaults must stay out of the XML", serialize(restored).contains("coverage_"))
+    }
+
+    fun testCoverageOptionsRoundTrip() {
+        val settings = TestoRunnerSettings(coverageLevel = "branch", coverageOptions = "--filter x")
+
+        val restored = deserialize(serialize(settings))
+
+        assertEquals("branch", restored.coverageLevel)
+        assertEquals("--filter x", restored.coverageOptions)
     }
 
     fun testUnknownElementsDoNotBreakDeserialization() {

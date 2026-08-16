@@ -72,6 +72,35 @@ class TestoCoverageArgumentsTest : TestoCoverageProgramRunner() {
     }
 
     @Test
+    fun coverageOnlyOptionsDefaultToExcludingBenchmarks() {
+        assertEquals(listOf("--type=!bench"), extraCoverageArguments(TestoRunnerSettings()))
+    }
+
+    @Test
+    fun coverageOnlyOptionsAreSplitLikeACommandLine() {
+        val settings = TestoRunnerSettings(coverageOptions = """--type=!bench --filter "a b"""")
+
+        assertEquals(listOf("--type=!bench", "--filter", "a b"), extraCoverageArguments(settings))
+    }
+
+    @Test
+    fun emptyCoverageOnlyOptionsAddNothing() {
+        assertTrue(extraCoverageArguments(TestoRunnerSettings(coverageOptions = "   ", coverageLevel = "auto")).isEmpty())
+    }
+
+    @Test
+    fun autoLevelSendsNoLevelFlag() {
+        assertTrue(extraCoverageArguments(TestoRunnerSettings()).none { it.startsWith("--coverage-level") })
+    }
+
+    @Test
+    fun chosenLevelLeadsTheCoverageOnlyArguments() {
+        val settings = TestoRunnerSettings(coverageLevel = "branch")
+
+        assertEquals(listOf("--coverage-level=branch", "--type=!bench"), extraCoverageArguments(settings))
+    }
+
+    @Test
     fun executorIdIsCoverage() {
         assertEquals("Coverage", EXECUTOR_ID)
     }

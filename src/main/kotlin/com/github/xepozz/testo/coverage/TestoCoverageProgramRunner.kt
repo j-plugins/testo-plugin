@@ -10,6 +10,7 @@ import com.intellij.execution.process.ProcessAdapter
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.configurations.ConfigurationInfoProvider
+import com.intellij.execution.configurations.ParametersList
 import com.intellij.execution.configurations.RunProfile
 import com.intellij.execution.configurations.RunProfileState
 import com.intellij.execution.configurations.RunnerSettings
@@ -63,7 +64,7 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
         val localCoverage = coverageConfiguration.coverageFilePath
         val settings = runConfiguration.testoSettings.getTestoRunnerSettings()
         val flags = coverageFlagLocalPaths(settings, localCoverage)
-        val coverageArguments = when {
+        val reportArguments = when {
             // No base path (runner missing) or every report unchecked: a bare --coverage still makes any
             // testo.php-configured writer collect, and the announce path picks the reports up.
             flags.isEmpty() -> listOf("--coverage")
@@ -71,6 +72,7 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
                 coverageFlagFor(format, toTargetPath(runConfiguration, interpreter, local))
             }
         }
+        val coverageArguments = reportArguments + extraCoverageArguments(settings)
 
         val command = createTestoCoverageCommand(
             runConfiguration,
@@ -107,6 +109,16 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
             if (settings.coverageCobertura) add(CoverageFormat.COBERTURA to "$stem-cobertura.xml")
             if (settings.coverageXml) add(CoverageFormat.COVERAGE_XML to "$stem-coverage-xml")
         }
+    }
+
+    /**
+     * The analysis level and the configuration's coverage-only options — everything a Coverage run adds beyond the
+     * report flags. The level is left out when set to auto: the one configured in testo.php then stands.
+     */
+    fun extraCoverageArguments(settings: TestoRunnerSettings): List<String> = buildList {
+        val level = settings.coverageLevel.trim()
+        if (level.isNotEmpty() && level != TestoRunnerSettings.COVERAGE_LEVEL_AUTO) add("--coverage-level=$level")
+        addAll(ParametersList.parse(settings.coverageOptions))
     }
 
     fun coverageFlagFor(format: CoverageFormat, targetCoverage: String): String = when (format) {

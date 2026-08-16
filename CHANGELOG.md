@@ -35,9 +35,25 @@
   the icon of what the run was: run, debug or coverage.
 - How many runs the history keeps is set from the history list itself, right above the button that clears it.
 - An imported run comes in locked, so retention never deletes the one copy of a run carried in from elsewhere.
+- The run configuration keeps its coverage settings in a group of their own, with the analysis level
+  (`--coverage-level`, or *auto* to leave it to testo.php) and options only a Coverage run adds — benchmarks are kept
+  out of coverage by default.
+- Group and Exclude group are lists of tags, added from the `#[Group]` names the project declares rather than typed
+  with commas.
+- Suite is a list of tags too — typed and added with Enter — and a run may now narrow to several suites at once, one
+  `--suite` flag each. A configuration saved with a single suite keeps it.
+- The run configuration is laid out in groups: Parallel sits under Test Runner Options, then Run Options, Filter and
+  Coverage.
+
+### Removed
+
+- The Repeat field: Testo's command line has no `--repeat`, so it never did anything.
+- The Command field: a test run is always `testo run`, and other subcommands are what *Run Anything* is for.
+- Parallel no longer sends a flag Testo does not have: the field is parked at 1 (no `--parallel`) until it does.
 
 ### Fixed
 
+- The Test Runner Options help button opens Testo's CLI reference.
 - The channel console no longer throws an EDT-threading error while streaming live output into an aggregate tab.
 - The report buttons no longer trigger a "slow operations on EDT" error: report paths now resolve off the UI thread.
 - The elapsed time in the run summary no longer counts up forever when a run ends before the toolbar is wired.
@@ -46,6 +62,7 @@
 - The first coverage run of an IDE session paints the editor right away, instead of waiting for something else to
   refresh the highlighting.
 - Lists of covering tests name the test class without its namespace, which is the same for every row anyway.
+- Excluding a group runs again: it goes out as `--group=!name`, the only form Testo's command line has.
 
 ## [2026.5.262] - 2026-08-12
 

@@ -117,6 +117,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │
 ├── index/
 │   ├── TestoDataProvidersIndex.kt  # FileBasedIndex: provider name → {class, method, providerFqn}
+│   ├── TestoGroupsIndex.kt         # FileBasedIndex: every name a #[Filter\Group] in the project spells
 │   └── TestoDataProviderUtils.kt   # isDataProvider / findDataProviderUsages / usage index
 │
 ├── references/
@@ -180,6 +181,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoRunConfigurationHandler.kt  # maps scope/settings → CLI flags
 │   │   ├── TestoRunConfigurationSettings.kt # persistence; default options "-q -n --teamcity"
 │   │   ├── TestoRunnerSettings.kt           # Testo-specific persisted fields + transient rerunFilters
+│   │   ├── TestoTagsField.kt                # the Group / Exclude group fields: removable tags + an add popup
 │   │   ├── TestoRunConfigurationProducer.kt # context → configuration (~615 lines, the trickiest file)
 │   │   ├── TestoTestRunConfigurationEditor.kt  # "Testo Options" panel wrapping the PHP editor
 │   │   ├── TestoTestRunnerSettingsValidator.kt # + the finder that switches the "Cannot find …" gate off
@@ -261,16 +263,17 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
 - `testRunnerOptions` default to **`-q -n --teamcity`** (`TestoRunConfigurationSettings.createDefault`).
   The `--teamcity` flag is what makes Testo emit the SM service messages this plugin parses.
 - Runner flags from `TestoRunnerSettings` (only emitted when non-empty / > 0): `--type`, `--suite`, `--group`,
-  `--exclude-group`, `--repeat`, `--parallel`, plus one `--filter <selector>` per entry in `rerunFilters`.
-  `group`/`excludeGroup` are single persisted strings holding comma-separated names; the handler splits them into one
-  flag per name (Testo ORs repeated `--group`s, and a `!name` prefix excludes). `groups`/`excludeGroups` are
-  persisted **lists** (`@XCollection`), so a name is opaque — whatever `#[Group]` spells reaches the CLI untouched.
+  `--parallel`, plus one `--filter <selector>` per entry in `rerunFilters`. `suites`, `groups`/`excludeGroups` are persisted
+  **lists** (`@XCollection`), one `--group` flag each — Testo ORs repeated `--group`s and reads a `!name` prefix as an
+  exclusion, which is the only exclusion form its CLI has. A name is opaque: whatever `#[Group]` spells reaches the
+  CLI untouched.
 - `--config <file>` when an alternative configuration file is set (`getConfigFileOption()`).
 - Scope flags: `Type` → `--suite <type>`; `Directory`/`File` → `--path <relative path>`;
   `Method` → `--path <file> --filter <method> [--data-provider <name>]`; `ConfigurationFile` → nothing
   (the config file argument alone drives the run).
-- Coverage adds `--coverage-clover=<IDE-managed path>` (or bare `--coverage` if no path), plus Xdebug or PCOV
-  INI options depending on `coverageEngine`.
+- Coverage adds one `--coverage-<format>=<IDE-managed path>` per checked report (or bare `--coverage` if no path),
+  `--coverage-level=<line|branch|path>` unless the level is *auto*, the configuration's own coverage-only options
+  (`coverageOptions`, `--type=!bench` by default), plus Xdebug or PCOV INI options depending on `coverageEngine`.
 - Working directory is always `project.basePath`.
 
 `methodName` is an encoded selector, not just a name:
@@ -514,9 +517,11 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **Debug installs channel tabs itself** (`TestoDebugRunner`): the augmenter's descriptor lookup misses debug
   sessions. `TestoConsoleProperties.channelsInstalled` guards against a double install. The debug session also
   gets the `Testo.RerunSplit` action handed to it explicitly, since it does not use `RunTab.TopToolbar`.
-- **Group names are a list in the model, a comma-separated string only in the editor.** `TestoRunnerSettings`
-  persists `groups`/`excludeGroups` via `@XCollection`; the comma lives in the editor's text field (`parseNames`/
-  `formatNames`) and in the pre-list persisted form. `migrateLegacyNames` folds an old `group="a,b"` attribute into
+- **Suite and group names are lists everywhere.** `TestoRunnerSettings` persists `suites`, `groups`/`excludeGroups`
+  via `@XCollection` and the editor shows them as tags (`TestoTagsField` — groups pick from what `TestoGroupsIndex`
+  found, suites are typed and added with Enter), so a name is never split on anything: a comma or a space inside one
+  survives. The comma lives only in the pre-list persisted form, and a legacy `suite="x"` becomes a one-item list
+  without being split at all. `migrateLegacyNames` folds an old `group="a,b"` attribute into
   the list and clears it, and `TestoRunConfigurationSettings.getTestoRunnerSettings` calls it — that is the first
   point after deserialization every reader goes through. `TestoRunnerSettingsSerializationTest` pins the XML shape.
 - **`rerunFilters` is `@Transient`** — it lives only on the throwaway clone a "rerun failed" launch creates, and
@@ -527,6 +532,12 @@ Non-obvious constraints already paid for in blood — read before touching the r
   or stale on-disk indexes silently stay empty.
 - **The run-configuration editor calls the parent editor's `resetEditorFrom`/`applyEditorTo` reflectively**
   (they are not public on `PhpTestRunConfigurationEditor`) and swallows `ReadOnlyModificationException`.
+- **Parallel is injected into the PHP editor's own form.** `PhpTestRunConfigurationEditor` hands out the whole panel
+  and nothing smaller, and its *Test Runner options* row is a one-row `GridLayoutManager` built by the UI designer, so
+  a row cannot be added to it. `injectParallelRow` finds that row by its label (the bundle string carries a `&`
+  mnemonic the rendered label does not), rebuilds the row's layout with a second row and re-adds the existing children
+  with the constraints `getConstraintsForComponent` gives back — which is what keeps the label column shared, and the
+  two rows aligned. It falls back to a row of our own below the panel, so a PhpStorm form change only moves the field.
 - **`TestoFrameworkType.getComposerPackageNames()` currently returns `arrayOf("php")`**, not `testo/testo` —
   deliberate (the commented-out line records the intent); changing it affects framework auto-detection.
 - **`TestoTestRunLineMarkerProviderInfo.shouldReplace = true`** so Testo's gutter icon wins over PhpStorm's

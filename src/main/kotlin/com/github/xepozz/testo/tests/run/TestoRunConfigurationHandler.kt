@@ -36,25 +36,21 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
             arguments.add("--type")
             arguments.add(runner.testoType)
         }
-        if (runner.suite.isNotEmpty()) {
+        for (suite in runner.suites) {
             arguments.add("--suite")
-            arguments.add(runner.suite)
+            arguments.add(suite)
         }
-        // Testo takes `--group`/`--exclude-group` repeatedly (OR logic), one name per flag — that is how a
-        // `#[Group('db', 'slow')]` run reaches the CLI.
+        // Testo takes `--group` repeatedly (OR logic), one name per flag — that is how a `#[Group('db', 'slow')]` run
+        // reaches the CLI. Exclusion is the same flag with a `!` prefix; the CLI has no --exclude-group at all.
         for (group in runner.groups) {
             arguments.add("--group")
             arguments.add(group)
         }
         for (group in runner.excludeGroups) {
-            arguments.add("--exclude-group")
-            arguments.add(group)
+            arguments.add("--group")
+            arguments.add(if (group.startsWith("!")) group else "!$group")
         }
-        if (runner.repeat > 0) {
-            arguments.add("--repeat")
-            arguments.add(runner.repeat.toString())
-        }
-        if (runner.parallel > 0) {
+        if (runner.parallel != 1) {
             arguments.add("--parallel")
             arguments.add(runner.parallel.toString())
         }

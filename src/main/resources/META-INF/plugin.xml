@@ -80,6 +80,8 @@
                 implementation="com.github.xepozz.testo.tests.console.TestoRepeatedFrameFolding"/>
         <fileBasedIndex
                 implementation="com.github.xepozz.testo.index.TestoDataProvidersIndex"/>
+        <fileBasedIndex
+                implementation="com.github.xepozz.testo.index.TestoGroupsIndex"/>
 
         <spellchecker.bundledDictionaryProvider
                 implementation="com.github.xepozz.testo.SpellcheckingDictionaryProvider"/>
