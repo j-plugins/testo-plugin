@@ -16,8 +16,8 @@
   tests, or every test under a directory.
 - *Select Opened File* on the Coverage panel selects the file open in the editor, which the platform's *Always select
   opened element* never managed to do in a file-based coverage view.
-- A gutter icon on every covered method, function and class runs exactly the tests that cover it, with coverage;
-  the Coverage panel has a switch for those icons.
+- A gutter icon on every covered method, function and class lists the tests that cover it — all of them in one run
+  from the top of the list, or one at a time — and the Coverage panel has a switch for those icons.
 - The popup on a covered line highlights the row under the pointer and ends with a button running all of that line's
   covering tests.
 - Every run is archived — its output, its reports and the parameters it ran with — and replays from the *Test History*
@@ -43,6 +43,9 @@
 - The elapsed time in the run summary no longer counts up forever when a run ends before the toolbar is wired.
 - Clearing the history now shows on the tab of the run it spares: its *Replay* menu says *Do not keep in history*,
   where it used to keep claiming the run was being kept.
+- The first coverage run of an IDE session paints the editor right away, instead of waiting for something else to
+  refresh the highlighting.
+- Lists of covering tests name the test class without its namespace, which is the same for every row anyway.
 
 ## [2026.5.262] - 2026-08-12
 

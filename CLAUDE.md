@@ -499,7 +499,16 @@ Non-obvious constraints already paid for in blood — read before touching the r
   inline, and holds `EditSource` alone. Anything acting on the selected row goes on the toolbar instead
   (`createExtraToolbarActions`, `@Experimental`) and reads the selection as `CommonDataKeys.NAVIGATABLE`.
 - **A column's width comes from `getPercentage(column, rootNode)`**, so a column whose values are not percentages must
-  still answer there — the *Tests* column returns its count, or the view sizes it for "100% (1234/1234)".
+  still answer there — the *Tests* column returns its count, or the view sizes it for "100% (1234/1234)". The width the
+  user ends up with is then remembered in `CoverageViewManager.StateBean.myColumnSize` (`@Internal`), which wins over
+  the computed one whenever the column count matches.
+- **`CoverageViewExtension` is instantiated three times per view** — `CoverageView`, `CoverageTableModel` and
+  `CoverageViewTreeStructure` each call `createCoverageViewExtension`. Nothing one of them stores in a field is
+  visible to another, so anything `getPercentage` needs must be derived from the bundle, not remembered from
+  `createColumnInfos`.
+- **The editor highlighter is installed from `applyTestoCoverage`, not from the annotator.** `onSuiteChosen` fires only
+  when a bundle is *reloaded or closed* — the first `chooseSuitesBundle` of a session never calls it, so installing
+  there alone left the very first coverage run of an IDE session unpainted until something else forced a refresh.
 - **`ConsoleFolding` instances are shared across consoles** and get no per-console reset; both foldings track
   state in a `ThreadLocal` and clear it on the first non-frame line.
 - **Debug installs channel tabs itself** (`TestoDebugRunner`): the augmenter's descriptor lookup misses debug

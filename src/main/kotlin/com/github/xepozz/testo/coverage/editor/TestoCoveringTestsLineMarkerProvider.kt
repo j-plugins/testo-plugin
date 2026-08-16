@@ -3,7 +3,7 @@ package com.github.xepozz.testo.coverage.editor
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.format.TestId
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
-import com.github.xepozz.testo.coverage.perTest.TestoCoveringTestsLauncher
+import com.github.xepozz.testo.coverage.perTest.TestoCoveringTestsPopup
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.daemon.LineMarkerInfo
 import com.intellij.codeInsight.daemon.LineMarkerProvider
@@ -15,6 +15,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.elementType
+import com.intellij.ui.awt.RelativePoint
 import com.jetbrains.php.lang.lexer.PhpTokenTypes
 import com.jetbrains.php.lang.psi.elements.Function
 import com.jetbrains.php.lang.psi.elements.PhpClass
@@ -33,10 +34,14 @@ class TestoCoveringTestsLineMarkerProvider : LineMarkerProvider {
         if (element.elementType != PhpTokenTypes.IDENTIFIER) return null
         val owner = element.parent
         if (owner !is Function && owner !is PhpClass) return null
+        owner as PhpNamedElement
+        // The declaration's own name, and nothing else that parses as an identifier under it — otherwise one
+        // declaration can be marked twice.
+        if (owner.nameNode?.psi !== element) return null
         val project = element.project
         if (!TestoCoveringTestsGutter.getInstance(project).enabled) return null
 
-        val tests = coveringTests(owner as PhpNamedElement)
+        val tests = coveringTests(owner).sortedBy { "${it.fqcn}::${it.method}" }
         if (tests.isEmpty()) return null
         val label = TestoBundle.message("testo.coverage.gutter.run.covering", tests.size)
         val subject = owner.name
@@ -46,7 +51,9 @@ class TestoCoveringTestsLineMarkerProvider : LineMarkerProvider {
             element.textRange,
             AllIcons.Toolwindows.ToolWindowRunWithCoverage,
             { label },
-            { _, _ -> TestoCoveringTestsLauncher.run(project, tests, TestoCoveringTestsLauncher.runName(subject, tests.size)) },
+            { event, _ ->
+                TestoCoveringTestsPopup.show(project, tests, subject, null, RelativePoint(event))
+            },
             GutterIconRenderer.Alignment.LEFT,
             { label },
         )

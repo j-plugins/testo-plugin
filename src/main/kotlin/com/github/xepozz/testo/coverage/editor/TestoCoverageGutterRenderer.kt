@@ -5,6 +5,7 @@ import com.github.xepozz.testo.coverage.format.TestId
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
 import com.github.xepozz.testo.coverage.perTest.TestoCoveringTestsLauncher
 import com.github.xepozz.testo.coverage.perTest.TestoTestIdentityMapper
+import com.github.xepozz.testo.coverage.perTest.shortTestLabel
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.colors.CodeInsightColors
@@ -94,7 +95,7 @@ internal class TestoCoverageGutterRenderer(
 
         header.add(JBLabel(TestoBundle.message("testo.coverage.editor.popup.tests", tests.size)))
         val list = JBList(tests)
-        list.cellRenderer = SimpleListCellRenderer.create<TestId>("") { "${it.fqcn.trimStart('\\')}::${it.method}" }
+        list.cellRenderer = SimpleListCellRenderer.create<TestId>("") { shortTestLabel(it) }
         list.selectedIndex = 0
         list.visibleRowCount = minOf(tests.size, 8)
         // A plain JBList tracks the keyboard only; the row under the pointer is highlighted by the list wrappers the

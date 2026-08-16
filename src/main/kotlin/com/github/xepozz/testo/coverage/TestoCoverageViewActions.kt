@@ -107,7 +107,8 @@ internal class TestoSelectOpenedFileAction(private val project: Project) : Toggl
 internal class TestoRunCoveringTestsAction(private val project: Project) : AnAction(
     TestoBundle.message("testo.coverage.view.run.covering"),
     null,
-    AllIcons.Toolwindows.ToolWindowRunWithCoverage,
+    // Not the tool window icon the gutter toggle beside it wears — two buttons on one toolbar must not look alike.
+    AllIcons.General.RunWithCoverage,
 ), DumbAware {
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 

@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.coverage
 
+import com.github.xepozz.testo.coverage.editor.TestoCoverageEditorHighlighter
 import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.coverage.format.detectCoverageFormat
 import com.intellij.coverage.CoverageDataManager
@@ -44,6 +45,10 @@ fun applyTestoCoverage(project: Project, reports: List<TestoCoverageReport>): Bo
         suite
     }
     if (suites.isEmpty()) return false
+    // Before the bundle is handed over, not after: the highlighter paints on `coverageDataCalculated`, and that fires
+    // from inside chooseSuitesBundle. Its other install point, the annotator's onSuiteChosen, is not reached on the
+    // first bundle of a session at all — the platform calls it only when a bundle is reloaded or closed.
+    TestoCoverageEditorHighlighter.getInstance(project).install()
     CoverageDataManager.getInstance(project).chooseSuitesBundle(CoverageSuitesBundle(suites.toTypedArray<CoverageSuite>()))
     return true
 }

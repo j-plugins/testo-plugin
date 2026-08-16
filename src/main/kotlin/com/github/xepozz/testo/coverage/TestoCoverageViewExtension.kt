@@ -2,9 +2,7 @@ package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.format.CoverageFormat
-import com.github.xepozz.testo.coverage.format.TestId
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
-import com.github.xepozz.testo.coverage.perTest.TestoCoverageKeys
 import com.github.xepozz.testo.coverage.perTest.testsUnder
 import com.intellij.coverage.CoverageBundle
 import com.intellij.coverage.CoverageSuitesBundle
@@ -27,10 +25,6 @@ class TestoCoverageViewExtension(
     private val annotator: TestoCoverageAnnotator,
     suitesBundle: CoverageSuitesBundle,
 ) : DirectoryCoverageViewExtension(project, annotator, suitesBundle) {
-    // Where the Tests column ended up, or -1 when it is not shown — the view asks for column values by index.
-    private var testsColumn = -1
-    private var tests: TestsColumnInfo? = null
-
     override fun createColumnInfos(): Array<ColumnInfo<*, *>> {
         val columns = mutableListOf<ColumnInfo<*, *>>(
             ElementColumnInfo(),
@@ -40,26 +34,37 @@ class TestoCoverageViewExtension(
             val name = TestoBundle.message("testo.coverage.view.column.branches")
             columns.add(PercentageCoverageColumnInfo(BRANCHES_COLUMN, name, mySuitesBundle))
         }
-        testsColumn = -1
-        tests = null
-        if (hasPerTestData()) {
-            val testsByFile = TestoCoverageByTestIndex.getInstance(project).data().testsByFile()
-            if (testsByFile.isNotEmpty()) {
-                tests = TestsColumnInfo(testsByFile)
-                testsColumn = columns.size
-                columns.add(tests!!)
-            }
-        }
+        if (showsTests()) columns.add(TestsColumnInfo())
         return columns.toTypedArray()
     }
 
     override fun getPercentage(columnIdx: Int, node: AbstractTreeNode<*>): String? {
         // Also what the view sizes a column by, off the root node — so the Tests column must answer with a count and
         // not fall through to the percentage string, which would size it for "100% (1234/1234)".
-        if (columnIdx == testsColumn) return tests?.valueOf(node)
+        if (columnIdx == testsColumn()) return countFor(node)?.takeIf { it > 0 }?.toString()
         if (columnIdx != BRANCHES_COLUMN) return super.getPercentage(columnIdx, node)
         val file = extractFile(node) ?: return null
         return annotator.getBranchCoverageInformationString(file, mySuitesBundle)
+    }
+
+    /**
+     * Where the Tests column sits, or -1 when it is not shown. Worked out from the bundle rather than remembered from
+     * [createColumnInfos]: the view builds a *separate* extension instance for its columns, its tree structure and
+     * itself, so nothing one of them stores is visible to the one being asked here.
+     */
+    private fun testsColumn(): Int = when {
+        !showsTests() -> -1
+        mySuitesBundle.isBranchCoverage -> BRANCHES_COLUMN + 1
+        else -> BRANCHES_COLUMN
+    }
+
+    private fun showsTests(): Boolean =
+        hasPerTestData() && TestoCoverageByTestIndex.getInstance(project).data().testsByFile().isNotEmpty()
+
+    /** Distinct covering tests of a node: the file's own set, a directory as the union over everything beneath it. */
+    private fun countFor(node: NodeDescriptor<*>): Int? {
+        val file = (node as? AbstractTreeNode<*>)?.let { extractFile(it) } ?: return null
+        return TestoCoverageByTestIndex.getInstance(project).data().testsUnder(file.path, file.isDirectory).size
     }
 
 
@@ -82,24 +87,16 @@ class TestoCoverageViewExtension(
         mySuitesBundle.suites.filterIsInstance<TestoCoverageSuite>().any { it.format == CoverageFormat.COVERAGE_XML }
 
     /** Distinct covering tests: the file's own set, a directory as the union over the files beneath it. */
-    private inner class TestsColumnInfo(
-        private val testsByFile: Map<String, Set<TestId>>,
-    ) : ColumnInfo<NodeDescriptor<*>, String>(TestoBundle.message("testo.coverage.view.column.tests")) {
-        // One directory is asked for per visible row and per sort comparison — the union walk runs once per path.
-        private val dirCounts = HashMap<String, Int>()
+    private inner class TestsColumnInfo :
+        ColumnInfo<NodeDescriptor<*>, String>(TestoBundle.message("testo.coverage.view.column.tests")) {
+        // One row is asked for per repaint and per sort comparison, and a directory means a walk of the whole map.
+        private val counts = HashMap<NodeDescriptor<*>, Int>()
 
-        override fun valueOf(node: NodeDescriptor<*>): String? = countFor(node)?.takeIf { it > 0 }?.toString()
+        override fun valueOf(node: NodeDescriptor<*>): String? = count(node).takeIf { it > 0 }?.toString()
 
-        override fun getComparator(): Comparator<NodeDescriptor<*>> = compareBy { countFor(it) ?: -1 }
+        override fun getComparator(): Comparator<NodeDescriptor<*>> = compareBy { count(it) }
 
-        private fun countFor(node: NodeDescriptor<*>): Int? {
-            val file = (node as? AbstractTreeNode<*>)?.let { extractFile(it) } ?: return null
-            val key = TestoCoverageKeys.normalize(file.path)
-            if (!file.isDirectory) return testsByFile[key]?.size
-            return dirCounts.getOrPut(key) {
-                TestoCoverageByTestIndex.getInstance(project).data().testsUnder(key, isDirectory = true).size
-            }
-        }
+        private fun count(node: NodeDescriptor<*>): Int = counts.getOrPut(node) { countFor(node) ?: 0 }
     }
 
     companion object {

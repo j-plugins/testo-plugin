@@ -4,6 +4,7 @@ import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.coverage.format.TestId
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
 import com.github.xepozz.testo.coverage.perTest.TestoTestIdentityMapper
+import com.github.xepozz.testo.coverage.perTest.shortTestLabel
 import com.intellij.codeInsight.codeVision.CodeVisionAnchorKind
 import com.intellij.codeInsight.codeVision.CodeVisionEntry
 import com.intellij.codeInsight.codeVision.CodeVisionRelativeOrdering
@@ -68,7 +69,7 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
         val popup = JBPopupFactory.getInstance()
             .createPopupChooserBuilder(tests)
             .setTitle(if (tests.size == 1) "1 Covering Test" else "${tests.size} Covering Tests")
-            .setRenderer(SimpleListCellRenderer.create<TestId>("") { "${it.fqcn.trimStart('\\')}::${it.method}" })
+            .setRenderer(SimpleListCellRenderer.create<TestId>("") { shortTestLabel(it) })
             .setItemChosenCallback { id ->
                 (mapper.resolve(id, project) as? Navigatable)?.takeIf { it.canNavigate() }?.navigate(true)
             }
