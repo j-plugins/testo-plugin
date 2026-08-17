@@ -12,6 +12,7 @@ import com.intellij.execution.testframework.sm.SMTestRunnerConnectionUtil
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.project.Project
 import com.intellij.util.SmartList
 import com.intellij.xdebugger.XDebugProcess
 import com.intellij.xdebugger.XDebugProcessStarter
@@ -100,17 +101,37 @@ class TestoDebugRunner : PhpTestDebugRunner<TestoRunConfiguration>(TestoRunConfi
                     )
                 }
             }
-            // Go through the session builder like PhpTestDebugRunner does: its result carries the descriptor.
-            // XDebugSession.getRunContentDescriptor() itself is deprecated and logs an error under the split debugger.
-            val descriptor = XDebuggerManager.getInstance(project).newSessionBuilder(starter)
-                .environment(env)
-                .startSession()
-                .runContentDescriptor
+            val descriptor = startDebugDescriptor(project, env, starter)
             processHandler.startNotify()
             return descriptor
         } catch (e: ExecutionException) {
             debugServer.unregisterSessionHandler(sessionId)
             throw e
         }
+    }
+
+    // 2026.2+: the session builder's result carries the descriptor without XDebugSession.getRunContentDescriptor(),
+    // which is deprecated there and logs a "split debugger" error. newSessionBuilder is absent on 2025.2, so it is
+    // reached by reflection (methods resolved off the public interfaces, never the internal impl); the 2025.2 fallback
+    // is the classic API, whose descriptor accessor is safe on a platform with no split debugger.
+    private fun startDebugDescriptor(
+        project: Project,
+        env: ExecutionEnvironment,
+        starter: XDebugProcessStarter,
+    ): RunContentDescriptor? {
+        val manager = XDebuggerManager.getInstance(project)
+        val newSessionBuilder = runCatching {
+            XDebuggerManager::class.java.getMethod("newSessionBuilder", XDebugProcessStarter::class.java)
+        }.getOrNull()
+        if (newSessionBuilder != null) {
+            val builderClass = Class.forName("com.intellij.xdebugger.XDebugSessionBuilder")
+            val resultClass = Class.forName("com.intellij.xdebugger.XSessionStartedResult")
+            val builder = newSessionBuilder.invoke(manager, starter)
+            val withEnv = builderClass.getMethod("environment", ExecutionEnvironment::class.java).invoke(builder, env)
+            val result = builderClass.getMethod("startSession").invoke(withEnv)
+            return resultClass.getMethod("getRunContentDescriptor").invoke(result) as RunContentDescriptor?
+        }
+        @Suppress("DEPRECATION")
+        return manager.startSession(env, starter).runContentDescriptor
     }
 }

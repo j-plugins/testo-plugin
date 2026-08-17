@@ -55,6 +55,8 @@ gone. `phpApi` is now purely a build selector (platform version, since/until, pe
 `PhpUnitCoverageEngine.CoverageEngine` (the Xdebug/PCOV driver) is the one PHP coverage symbol still used and did **not**
 move — it is imported directly from `com.jetbrains.php`.
 
+Source that is single but not version-agnostic is reached by reflection, never a direct symbol: `XDebuggerManager.newSessionBuilder` (`TestoDebugRunner`) exists only on 262, so a direct call compiles green locally on 262 and breaks the 252 build in CI. Guard any such 262-only platform symbol behind a reflective lookup with a 252 fallback, or compile both variants before calling it done.
+
 Each variant is published as `<pluginVersion>.<phpApi>` (e.g. `2026.3.1.252` / `2026.3.1.262`). The Marketplace keys
 uploads by version and rejects a second upload carrying a version it already has, so the two builds *must not* share
 `pluginVersion`. The API goes in as a fourth component rather than a `-252` suffix: it sorts above the bare version
