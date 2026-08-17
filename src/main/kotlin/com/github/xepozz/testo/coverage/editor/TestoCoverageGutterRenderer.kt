@@ -2,6 +2,7 @@ package com.github.xepozz.testo.coverage.editor
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.format.TestId
+import com.github.xepozz.testo.coverage.perTest.TEST_ID_ORDER
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
 import com.github.xepozz.testo.coverage.perTest.TestoCoveringTestsLauncher
 import com.github.xepozz.testo.coverage.perTest.TestoTestIdentityMapper
@@ -162,7 +163,7 @@ internal class TestoCoverageGutterRenderer(
     private fun coveringTests(): List<TestId> =
         TestoCoverageByTestIndex.getInstance(project).data()
             .testsCoveringLine(filePath, lineData.lineNumber)
-            .sortedBy { "${it.fqcn}::${it.method}" }
+            .sortedWith(TEST_ID_ORDER)
 
     private fun statusText(): String = coverageLineStatusText(lineData)
 

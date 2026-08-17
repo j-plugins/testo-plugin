@@ -1,9 +1,9 @@
 package com.github.xepozz.testo.coverage.editor
 
 import com.github.xepozz.testo.TestoBundle
-import com.github.xepozz.testo.coverage.format.TestId
-import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
+import com.github.xepozz.testo.coverage.perTest.TEST_ID_ORDER
 import com.github.xepozz.testo.coverage.perTest.TestoCoveringTestsPopup
+import com.github.xepozz.testo.coverage.perTest.testsCoveringElement
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.daemon.LineMarkerInfo
 import com.intellij.codeInsight.daemon.LineMarkerProvider
@@ -12,7 +12,6 @@ import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.editor.markup.GutterIconRenderer
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.elementType
 import com.intellij.ui.awt.RelativePoint
@@ -41,7 +40,7 @@ class TestoCoveringTestsLineMarkerProvider : LineMarkerProvider {
         val project = element.project
         if (!TestoCoveringTestsGutter.getInstance(project).enabled) return null
 
-        val tests = coveringTests(owner).sortedBy { "${it.fqcn}::${it.method}" }
+        val tests = testsCoveringElement(owner).sortedWith(TEST_ID_ORDER)
         if (tests.isEmpty()) return null
         val label = TestoBundle.message("testo.coverage.gutter.run.covering", tests.size)
         val subject = owner.name
@@ -57,19 +56,6 @@ class TestoCoveringTestsLineMarkerProvider : LineMarkerProvider {
             GutterIconRenderer.Alignment.LEFT,
             { label },
         )
-    }
-
-    /** The tests that touched any line of the declaration — for a class, the union over everything it holds. */
-    private fun coveringTests(owner: PhpNamedElement): Set<TestId> {
-        val file = owner.containingFile ?: return emptySet()
-        val virtualFile = file.virtualFile ?: return emptySet()
-        val data = TestoCoverageByTestIndex.getInstance(owner.project).data()
-        val document = PsiDocumentManager.getInstance(owner.project).getDocument(file) ?: return emptySet()
-        val range = owner.textRange ?: return emptySet()
-        // Report line numbers are 1-based; the document is 0-based.
-        val first = document.getLineNumber(range.startOffset) + 1
-        val last = document.getLineNumber(range.endOffset.coerceAtMost(document.textLength)) + 1
-        return data.testsCoveringRange(virtualFile.path, first..last)
     }
 }
 

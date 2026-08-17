@@ -43,6 +43,7 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -167,7 +168,7 @@ class TestoReportsAction(
         // A fresh cell has no tooltip yet, so the first refresh must go through however little has changed.
         private var refreshed = false
         private var hovered = false
-        private var resolving = false
+        private val resolving = AtomicBoolean()
 
         // Asked for per paint: a font set once on a raw JComponent outlives a zoom (no UI delegate reinstalls it).
         override fun getFont(): Font = UIUtil.getLabelFont()
@@ -203,29 +204,16 @@ class TestoReportsAction(
         fun refresh() {
             // Not while the run is going: a report is announced as Testo starts writing it, over the path the
             // previous run wrote to — a check now would offer that run's file.
-            val finished = reports.runFinished
-            if (!finished) {
+            if (!reports.runFinished) {
                 applyResolved(null, false)
                 return
             }
-            // resolveReport goes through the PHP path mapper, whose getLocalPath hits the file index — a slow operation
-            // forbidden on the EDT, and this runs off a Swing timer on the EDT.
-            if (resolving) return
-            resolving = true
-            val startedAt = reports.runStartedAt
             val cellRef = ref
-            ApplicationManager.getApplication().executeOnPooledThread {
-                val found = resolveReport(cellRef, project, mapToLocal, startedAt)
-                ApplicationManager.getApplication().invokeLater(
-                    {
-                        resolving = false
-                        // A rerun may have started while this resolved; applying then would auto-open the previous
-                        // run's report and mark the new run as already opened. Drop it — the next tick sees the run.
-                        if (reports.runStartedAt == startedAt && reports.runFinished) applyResolved(found, true)
-                    },
-                    ModalityState.any(),
-                ) { project.isDisposed }
-            }
+            resolveReportOffEdt(
+                project, reports, resolving,
+                resolve = { startedAt -> resolveReport(cellRef, project, mapToLocal, startedAt) },
+                apply = { applyResolved(it, true) },
+            )
         }
 
         private fun applyResolved(found: Path?, finished: Boolean) {
@@ -377,7 +365,7 @@ class TestoReportsAction(
         private var runWasFinished = false
         private var refreshed = false
         private var hovered = false
-        private var resolving = false
+        private val resolving = AtomicBoolean()
 
         override fun getFont(): Font = UIUtil.getLabelFont()
 
@@ -399,29 +387,21 @@ class TestoReportsAction(
 
         fun refresh(coverage: List<TestoReportRef>) {
             refs = coverage
-            val finished = reports.runFinished
-            if (!finished) {
+            if (!reports.runFinished) {
                 applyResolved(emptyMap(), false)
                 return
             }
-            // resolveCoverageDataFile goes through the PHP path mapper and touches the filesystem — forbidden on the
-            // EDT, and this runs off a Swing timer on the EDT.
-            if (resolving) return
-            resolving = true
-            val startedAt = reports.runStartedAt
-            ApplicationManager.getApplication().executeOnPooledThread {
-                val found = LinkedHashMap<String, Path>()
-                for (ref in coverage) {
-                    resolveCoverageDataFile(ref, project, mapToLocal, startedAt)?.let { found[ref.path] = it }
-                }
-                ApplicationManager.getApplication().invokeLater(
-                    {
-                        resolving = false
-                        if (reports.runStartedAt == startedAt && reports.runFinished) applyResolved(found, true)
-                    },
-                    ModalityState.any(),
-                ) { project.isDisposed }
-            }
+            resolveReportOffEdt(
+                project, reports, resolving,
+                resolve = { startedAt ->
+                    val found = LinkedHashMap<String, Path>()
+                    for (ref in coverage) {
+                        resolveCoverageDataFile(ref, project, mapToLocal, startedAt)?.let { found[ref.path] = it }
+                    }
+                    found
+                },
+                apply = { applyResolved(it, true) },
+            )
         }
 
         private fun applyResolved(found: Map<String, Path>, finished: Boolean) {
@@ -683,3 +663,29 @@ internal fun resolveReport(
 internal fun isReportOf(path: Path, writtenAfter: Long): Boolean = runCatching {
     Files.isRegularFile(path) && Files.getLastModifiedTime(path).toMillis() >= writtenAfter
 }.getOrDefault(false)
+
+/**
+ * Resolves a report path off the EDT (the PHP path mapper hits the file index, forbidden on the EDT) and applies it
+ * back on the EDT — but only if no rerun started meanwhile, which would auto-open the previous run's report over the
+ * new run and mark the new one already opened. [busy] drops overlapping ticks (this runs off a twice-a-second timer).
+ */
+private fun <T> resolveReportOffEdt(
+    project: Project,
+    reports: TestoReportStore,
+    busy: AtomicBoolean,
+    resolve: (startedAt: Long) -> T,
+    apply: (T) -> Unit,
+) {
+    if (!busy.compareAndSet(false, true)) return
+    val startedAt = reports.runStartedAt
+    ApplicationManager.getApplication().executeOnPooledThread {
+        val found = resolve(startedAt)
+        ApplicationManager.getApplication().invokeLater(
+            {
+                busy.set(false)
+                if (reports.runStartedAt == startedAt && reports.runFinished) apply(found)
+            },
+            ModalityState.any(),
+        ) { project.isDisposed }
+    }
+}

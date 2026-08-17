@@ -3,9 +3,10 @@ package com.github.xepozz.testo.ui
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.coverage.format.TestId
-import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
+import com.github.xepozz.testo.coverage.perTest.TEST_ID_ORDER
 import com.github.xepozz.testo.coverage.perTest.TestoTestIdentityMapper
 import com.github.xepozz.testo.coverage.perTest.shortTestLabel
+import com.github.xepozz.testo.coverage.perTest.testsCoveringElement
 import com.intellij.codeInsight.codeVision.CodeVisionAnchorKind
 import com.intellij.codeInsight.codeVision.CodeVisionEntry
 import com.intellij.codeInsight.codeVision.CodeVisionRelativeOrdering
@@ -16,7 +17,6 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.pom.Navigatable
-import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.SmartPointerManager
@@ -52,7 +52,7 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
     override fun acceptsElement(element: PsiElement): Boolean = element is Function
 
     override fun getHint(element: PsiElement, file: PsiFile): String? {
-        val count = coveringTests(element as? Function ?: return null, file).size
+        val count = testsCoveringElement(element as? Function ?: return null).size
         return when (count) {
             0 -> null
             1 -> TestoBundle.message("testo.coverage.byTest.hint.one")
@@ -63,7 +63,7 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
     override fun handleClick(editor: Editor, element: PsiElement, event: MouseEvent?) {
         val function = element as? Function ?: return
         val project = function.project
-        val tests = coveringTests(function, function.containingFile).sortedBy { "${it.fqcn}::${it.method}" }
+        val tests = testsCoveringElement(function).sortedWith(TEST_ID_ORDER)
         if (tests.isEmpty()) return
 
         val mapper = TestoTestIdentityMapper.getInstance()
@@ -79,18 +79,6 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
             }
             .createPopup()
         if (event != null) popup.show(RelativePoint(event)) else popup.showInBestPositionFor(editor)
-    }
-
-    private fun coveringTests(function: Function, file: PsiFile): Set<TestId> {
-        val virtualFile = file.virtualFile ?: return emptySet()
-        val project = file.project
-        val data = TestoCoverageByTestIndex.getInstance(project).data()
-        val document = PsiDocumentManager.getInstance(project).getDocument(file) ?: return emptySet()
-        val range = function.textRange
-        // Report line numbers are 1-based; the document is 0-based.
-        val first = document.getLineNumber(range.startOffset) + 1
-        val last = document.getLineNumber(range.endOffset.coerceAtMost(document.textLength)) + 1
-        return data.testsCoveringRange(virtualFile.path, first..last)
     }
 
     // Mirror CodeVisionProviderBase's traversal but decorate the entry with the Testo icon and a tooltip (as the
