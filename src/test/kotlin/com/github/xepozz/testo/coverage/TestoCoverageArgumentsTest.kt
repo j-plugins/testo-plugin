@@ -2,6 +2,7 @@ package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.tests.run.TestoRunnerSettings
+import com.jetbrains.php.phpunit.coverage.PhpUnitCoverageEngine.CoverageEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -73,31 +74,46 @@ class TestoCoverageArgumentsTest : TestoCoverageProgramRunner() {
 
     @Test
     fun coverageOnlyOptionsDefaultToExcludingBenchmarks() {
-        assertEquals(listOf("--type=!bench"), extraCoverageArguments(TestoRunnerSettings()))
+        // The default engine/report (Xdebug + Cobertura) turns auto into branch, so the level leads the options.
+        assertEquals(listOf("--coverage-level=branch", "--type=!bench"), extraCoverageArguments(TestoRunnerSettings()))
     }
 
     @Test
     fun coverageOnlyOptionsAreSplitLikeACommandLine() {
-        val settings = TestoRunnerSettings(coverageOptions = """--type=!bench --filter "a b"""")
+        val settings = TestoRunnerSettings(coverageOptions = """--type=!bench --filter "a b"""", coverageCobertura = false)
 
         assertEquals(listOf("--type=!bench", "--filter", "a b"), extraCoverageArguments(settings))
     }
 
     @Test
     fun emptyCoverageOnlyOptionsAddNothing() {
-        assertTrue(extraCoverageArguments(TestoRunnerSettings(coverageOptions = "   ", coverageLevel = "auto")).isEmpty())
+        val settings = TestoRunnerSettings(coverageOptions = "   ", coverageLevel = "auto", coverageCobertura = false)
+        assertTrue(extraCoverageArguments(settings).isEmpty())
     }
 
     @Test
-    fun autoLevelSendsNoLevelFlag() {
-        assertTrue(extraCoverageArguments(TestoRunnerSettings()).none { it.startsWith("--coverage-level") })
+    fun autoWithXdebugAndCoberturaCollectsBranches() {
+        assertEquals("branch", resolveCoverageLevel(TestoRunnerSettings()))
     }
 
     @Test
-    fun chosenLevelLeadsTheCoverageOnlyArguments() {
-        val settings = TestoRunnerSettings(coverageLevel = "branch")
+    fun autoWithoutCoberturaSendsNoLevelFlag() {
+        val settings = TestoRunnerSettings(coverageCobertura = false)
+        assertEquals(null, resolveCoverageLevel(settings))
+        assertTrue(extraCoverageArguments(settings).none { it.startsWith("--coverage-level") })
+    }
 
-        assertEquals(listOf("--coverage-level=branch", "--type=!bench"), extraCoverageArguments(settings))
+    @Test
+    fun autoWithPcovSendsNoLevelFlag() {
+        val settings = TestoRunnerSettings(coverageEngine = CoverageEngine.PCOV)
+        assertEquals(null, resolveCoverageLevel(settings))
+    }
+
+    @Test
+    fun chosenLevelWinsOverTheAutoBranchDefault() {
+        val settings = TestoRunnerSettings(coverageLevel = "line")
+
+        assertEquals(listOf("--coverage-level=line", "--type=!bench"), extraCoverageArguments(settings))
     }
 
     @Test

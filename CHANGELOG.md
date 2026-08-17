@@ -43,6 +43,7 @@
 
 ### Changed
 
+- A Coverage run at level *auto* now collects branch coverage when the engine is Xdebug and a Cobertura report is on.
 - The *Log Levels* filter moved onto the console's own toolbar, right of the channel tabs, with a filter icon.
 
 ### Fixed

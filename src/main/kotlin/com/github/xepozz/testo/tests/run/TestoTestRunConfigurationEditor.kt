@@ -141,7 +141,7 @@ class TestoTestRunConfigurationEditor(
                 cell(coverageLevelField)
             }
                 .layout(RowLayout.PARENT_GRID)
-                .rowComment("--coverage-level=<line|branch|path>; auto leaves the level to testo.php. Branch and path need Xdebug")
+                .rowComment("--coverage-level=<line|branch|path>; auto leaves it to testo.php, or collects branches when Xdebug and Cobertura are both on. Branch and path need Xdebug")
 
             row {
                 label("Reports")

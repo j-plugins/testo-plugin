@@ -276,8 +276,10 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
   `Method` → `--path <file> --filter <method> [--data-provider <name>]`; `ConfigurationFile` → nothing
   (the config file argument alone drives the run).
 - Coverage adds one `--coverage-<format>=<IDE-managed path>` per checked report (or bare `--coverage` if no path),
-  `--coverage-level=<line|branch|path>` unless the level is *auto*, the configuration's own coverage-only options
-  (`coverageOptions`, `--type=!bench` by default), plus Xdebug or PCOV INI options depending on `coverageEngine`.
+  `--coverage-level=<line|branch|path>` (`resolveCoverageLevel`: an explicit level, else *auto* → `branch` when the
+  engine is Xdebug and a Cobertura report is on — branches need Xdebug and Cobertura carries them — else nothing),
+  the configuration's own coverage-only options (`coverageOptions`, `--type=!bench` by default), plus Xdebug or PCOV
+  INI options depending on `coverageEngine`.
 - Working directory is always `project.basePath`.
 
 `methodName` is an encoded selector, not just a name:
