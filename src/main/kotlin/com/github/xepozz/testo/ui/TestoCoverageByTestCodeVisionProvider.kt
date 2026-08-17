@@ -4,10 +4,12 @@ import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.coverage.format.TestId
 import com.github.xepozz.testo.coverage.perTest.TEST_ID_ORDER
+import com.github.xepozz.testo.coverage.perTest.TestoCoveringTestsLauncher
 import com.github.xepozz.testo.coverage.perTest.TestoTestIdentityMapper
 import com.github.xepozz.testo.coverage.perTest.shortTestLabel
 import com.github.xepozz.testo.coverage.perTest.testsCoveringElement
 import com.intellij.codeInsight.codeVision.CodeVisionAnchorKind
+import com.intellij.icons.AllIcons
 import com.intellij.codeInsight.codeVision.CodeVisionEntry
 import com.intellij.codeInsight.codeVision.CodeVisionRelativeOrdering
 import com.intellij.codeInsight.codeVision.ui.model.ClickableTextCodeVisionEntry
@@ -27,6 +29,7 @@ import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.jetbrains.php.lang.psi.PhpFile
 import com.jetbrains.php.lang.psi.elements.Function
 import java.awt.event.MouseEvent
+import javax.swing.Icon
 
 /**
  * Code Vision lens on any PHP method/function that Testo's per-test coverage recorded as covered, reading the
@@ -67,19 +70,34 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
         if (tests.isEmpty()) return
 
         val mapper = TestoTestIdentityMapper.getInstance()
+        // A run-all action first (like the *Run covering tests* gutter), then one navigable row per test.
+        val rows = buildList {
+            add(Row(null, TestoBundle.message("testo.coverage.editor.popup.run.all", tests.size), AllIcons.Actions.RunAll))
+            tests.forEach { add(Row(it, shortTestLabel(it), AllIcons.Nodes.Method)) }
+        }
         val popup = JBPopupFactory.getInstance()
-            .createPopupChooserBuilder(tests)
+            .createPopupChooserBuilder(rows)
             .setTitle(
                 if (tests.size == 1) TestoBundle.message("testo.coverage.byTest.chooser.one")
                 else TestoBundle.message("testo.coverage.byTest.chooser.many", tests.size)
             )
-            .setRenderer(SimpleListCellRenderer.create<TestId>("") { shortTestLabel(it) })
-            .setItemChosenCallback { id ->
-                (mapper.resolve(id, project) as? Navigatable)?.takeIf { it.canNavigate() }?.navigate(true)
+            .setRenderer(SimpleListCellRenderer.create<Row> { label, row, _ ->
+                label.text = row.label
+                label.icon = row.icon
+            })
+            .setItemChosenCallback { row ->
+                val test = row.test
+                if (test == null) {
+                    TestoCoveringTestsLauncher.run(project, tests, TestoCoveringTestsLauncher.runName(function.name, tests.size))
+                } else {
+                    (mapper.resolve(test, project) as? Navigatable)?.takeIf { it.canNavigate() }?.navigate(true)
+                }
             }
             .createPopup()
         if (event != null) popup.show(RelativePoint(event)) else popup.showInBestPositionFor(editor)
     }
+
+    private class Row(val test: TestId?, val label: String, val icon: Icon)
 
     // Mirror CodeVisionProviderBase's traversal but decorate the entry with the Testo icon and a tooltip (as the
     // "Show history" lens does), and route the click through handleClick.

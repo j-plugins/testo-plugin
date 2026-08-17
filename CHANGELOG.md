@@ -18,6 +18,7 @@
 - A gutter icon on every covered method, function and class lists its covering tests, runnable together or one at a
   time, with a switch on the Coverage panel.
 - The popup on a covered line highlights the row under the pointer and runs all of that line's covering tests.
+- The covering-tests lens on a covered declaration leads its list with *Run all covering tests*, then a jump to each.
 - Every run is archived — output, reports and parameters — and replays from *Test History* as a full Testo console.
 - *Show history* above a test replays the newest archived run containing it and selects its node.
 - How many runs the history keeps is set in *Tools | Testo* or from the history list itself, which also clears it.
