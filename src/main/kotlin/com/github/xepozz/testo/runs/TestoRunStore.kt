@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.runs
 
 import com.google.gson.Gson
+import com.google.gson.JsonObject
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.Service
@@ -97,8 +98,11 @@ class TestoRunStore(private val project: Project) {
     fun readManifest(dir: Path): TestoRunManifest? = runCatching {
         val file = dir.resolve(TestoRunRecording.MANIFEST_FILE)
         if (!file.exists()) return null
-        gson.fromJson(Files.readString(file, StandardCharsets.UTF_8), TestoRunManifest::class.java)
-            ?.takeIf { it.v >= 1 }
+        // Every field has a default, so Gson deserializes a bare `{}` — or any foreign JSON object — into a
+        // valid-looking v=VERSION manifest. Require `v` to be spelled out; a manifest we wrote always carries it.
+        val root = gson.fromJson(Files.readString(file, StandardCharsets.UTF_8), JsonObject::class.java) ?: return null
+        if (!root.has("v") || root.get("v").asInt < 1) return null
+        gson.fromJson(root, TestoRunManifest::class.java)
     }.getOrNull()
 
     /** The tests the run announced, as [normalizeRunLocation] keys. Empty for a v1 archive, which recorded none. */
