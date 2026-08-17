@@ -1,80 +1,52 @@
 package com.github.xepozz.testo.tests.console
 
 import com.github.xepozz.testo.TestoBundle
-import com.intellij.icons.AllIcons
-import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.Separator
+import com.intellij.openapi.actionSystem.DataContext
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.ToggleAction
+import com.intellij.openapi.actionSystem.ex.ComboBoxAction
 import com.intellij.openapi.project.DumbAware
+import javax.swing.JComponent
 
 /**
- * Dropdown that toggles which log levels the channel consoles show. "All" flips every seen level on/off at once;
- * each level below has its own checkbox. The menu lists exactly the levels encountered in the current run (ordered by
- * PSR severity), so it grows as new levels arrive. Toggling rebuilds the tabs via [LogLevelFilter.fireChange] — channel
- * tabs left empty by the filter disappear, and re-enabling a level brings them back.
+ * Labeled dropdown that picks the *minimum* log level the channel consoles show. The button reads `info +` / `debug +`
+ * (the chosen level, and everything above it); the popup lists all eight PSR levels as a radio group. Picking one
+ * rebuilds the tabs via [LogLevelFilter.fireChange] — channels left empty by the filter disappear, and lowering the
+ * minimum brings them back.
  *
- * Lives on the console's own vertical toolbar, beside the output it filters (installed by [TestoChannelsUi]).
+ * Right-aligned on the channel tabs row (installed by [TestoChannelsUi] as the tabs' entry-point action group).
  */
 class TestoLogLevelFilterAction(
     private val filter: LogLevelFilter,
-) : ActionGroup(), DumbAware {
+) : ComboBoxAction(), DumbAware {
     init {
-        isPopup = true
-        templatePresentation.icon = AllIcons.General.Filter
-        templatePresentation.text = TestoBundle.message("testo.console.loglevel.filter.title")
+        templatePresentation.description = TestoBundle.message("testo.console.loglevel.filter.title")
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
-    override fun getChildren(e: AnActionEvent?): Array<AnAction> {
-        val levels = filter.seenLevels().sortedWith(LEVEL_ORDER)
-        val children = mutableListOf<AnAction>(AllToggle())
-        if (levels.isNotEmpty()) {
-            children += Separator.getInstance()
-            levels.mapTo(children) { LevelToggle(it) }
-        }
-        return children.toTypedArray()
+    override fun update(e: AnActionEvent) {
+        e.presentation.text = filter.label()
     }
 
-    private inner class AllToggle : ToggleAction(TestoBundle.message("testo.console.loglevel.filter.all")), DumbAware {
+    override fun createPopupActionGroup(button: JComponent, context: DataContext): DefaultActionGroup {
+        val group = DefaultActionGroup()
+        LogLevelFilter.LEVELS.forEach { group.add(LevelItem(it)) }
+        return group
+    }
+
+    private inner class LevelItem(private val level: String) : ToggleAction(humanize(level)), DumbAware {
         override fun getActionUpdateThread() = ActionUpdateThread.EDT
-        override fun isSelected(e: AnActionEvent) = filter.isAllEnabled()
+        override fun isSelected(e: AnActionEvent) = filter.minLevel == level
         override fun setSelected(e: AnActionEvent, state: Boolean) {
-            if (state) filter.enableAll() else filter.disableAll()
+            if (!state) return
+            filter.setMinLevel(level)
             filter.fireChange()
         }
     }
 
-    private inner class LevelToggle(private val level: String) : ToggleAction(humanize(level)), DumbAware {
-        override fun getActionUpdateThread() = ActionUpdateThread.EDT
-        override fun isSelected(e: AnActionEvent) = !filter.isHidden(level)
-        override fun setSelected(e: AnActionEvent, state: Boolean) {
-            filter.setHidden(level, !state)
-            filter.fireChange()
-        }
-    }
-
-    companion object {
-        // PSR-3 severities, most severe first; levels outside this list sort after, alphabetically.
-        private val PSR_ORDER = listOf(
-            "emergency", "alert", "critical", "error", "warning", "notice", "info", "debug",
-        )
-
-        private val LEVEL_ORDER = Comparator<String> { a, b ->
-            val ia = PSR_ORDER.indexOf(a.lowercase())
-            val ib = PSR_ORDER.indexOf(b.lowercase())
-            when {
-                ia >= 0 && ib >= 0 -> ia - ib
-                ia >= 0 -> -1
-                ib >= 0 -> 1
-                else -> a.compareTo(b)
-            }
-        }
-
-        private fun humanize(level: String): String =
-            level.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
-    }
+    private fun humanize(level: String): String =
+        level.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 }

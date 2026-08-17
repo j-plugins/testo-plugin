@@ -146,8 +146,8 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoProtocolGate.kt    # nodeId-less messages ⇒ pre-0.10.39 Testo; banner → version
 │   │   ├── ChannelOutputStore.kt   # per-test live buffers: all / output / per-channel
 │   │   ├── ChannelIcons.kt         # channel name or icon= hint → platform icon
-│   │   ├── LogLevelFilter.kt       # persisted display-time log-level filter
-│   │   ├── TestoLogLevelFilterAction.kt     # dropdown for the filter, on the console's own vertical toolbar
+│   │   ├── LogLevelFilter.kt       # persisted minimum-log-level filter (a message shows at or above it)
+│   │   ├── TestoLogLevelFilterAction.kt     # the `info +` combo box on the channel tabs row picking that minimum
 │   │   ├── TestoChannelsUi.kt      # the tabbed channel view (~1150 lines) + testoDisplayName()
 │   │   ├── TestoConsoleAugmenter.kt         # ExecutionListener that installs the channel tabs
 │   │   ├── TestoReplaySelection.kt # selects a test's node once the replayed tree stops growing
@@ -450,6 +450,8 @@ Non-obvious constraints already paid for in blood — read before touching the r
   the channel UI is looked up by test name, which is all a tab has when the selection changes.
 - **`TestoChannelsUi` reaches `TestResultsPanel.myConsole` by reflection** — there is no public accessor. It
   degrades gracefully (logs a warning, no channel tabs) if the field disappears.
+- **The log-level filter is the channel tabs' `entryPointActionGroup`** (right edge of the tab row): a `protected open`
+  val re-read by `updateEntryPointToolbar` on every tab change, so overriding it on the `JBEditorTabs` subclass suffices.
 - **The tree has one filter slot, shared with *Show passed* / *Show ignored*.** `TestoProgressAction.applyFilter` is
   its single writer: a selected counter replaces the toggles rather than narrowing them (intersecting would answer
   "show me the passed ones" with an empty tree), and releasing it recomposes them via `hiddenByToggles` — off Testo's
@@ -471,10 +473,6 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to
   `SMTRunnerEventsListener`: a short run finishes replaying before the augmenter hands us the console, so the
   events are already fired and missed.
-- **The console's own vertical toolbar is reached through `ActionToolbar.getActionGroup()`.** `TestResultsPanel`
-  builds it once from a `DefaultActionGroup` copy of its `protected final` actions array — the array is closed, the
-  group is not. The log-level filter is appended there, then `updateActionsAsync()`. The tab-row seam
-  (`TabInfo.setTabPaneActions`, read off the selected tab only) was tried and dropped: it costs a row of its own.
 - **Whatever our own `createImportActions` returns must survive the RunTab toolbar snapshot** — `appendAdditionalActions`
   is routed into the gear submenu instead and would not.
 - **`createImportActions` deliberately does not call `super`.** Super's entries (`ImportTestsGroup`,

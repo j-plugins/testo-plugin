@@ -97,7 +97,6 @@ class TestoConsoleProperties(
             testFrameworkName,
             consoleProperties,
             channelStore,
-            levelFilter,
             statusStore,
             runTimings,
             targetStore,

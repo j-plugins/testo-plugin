@@ -19,7 +19,6 @@ class TestoOutputToGeneralEventsConverter(
     testFrameworkName: String,
     private val consoleProperties: TestConsoleProperties,
     private val store: ChannelOutputStore,
-    private val levelFilter: LogLevelFilter,
     private val statusStore: TestoStatusStore,
     private val timings: TestoRunTimings,
     private val targetStore: TestoTargetStore,
@@ -126,8 +125,6 @@ class TestoOutputToGeneralEventsConverter(
                 val out = attrs["out"] ?: ""
                 val level = attrs["level"]
                 val channel = attrs["channel"]?.takeIf { it.isNotEmpty() }
-                // Record the level so the filter menu can list it; storage keeps every chunk regardless.
-                levelFilter.noteSeen(level)
                 // Tag the all-stream chunk with its channel so the aggregated All tab can highlight per message.
                 if (key != null) store.appendAll(key, out, level, channel)
 
