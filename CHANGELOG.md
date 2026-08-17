@@ -6,6 +6,8 @@
 
 ### Added
 
+- The run configuration writes an HTML report (`--log-html`, on by default) and a JUnit report (`--log-junit`, off)
+  into an IDE-managed folder on every run; both are kept in the run history, and HTML opens in a tab.
 - The run configuration chooses which coverage reports a Coverage run asks Testo for: Clover, Cobertura, coverage-xml.
 - A Coverage run applies every report it produced on its own, one per format.
 - The Coverage button on the test toolbar gathers every announced report under one click, with a checkbox per report.

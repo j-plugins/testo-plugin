@@ -31,6 +31,7 @@ import com.jetbrains.php.testFramework.run.PhpTestRunConfigurationHandler
 import com.jetbrains.php.testFramework.run.PhpTestRunConfigurationSettings
 import com.jetbrains.php.testFramework.run.PhpTestRunnerConfigurationEditor
 import com.jetbrains.php.testFramework.run.PhpTestRunnerSettings
+import java.nio.file.Files
 
 class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : PhpTestRunConfiguration(
     project,
@@ -176,6 +177,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         command.setWorkingDir(workingDirectory)
 
         myHandler.prepareArguments(arguments, testoSettings)
+        addReportFlags(arguments, interpreter)
         myHandler.prepareCommand(project, command, executablePath, null, testoSettings.runnerSettings.command)
 
         command.importCommandLineSettings(settings.commandLineSettings, workingDirectory)
@@ -192,6 +194,26 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         )
 
         return command
+    }
+
+    /**
+     * Adds `--log-html` / `--log-junit` for the checked reports, pointed at an IDE-managed folder ([TestoReportFlags]).
+     * Local interpreters only: a remote one would write these to a host path it never maps back, so there the reports
+     * are left to whatever testo.php configures — no worse than before the flags existed.
+     */
+    private fun addReportFlags(arguments: MutableList<String?>, interpreter: PhpInterpreter) {
+        if (interpreter.isRemote) return
+        val runner = testoSettings.runnerSettings
+        if (!runner.logHtml && !runner.logJunit) return
+
+        val htmlPath = TestoReportFlags.htmlReportFile(project, name)
+        val junitPath = TestoReportFlags.junitReportFile(project, name)
+        // Testo's report writers create the parent themselves, but a missing directory is the one avoidable failure
+        // between here and a written report, so make sure of it.
+        runCatching { Files.createDirectories(htmlPath.parent) }
+        arguments.addAll(
+            TestoReportFlags.reportFlagArguments(runner.logHtml, runner.logJunit, htmlPath.toString(), junitPath.toString())
+        )
     }
 
     override fun createTestConsoleProperties(executor: Executor): SMTRunnerConsoleProperties {

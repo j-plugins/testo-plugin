@@ -60,6 +60,8 @@ class TestoTestRunConfigurationEditor(
             }
         }
     }
+    private val htmlReportBox = JBCheckBox("HTML")
+    private val junitReportBox = JBCheckBox("JUnit")
     private val coverageCloverBox = JBCheckBox("Clover")
     private val coverageCoberturaBox = JBCheckBox("Cobertura")
     private val coverageXmlBox = JBCheckBox("coverage-xml")
@@ -112,6 +114,17 @@ class TestoTestRunConfigurationEditor(
                 .rowComment("One --group=!<name> per tag: the CLI reads the ! prefix as an exclusion")
         }
 
+        group("Reports") {
+            row {
+                label("Write")
+                    .gap(RightGap.COLUMNS)
+                cell(htmlReportBox)
+                cell(junitReportBox)
+            }
+                .layout(RowLayout.PARENT_GRID)
+                .rowComment("--log-html / --log-junit into an IDE-managed folder, kept in the run history. HTML opens in a tab; JUnit is for external tooling")
+        }
+
         group("Coverage") {
             row {
                 label("Preferred engine")
@@ -162,6 +175,8 @@ class TestoTestRunConfigurationEditor(
         excludeGroupField.addChangeListener(listener)
         coverageOptionsField.document.addDocumentListener(documentAdapter)
         parallelField.addChangeListener { listener() }
+        htmlReportBox.addActionListener { listener() }
+        junitReportBox.addActionListener { listener() }
         coverageEngineField.addActionListener { listener() }
         coverageCloverBox.addActionListener { listener() }
         coverageCoberturaBox.addActionListener { listener() }
@@ -177,6 +192,8 @@ class TestoTestRunConfigurationEditor(
                 || groupField.names != runner.groups
                 || excludeGroupField.names != runner.excludeGroups
                 || (parallelField.value as Int) != runner.parallel
+                || htmlReportBox.isSelected != runner.logHtml
+                || junitReportBox.isSelected != runner.logJunit
                 || coverageEngineField.selectedItem != runner.coverageEngine
                 || coverageCloverBox.isSelected != runner.coverageClover
                 || coverageCoberturaBox.isSelected != runner.coverageCobertura
@@ -192,6 +209,8 @@ class TestoTestRunConfigurationEditor(
         groupField.names = runnerSettings.groups
         excludeGroupField.names = runnerSettings.excludeGroups
         parallelField.value = runnerSettings.parallel
+        htmlReportBox.isSelected = runnerSettings.logHtml
+        junitReportBox.isSelected = runnerSettings.logJunit
         coverageEngineField.selectedItem = runnerSettings.coverageEngine
         coverageCloverBox.isSelected = runnerSettings.coverageClover
         coverageCoberturaBox.isSelected = runnerSettings.coverageCobertura
@@ -223,6 +242,8 @@ class TestoTestRunConfigurationEditor(
         runnerSettings.groups = groupField.names.toMutableList()
         runnerSettings.excludeGroups = excludeGroupField.names.toMutableList()
         runnerSettings.parallel = parallelField.value as? Int ?: 1
+        runnerSettings.logHtml = htmlReportBox.isSelected
+        runnerSettings.logJunit = junitReportBox.isSelected
         runnerSettings.coverageEngine = coverageEngineField.selectedItem as? CoverageEngine ?: CoverageEngine.XDEBUG
         runnerSettings.coverageClover = coverageCloverBox.isSelected
         runnerSettings.coverageCobertura = coverageCoberturaBox.isSelected

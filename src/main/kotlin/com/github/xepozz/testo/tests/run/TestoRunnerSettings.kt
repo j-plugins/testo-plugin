@@ -45,6 +45,14 @@ class TestoRunnerSettings(
      */
     @Attribute("coverage_options")
     var coverageOptions: String = DEFAULT_COVERAGE_OPTIONS,
+
+    // Reports written into an IDE-managed folder on every run (`--log-html` / `--log-junit`) and copied into history.
+    // HTML is on by default (it opens in a tab); JUnit is off — it exists for external tooling (mutation testing).
+    @Attribute("log_html")
+    var logHtml: Boolean = true,
+
+    @Attribute("log_junit")
+    var logJunit: Boolean = false,
 ) : PhpTestRunnerSettings() {
     /** Suite names to run, one `--suite` flag each (Testo ORs them). A name is opaque — spaces and all. */
     @get:XCollection(propertyElementName = "suites", style = XCollection.Style.v2)
@@ -148,6 +156,8 @@ class TestoRunnerSettings(
                 runnerSettings.coverageXml = settings.coverageXml
                 runnerSettings.coverageLevel = settings.coverageLevel
                 runnerSettings.coverageOptions = settings.coverageOptions
+                runnerSettings.logHtml = settings.logHtml
+                runnerSettings.logJunit = settings.logJunit
                 runnerSettings.migrateLegacyNames()
             }
 

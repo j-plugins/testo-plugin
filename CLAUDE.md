@@ -268,6 +268,9 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
   **lists** (`@XCollection`), one `--group` flag each — Testo ORs repeated `--group`s and reads a `!name` prefix as an
   exclusion, which is the only exclusion form its CLI has. A name is opaque: whatever `#[Group]` spells reaches the
   CLI untouched.
+- `--log-html`/`--log-junit` at an IDE-managed path (`TestoReportFlags`, `logHtml` on / `logJunit` off by default),
+  emitted from `createCommand` so every executor gets them — local interpreters only, and the archive copies the
+  reports into history the same way it does coverage. Not in `prepareArguments`: that has no project/interpreter.
 - `--config <file>` when an alternative configuration file is set (`getConfigFileOption()`).
 - Scope flags: `Type` → `--suite <type>`; `Directory`/`File` → `--path <relative path>`;
   `Method` → `--path <file> --filter <method> [--data-provider <name>]`; `ConfigurationFile` → nothing
