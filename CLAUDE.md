@@ -508,8 +508,12 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **`ConsoleFolding` instances are shared across consoles** and get no per-console reset; both foldings track
   state in a `ThreadLocal` and clear it on the first non-frame line.
 - **Debug installs channel tabs itself** (`TestoDebugRunner`): the augmenter's descriptor lookup misses debug
-  sessions. `TestoConsoleProperties.channelsInstalled` guards against a double install. The debug session also
-  gets the `Testo.RerunSplit` action handed to it explicitly, since it does not use `RunTab.TopToolbar`.
+  sessions. `TestoConsoleProperties.channelsInstalled` guards against a double install.
+- **The debug toolbar's restart button is the overridden platform `Rerun`** (`TestoAwareRerunAction`), and it must
+  stay visible on debug tabs. The split button that normally replaces it in SPLIT_BUTTON mode lives on
+  `RunTab.TopToolbar`, which the debug tab does not use — so the action's hide branch is gated on *not* the Debug
+  executor. A descriptor's restart actions are constructor-only, so this cannot be fixed by handing the debug
+  `RunContentDescriptor` its own.
 - **Suite and group names are lists everywhere.** `TestoRunnerSettings` persists `suites`/`groups`/`excludeGroups`
   via `@XCollection`, the editor shows them as tags (`TestoTagsField`), and a name is never split on anything — the
   comma lives only in the legacy persisted form. `migrateLegacyNames` folds that form in, called from

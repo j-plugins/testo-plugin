@@ -21,6 +21,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.ExecutionDataKeys
+import com.intellij.openapi.actionSystem.LangDataKeys
 import com.intellij.openapi.actionSystem.SplitButtonAction
 import com.intellij.openapi.project.DumbAware
 import javax.swing.Icon
@@ -164,7 +165,7 @@ class TestoRerunCurrentAction : AnAction(), DumbAware {
     override fun update(e: AnActionEvent) {
         val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT)
         e.presentation.isEnabledAndVisible = environment != null
-        if (environment != null) e.presentation.icon = rerunIcon(environment)
+        if (environment != null) e.presentation.icon = rerunIcon(e, environment)
     }
 
     override fun actionPerformed(e: AnActionEvent) {
@@ -172,12 +173,21 @@ class TestoRerunCurrentAction : AnAction(), DumbAware {
     }
 }
 
-/** The icon of the executor a rerun would use — the archived one on a replayed tab, this tab's otherwise. */
-internal fun rerunIcon(environment: ExecutionEnvironment): Icon {
+/**
+ * The icon of the executor a rerun would use (the archived one on a replayed tab), or the restart-debugger icon while
+ * a debug session is live.
+ */
+internal fun rerunIcon(e: AnActionEvent, environment: ExecutionEnvironment): Icon {
     val executorId = environment.testoRerunExecutorId()
+    if (executorId == DefaultDebugExecutor.EXECUTOR_ID && isProcessAlive(e)) return AllIcons.Actions.RestartDebugger
     return ExecutorRegistry.getInstance().getExecutorById(executorId)?.icon
         ?: environment.executor.icon
         ?: AllIcons.Actions.Restart
+}
+
+private fun isProcessAlive(e: AnActionEvent): Boolean {
+    val handler = e.getData(LangDataKeys.RUN_CONTENT_DESCRIPTOR)?.processHandler ?: return false
+    return !handler.isProcessTerminated
 }
 
 /**
@@ -247,13 +257,15 @@ class TestoAwareRerunAction : AnAction(), DumbAware {
             e.presentation.isEnabledAndVisible = false
             return
         }
-        // Step aside for the split button on Testo tabs in split-button mode.
-        if (environment.isTestoRunTab() && TestoRerunStyleSettings.style == TestoRerunStyle.SPLIT_BUTTON) {
+        // Step aside for the split button in split-button mode — but not on the debug tab, whose toolbar has no
+        // RunTab.TopToolbar (where the split button lives), so hiding this Rerun would leave it with no restart button.
+        val splitButtonPresent = environment.executor.id != DefaultDebugExecutor.EXECUTOR_ID
+        if (environment.isTestoRunTab() && TestoRerunStyleSettings.style == TestoRerunStyle.SPLIT_BUTTON && splitButtonPresent) {
             e.presentation.isEnabledAndVisible = false
             return
         }
         e.presentation.isEnabledAndVisible = true
-        e.presentation.icon = rerunIcon(environment)
+        e.presentation.icon = rerunIcon(e, environment)
     }
 
     override fun actionPerformed(e: AnActionEvent) {

@@ -91,9 +91,8 @@ class TestoDebugRunner : PhpTestDebugRunner<TestoRunConfiguration>(TestoRunConfi
                     onSessionStart(session, debugServer, sessionId, connectionsManager, project, interpreter, processHandler)
                     val driver = debugExtension.debugDriver
 
-                    // The rerun-failed action rides the SM test console's own toolbar (added by the framework from our
-                    // TestoConsoleProperties), so the debug session needs no extra restart-action wiring here. Pushing
-                    // them onto the session toolbar would require the internal XDebugSessionImpl.addRestartActions.
+                    // The debug toolbar's restart button is the platform Rerun (overridden by TestoAwareRerunAction);
+                    // nothing to wire here.
                     return PhpDebugProcessFactory.forPhpTests(
                         session,
                         sessionId,

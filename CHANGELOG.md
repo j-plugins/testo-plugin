@@ -48,6 +48,8 @@
 
 ### Fixed
 
+- The debug toolbar has its rerun/restart button back, during the session and after it ends; while the session runs
+  it wears the restart-debugger icon.
 - The Test Runner Options help button opens Testo's CLI reference.
 - The channel console no longer throws an EDT-threading error while streaming live output into an aggregate tab.
 - The report buttons no longer trigger a "slow operations on EDT" error.
