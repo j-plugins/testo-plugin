@@ -43,9 +43,9 @@ internal fun ExecutionEnvironment.isTestoRunTab(): Boolean = testoRunProfile() !
 /**
  * The executor a rerun of this tab should use: the tab's own, except on a replayed archive — that tab is opened by the
  * Run executor whatever it holds, so a rerun there follows the *archived* run instead (a coverage archive reruns with
- * coverage). Null when the environment names no executor we can run.
+ * coverage).
  */
-internal fun ExecutionEnvironment.testoRerunExecutorId(): String? {
+internal fun ExecutionEnvironment.testoRerunExecutorId(): String {
     val archived = (runProfile as? TestoRunReplayProfile)?.executorId
         ?.takeIf { ExecutorRegistry.getInstance().getExecutorById(it) != null }
     return archived ?: executor.id
@@ -175,7 +175,7 @@ class TestoRerunCurrentAction : AnAction(), DumbAware {
 /** The icon of the executor a rerun would use — the archived one on a replayed tab, this tab's otherwise. */
 internal fun rerunIcon(environment: ExecutionEnvironment): Icon {
     val executorId = environment.testoRerunExecutorId()
-    return executorId?.let { ExecutorRegistry.getInstance().getExecutorById(it)?.icon }
+    return ExecutorRegistry.getInstance().getExecutorById(executorId)?.icon
         ?: environment.executor.icon
         ?: AllIcons.Actions.Restart
 }
@@ -187,9 +187,8 @@ internal fun rerunIcon(environment: ExecutionEnvironment): Icon {
 internal fun rerunCurrent(e: AnActionEvent) {
     val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT) ?: return
     val target = environment.testoRunProfile()
-    val executorId = environment.testoRerunExecutorId()
-    if (environment.isTestoReplay() && target != null && executorId != null) {
-        relaunchTesto(e, environment, target, executorId)
+    if (environment.isTestoReplay() && target != null) {
+        relaunchTesto(e, environment, target, environment.testoRerunExecutorId())
         return
     }
     ExecutionManager.getInstance(environment.project).restartRunProfile(environment)

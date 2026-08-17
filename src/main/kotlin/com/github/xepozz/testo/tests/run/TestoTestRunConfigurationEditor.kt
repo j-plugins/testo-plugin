@@ -66,12 +66,6 @@ class TestoTestRunConfigurationEditor(
     private val coverageLevelField = ComboBox(TestoRunnerSettings.COVERAGE_LEVELS.toTypedArray())
     private val coverageOptionsField = JBTextField()
 
-    // Held disabled until Testo can be asked for the report the plugin needs; nothing is persisted meanwhile.
-    private val htmlReportBox = JBCheckBox("Build an HTML report").apply {
-        isEnabled = false
-        toolTipText = "Not supported by Testo yet"
-    }
-
     private val parallelInjected = injectParallelRow()
 
     private val myMainPanel = panel {
@@ -116,14 +110,6 @@ class TestoTestRunConfigurationEditor(
             }
                 .layout(RowLayout.PARENT_GRID)
                 .rowComment("One --group=!<name> per tag: the CLI reads the ! prefix as an exclusion")
-        }
-
-        group("Reports") {
-            row {
-                cell(htmlReportBox)
-            }
-                .layout(RowLayout.PARENT_GRID)
-                .rowComment("Not supported by Testo yet")
         }
 
         group("Coverage") {

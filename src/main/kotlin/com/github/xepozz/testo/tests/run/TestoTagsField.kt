@@ -2,6 +2,7 @@ package com.github.xepozz.testo.tests.run
 
 import com.github.xepozz.testo.TestoBundle
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.IconButton
 import com.intellij.openapi.ui.popup.JBPopupFactory
@@ -100,7 +101,16 @@ class TestoTagsField(
     }
 
     private fun showSuggestions(anchor: Component) {
-        val known = suggestions?.invoke().orEmpty().filterNot { it in names }
+        val provider = suggestions
+        // The suggestions come off a file-based index (getContainingFiles per key) — a slow operation that would
+        // freeze the EDT on a large project. Compute it under a modal progress so it runs on a pooled thread.
+        val known = if (provider == null) emptyList() else
+            ProgressManager.getInstance().runProcessWithProgressSynchronously<List<String>, RuntimeException>(
+                { provider.invoke() },
+                TestoBundle.message("testo.tags.loading"),
+                true,
+                null,
+            ).filterNot { it in names }
         val rows = known.map { Row(it) } + Row(null)
 
         JBPopupFactory.getInstance()

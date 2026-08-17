@@ -21,7 +21,9 @@ object CoberturaCoverageParser : TestoCoverageParser {
             val filename = classEl.getAttribute("filename").ifBlank { continue }
             val path = if (source.isEmpty()) filename else "$source/$filename"
             val lines = byFile.getOrPut(path) { mutableListOf() }
-            for (lineEl in classEl.descendants("line")) {
+            // Only the class's own <lines>: a foreign writer (PHPUnit) also nests <methods><method><lines><line>,
+            // which descendants("line") would count a second time.
+            for (lineEl in classEl.childElements("lines").flatMap { it.childElements("line") }) {
                 val num = lineEl.getAttribute("number").toIntOrNull() ?: continue
                 val hits = lineEl.getAttribute("hits").toIntOrNull() ?: 0
                 val branch = if (lineEl.getAttribute("branch") == "true") {

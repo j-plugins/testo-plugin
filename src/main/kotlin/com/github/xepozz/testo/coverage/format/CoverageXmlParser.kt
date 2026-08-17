@@ -28,7 +28,8 @@ object CoverageXmlParser : TestoCoverageParser {
             val href = entry.getAttribute("href").ifBlank { continue }
             val perFilePath = indexDir.resolve(href)
             if (!Files.exists(perFilePath)) continue
-            val path = "$source/${href.removeSuffix(".xml")}"
+            val relative = href.removeSuffix(".xml")
+            val path = if (source.isEmpty()) relative else "$source/$relative"
             val fileRoot = readXmlRoot(perFilePath)
             val coverage = fileRoot.descendants("coverage").firstOrNull()
 
