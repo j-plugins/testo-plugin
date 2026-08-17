@@ -79,12 +79,32 @@ private fun settingsFor(environment: ExecutionEnvironment, target: RunProfile): 
     return RunManager.getInstance(configuration.project).createConfiguration(configuration, factory)
 }
 
+// A double-click delivers two actionPerformed a millisecond or two apart; both launches then start in the same
+// millisecond and interleave their output into one console and one archive directory (TestoRunStore.beginRun keys
+// the run dir by name + start time). A human cannot hit two *different* buttons that fast, so a per-button cooldown
+// catches the only realistic sub-millisecond case — the same button firing twice.
+private const val RELAUNCH_COOLDOWN_MS = 400L
+
+private class LaunchThrottle {
+    private var lastAt = 0L
+
+    /** True at most once per [RELAUNCH_COOLDOWN_MS]. EDT-confined (every caller is an actionPerformed), so unlocked. */
+    fun tryLaunch(): Boolean {
+        val now = System.currentTimeMillis()
+        if (now - lastAt < RELAUNCH_COOLDOWN_MS) return false
+        lastAt = now
+        return true
+    }
+}
+
 open class TestoRerunWithExecutorAction(
     text: String,
     icon: Icon,
     private val executorId: String,
     private val hideWhenCurrent: Boolean = false,
 ) : AnAction(text, null, icon), DumbAware {
+
+    private val throttle = LaunchThrottle()
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
@@ -106,6 +126,7 @@ open class TestoRerunWithExecutorAction(
     }
 
     override fun actionPerformed(e: AnActionEvent) {
+        if (!throttle.tryLaunch()) return
         val environment = e.getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT) ?: return
         val target = environment.testoRunProfile() ?: return
         relaunchTesto(e, environment, target, executorId)
@@ -136,6 +157,8 @@ class TestoRerunWithCoverageAction : TestoRerunWithExecutorAction(
 // The split button's main action: reruns the current tab's environment with its own executor. Mirrors the platform
 // "Rerun" (per-executor icon + restart-current) through public API, so it needs no internal FakeRerunAction.
 class TestoRerunCurrentAction : AnAction(), DumbAware {
+    private val throttle = LaunchThrottle()
+
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
@@ -144,7 +167,9 @@ class TestoRerunCurrentAction : AnAction(), DumbAware {
         if (environment != null) e.presentation.icon = rerunIcon(environment)
     }
 
-    override fun actionPerformed(e: AnActionEvent) = rerunCurrent(e)
+    override fun actionPerformed(e: AnActionEvent) {
+        if (throttle.tryLaunch()) rerunCurrent(e)
+    }
 }
 
 /** The icon of the executor a rerun would use — the archived one on a replayed tab, this tab's otherwise. */
@@ -213,6 +238,8 @@ class TestoRerunSplitButtonAction : SplitButtonAction(buildExecutorGroup()) {
 // otherwise it reruns the current environment, the same restart the platform action performs — done through public
 // API (restartRunProfile) so it carries no dependency on the internal FakeRerunAction.
 class TestoAwareRerunAction : AnAction(), DumbAware {
+    private val throttle = LaunchThrottle()
+
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
@@ -230,5 +257,7 @@ class TestoAwareRerunAction : AnAction(), DumbAware {
         e.presentation.icon = rerunIcon(environment)
     }
 
-    override fun actionPerformed(e: AnActionEvent) = rerunCurrent(e)
+    override fun actionPerformed(e: AnActionEvent) {
+        if (throttle.tryLaunch()) rerunCurrent(e)
+    }
 }
