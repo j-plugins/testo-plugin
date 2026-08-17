@@ -86,13 +86,10 @@ class TestoDebugRunner : PhpTestDebugRunner<TestoRunConfiguration>(TestoRunConfi
                 }
             })
 
-            val debugSession = XDebuggerManager.getInstance(project).startSession(env, object : XDebugProcessStarter() {
+            val starter = object : XDebugProcessStarter() {
                 override fun start(session: XDebugSession): XDebugProcess {
                     onSessionStart(session, debugServer, sessionId, connectionsManager, project, interpreter, processHandler)
                     val driver = debugExtension.debugDriver
-
-                    // The debug toolbar's restart button is the platform Rerun (overridden by TestoAwareRerunAction);
-                    // nothing to wire here.
                     return PhpDebugProcessFactory.forPhpTests(
                         session,
                         sessionId,
@@ -102,9 +99,15 @@ class TestoDebugRunner : PhpTestDebugRunner<TestoRunConfiguration>(TestoRunConfi
                         pathProcessor,
                     )
                 }
-            })
+            }
+            // Go through the session builder like PhpTestDebugRunner does: its result carries the descriptor.
+            // XDebugSession.getRunContentDescriptor() itself is deprecated and logs an error under the split debugger.
+            val descriptor = XDebuggerManager.getInstance(project).newSessionBuilder(starter)
+                .environment(env)
+                .startSession()
+                .runContentDescriptor
             processHandler.startNotify()
-            return debugSession.runContentDescriptor
+            return descriptor
         } catch (e: ExecutionException) {
             debugServer.unregisterSessionHandler(sessionId)
             throw e
