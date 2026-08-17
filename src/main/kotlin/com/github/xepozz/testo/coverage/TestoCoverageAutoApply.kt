@@ -37,8 +37,10 @@ internal fun autoApplyCoverage(project: Project, props: TestoConsoleProperties, 
             resolveCoverageDataFile(ref, project, mapToLocal, writtenAfter)?.let { ref to it }
         }
         val flagKeys = flagLocalPaths.map { TestoCoverageKeys.normalize(it.toString()) }.toSet()
-        val chosen = dedupeCoverageByFormat(resolved, flagKeys)
-            .filter { props.reportStore.isCoverageChecked(it.first.path) }
+        // Filter by the checkboxes before the per-format dedup, not after: otherwise an unchecked flag report wins the
+        // dedup and is then discarded, dropping a format whose checked testo.php-configured report should have applied.
+        val checked = resolved.filter { props.reportStore.isCoverageChecked(it.first.path) }
+        val chosen = dedupeCoverageByFormat(checked, flagKeys)
             .map { (ref, path) -> TestoCoverageReport(ref.name, ref.coverageFormat, path) }
         if (chosen.isEmpty()) return@executeOnPooledThread
         ApplicationManager.getApplication().invokeLater({ applyTestoCoverage(project, chosen) }, project.disposed)
