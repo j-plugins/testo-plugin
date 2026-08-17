@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.tests.console
 
 import com.github.xepozz.testo.runs.TestoRunStore
+import com.github.xepozz.testo.runs.runLocationKey
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.hints.codeVision.ModificationStampUtil
 import com.intellij.openapi.application.ApplicationManager
@@ -14,57 +15,42 @@ import java.util.concurrent.atomic.AtomicLong
  * tests some archive can actually replay. The source is the run archive ([TestoRunStore]) — the platform's own history
  * XMLs are not consulted: a lens click replays our archive, so the two would disagree the moment either side rotates.
  *
- * The index is rebuilt on a pooled thread and never blocks: [contains] answers from the last snapshot while a rebuild
- * is in flight. It is invalidated by exactly one event — an archived run becoming complete
- * ([com.github.xepozz.testo.runs.TestoRunArchiver], which also prunes) — so the lookup itself touches no filesystem.
+ * The set is built synchronously on first lookup (a few small `tests.txt`) and cached until the archive changes, so the
+ * first code-vision pass over a freshly opened file already answers, without waiting on a repaint (see CLAUDE.md).
  */
 internal object TestoHistoryIndex {
     private data class Snapshot(val generation: Long, val urls: Set<String>)
 
     private val generation = AtomicLong()
     private val cache = ConcurrentHashMap<String, Snapshot>()
-    private val building = ConcurrentHashMap.newKeySet<String>()
 
-    /** The archive changed: rebuild on the next lookup. */
+    /** The archive changed: the next lookup rebuilds. Callers repaint open editors via [refreshLens] themselves. */
     fun invalidate() {
         generation.incrementAndGet()
     }
 
     /** True if some archived run contains [url] (an exact test location, or a test declared under it). */
     fun contains(project: Project, url: String): Boolean {
-        val key = project.locationHash
-        val current = generation.get()
-        val snapshot = cache[key]
-        if (snapshot == null || snapshot.generation != current) scheduleRebuild(project, key, current)
-        val urls = snapshot?.urls ?: cache[key]?.urls ?: return false
-        // `startsWith("$url::")`, not `startsWith(url)`: `…::testPay` must not answer for `…::testPayment`.
-        return url in urls || urls.any { it.startsWith("$url::") }
+        val needle = runLocationKey(url)
+        val urls = snapshot(project).urls
+        // `startsWith("$needle::")`, not `startsWith(needle)`: `…::testPay` must not answer for `…::testPayment`.
+        return needle in urls || urls.any { it.startsWith("$needle::") }
     }
 
-    private fun scheduleRebuild(project: Project, key: String, generation: Long) {
-        if (!building.add(key)) return
-        ApplicationManager.getApplication().executeOnPooledThread {
-            try {
-                if (project.isDisposed) return@executeOnPooledThread
-                val store = TestoRunStore.getInstance(project)
-                val urls = HashSet<String>()
-                store.listRuns().forEach { (dir, _) -> urls.addAll(store.readLocations(dir)) }
-                // Only restart the daemon when the lenses would actually change: a rebuild also runs on the very first
-                // lookup, and restarting then interrupts an in-flight highlighting pass for nothing.
-                val previous = cache.put(key, Snapshot(generation, urls))?.urls ?: emptySet()
-                if (previous != urls) refreshLens(project)
-            } finally {
-                building.remove(key)
-            }
-        }
+    private fun snapshot(project: Project): Snapshot {
+        val key = project.locationHash
+        val current = generation.get()
+        cache[key]?.let { if (it.generation == current) return it }
+        val store = TestoRunStore.getInstance(project)
+        val urls = HashSet<String>()
+        store.listRuns().forEach { (dir, _) -> store.readLocations(dir).forEach { urls.add(runLocationKey(it)) } }
+        return Snapshot(current, urls).also { cache[key] = it }
     }
 
     /**
-     * Recompute the "Show history" lenses now. Code vision is gated by a PSI modification stamp: the daemon's code-vision
-     * pass self-skips when the file's stamp is unchanged, and a test run never touches the PHP source — so neither
-     * DaemonCodeAnalyzer.restart() nor CodeVisionHost.invalidateProvider re-runs getHint (the lens only refreshed on a
-     * full IDE restart). The platform's own recipe (CodeVisionHost.subscribeCVSettingsChanged) is to clear that stamp on
-     * each editor and then restart the daemon, which forces the pass to recompute getHint and repopulate the cache.
+     * Recompute the "Show history" lenses now: a test run touches no PHP source, so the code-vision pass self-skips
+     * unless each editor's PSI modification stamp is cleared first (the platform's own recipe) — then the daemon
+     * restart re-runs getHint.
      */
     fun refreshLens(project: Project) {
         ApplicationManager.getApplication().invokeLater {

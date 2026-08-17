@@ -2,9 +2,20 @@ package com.github.xepozz.testo.runs
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.TestoCoverageProgramRunner
+import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoTestStatus
+import com.github.xepozz.testo.tests.run.TestoRunConfiguration
+import com.github.xepozz.testo.tests.run.TestoRunConfigurationType
+import com.intellij.execution.ExecutionManager
+import com.intellij.execution.ExecutorRegistry
+import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultDebugExecutor
+import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.execution.runners.ExecutionEnvironmentBuilder
+import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
+import com.intellij.execution.ui.RunContentManager
 import com.intellij.icons.AllIcons
+import com.intellij.ide.DataManager
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
@@ -12,17 +23,26 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.ToggleAction
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.util.JDOMUtil
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.LayeredIcon
 import com.intellij.ui.SimpleTextAttributes
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.util.text.DateFormatUtil
+import java.awt.event.MouseEvent
 import java.nio.file.Path
 import javax.swing.Icon
 import javax.swing.JList
+
+private val LOG = Logger.getInstance("com.github.xepozz.testo.runs.TestoRunHistory")
 
 /** `Tools | Testo | Testo Run History…`: pick an archived run, replay it into a run tab. */
 class TestoRunHistoryAction : AnAction(TestoBundle.message("testo.runs.history.action"), null, AllIcons.Vcs.History), DumbAware {
@@ -138,34 +158,107 @@ internal fun runResultSummary(manifest: TestoRunManifest): String {
 }
 
 /**
- * "Show history" for one test: replay the newest archived run that actually holds it (not merely the latest run), and
- * select that test's node once the tree is rebuilt. Scans the archive off the EDT, launches on it.
+ * "Show history" for one test: a popup of the archived runs that hold it, newest first, the one already shown in a tab
+ * in bold. Each row carries the Load-replay / Repeat-run inline buttons (see [RunHistoryRow]). The archive is scanned
+ * off the EDT, but the open-tab set is read first — RunContentManager is EDT-only.
  */
-internal fun replayNewestRunWithTest(project: Project, url: String) {
-    val key = normalizeRunLocation(url)
+internal fun showRunHistoryForTest(project: Project, url: String, editor: Editor, event: MouseEvent?) {
+    val key = runLocationKey(url)
+    val openDirs = openReplayDirs(project)
     ApplicationManager.getApplication().executeOnPooledThread {
         if (project.isDisposed) return@executeOnPooledThread
         val store = TestoRunStore.getInstance(project)
         // `startsWith("$key::")`, not `startsWith(key)`: `…::testPay` must not answer for `…::testPayment`.
-        val match = store.listRuns().firstOrNull { (dir, _) ->
-            store.readLocations(dir).any { it == key || it.startsWith("$key::") }
-        }
+        val entries = store.listRuns()
+            .filter { (dir, _) -> store.readLocations(dir).any { val k = runLocationKey(it); k == key || k.startsWith("$key::") } }
+            .map { (dir, manifest) -> RunHistoryEntry(dir, manifest, dir.toAbsolutePath().normalize() in openDirs) }
         ApplicationManager.getApplication().invokeLater(
             {
-                if (match == null) {
+                if (project.isDisposed) return@invokeLater
+                if (entries.isEmpty()) {
                     NotificationGroupManager.getInstance().getNotificationGroup("Testo")
-                        ?.createNotification(
-                            TestoBundle.message("testo.runs.history.none"),
-                            NotificationType.INFORMATION,
-                        )
+                        ?.createNotification(TestoBundle.message("testo.runs.history.none"), NotificationType.INFORMATION)
                         ?.notify(project)
                     return@invokeLater
                 }
-                TestoRunReplayProfile.replay(project, match.first, match.second, url)
+                val group = DefaultActionGroup().apply { entries.forEach { add(RunHistoryRow(project, it, url)) } }
+                val popup = JBPopupFactory.getInstance().createActionGroupPopup(
+                    TestoBundle.message("testo.runs.history.forTest.title"),
+                    group,
+                    DataManager.getInstance().getDataContext(editor.contentComponent),
+                    JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
+                    false,
+                )
+                if (event != null) popup.show(RelativePoint(event)) else popup.showInBestPositionFor(editor)
             },
             project.disposed,
         )
     }
+}
+
+private class RunHistoryEntry(val dir: Path, val manifest: TestoRunManifest, val current: Boolean)
+
+/** The archive dirs a run tab is currently showing (a live run's own, or a replay's), so the list can bold them. */
+private fun openReplayDirs(project: Project): Set<Path> =
+    RunContentManager.getInstance(project).allDescriptors.mapNotNull { descriptor ->
+        val console = descriptor.executionConsole as? SMTRunnerConsoleView
+        (console?.properties as? TestoConsoleProperties)?.currentRunDir()?.toAbsolutePath()?.normalize()
+    }.toSet()
+
+/** One archived run: Load-replay / Repeat-run inline buttons at the row's right edge; a bare click on the body runs nothing. */
+private class RunHistoryRow(project: Project, entry: RunHistoryEntry, url: String) : AnAction(), DumbAware {
+    init {
+        val manifest = entry.manifest
+        val name = manifest.configurationName.ifEmpty { entry.dir.fileName.toString() }
+        val text = "$name — ${DateFormatUtil.formatDateTime(manifest.startedAt)}   ${runResultSummary(manifest)}"
+        // Menu items render HTML; the run this tab already shows goes bold, as the history list does.
+        templatePresentation.text = if (entry.current) "<html><b>${StringUtil.escapeXmlEntities(text)}</b></html>" else text
+        templatePresentation.icon = runHistoryIcon(manifest)
+        templatePresentation.putClientProperty(
+            ActionUtil.INLINE_ACTIONS,
+            listOf(InlineReplay(project, entry, url), InlineRepeat(project, entry)),
+        )
+    }
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+    override fun actionPerformed(e: AnActionEvent) = Unit
+}
+
+private class InlineReplay(private val project: Project, private val entry: RunHistoryEntry, private val url: String) :
+    AnAction(
+        TestoBundle.message("testo.runs.history.forTest.loadReplay"),
+        TestoBundle.message("testo.runs.history.forTest.loadReplay"),
+        AllIcons.Actions.Rollback,
+    ), DumbAware {
+    init { templatePresentation.putClientProperty(ActionUtil.ALWAYS_VISIBLE_INLINE_ACTION, true) }
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+    override fun actionPerformed(e: AnActionEvent) = TestoRunReplayProfile.replay(project, entry.dir, entry.manifest, url)
+}
+
+private class InlineRepeat(private val project: Project, private val entry: RunHistoryEntry) :
+    AnAction(
+        TestoBundle.message("testo.runs.history.forTest.repeat"),
+        TestoBundle.message("testo.runs.history.forTest.repeat"),
+        AllIcons.Actions.Restart,
+    ), DumbAware {
+    init { templatePresentation.putClientProperty(ActionUtil.ALWAYS_VISIBLE_INLINE_ACTION, true) }
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+    override fun actionPerformed(e: AnActionEvent) = repeatArchivedRun(project, entry.dir, entry.manifest)
+}
+
+/** Re-executes an archived run: its own configuration, restored from the manifest, launched with its original executor. */
+private fun repeatArchivedRun(project: Project, runDir: Path, manifest: TestoRunManifest) {
+    val executor = ExecutorRegistry.getInstance().getExecutorById(manifest.executorId)
+        ?: DefaultRunExecutor.getRunExecutorInstance()
+    val name = manifest.configurationName.ifEmpty { runDir.fileName.toString() }
+    val settings = RunManager.getInstance(project).createConfiguration(name, TestoRunConfigurationType.INSTANCE)
+    val configuration = settings.configuration as? TestoRunConfiguration ?: return
+    manifest.configuration.takeIf { it.isNotBlank() }?.let { xml ->
+        runCatching { configuration.readExternal(JDOMUtil.load(xml)) }
+            .onFailure { LOG.warn("Failed to restore the run configuration of $runDir", it) }
+    }
+    val environment = ExecutionEnvironmentBuilder.createOrNull(executor, settings)?.build() ?: return
+    ExecutionManager.getInstance(project).restartRunProfile(environment)
 }
 
 /** The lens's fallback when it cannot name a test: replay the newest archived run. */

@@ -99,6 +99,13 @@ internal fun normalizeRunLocation(hint: String): String =
     hint.substringBefore('#').substringBefore(" with data set").trim()
 
 /**
+ * Compare-ready form: [normalizeRunLocation] plus `\`→`/`. The lens builds its hint from PSI via the local path
+ * processor (OS-native `D:\…` on Windows), while Testo emits `D:/…` — folding separators makes the two match.
+ */
+internal fun runLocationKey(hint: String): String =
+    normalizeRunLocation(hint).replace('\\', '/')
+
+/**
  * Writes `run.json` through a temp file and an atomic move, so a concurrent reader (`listRuns`/`prune`/`retentionOf`,
  * all off other pooled threads) never sees a half-written manifest — for which `prune` would read null and, on a
  * day-old run, delete it.

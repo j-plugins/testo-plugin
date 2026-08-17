@@ -42,6 +42,11 @@
                 implementationClass="com.github.xepozz.testo.ui.TestoHistoryCodeVisionProvider"/>
         <codeInsight.daemonBoundCodeVisionProvider
                 implementationClass="com.github.xepozz.testo.ui.TestoCoverageByTestCodeVisionProvider"/>
+        <!-- Names/descriptions for the two lenses in Settings | Editor | Inlay Hints | Code Vision. -->
+        <config.codeVisionGroupSettingProvider
+                implementation="com.github.xepozz.testo.ui.TestoHistoryCodeVisionGroupSettingProvider"/>
+        <config.codeVisionGroupSettingProvider
+                implementation="com.github.xepozz.testo.ui.TestoCoverageByTestCodeVisionGroupSettingProvider"/>
 
         <!--        <notificationGroup-->
         <!--                id="Testo"-->

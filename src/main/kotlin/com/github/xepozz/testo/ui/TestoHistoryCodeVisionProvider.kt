@@ -4,7 +4,7 @@ import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.isTestoFile
 import com.github.xepozz.testo.runs.replayNewestRun
-import com.github.xepozz.testo.runs.replayNewestRunWithTest
+import com.github.xepozz.testo.runs.showRunHistoryForTest
 import com.github.xepozz.testo.tests.TestoTestRunLineMarkerProvider
 import com.github.xepozz.testo.tests.console.TestoHistoryIndex
 import com.intellij.codeInsight.codeVision.CodeVisionAnchorKind
@@ -28,8 +28,8 @@ import java.awt.event.MouseEvent
  * right where the green gutter run icons live.
  *
  * The lens reads "Show history" and is shown only for tests the run archive
- * ([com.github.xepozz.testo.runs.TestoRunStore]) holds; clicking it replays the newest archived run containing that
- * test into a full Testo run tab. The pass/total (N/M) count is intentionally NOT computed yet — see [historyHint].
+ * ([com.github.xepozz.testo.runs.TestoRunStore]) holds; clicking it pops up the archived runs containing that test to
+ * replay one into a full Testo run tab. The pass/total (N/M) count is intentionally NOT computed yet — see [historyHint].
  */
 class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
 
@@ -70,7 +70,7 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
     override fun handleClick(editor: Editor, element: PsiElement, event: MouseEvent?) {
         val function = element as? Function ?: return openLatestHistory(element.project)
         val url = TestoTestRunLineMarkerProvider.getLocationHint(function)
-        replayNewestRunWithTest(element.project, url)
+        showRunHistoryForTest(element.project, url, editor, event)
     }
 
     /**

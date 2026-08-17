@@ -20,7 +20,9 @@
 - The popup on a covered line highlights the row under the pointer and runs all of that line's covering tests.
 - The covering-tests lens on a covered declaration leads its list with *Run all covering tests*, then a jump to each.
 - Every run is archived — output, reports and parameters — and replays from *Test History* as a full Testo console.
-- *Show history* above a test replays the newest archived run containing it and selects its node.
+- *Show history* above a test pops up the archived runs containing it (the one already open in a tab in bold); each
+  entry offers *Load replay* (opens the archive and selects the test's node) and *Repeat run* (re-executes it), so a
+  bare click never launches anything.
 - How many runs the history keeps is set in *Tools | Testo* or from the history list itself, which also clears it.
 - *Expand All* / *Collapse All* now sit on the toolbar itself, next to *Show Passed* / *Show Ignored*.
 - A tab opened from the history reruns with the executor the archived run used.
@@ -50,6 +52,11 @@
 
 ### Fixed
 
+- The *Show history* lens shows again (it never did on Windows): the lens built its location from the OS-native path
+  (`D:\…`) while the archive stored Testo's `D:/…`, so nothing matched. Locations are now compared with unified path
+  separators, and the archive index is built when the lens is first asked rather than on a later repaint.
+- The two Code Vision lenses (test history, covering tests) now carry a name and description in *Settings | Editor |
+  Inlay Hints | Code Vision* instead of showing up blank.
 - The debug toolbar has its rerun/restart button back, during the session and after it ends; while the session runs
   it wears the restart-debugger icon.
 - Starting a debug session no longer logs a *split debugger* error: the run descriptor now comes off the session

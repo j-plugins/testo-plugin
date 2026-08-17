@@ -204,6 +204,7 @@ src/main/kotlin/com/github/xepozz/testo/
 └── ui/
     ├── TestoIconProvider.kt                 # Testo-marked icons for PHP test files
     ├── TestoHistoryCodeVisionProvider.kt    # "Show history" lens above each test
+    ├── TestoCodeVisionGroupSettings.kt      # the two lenses' name/description in Inlay Hints settings (else blank)
     ├── TestoReportEditor.kt                 # JCEF editor tab for a generated report (light file + provider)
     └── TestoStackTraceConsoleFolding.kt     # folds `[internal function]` frame runs
 
@@ -463,9 +464,18 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `setCellRenderer`). Safe: `attachToModel` is the only installer and runs at form construction, and nothing in the
   test-framework packages reads the renderer back. The proxy comes off `NodeDescriptor.getElement()` for the same
   reason — same object, public class.
+- **`TestoHistoryIndex` builds its location set synchronously in `contains`**, on the daemon's background thread, so
+  the *first* code-vision pass over a freshly opened file already answers. An earlier async build left the first pass
+  empty and leaned on a later repaint, but `refreshLens` does not reliably force a daemon-bound recompute in 2026.2 —
+  so the *Show history* lens never appeared until the file was edited. The read is bounded (a few small `tests.txt`)
+  and cached per archive generation.
+- **Location hints from PSI and from Testo differ in path separators.** `getLocationHint` runs the file through the
+  local `PhpCommandLinePathProcessor`, which yields the OS-native path (`D:\…` on Windows); Testo emits the same
+  location with `/`. So any lookup of a PSI-built hint against an archived one (the history lens, *Show history*'s
+  replay) must go through `runLocationKey`, which folds separators to `/` — otherwise it never matches on Windows.
 - **`TestoHistoryIndex.refreshLens` uses the internal `ModificationStampUtil`** to force code-vision recomputation
-  after a run; a test run never touches PHP source, so neither `DaemonCodeAnalyzer.restart()` nor
-  `invalidateProvider` alone re-runs `getHint`. Wrapped in `runCatching`.
+  after a run — for editors already open when a run finishes; a test run never touches PHP source, so neither
+  `DaemonCodeAnalyzer.restart()` nor `invalidateProvider` alone re-runs `getHint`. Wrapped in `runCatching`.
 - **History is replayed, not imported.** The platform's import forces `ImportedTestConsoleProperties` and its own
   converter, so none of our stores fill — an imported tab is a PHPUnit-looking tree. `TestoRunReplayProfile` feeds
   the archived teamcity stream through the *live* properties instead. Three switches keep a replay from acting like

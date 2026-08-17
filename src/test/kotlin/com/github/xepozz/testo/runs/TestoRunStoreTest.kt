@@ -79,6 +79,17 @@ class TestoRunStoreTest {
     }
 
     @Test
+    fun runLocationKeyUnifiesSeparatorsSoPsiAndTestoHintsMatch() {
+        // The lens builds its hint from PSI through the local path processor (OS-native `\` path on Windows); Testo
+        // emits the same location with `/`. Both must reduce to one key, or the history lens never matches on Windows.
+        val fromPsi = "php_qn://D:\\git\\app\\OrderTest.php::\\App\\OrderTest::testPay"
+        val fromTesto = "php_qn://D:/git/app/OrderTest.php::\\App\\OrderTest::testPay"
+        assertEquals(runLocationKey(fromTesto), runLocationKey(fromPsi))
+        // Dataset coordinates are still dropped, so a method key answers for its data sets.
+        assertEquals(runLocationKey(fromPsi), runLocationKey("$fromTesto with data set #3"))
+    }
+
+    @Test
     fun manifestRoundTripsThroughJson() {
         val manifest = TestoRunManifest(
             configurationName = "All tests",
