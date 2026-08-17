@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.ui
 
+import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.coverage.format.TestId
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
@@ -39,7 +40,7 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
 
     override val id: String = "testo.coverage.byTest"
 
-    override val name: String = "Testo tests covering code"
+    override val name: String = TestoBundle.message("testo.coverage.byTest.name")
 
     override val relativeOrderings: List<CodeVisionRelativeOrdering> =
         listOf(CodeVisionRelativeOrdering.CodeVisionRelativeOrderingFirst)
@@ -54,8 +55,8 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
         val count = coveringTests(element as? Function ?: return null, file).size
         return when (count) {
             0 -> null
-            1 -> "1 covering test"
-            else -> "$count covering tests"
+            1 -> TestoBundle.message("testo.coverage.byTest.hint.one")
+            else -> TestoBundle.message("testo.coverage.byTest.hint.many", count)
         }
     }
 
@@ -68,7 +69,10 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
         val mapper = TestoTestIdentityMapper.getInstance()
         val popup = JBPopupFactory.getInstance()
             .createPopupChooserBuilder(tests)
-            .setTitle(if (tests.size == 1) "1 Covering Test" else "${tests.size} Covering Tests")
+            .setTitle(
+                if (tests.size == 1) TestoBundle.message("testo.coverage.byTest.chooser.one")
+                else TestoBundle.message("testo.coverage.byTest.chooser.many", tests.size)
+            )
             .setRenderer(SimpleListCellRenderer.create<TestId>("") { shortTestLabel(it) })
             .setItemChosenCallback { id ->
                 (mapper.resolve(id, project) as? Navigatable)?.takeIf { it.canNavigate() }?.navigate(true)
@@ -112,7 +116,7 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
                     onClick,
                     TestoIcons.TESTO,
                     hint,
-                    "Show the Testo tests that cover this declaration",
+                    TestoBundle.message("testo.coverage.byTest.tooltip"),
                 )
             )
         }

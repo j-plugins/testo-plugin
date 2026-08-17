@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.coverage
 
+import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
@@ -55,7 +56,7 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
     override fun doExecute(state: RunProfileState, env: ExecutionEnvironment): RunContentDescriptor? {
         FileDocumentManager.getInstance().saveAllDocuments()
         val runConfiguration = env.runProfile as? TestoRunConfiguration
-            ?: throw ExecutionException("Coverage is not supported for the selected run profile.")
+            ?: throw ExecutionException(TestoBundle.message("testo.coverage.run.unsupported.profile"))
         val interpreter = runConfiguration.interpreter
             ?: throw ExecutionException(PhpCommandSettingsBuilder.getInterpreterNotFoundError())
 
