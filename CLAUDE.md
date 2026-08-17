@@ -453,8 +453,11 @@ Non-obvious constraints already paid for in blood — read before touching the r
   the channel UI is looked up by test name, which is all a tab has when the selection changes.
 - **`TestoChannelsUi` reaches `TestResultsPanel.myConsole` by reflection** — there is no public accessor. It
   degrades gracefully (logs a warning, no channel tabs) if the field disappears.
-- **The log-level filter is the channel tabs' `entryPointActionGroup`** (right edge of the tab row): a `protected open`
-  val re-read by `updateEntryPointToolbar` on every tab change, so overriding it on the `JBEditorTabs` subclass suffices.
+- **The log-level filter rides on each tab's `TabInfo.setTabPaneActions`** (right edge of the tab row), not on
+  `JBTabs.getEntryPointActionGroup()`: that getter is `@ApiStatus.Internal` and fails the verifier's default
+  `failureLevel` (overriding it cost a red `verifyPlugin` that `buildPlugin` and `test` never catch). `setTabPaneActions`
+  is public, and the platform feeds the selected tab's group into the same entry-point toolbar on every tab change, so
+  setting it on every `TabInfo` is equivalent — put it on all tabs, since the toolbar follows the active one.
 - **The tree has one filter slot, shared with *Show passed* / *Show ignored*.** `TestoProgressAction.applyFilter` is
   its single writer: a selected counter replaces the toggles rather than narrowing them (intersecting would answer
   "show me the passed ones" with an empty tree), and releasing it recomposes them via `hiddenByToggles` — off Testo's

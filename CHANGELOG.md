@@ -49,6 +49,8 @@
 - A Coverage run at level *auto* now collects branch coverage when the engine is Xdebug and a Cobertura report is on.
 - The *Log Levels* filter is now a minimum-level picker: an `info +` combo box at the right of the channel tabs row
   shows that level and everything above it (default `info`), instead of per-level checkboxes.
+- The channel console keeps the open channel when you change the log level or switch tests, reselecting the same-named
+  tab after the rebuild; Output now leads the tabs, apart from the channel-aggregating *All*.
 
 ### Fixed
 

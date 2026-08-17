@@ -157,6 +157,10 @@ object TestoChannelsUi {
 
         private var tabs: JBEditorTabs? = null
         private var outputComponent: JComponent? = null
+        // The log-level filter, shown at the right edge of the tab row. It rides on every tab's tabPaneActions rather
+        // than on JBTabs.getEntryPointActionGroup(): that getter is @ApiStatus.Internal and fails the plugin verifier,
+        // while setTabPaneActions is public and the platform feeds the selected tab's group into the same toolbar.
+        private val entryPointActions = DefaultActionGroup(TestoLogLevelFilterAction(levelFilter))
         private val dynamicConsoles = mutableListOf<ConsoleViewImpl>()
         private val subscriptions = mutableListOf<() -> Unit>()
         // A per-parent live stream: console (LiveAggregate) or syntax-highlighted cards (CardsAggregate). Late leaves
@@ -190,6 +194,9 @@ object TestoChannelsUi {
         ) {
             val tabbed = ensureInstalled() ?: return
             val platform = outputComponent ?: return
+            // Keep the open channel across a rebuild (a log-level toggle or a test switch): remember its title now and
+            // reselect the same-named tab afterwards, falling back to Output when that channel is gone from the new set.
+            val previousTitle = tabbed.selectedInfo?.text
             tabbed.removeAllTabs()
             lazyTabs.clear()
             disposeDynamicConsoles()
@@ -205,14 +212,15 @@ object TestoChannelsUi {
             if (!selected.isLeaf) {
                 val leaves = selected.allTests.filter { it !== selected && it.isLeaf }
 
+                // Output first: it is the raw process console, outside the channel-aggregating "All" scope.
+                val outputTab =
+                    addAggregateTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, viewer, leaves, attach = store::attachOutput)
+
                 // All: syntax-highlighted cards, language picked per message from its own channel.
                 val allCards = newCards(null)
                 store.header().forEach { allCards.add(it) }
                 addCardsAggregate(allCards, viewer, leaves) { key, sink -> store.attachAll(key, sink) }
                 addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
-
-                val outputTab =
-                    addAggregateTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, viewer, leaves, attach = store::attachOutput)
 
                 // Every channel renders as cards (one per test, that test's messages merged); only the Output tab above
                 // stays a console. A language channel highlights each card; a format-less one keeps its ANSI.
@@ -228,12 +236,12 @@ object TestoChannelsUi {
                         cards.component
                     }
                 }
-                // Selected last, once every tab exists: JBEditorTabs activates whichever was added first, and the
-                // tab that opens on a node has to be Output whatever else the node happens to have.
-                outputTab?.let { tabbed.select(it, false) }
+                selectPreferredTab(tabbed, previousTitle, outputTab)
                 return
             }
 
+            // Output first: the raw process console, outside the channel-aggregating "All" scope.
+            val outputTab = addComponentTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, platform)
             val key = keyOf(selected)
             val header = store.header()
             // All: highlighted cards (per-message language). Header chunks first, then the live "all" stream replays
@@ -244,7 +252,6 @@ object TestoChannelsUi {
                 if (key != null) subscriptions += store.attachAll(key) { allCards.add(it) }
                 addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
             }
-            val outputTab = addComponentTab(tabbed, OUTPUT_TAB, AllIcons.Debugger.Console, platform)
             if (key != null) {
                 for ((channel, chunks) in store.channelsFor(key)) {
                     if (chunks.none { levelFilter.isVisible(it.level) }) continue
@@ -253,7 +260,13 @@ object TestoChannelsUi {
                     addComponentTab(tabbed, humanize(channel), channelIcon(channel, chunks), cards.component)
                 }
             }
-            tabbed.select(outputTab, false)
+            selectPreferredTab(tabbed, previousTitle, outputTab)
+        }
+
+        // Reselect the tab whose title the user last had open, so a rebuild keeps their channel; Output when it is gone.
+        private fun selectPreferredTab(tabbed: JBEditorTabs, preferredTitle: String?, fallback: TabInfo?) {
+            val target = preferredTitle?.let { title -> tabbed.tabs.firstOrNull { it.text == title } } ?: fallback
+            target?.let { tabbed.select(it, false) }
         }
 
         override fun onTestNodeAdded(viewer: TestResultsViewer, test: SMTestProxy) {
@@ -295,7 +308,7 @@ object TestoChannelsUi {
             view?.let { addComponentTab(tabbed, title, icon, it.component) }
 
         private fun addComponentTab(tabbed: JBEditorTabs, title: String, icon: Icon, component: JComponent): TabInfo {
-            val info = TabInfo(component).setText(title).setIcon(icon)
+            val info = TabInfo(component).setText(title).setIcon(icon).setTabPaneActions(entryPointActions)
             tabbed.addTab(info)
             return info
         }
@@ -313,7 +326,7 @@ object TestoChannelsUi {
 
         private fun addLazyTab(tabbed: JBEditorTabs, title: String, icon: Icon, build: () -> JComponent) {
             val placeholder = JBPanel<Nothing>(BorderLayout()).apply { isOpaque = false }
-            val info = TabInfo(placeholder).setText(title).setIcon(icon)
+            val info = TabInfo(placeholder).setText(title).setIcon(icon).setTabPaneActions(entryPointActions)
             lazyTabs[info] = LazyTab(build)
             tabbed.addTab(info)
         }
@@ -1102,12 +1115,9 @@ object TestoChannelsUi {
 
             holder.remove(original)
             // The editor's own tabs widget: one row that scrolls and shows a "hidden tabs" dropdown when the channels
-            // don't fit, instead of wrapping to extra rows like JBTabbedPane. The log-level filter is its entry-point
-            // group: the toolbar JBTabs paints at the right edge of that row.
-            val entryPoint = DefaultActionGroup(TestoLogLevelFilterAction(levelFilter))
-            val tabbed = object : JBEditorTabs(project, this@ChannelTabsController) {
-                override val entryPointActionGroup: DefaultActionGroup get() = entryPoint
-            }
+            // don't fit, instead of wrapping to extra rows like JBTabbedPane. The log-level filter rides on each tab's
+            // tabPaneActions (see entryPointActions), which the platform paints at the right edge of that row.
+            val tabbed = JBEditorTabs(project, this@ChannelTabsController)
             tabbed.addListener(object : com.intellij.ui.tabs.TabsListener {
                 override fun selectionChanged(oldSelection: TabInfo?, newSelection: TabInfo?) = buildLazyTab(newSelection)
             })
