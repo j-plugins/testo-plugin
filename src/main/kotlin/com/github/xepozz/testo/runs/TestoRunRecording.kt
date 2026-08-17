@@ -5,6 +5,7 @@ import java.io.Writer
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -62,9 +63,7 @@ class TestoRunRecording internal constructor(
         }
     }
 
-    fun writeManifest(manifest: TestoRunManifest) {
-        Files.writeString(dir.resolve(MANIFEST_FILE), gson.toJson(manifest), StandardCharsets.UTF_8)
-    }
+    fun writeManifest(manifest: TestoRunManifest) = writeManifestFile(dir, manifest, gson)
 
     fun writeLocations() {
         val snapshot = synchronized(lock) { locations.toList() }
@@ -98,3 +97,20 @@ class TestoRunRecording internal constructor(
  */
 internal fun normalizeRunLocation(hint: String): String =
     hint.substringBefore('#').substringBefore(" with data set").trim()
+
+/**
+ * Writes `run.json` through a temp file and an atomic move, so a concurrent reader (`listRuns`/`prune`/`retentionOf`,
+ * all off other pooled threads) never sees a half-written manifest — for which `prune` would read null and, on a
+ * day-old run, delete it.
+ */
+internal fun writeManifestFile(dir: Path, manifest: TestoRunManifest, gson: Gson) {
+    val target = dir.resolve(TestoRunRecording.MANIFEST_FILE)
+    val tmp = Files.createTempFile(dir, "run", ".json.tmp")
+    try {
+        Files.writeString(tmp, gson.toJson(manifest), StandardCharsets.UTF_8)
+        runCatching { Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE) }
+            .getOrElse { Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING) }
+    } finally {
+        runCatching { Files.deleteIfExists(tmp) }
+    }
+}

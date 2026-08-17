@@ -91,9 +91,7 @@ class TestoRunStore(private val project: Project) {
         return candidate
     }
 
-    private fun writeManifest(dir: Path, manifest: TestoRunManifest) {
-        Files.writeString(dir.resolve(TestoRunRecording.MANIFEST_FILE), gson.toJson(manifest), StandardCharsets.UTF_8)
-    }
+    private fun writeManifest(dir: Path, manifest: TestoRunManifest) = writeManifestFile(dir, manifest, gson)
 
     fun readManifest(dir: Path): TestoRunManifest? = runCatching {
         val file = dir.resolve(TestoRunRecording.MANIFEST_FILE)
