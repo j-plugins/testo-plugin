@@ -1,72 +1,56 @@
 package com.github.xepozz.testo.tests.console
 
+import com.github.xepozz.testo.runs.TestoRunStore
+import com.github.xepozz.testo.runs.runLocationKey
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.hints.codeVision.ModificationStampUtil
-import com.intellij.execution.TestStateStorage
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.project.Project
-import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Cached set of every test locationUrl present in the project's saved run-history XML files, so the "Show history" lens
- * can be shown only for tests that actually have saved history. A test's last status survives in [TestStateStorage]
- * long after its run XML is pruned from the 10-file history, so checking storage alone would show the lens for tests
- * whose history is gone.
+ * Cached set of every test location the project's archived runs hold, so the "Show history" lens is shown only for
+ * tests some archive can actually replay. The source is the run archive ([TestoRunStore]) — the platform's own history
+ * XMLs are not consulted: a lens click replays our archive, so the two would disagree the moment either side rotates.
  *
- * The index is rebuilt on a pooled thread whenever the history files' newest timestamp changes (i.e. after a new run is
- * saved), then triggers a daemon restart so the lenses recompute. [contains] never blocks: it returns the last good
- * answer while a rebuild is in flight.
+ * The set is built synchronously on first lookup (a few small `tests.txt`) and cached until the archive changes, so the
+ * first code-vision pass over a freshly opened file already answers, without waiting on a repaint (see CLAUDE.md).
  */
 internal object TestoHistoryIndex {
-    private val locationUrl = Regex("locationUrl=\"([^\"]*)\"")
-    private data class Snapshot(val stamp: Long, val urls: Set<String>)
-    private val cache = ConcurrentHashMap<String, Snapshot>()
-    private val building = ConcurrentHashMap.newKeySet<String>()
+    private data class Snapshot(val generation: Long, val urls: Set<String>)
 
-    /** True if some saved run history contains [url] (an exact node locationUrl, or a dataset under that method). */
-    fun contains(project: Project, url: String): Boolean {
-        val key = project.locationHash
-        val files = historyFiles(project)
-        val stamp = files.maxOfOrNull { it.lastModified() } ?: 0L
-        val snap = cache[key]
-        if (snap == null || snap.stamp != stamp) scheduleRebuild(project, key, files, stamp)
-        val urls = (if (snap?.stamp == stamp) snap else cache[key])?.urls ?: return false
-        return url in urls || urls.any { it.startsWith(url) }
+    private val generation = AtomicLong()
+    private val cache = ConcurrentHashMap<String, Snapshot>()
+
+    /** The archive changed: the next lookup rebuilds. Callers repaint open editors via [refreshLens] themselves. */
+    fun invalidate() {
+        generation.incrementAndGet()
     }
 
-    // List the history directory directly rather than TestHistoryConfiguration.files: a just-saved run's file lands on
-    // disk before it is registered there, and we want the lens to appear as soon as the run is written.
-    private fun historyFiles(project: Project): List<File> =
-        TestStateStorage.getTestHistoryRoot(project).listFiles { f -> f.isFile && f.name.endsWith(".xml") }?.toList()
-            ?: emptyList()
+    /** True if some archived run contains [url] (an exact test location, or a test declared under it). */
+    fun contains(project: Project, url: String): Boolean {
+        val needle = runLocationKey(url)
+        val urls = snapshot(project).urls
+        // `startsWith("$needle::")`, not `startsWith(needle)`: `…::testPay` must not answer for `…::testPayment`.
+        return needle in urls || urls.any { it.startsWith("$needle::") }
+    }
 
-    private fun scheduleRebuild(project: Project, key: String, files: List<File>, stamp: Long) {
-        if (!building.add(key)) return
-        ApplicationManager.getApplication().executeOnPooledThread {
-            try {
-                val urls = HashSet<String>()
-                files.forEach { f ->
-                    runCatching { locationUrl.findAll(f.readText()).forEach { urls.add(it.groupValues[1]) } }
-                }
-                // Only restart the daemon when the lenses would actually change. A rebuild also runs on the very first
-                // lookup and whenever a history file's timestamp moves without its contents mattering; restarting then
-                // interrupts an in-flight highlighting pass for nothing.
-                val previous = cache.put(key, Snapshot(stamp, urls))?.urls ?: emptySet()
-                if (previous != urls) refreshLens(project)
-            } finally {
-                building.remove(key)
-            }
-        }
+    private fun snapshot(project: Project): Snapshot {
+        val key = project.locationHash
+        val current = generation.get()
+        cache[key]?.let { if (it.generation == current) return it }
+        val store = TestoRunStore.getInstance(project)
+        val urls = HashSet<String>()
+        store.listRuns().forEach { (dir, _) -> store.readLocations(dir).forEach { urls.add(runLocationKey(it)) } }
+        return Snapshot(current, urls).also { cache[key] = it }
     }
 
     /**
-     * Recompute the "Show history" lenses now. Code vision is gated by a PSI modification stamp: the daemon's code-vision
-     * pass self-skips when the file's stamp is unchanged, and a test run never touches the PHP source — so neither
-     * DaemonCodeAnalyzer.restart() nor CodeVisionHost.invalidateProvider re-runs getHint (the lens only refreshed on a
-     * full IDE restart). The platform's own recipe (CodeVisionHost.subscribeCVSettingsChanged) is to clear that stamp on
-     * each editor and then restart the daemon, which forces the pass to recompute getHint and repopulate the cache.
+     * Recompute the "Show history" lenses now: a test run touches no PHP source, so the code-vision pass self-skips
+     * unless each editor's PSI modification stamp is cleared first (the platform's own recipe) — then the daemon
+     * restart re-runs getHint.
      */
     fun refreshLens(project: Project) {
         ApplicationManager.getApplication().invokeLater {

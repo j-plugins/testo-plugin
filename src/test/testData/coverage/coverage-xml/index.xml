@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns="https://schema.phpunit.de/coverage/1.0">
+  <project source="D:/git/testo/testo" timestamp="1786714532">
+    <directory name="D:/git/testo/testo">
+      <totals>
+        <lines total="128" executed="60" percent="46.88"/>
+      </totals>
+      <file name="DataProviderInterceptor.php" href="plugin/data/src/Internal/DataProviderInterceptor.php.xml">
+        <totals>
+          <lines total="124" executed="58" percent="46.77"/>
+        </totals>
+      </file>
+      <file name="MultipleResult.php" href="plugin/data/src/MultipleResult.php.xml">
+        <totals>
+          <lines total="2" executed="2" percent="100.00"/>
+        </totals>
+      </file>
+      <file name="DataCross.php" href="plugin/data/src/DataCross.php.xml">
+        <totals>
+          <lines total="2" executed="0" percent="0.00"/>
+        </totals>
+      </file>
+    </directory>
+  </project>
+</phpunit>

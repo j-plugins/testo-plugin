@@ -31,8 +31,7 @@ object TestoTestTreeDecorator {
     private val LOG = logger<TestoTestTreeDecorator>()
 
     /**
-     * @param describe a node's description, by the key the converter filed it under. Not `SMTestProxy.metainfo`,
-     *        where the platform puts it: [TestoChannelHistory] overwrites that field with the channel output.
+     * @param describe a node's description, by the key the converter filed it under.
      */
     fun install(
         console: SMTRunnerConsoleView,

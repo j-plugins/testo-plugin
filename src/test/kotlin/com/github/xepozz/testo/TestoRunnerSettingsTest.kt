@@ -12,12 +12,13 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals(-1, settings.dataSetIndex)
         assertFalse(settings.parallelTestingEnabled)
         assertEquals("run", settings.command)
-        assertEquals("", settings.suite)
+        assertTrue(settings.suites.isEmpty())
         assertTrue(settings.groups.isEmpty())
         assertTrue(settings.excludeGroups.isEmpty())
-        assertEquals(0, settings.repeat)
-        assertEquals(0, settings.parallel)
+        assertEquals(1, settings.parallel)
         assertEquals("", settings.testoType)
+        assertEquals("auto", settings.coverageLevel)
+        assertEquals("--type=!bench", settings.coverageOptions)
         assertTrue("rerunFilters defaults to empty", settings.rerunFilters.isEmpty())
     }
 
@@ -27,11 +28,10 @@ class TestoRunnerSettingsTest : TestCase() {
             dataSetIndex = 5,
             parallelTestingEnabled = true,
             command = "list",
-            suite = "unit",
-            repeat = 3,
             parallel = 4,
             testoType = "bench",
         ).apply {
+            suites = mutableListOf("unit")
             groups = mutableListOf("fast")
             excludeGroups = mutableListOf("slow")
         }
@@ -39,10 +39,9 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals(5, settings.dataSetIndex)
         assertTrue(settings.parallelTestingEnabled)
         assertEquals("list", settings.command)
-        assertEquals("unit", settings.suite)
+        assertEquals(listOf("unit"), settings.suites)
         assertEquals(listOf("fast"), settings.groups)
         assertEquals(listOf("slow"), settings.excludeGroups)
-        assertEquals(3, settings.repeat)
         assertEquals(4, settings.parallel)
         assertEquals("bench", settings.testoType)
     }
@@ -71,11 +70,10 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals(-1, result.dataSetIndex)
         assertFalse(result.parallelTestingEnabled)
         assertEquals("run", result.command)
-        assertEquals("", result.suite)
+        assertTrue(result.suites.isEmpty())
         assertTrue(result.groups.isEmpty())
         assertTrue(result.excludeGroups.isEmpty())
-        assertEquals(0, result.repeat)
-        assertEquals(0, result.parallel)
+        assertEquals(1, result.parallel)
         assertEquals("", result.testoType)
     }
 
@@ -85,11 +83,12 @@ class TestoRunnerSettingsTest : TestCase() {
             dataSetIndex = 7,
             parallelTestingEnabled = true,
             command = "debug",
-            suite = "integration",
-            repeat = 5,
             parallel = 8,
             testoType = "inline",
+            coverageLevel = "branch",
+            coverageOptions = "--type=!bench",
         )
+        source.suites = mutableListOf("integration")
         source.groups = mutableListOf("database")
         source.excludeGroups = mutableListOf("slow")
         source.scope = PhpTestRunnerSettings.Scope.Method
@@ -108,12 +107,13 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals(7, result.dataSetIndex)
         assertTrue(result.parallelTestingEnabled)
         assertEquals("debug", result.command)
-        assertEquals("integration", result.suite)
+        assertEquals(listOf("integration"), result.suites)
         assertEquals(listOf("database"), result.groups)
         assertEquals(listOf("slow"), result.excludeGroups)
-        assertEquals(5, result.repeat)
         assertEquals(8, result.parallel)
         assertEquals("inline", result.testoType)
+        assertEquals("branch", result.coverageLevel)
+        assertEquals("--type=!bench", result.coverageOptions)
         // rerunFilters is @Transient and intentionally NOT copied — stays empty on the result.
         assertTrue("rerunFilters is not copied (transient)", result.rerunFilters.isEmpty())
     }

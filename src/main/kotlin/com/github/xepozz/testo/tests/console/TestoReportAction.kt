@@ -1,6 +1,11 @@
 package com.github.xepozz.testo.tests.console
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.coverage.TestoCoverageReport
+import com.github.xepozz.testo.coverage.applyTestoCoverage
+import com.github.xepozz.testo.coverage.closeTestoCoverage
+import com.github.xepozz.testo.coverage.isTestoCoverageActive
+import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.ui.TestoReportViewer
 import com.intellij.icons.AllIcons
 import com.intellij.ide.BrowserUtil
@@ -11,12 +16,16 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.KeepPopupOnPerform
 import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.actionSystem.RightAlignedToolbarAction
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.actionSystem.ex.CustomComponentAction
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.DumbAware
+import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.JBColor
@@ -34,6 +43,7 @@ import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -63,6 +73,7 @@ class TestoReportsAction(
     /** One cell per announced report, polled: whether the file exists yet changes without anything telling us. */
     private inner class ReportsPanel : JPanel() {
         private val cells = LinkedHashMap<String, ReportCell>()
+        private var coverageCell: CoverageGroupCell? = null
         private val timer = Timer(REFRESH_MS) { tick() }
 
         init {
@@ -125,9 +136,16 @@ class TestoReportsAction(
             }
             val gone = cells.keys - announced.mapTo(HashSet()) { it.path }
             gone.forEach { path -> cells.remove(path)?.let { remove(it) } }
-
             cells.values.forEach { it.refresh() }
-            isVisible = cells.isNotEmpty()
+
+            val coverage = reports.coverage()
+            val cell = when {
+                coverage.isEmpty() -> coverageCell?.let { remove(it); coverageCell = null; null }
+                else -> coverageCell ?: CoverageGroupCell().also { add(it); coverageCell = it }
+            }
+            cell?.refresh(coverage)
+
+            isVisible = cells.isNotEmpty() || coverageCell != null
 
             // Re-laid out only when the row changed shape — this runs twice a second.
             val width = preferredSize.width
@@ -150,6 +168,7 @@ class TestoReportsAction(
         // A fresh cell has no tooltip yet, so the first refresh must go through however little has changed.
         private var refreshed = false
         private var hovered = false
+        private val resolving = AtomicBoolean()
 
         // Asked for per paint: a font set once on a raw JComponent outlives a zoom (no UI delegate reinstalls it).
         override fun getFont(): Font = UIUtil.getLabelFont()
@@ -185,8 +204,19 @@ class TestoReportsAction(
         fun refresh() {
             // Not while the run is going: a report is announced as Testo starts writing it, over the path the
             // previous run wrote to — a check now would offer that run's file.
-            val finished = reports.runFinished
-            val found = if (finished) resolveReport(ref, project, mapToLocal, reports.runStartedAt) else null
+            if (!reports.runFinished) {
+                applyResolved(null, false)
+                return
+            }
+            val cellRef = ref
+            resolveReportOffEdt(
+                project, reports, resolving,
+                resolve = { startedAt -> resolveReport(cellRef, project, mapToLocal, startedAt) },
+                apply = { applyResolved(it, true) },
+            )
+        }
+
+        private fun applyResolved(found: Path?, finished: Boolean) {
             maybeAutoOpen(found, finished)
             val willOpen = !finished && TestoReportAutoOpen.decide(project, reports, ref).isNotEmpty()
             // Tooltip and repaint only on a real change: this runs twice a second.
@@ -324,6 +354,152 @@ class TestoReportsAction(
             OpenReportGroup(TestoBundle.message(key), icon, way, { ref }, project, reports, ::openOrArm)
     }
 
+    /**
+     * The run's coverage reports as one button: a click applies every checked report as a single merged bundle
+     * ([applyTestoCoverage]), the arrow opens a checkbox per report. Toggling a checkbox while Testo coverage is
+     * showing recomposes the bundle live; unchecking the last one closes it.
+     */
+    private inner class CoverageGroupCell : JComponent() {
+        private var refs: List<TestoReportRef> = emptyList()
+        private var located: Map<String, Path> = emptyMap()
+        private var runWasFinished = false
+        private var refreshed = false
+        private var hovered = false
+        private val resolving = AtomicBoolean()
+
+        override fun getFont(): Font = UIUtil.getLabelFont()
+
+        init {
+            isOpaque = false
+            cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+            addMouseListener(object : MouseAdapter() {
+                override fun mouseEntered(e: MouseEvent) { hovered = true; repaint() }
+                override fun mouseExited(e: MouseEvent) { hovered = false; repaint() }
+                override fun mouseClicked(e: MouseEvent) {
+                    if (e.x >= width - arrowZone()) showMenu() else applyChecked()
+                }
+            })
+        }
+
+        private fun text(): String = TestoBundle.message("testo.coverage.group.text")
+
+        private fun arrowZone(): Int = ARROW.iconWidth + GAP + PADDING
+
+        fun refresh(coverage: List<TestoReportRef>) {
+            refs = coverage
+            if (!reports.runFinished) {
+                applyResolved(emptyMap(), false)
+                return
+            }
+            resolveReportOffEdt(
+                project, reports, resolving,
+                resolve = { startedAt ->
+                    val found = LinkedHashMap<String, Path>()
+                    for (ref in coverage) {
+                        resolveCoverageDataFile(ref, project, mapToLocal, startedAt)?.let { found[ref.path] = it }
+                    }
+                    found
+                },
+                apply = { applyResolved(it, true) },
+            )
+        }
+
+        private fun applyResolved(found: Map<String, Path>, finished: Boolean) {
+            if (refreshed && found == located && finished == runWasFinished) return
+            refreshed = true
+            located = found
+            runWasFinished = finished
+            toolTipText = when {
+                found.isNotEmpty() -> TestoBundle.message("testo.coverage.action.description")
+                finished -> TestoBundle.message("testo.coverage.action.description.pending")
+                else -> TestoBundle.message("testo.coverage.action.description.running")
+            }
+            repaint()
+        }
+
+        /** The checked reports that are actually on disk — what a click applies and a toggle recomposes. */
+        private fun checkedReports(): List<TestoCoverageReport> = refs.mapNotNull { ref ->
+            val path = located[ref.path] ?: return@mapNotNull null
+            if (!reports.isCoverageChecked(ref.path)) return@mapNotNull null
+            TestoCoverageReport(ref.name, ref.coverageFormat, path)
+        }
+
+        private fun applyChecked() {
+            val checked = checkedReports()
+            if (checked.isNotEmpty()) applyTestoCoverage(project, checked)
+        }
+
+        private fun onToggled() {
+            if (!isTestoCoverageActive(project)) return
+            val checked = checkedReports()
+            if (checked.isEmpty()) closeTestoCoverage(project) else applyTestoCoverage(project, checked)
+        }
+
+        private fun showMenu() {
+            val group = DefaultActionGroup(refs.map { CoverageReportToggle(it) })
+            JBPopupFactory.getInstance()
+                .createActionGroupPopup(
+                    null,
+                    group,
+                    DataManager.getInstance().getDataContext(this),
+                    JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
+                    true,
+                    ActionPlaces.TOOLBAR,
+                )
+                .showUnderneathOf(this)
+        }
+
+        private inner class CoverageReportToggle(private val ref: TestoReportRef) :
+            ToggleAction(ref.name ?: ref.format), DumbAware {
+
+            init {
+                // Checking off several reports is one gesture — the menu must survive each click.
+                templatePresentation.keepPopupOnPerform = KeepPopupOnPerform.Always
+            }
+
+            override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+
+            override fun isSelected(e: AnActionEvent): Boolean = reports.isCoverageChecked(ref.path)
+
+            override fun setSelected(e: AnActionEvent, state: Boolean) {
+                reports.setCoverageChecked(ref.path, state)
+                onToggled()
+            }
+        }
+
+        override fun getPreferredSize(): Dimension {
+            val metrics = getFontMetrics(font)
+            val width =
+                PADDING + COVERAGE_ICON.iconWidth + GAP + metrics.stringWidth(text()) + GAP + ARROW.iconWidth + PADDING
+            val height = maxOf(COVERAGE_ICON.iconHeight, metrics.height, JBUI.scale(16)) + JBUI.scale(4)
+            return Dimension(width, height)
+        }
+
+        override fun getMinimumSize(): Dimension = preferredSize
+        override fun getMaximumSize(): Dimension = preferredSize
+
+        override fun paintComponent(g: Graphics) {
+            val g2 = g.create() as Graphics2D
+            try {
+                GraphicsUtil.setupAAPainting(g2)
+                if (hovered) {
+                    g2.color = JBUI.CurrentTheme.ActionButton.hoverBackground()
+                    val arc = JBUI.scale(6)
+                    g2.fillRoundRect(0, 0, width, height, arc, arc)
+                }
+                val icon = if (located.isNotEmpty()) COVERAGE_ICON else COVERAGE_PENDING_ICON
+                icon.paintIcon(this, g2, PADDING, (height - icon.iconHeight) / 2)
+                g2.font = font
+                g2.color = UIUtil.getLabelForeground()
+                val metrics = g2.fontMetrics
+                g2.drawString(text(), PADDING + COVERAGE_ICON.iconWidth + GAP, (height - metrics.height) / 2 + metrics.ascent)
+                ARROW.paintIcon(this, g2, width - PADDING - ARROW.iconWidth, (height - ARROW.iconHeight) / 2)
+            } finally {
+                g2.dispose()
+            }
+        }
+    }
+
     private companion object {
         private const val REFRESH_MS = 500
 
@@ -333,6 +509,12 @@ class TestoReportsAction(
         /** The icon's three colours: grey (nothing to open), blue (this run's report is on disk), green (scheduled). */
         private val READY_ICON: Icon = IconUtil.colorize(ICON, JBColor(0x3574F0, 0x548AF7))
         private val SCHEDULED_ICON: Icon = IconUtil.colorize(ICON, JBColor(0x59A869, 0x499C54))
+
+        // Coverage cell: the normal coverage icon once the report is on disk, greyed while it is still pending.
+        // The Coverage tool window's own icon — the button opens exactly that. (The platform spells it
+        // `ToolWindowCoverage`; there is no `Toolwindows.Coverage`.)
+        private val COVERAGE_ICON: Icon = AllIcons.Toolwindows.ToolWindowCoverage
+        private val COVERAGE_PENDING_ICON: Icon = IconLoader.getDisabledIcon(COVERAGE_ICON)
 
         // Read at paint time, never cached: the scale changes with the monitor the IDE was dragged to.
         private val PADDING get() = JBUI.scale(5)
@@ -446,6 +628,24 @@ private class CopyReportPathAction(
 // Via toUri(), not browse(File): the latter percent-encodes Windows separators and no browser resolves the result.
 private fun browseReport(path: Path) = BrowserUtil.browse(path.toUri())
 
+/**
+ * The coverage data file this run wrote — the report file itself for clover/cobertura, or `<dir>/index.xml` for
+ * coverage-xml (a directory the platform's file provider cannot consume) — or `null` while there is none yet.
+ */
+internal fun resolveCoverageDataFile(
+    ref: TestoReportRef,
+    project: Project,
+    mapToLocal: (String) -> String?,
+    writtenAfter: Long,
+): Path? {
+    val coverageXml = ref.coverageFormat == CoverageFormat.COVERAGE_XML
+    return reportPathCandidates(ref, project.basePath) { runCatching { mapToLocal(it) }.getOrNull() }
+        .asSequence()
+        .mapNotNull { runCatching { Path.of(it) }.getOrNull() }
+        .map { if (coverageXml && !it.fileName?.toString().equals("index.xml", ignoreCase = true)) it.resolve("index.xml") else it }
+        .firstOrNull { isReportOf(it, writtenAfter) }
+}
+
 /** The announced report as a local file this run wrote, or `null` while there is none. Touches the filesystem. */
 internal fun resolveReport(
     ref: TestoReportRef,
@@ -463,3 +663,29 @@ internal fun resolveReport(
 internal fun isReportOf(path: Path, writtenAfter: Long): Boolean = runCatching {
     Files.isRegularFile(path) && Files.getLastModifiedTime(path).toMillis() >= writtenAfter
 }.getOrDefault(false)
+
+/**
+ * Resolves a report path off the EDT (the PHP path mapper hits the file index, forbidden on the EDT) and applies it
+ * back on the EDT — but only if no rerun started meanwhile, which would auto-open the previous run's report over the
+ * new run and mark the new one already opened. [busy] drops overlapping ticks (this runs off a twice-a-second timer).
+ */
+private fun <T> resolveReportOffEdt(
+    project: Project,
+    reports: TestoReportStore,
+    busy: AtomicBoolean,
+    resolve: (startedAt: Long) -> T,
+    apply: (T) -> Unit,
+) {
+    if (!busy.compareAndSet(false, true)) return
+    val startedAt = reports.runStartedAt
+    ApplicationManager.getApplication().executeOnPooledThread {
+        val found = resolve(startedAt)
+        ApplicationManager.getApplication().invokeLater(
+            {
+                busy.set(false)
+                if (reports.runStartedAt == startedAt && reports.runFinished) apply(found)
+            },
+            ModalityState.any(),
+        ) { project.isDisposed }
+    }
+}

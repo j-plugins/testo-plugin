@@ -12,6 +12,7 @@ import com.intellij.execution.testframework.sm.SMTestRunnerConnectionUtil
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.project.Project
 import com.intellij.util.SmartList
 import com.intellij.xdebugger.XDebugProcess
 import com.intellij.xdebugger.XDebugProcessStarter
@@ -79,15 +80,17 @@ class TestoDebugRunner : PhpTestDebugRunner<TestoRunConfiguration>(TestoRunConfi
             // The run path wires the channel tabs via TestoConsoleAugmenter (an ExecutionListener), but its
             // descriptor lookup misses the debug session, so install them directly here while we hold the console.
             TestoConsoleAugmenter.installChannels(project, console, properties, processHandler)
+            // Same reason for the run archive: the augmenter's processTerminated never finds this session.
+            processHandler.addProcessListener(object : com.intellij.execution.process.ProcessAdapter() {
+                override fun processTerminated(event: com.intellij.execution.process.ProcessEvent) {
+                    com.github.xepozz.testo.runs.TestoRunArchiver.finalizeRun(project, properties)
+                }
+            })
 
-            val debugSession = XDebuggerManager.getInstance(project).startSession(env, object : XDebugProcessStarter() {
+            val starter = object : XDebugProcessStarter() {
                 override fun start(session: XDebugSession): XDebugProcess {
                     onSessionStart(session, debugServer, sessionId, connectionsManager, project, interpreter, processHandler)
                     val driver = debugExtension.debugDriver
-
-                    // The rerun-failed action rides the SM test console's own toolbar (added by the framework from our
-                    // TestoConsoleProperties), so the debug session needs no extra restart-action wiring here. Pushing
-                    // them onto the session toolbar would require the internal XDebugSessionImpl.addRestartActions.
                     return PhpDebugProcessFactory.forPhpTests(
                         session,
                         sessionId,
@@ -97,12 +100,38 @@ class TestoDebugRunner : PhpTestDebugRunner<TestoRunConfiguration>(TestoRunConfi
                         pathProcessor,
                     )
                 }
-            })
+            }
+            val descriptor = startDebugDescriptor(project, env, starter)
             processHandler.startNotify()
-            return debugSession.runContentDescriptor
+            return descriptor
         } catch (e: ExecutionException) {
             debugServer.unregisterSessionHandler(sessionId)
             throw e
         }
+    }
+
+    // 2026.2+: the session builder's result carries the descriptor without XDebugSession.getRunContentDescriptor(),
+    // which is deprecated there and logs a "split debugger" error. newSessionBuilder is absent on 2025.2, so it is
+    // reached by reflection (methods resolved off the public interfaces, never the internal impl); the 2025.2 fallback
+    // is the classic API, whose descriptor accessor is safe on a platform with no split debugger.
+    private fun startDebugDescriptor(
+        project: Project,
+        env: ExecutionEnvironment,
+        starter: XDebugProcessStarter,
+    ): RunContentDescriptor? {
+        val manager = XDebuggerManager.getInstance(project)
+        val newSessionBuilder = runCatching {
+            XDebuggerManager::class.java.getMethod("newSessionBuilder", XDebugProcessStarter::class.java)
+        }.getOrNull()
+        if (newSessionBuilder != null) {
+            val builderClass = Class.forName("com.intellij.xdebugger.XDebugSessionBuilder")
+            val resultClass = Class.forName("com.intellij.xdebugger.XSessionStartedResult")
+            val builder = newSessionBuilder.invoke(manager, starter)
+            val withEnv = builderClass.getMethod("environment", ExecutionEnvironment::class.java).invoke(builder, env)
+            val result = builderClass.getMethod("startSession").invoke(withEnv)
+            return resultClass.getMethod("getRunContentDescriptor").invoke(result) as RunContentDescriptor?
+        }
+        @Suppress("DEPRECATION")
+        return manager.startSession(env, starter).runContentDescriptor
     }
 }

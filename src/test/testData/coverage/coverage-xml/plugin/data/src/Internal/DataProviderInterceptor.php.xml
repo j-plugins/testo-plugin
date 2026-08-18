@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns="https://schema.phpunit.de/coverage/1.0">
+  <file name="DataProviderInterceptor.php" path="plugin/data/src/Internal">
+    <totals>
+      <lines total="124" executed="58" percent="46.77"/>
+    </totals>
+    <coverage>
+      <line nr="40">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="48">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="50">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="56">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="58">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="59">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="62">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="63">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="66">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="68">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="69">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="73">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="75">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="78">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="79">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="80">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="81">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="85">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="90">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="98">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="99">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="104">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="107">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="109">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="110">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="116">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="117">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="129">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="130">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="131">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="133">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="135">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="139">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="140">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="141">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="147">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="150">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="172">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="173">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="178">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="181">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="192">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="194">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="200">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="201">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="205">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="214">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="217">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="218">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="220">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="222">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="223">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="224">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="225">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="230">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="236">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="237">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+      <line nr="241">
+        <covered by="Tests\Data\Unit\Internal\DataProviderInterceptorTest::collectsResultsFromAllProviders"/>
+      </line>
+    </coverage>
+  </file>
+</phpunit>

@@ -38,6 +38,21 @@ class TestoReportStoreTest {
         assertEquals("Testo HTML report", ref.name)
         assertEquals("1", ref.schemaVersion)
         assertTrue(ref.isViewable)
+        assertFalse(ref.isCoverage)
+    }
+
+    @Test
+    fun coverageFormatsAreRecognizedAndNotViewable() {
+        fun ref(format: String) = TestoReportRef.fromAttributes(mapOf("format" to format, "path" to "/tmp/r"))!!
+
+        for (format in listOf("clover", "cobertura", "coverage-xml")) {
+            val ref = ref(format)
+            assertTrue(format, ref.isCoverage)
+            assertFalse(format, ref.isViewable)
+            assertEquals(format, com.github.xepozz.testo.coverage.format.CoverageFormat.fromId(format), ref.coverageFormat)
+        }
+        assertFalse(ref("html").isCoverage)
+        assertNull(ref("html").coverageFormat)
     }
 
     @Test
@@ -241,6 +256,24 @@ class TestoReportStoreTest {
 
         assertNull(store.primary())
         assertTrue(store.all().isEmpty())
+    }
+
+    @Test
+    fun coverageChecksDefaultOnSurviveRerunsAndFallWithClear() {
+        val store = TestoReportStore()
+        assertTrue(store.isCoverageChecked("/tmp/clover.xml"))
+
+        store.setCoverageChecked("/tmp/clover.xml", false)
+        store.noteRunStarted(1_000)   // a rerun keeps the choice — it is about the report, not the run
+        assertFalse(store.isCoverageChecked("/tmp/clover.xml"))
+        assertTrue(store.isCoverageChecked("/tmp/cobertura.xml"))
+
+        store.setCoverageChecked("/tmp/clover.xml", true)
+        assertTrue(store.isCoverageChecked("/tmp/clover.xml"))
+
+        store.setCoverageChecked("/tmp/clover.xml", false)
+        store.clear()
+        assertTrue(store.isCoverageChecked("/tmp/clover.xml"))
     }
 
     @Test

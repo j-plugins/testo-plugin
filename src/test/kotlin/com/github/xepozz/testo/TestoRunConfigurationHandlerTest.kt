@@ -100,7 +100,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_defaultTestoType_noTypeFlag() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.suite = "unit"
+        settings.runnerSettings.suites = mutableListOf("unit")
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
@@ -113,7 +113,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_withSuite() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.suite = "unit"
+        settings.runnerSettings.suites = mutableListOf("unit")
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
@@ -178,7 +178,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        assertEquals(listOf<String?>("--exclude-group", "slow", "--exclude-group", "flaky"), arguments)
+        assertEquals(listOf<String?>("--group", "!slow", "--group", "!flaky"), arguments)
     }
 
     fun testPrepareArguments_withExcludeGroup() {
@@ -188,71 +188,61 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        assertEquals(2, arguments.size)
-        assertEquals("--exclude-group", arguments[0])
-        assertEquals("slow", arguments[1])
+        // Testo has no --exclude-group: exclusion is --group with a `!` prefix.
+        assertEquals(listOf<String?>("--group", "!slow"), arguments)
     }
 
-    fun testPrepareArguments_withRepeat() {
+    fun testPrepareArguments_excludedGroupIsNotPrefixedTwice() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.repeat = 3
+        settings.runnerSettings.excludeGroups = mutableListOf("!slow")
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        assertEquals(2, arguments.size)
-        assertEquals("--repeat", arguments[0])
-        assertEquals("3", arguments[1])
+        assertEquals(listOf<String?>("--group", "!slow"), arguments)
     }
 
-    fun testPrepareArguments_withParallel() {
+    fun testPrepareArguments_parallelNeverEmitted() {
         val settings = TestoRunConfigurationSettings()
         settings.runnerSettings.parallel = 8
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        assertEquals(2, arguments.size)
-        assertEquals("--parallel", arguments[0])
-        assertEquals("8", arguments[1])
+        assertTrue("Testo's CLI has no --parallel; a legacy value must not break the run", arguments.isEmpty())
     }
 
-    fun testPrepareArguments_zeroRepeatAndParallel_skipped() {
+    /** The coverage-only options belong to the Coverage runner alone and must never reach an ordinary run. */
+    fun testPrepareArguments_coverageOptionsStayOutOfAnOrdinaryRun() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.repeat = 0
-        settings.runnerSettings.parallel = 0
+        settings.runnerSettings.coverageOptions = "--type=!bench"
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        assertTrue("Zero repeat/parallel should not add arguments", arguments.isEmpty())
+        assertTrue(arguments.isEmpty())
     }
 
     fun testPrepareArguments_allOptions() {
         val settings = TestoRunConfigurationSettings()
         settings.runnerSettings.testoType = "bench"
-        settings.runnerSettings.suite = "integration"
+        settings.runnerSettings.suites = mutableListOf("integration")
         settings.runnerSettings.groups = mutableListOf("db")
         settings.runnerSettings.excludeGroups = mutableListOf("slow")
-        settings.runnerSettings.repeat = 2
         settings.runnerSettings.parallel = 4
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        assertEquals(12, arguments.size)
+        assertEquals(8, arguments.size)
         assertTrue(arguments.contains("--type"))
         assertTrue(arguments.contains("bench"))
         assertTrue(arguments.contains("--suite"))
         assertTrue(arguments.contains("integration"))
         assertTrue(arguments.contains("--group"))
         assertTrue(arguments.contains("db"))
-        assertTrue(arguments.contains("--exclude-group"))
-        assertTrue(arguments.contains("slow"))
-        assertTrue(arguments.contains("--repeat"))
-        assertTrue(arguments.contains("2"))
-        assertTrue(arguments.contains("--parallel"))
-        assertTrue(arguments.contains("4"))
+        assertTrue(arguments.contains("!slow"))
+        assertFalse(arguments.contains("--parallel"))
     }
 
     fun testPrepareArguments_withSingleRerunFilter() {
@@ -311,21 +301,18 @@ class TestoRunConfigurationHandlerTest : TestCase() {
     fun testPrepareArguments_orderIsCorrect() {
         val settings = TestoRunConfigurationSettings()
         settings.runnerSettings.testoType = "bench"
-        settings.runnerSettings.suite = "unit"
+        settings.runnerSettings.suites = mutableListOf("unit")
         settings.runnerSettings.groups = mutableListOf("fast")
-        settings.runnerSettings.parallel = 2
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        // type comes first, then suite, then group, then parallel
+        // type comes first, then suite, then group
         assertEquals("--type", arguments[0])
         assertEquals("bench", arguments[1])
         assertEquals("--suite", arguments[2])
         assertEquals("unit", arguments[3])
         assertEquals("--group", arguments[4])
         assertEquals("fast", arguments[5])
-        assertEquals("--parallel", arguments[6])
-        assertEquals("2", arguments[7])
     }
 }

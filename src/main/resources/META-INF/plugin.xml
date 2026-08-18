@@ -40,6 +40,13 @@
 
         <codeInsight.daemonBoundCodeVisionProvider
                 implementationClass="com.github.xepozz.testo.ui.TestoHistoryCodeVisionProvider"/>
+        <codeInsight.daemonBoundCodeVisionProvider
+                implementationClass="com.github.xepozz.testo.ui.TestoCoverageByTestCodeVisionProvider"/>
+        <!-- Names/descriptions for the two lenses in Settings | Editor | Inlay Hints | Code Vision. -->
+        <config.codeVisionGroupSettingProvider
+                implementation="com.github.xepozz.testo.ui.TestoHistoryCodeVisionGroupSettingProvider"/>
+        <config.codeVisionGroupSettingProvider
+                implementation="com.github.xepozz.testo.ui.TestoCoverageByTestCodeVisionGroupSettingProvider"/>
 
         <!--        <notificationGroup-->
         <!--                id="Testo"-->
@@ -78,6 +85,8 @@
                 implementation="com.github.xepozz.testo.tests.console.TestoRepeatedFrameFolding"/>
         <fileBasedIndex
                 implementation="com.github.xepozz.testo.index.TestoDataProvidersIndex"/>
+        <fileBasedIndex
+                implementation="com.github.xepozz.testo.index.TestoGroupsIndex"/>
 
         <spellchecker.bundledDictionaryProvider
                 implementation="com.github.xepozz.testo.SpellcheckingDictionaryProvider"/>
@@ -150,6 +159,9 @@
                     class="com.github.xepozz.testo.tests.actions.TestoRerunStyleMirrorAction"/>
             <action id="Testo.RerunStyle.Split"
                     class="com.github.xepozz.testo.tests.actions.TestoRerunStyleSplitAction"/>
+            <separator/>
+            <action id="Testo.RunHistory"
+                    class="com.github.xepozz.testo.runs.TestoRunHistoryAction"/>
         </group>
         <action id="Testo.AddSkippedPath"
                 class="com.github.xepozz.testo.tests.actions.TestoAddSkippedPathAction"

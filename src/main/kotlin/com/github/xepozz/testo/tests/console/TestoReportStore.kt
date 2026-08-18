@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.tests.console
 
+import com.github.xepozz.testo.coverage.format.CoverageFormat
 import java.nio.file.Path
 
 /**
@@ -19,6 +20,11 @@ data class TestoReportRef(
 ) {
     /** Whether the button can show this report as a page; the rest (data documents, coverage) is kept, not offered. */
     val isViewable: Boolean get() = VIEWABLE_FORMATS.any { format.equals(it, ignoreCase = true) }
+
+    /** A coverage report — clover / cobertura / coverage-xml — that the "Show coverage" button can apply without a rerun. */
+    val coverageFormat: CoverageFormat? get() = CoverageFormat.fromId(format)
+
+    val isCoverage: Boolean get() = coverageFormat != null
 
     companion object {
         const val FORMAT_HTML: String = "html"
@@ -68,6 +74,10 @@ class TestoReportStore {
     // Reports clicked back off for this run alone — one flag over every way; the standing choices stay checked.
     private val autoOpenMuted = HashSet<String>()
 
+    // Coverage reports unchecked in the grouped Coverage button's dropdown. Checked is the default, so only the
+    // exceptions are kept; they survive reruns of the same console — the choice is about the report, not the run.
+    private val coverageUnchecked = HashSet<String>()
+
     /**
      * Whether the process that writes these reports has exited. Nothing is looked for on disk before it has: a report
      * is announced when Testo *starts* writing it, over the same path every run, so an earlier check finds the
@@ -86,9 +96,14 @@ class TestoReportStore {
     var runStartedAt: Long = 0
         private set
 
+    /** A replay pins the clock to the original run, so its captured report copies pass the mtime-vs-start gate. */
+    @Volatile
+    var startedAtOverride: Long? = null
+
     fun noteRunStarted(now: Long = System.currentTimeMillis()) {
         runFinished = false
-        runStartedAt = now - now % 1000
+        val at = startedAtOverride ?: now
+        runStartedAt = at - at % 1000
         // Arms and mutes belong to the run they were clicked in.
         synchronized(autoOpenThisRun) {
             autoOpenThisRun.clear()
@@ -133,6 +148,12 @@ class TestoReportStore {
 
     fun isAutoOpenMuted(key: String): Boolean = synchronized(autoOpenThisRun) { key in autoOpenMuted }
 
+    fun isCoverageChecked(path: String): Boolean = synchronized(coverageUnchecked) { path !in coverageUnchecked }
+
+    fun setCoverageChecked(path: String, checked: Boolean) {
+        synchronized(coverageUnchecked) { if (checked) coverageUnchecked.remove(path) else coverageUnchecked.add(path) }
+    }
+
     fun clear() {
         runFinished = false
         runStartedAt = 0
@@ -141,11 +162,14 @@ class TestoReportStore {
             autoOpenThisRun.clear()
             autoOpenMuted.clear()
         }
+        synchronized(coverageUnchecked) { coverageUnchecked.clear() }
     }
 
     fun all(): List<TestoReportRef> = synchronized(reports) { reports.values.toList() }
 
     fun viewable(): List<TestoReportRef> = all().filter { it.isViewable }
+
+    fun coverage(): List<TestoReportRef> = all().filter { it.isCoverage }
 
     fun primary(): TestoReportRef? = viewable().lastOrNull()
 }

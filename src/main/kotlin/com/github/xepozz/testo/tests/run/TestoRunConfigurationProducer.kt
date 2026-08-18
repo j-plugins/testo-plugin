@@ -102,7 +102,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
         val target = treeTarget(context) ?: return super.isConfigurationFromContext(configuration, context)
         val settings = configuration.testoSettings.getTestoRunnerSettings()
 
-        if (settings.suite != target.suite.orEmpty()) return false
+        if (settings.suites != listOfNotNull(target.suite?.takeIf { it.isNotBlank() })) return false
         if (settings.testoType != target.type.orEmpty()) return false
 
         target.filter?.let {
@@ -137,7 +137,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
     }
 
     private fun applyTreeTarget(settings: TestoRunnerSettings, target: TestoRunTarget) {
-        target.suite?.takeIf { it.isNotBlank() }?.let { settings.suite = it }
+        target.suite?.takeIf { it.isNotBlank() }?.let { settings.suites = mutableListOf(it) }
         target.type?.takeIf { it.isNotBlank() }?.let { settings.testoType = it }
 
         // The whole selector, class and all: a bare method name would also match a namesake in the same file, and a
@@ -167,7 +167,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             testRunnerSettings.scope = PhpTestRunnerSettings.Scope.ConfigurationFile
             testRunnerSettings.isUseAlternativeConfigurationFile = true
             testRunnerSettings.configurationFilePath = virtualFile.path
-            testRunnerSettings.suite = suiteName
+            testRunnerSettings.suites = mutableListOf(suiteName)
             return element
         }
         if (element is PhpAttribute && element.fqn == TestoClasses.FILTER_GROUP) {
@@ -287,7 +287,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             val suiteName = extractSuiteName(newExpression) ?: return false
             return testoSettings.scope == PhpTestRunnerSettings.Scope.ConfigurationFile
                 && testoSettings.configurationFilePath == element.containingFile.virtualFile.path
-                && testoSettings.suite == suiteName
+                && testoSettings.suites == listOf(suiteName)
         }
         if (element is PhpAttribute && element.fqn == TestoClasses.FILTER_GROUP) {
             val testoSettings = testRunnerSettings as? TestoRunnerSettings ?: return false

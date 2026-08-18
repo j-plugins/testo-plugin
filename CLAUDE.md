@@ -40,20 +40,22 @@ Dependabot bumps these regularly — read the files rather than trusting this ta
 
 ### Two build variants (`phpApi`)
 
-PHP moved its coverage classes from `com.jetbrains.php.phpunit.coverage` to `com.intellij.php.coverage` in 2026.2, and
-no single artifact can reference both (`<idea-version>` inside an optional descriptor is ignored, and there is no module
-that exists only on ≤261 to gate on). So every platform-dependent property in `gradle.properties` is declared twice with
-an API suffix and selected by `phpApi`:
+The plugin ships as two artifacts because the platform since/until ranges and a few bundled modules differ across
+2025.2 and 2026.2 (jcef / smRunner / testRunner split out of the monolith on 262). So every platform-dependent property
+in `gradle.properties` is declared twice with an API suffix and selected by `phpApi`:
 
 ```bash
 ./gradlew buildPlugin                # 262: platform 2026.2, since 262, no untilBuild
 ./gradlew buildPlugin -PphpApi=252   # 252: platform 2025.2, since 252, until 261.*
 ```
 
-The only source difference is `src/php252/kotlin` vs `src/php262/kotlin`, each holding one file of `typealias`es
-(`PhpCoverageRunner`, `PhpCoverageSuite`, `PhpUnitCoverageEngine`, `PhpUnitCoverageRunner`) pointing at whichever package
-is current. `src/main/kotlin/.../coverage/` imports none of them — the aliases live in its own package. The enum
-`PhpUnitCoverageEngine.CoverageEngine` did **not** move and is still imported directly from `com.jetbrains.php`.
+**The two artifacts no longer differ in source** — coverage runs on 100 % public platform API (`coverage/`, see
+"Generated reports" / the `coverage/` tree), so the old `src/php252/kotlin` vs `src/php262/kotlin` typealias split is
+gone. `phpApi` is now purely a build selector (platform version, since/until, per-platform modules). The enum
+`PhpUnitCoverageEngine.CoverageEngine` (the Xdebug/PCOV driver) is the one PHP coverage symbol still used and did **not**
+move — it is imported directly from `com.jetbrains.php`.
+
+Source that is single but not version-agnostic is reached by reflection, never a direct symbol: `XDebuggerManager.newSessionBuilder` (`TestoDebugRunner`) exists only on 262, so a direct call compiles green locally on 262 and breaks the 252 build in CI. Guard any such 262-only platform symbol behind a reflective lookup with a 252 fallback, or compile both variants before calling it done.
 
 Each variant is published as `<pluginVersion>.<phpApi>` (e.g. `2026.3.1.252` / `2026.3.1.262`). The Marketplace keys
 uploads by version and rejects a second upload carrying a version it already has, so the two builds *must not* share
@@ -105,10 +107,19 @@ src/main/kotlin/com/github/xepozz/testo/
 │
 ├── coverage/                       # optional, enabled via META-INF/coverage.xml
 │   ├── TestoCoverageEngine.kt      # PhpUnitCoverageEngine subclass + suite/enabled-configuration
-│   └── TestoCoverageProgramRunner.kt  # --coverage-clover=<IDE-managed path>, Xdebug/PCOV toggling
+│   ├── TestoCoverageProgramRunner.kt  # --coverage-* flags on the IDE-managed paths, Xdebug/PCOV toggling
+│   ├── TestoCoverageRunner.kt      # loads a report into ProjectData + the per-test index
+│   ├── TestoCoverageAnnotator.kt   # per-file/dir percentages behind the Coverage view's columns
+│   ├── TestoCoverageViewExtension.kt  # the view's columns (Branches, Tests) and its extra toolbar
+│   ├── TestoCoverageViewActions.kt    # those toolbar actions: highlight, gutters, run covering, badges
+│   ├── TestoCoverageSelectOpenedFile.kt  # our own "select the opened file" (the platform's cannot work here)
+│   ├── editor/                     # the editor side: stripes, the line popup, the covering-tests gutter
+│   ├── format/                     # clover / cobertura / coverage-xml parsers → one model
+│   └── perTest/                    # which test touched which line: index, keys, identity, launcher
 │
 ├── index/
 │   ├── TestoDataProvidersIndex.kt  # FileBasedIndex: provider name → {class, method, providerFqn}
+│   ├── TestoGroupsIndex.kt         # FileBasedIndex: every name a #[Filter\Group] in the project spells
 │   └── TestoDataProviderUtils.kt   # isDataProvider / findDataProviderUsages / usage index
 │
 ├── references/
@@ -137,13 +148,12 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoProtocolGate.kt    # nodeId-less messages ⇒ pre-0.10.39 Testo; banner → version
 │   │   ├── ChannelOutputStore.kt   # per-test live buffers: all / output / per-channel
 │   │   ├── ChannelIcons.kt         # channel name or icon= hint → platform icon
-│   │   ├── LogLevelFilter.kt       # persisted display-time log-level filter
-│   │   ├── TestoLogLevelFilterAction.kt     # toolbar dropdown for the filter
+│   │   ├── LogLevelFilter.kt       # persisted minimum-log-level filter (a message shows at or above it)
+│   │   ├── TestoLogLevelFilterAction.kt     # the `info +` combo box on the channel tabs row picking that minimum
 │   │   ├── TestoChannelsUi.kt      # the tabbed channel view (~1150 lines) + testoDisplayName()
 │   │   ├── TestoConsoleAugmenter.kt         # ExecutionListener that installs the channel tabs
-│   │   ├── TestoChannelHistory.kt  # channel output ⇄ SMTestProxy.metainfo (survives history export)
-│   │   ├── TestoHistoryImport.kt   # "Show history": import a saved run onto our own console properties
-│   │   ├── TestoHistoryIndex.kt    # which locationUrls exist in saved history XMLs (+ lens refresh)
+│   │   ├── TestoReplaySelection.kt # selects a test's node once the replayed tree stops growing
+│   │   ├── TestoHistoryIndex.kt    # which test locations the run archive holds (+ lens refresh)
 │   │   ├── TestoTestStatus.kt      # the 8 cases of Testo\Core\Value\Status: wire name, icon, label
 │   │   ├── TestoStatusStore.kt     # per-test status/assertions + the tally the toolbar summary renders
 │   │   ├── TestoRunTimings.kt      # start/first test/last test/finish marks + summed test durations
@@ -154,6 +164,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoReportStore.kt     # reports announced by `##teamcity[testoReport …]` + where to look for them
 │   │   ├── TestoReportAutoOpen.kt  # when a report opens on its own: this-run arm / project / application scopes
 │   │   ├── TestoReportAction.kt    # right-aligned panel of hand-drawn report buttons (WebView / browser / copy)
+│   │   ├── TestoTreeToolbarActions.kt       # expand/collapse for the test tree and the Coverage view alike
 │   │   ├── TestoTestTreeDecorator.kt        # wraps the tree's cell renderer: status icons + description tooltips
 │   │   ├── TestoRepeatedFrameFolding.kt     # folds repeated `#N frame` lines
 │   │   └── PhpBacktraceFileFilter.kt        # file(line) / file:line / "on line N" → hyperlinks
@@ -172,6 +183,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │   ├── TestoRunConfigurationHandler.kt  # maps scope/settings → CLI flags
 │   │   ├── TestoRunConfigurationSettings.kt # persistence; default options "-q -n --teamcity"
 │   │   ├── TestoRunnerSettings.kt           # Testo-specific persisted fields + transient rerunFilters
+│   │   ├── TestoTagsField.kt                # the Group / Exclude group fields: removable tags + an add popup
 │   │   ├── TestoRunConfigurationProducer.kt # context → configuration (~615 lines, the trickiest file)
 │   │   ├── TestoTestRunConfigurationEditor.kt  # "Testo Options" panel wrapping the PHP editor
 │   │   ├── TestoTestRunnerSettingsValidator.kt # + the finder that switches the "Cannot find …" gate off
@@ -180,9 +192,21 @@ src/main/kotlin/com/github/xepozz/testo/
 │   └── runAnything/
 │       └── TestoRunAnythingProvider.kt      # "testo <command>" in Run Anything
 │
+├── runs/                           # the run archive: every run replayable, reports kept beside it
+│   ├── TestoRunStore.kt            # project service: archive root, listing, reading, retention
+│   ├── TestoRunRecording.kt        # one live run being written (output.log framing, tests.txt, run.json)
+│   ├── TestoRunManifest.kt         # run.json: executor, timings, per-status tally, captured reports
+│   ├── TestoRunArchiver.kt         # finalizes a run: captures reports, writes the manifest, prunes
+│   ├── TestoRunReplayProfile.kt    # replays an archive through the live console properties
+│   ├── TestoRunArchive.kt          # a run as one zip: export, import (zip-slip guarded), export file name
+│   ├── TestoReplayGroup.kt         # toolbar "Replay": keep-discard-lock + export/import/reveal, for this tab's run
+│   ├── TestoRunHistoryGroup.kt     # the "Test History" toolbar button, replacing the platform's
+│   └── TestoRunHistoryActions.kt   # run kind icons + summaries, the retention submenu, the lens's lookups
+│
 └── ui/
     ├── TestoIconProvider.kt                 # Testo-marked icons for PHP test files
     ├── TestoHistoryCodeVisionProvider.kt    # "Show history" lens above each test
+    ├── TestoCodeVisionGroupSettings.kt      # the two lenses' name/description in Inlay Hints settings (else blank)
     ├── TestoReportEditor.kt                 # JCEF editor tab for a generated report (light file + provider)
     └── TestoStackTraceConsoleFolding.kt     # folds `[internal function]` frame runs
 
@@ -216,8 +240,8 @@ src/test/testData/mixin, rename # PHP fixtures for PSI-backed tests
 `com.jetbrains.php` namespace: `testFrameworkType` (`TestoFrameworkType`), `composerConfigClient`
 (`TestoComposerConfig`).
 
-`META-INF/coverage.xml` (optional, `com.intellij.modules.coverage`) adds `coverageEngine` + the coverage
-`programRunner`.
+`META-INF/coverage.xml` (optional, `com.intellij.modules.coverage`) adds `coverageEngine`, `coverageRunner`, the
+coverage `programRunner`, the annotator service and the *Run covering tests* `codeInsight.lineMarkerProvider`.
 
 `projectListeners`: `TestoConsoleAugmenter` on `ExecutionListener` — the only hook where the PHP-built test console
 can be reached to install the channel tabs.
@@ -238,19 +262,26 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
 <executablePath> <command> [testRunnerOptions] [runner flags] [--config <file>] [scope flags]
 ```
 
-- `command` — the subcommand, default `run` (editable in the editor's combo box).
+- `command` — the subcommand, always `run` for a test run (other subcommands live in Run Anything).
 - `testRunnerOptions` default to **`-q -n --teamcity`** (`TestoRunConfigurationSettings.createDefault`).
   The `--teamcity` flag is what makes Testo emit the SM service messages this plugin parses.
-- Runner flags from `TestoRunnerSettings` (only emitted when non-empty / > 0): `--type`, `--suite`, `--group`,
-  `--exclude-group`, `--repeat`, `--parallel`, plus one `--filter <selector>` per entry in `rerunFilters`.
-  `group`/`excludeGroup` are single persisted strings holding comma-separated names; the handler splits them into one
-  flag per name (Testo ORs repeated `--group`s, and a `!name` prefix excludes). `groups`/`excludeGroups` are
-  persisted **lists** (`@XCollection`), so a name is opaque — whatever `#[Group]` spells reaches the CLI untouched.
+- Runner flags from `TestoRunnerSettings` (only emitted when non-empty): `--type`, `--suite`, `--group`,
+  plus one `--filter <selector>` per entry in `rerunFilters` (no `--parallel` — Testo's CLI does not take it yet).
+  `suites`, `groups`/`excludeGroups` are persisted
+  **lists** (`@XCollection`), one `--group` flag each — Testo ORs repeated `--group`s and reads a `!name` prefix as an
+  exclusion, which is the only exclusion form its CLI has. A name is opaque: whatever `#[Group]` spells reaches the
+  CLI untouched.
+- `--log-html`/`--log-junit` at an IDE-managed path (`TestoReportFlags`, `logHtml` on / `logJunit` off by default),
+  emitted from `createCommand` so every executor gets them — local interpreters only, and the archive copies the
+  reports into history the same way it does coverage. Not in `prepareArguments`: that has no project/interpreter.
 - `--config <file>` when an alternative configuration file is set (`getConfigFileOption()`).
 - Scope flags: `Type` → `--suite <type>`; `Directory`/`File` → `--path <relative path>`;
   `Method` → `--path <file> --filter <method> [--data-provider <name>]`; `ConfigurationFile` → nothing
   (the config file argument alone drives the run).
-- Coverage adds `--coverage-clover=<IDE-managed path>` (or bare `--coverage` if no path), plus Xdebug or PCOV
+- Coverage adds one `--coverage-<format>=<IDE-managed path>` per checked report (or bare `--coverage` if no path),
+  `--coverage-level=<line|branch|path>` (`resolveCoverageLevel`: an explicit level, else *auto* → `branch` when the
+  engine is Xdebug and a Cobertura report is on — branches need Xdebug and Cobertura carries them — else nothing),
+  the configuration's own coverage-only options (`coverageOptions`, `--type=!bench` by default), plus Xdebug or PCOV
   INI options depending on `coverageEngine`.
 - Working directory is always `project.basePath`.
 
@@ -368,10 +399,12 @@ it keeps everything the class holds (a `#[Test]` class typed as `test` would dro
    `TestoRunTimings` splits the run into startup / tests / post-processing for the hover and sums the `duration`
    attributes beside them, which concurrency pushes past the window the tests ran in.
 
-4. **Run history** — three cooperating pieces: `TestoChannelHistory` round-trips channel output through
-   `SMTestProxy.metainfo` (the only per-test datum the platform's history XML preserves), `TestoHistoryIndex` knows
-   which tests appear in saved history files, and `TestoHistoryCodeVisionProvider` shows a clickable
-   *Show history* lens that imports the newest run containing that specific test and selects its node.
+4. **Run history** (`runs/`) — every run is archived under the IDE system dir as its raw teamcity output
+   (`output.log`), a manifest (`run.json`: executor, per-status tally, captured reports) and the report files
+   themselves; `tests.txt` lists the test locations it holds. `TestoRunReplayProfile` feeds that stream back through
+   the live console, so a replayed run has the whole Testo UI. `TestoHistoryIndex` answers which tests the archive
+   holds, and `TestoHistoryCodeVisionProvider` shows a *Show history* lens that replays the newest run containing
+   that specific test and selects its node. Retention is the plugin's own (`Tools | Testo`).
 
 5. **Rerun toolbar** — two user-selectable styles (`Tools | Testo`): `MIRROR_AWARE` (three executor-pinned buttons
    that hide whichever duplicates the platform Rerun) and `SPLIT_BUTTON` (default; one split button, platform Rerun
@@ -416,11 +449,15 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **`TestoNodeIndex` makes an id-keyed store readable from the tree.** `SMTestProxy` does not carry the id, but
   `SMTRunnerEventsListener.onTestStarted(proxy, nodeId, parentNodeId)` hands both out together. Hooked from
   `TestoOutputToGeneralEventsConverter.setProcessor`, before any output is read. Writes never consult it.
-- **Channel storage keys still go through `ChannelOutputStore.keyFor(name)`** and so inherit the name collision.
-  They cannot move to node ids: an imported history run has none, and `TestoChannelHistory` rebuilds its tabs from
-  the saved XML.
+- **Channel storage keys still go through `ChannelOutputStore.keyFor(name)`** and so inherit the name collision:
+  the channel UI is looked up by test name, which is all a tab has when the selection changes.
 - **`TestoChannelsUi` reaches `TestResultsPanel.myConsole` by reflection** — there is no public accessor. It
   degrades gracefully (logs a warning, no channel tabs) if the field disappears.
+- **The log-level filter rides on each tab's `TabInfo.setTabPaneActions`** (right edge of the tab row), not on
+  `JBTabs.getEntryPointActionGroup()`: that getter is `@ApiStatus.Internal` and fails the verifier's default
+  `failureLevel` (overriding it cost a red `verifyPlugin` that `buildPlugin` and `test` never catch). `setTabPaneActions`
+  is public, and the platform feeds the selected tab's group into the same entry-point toolbar on every tab change, so
+  setting it on every `TabInfo` is equivalent — put it on all tabs, since the toolbar follows the active one.
 - **The tree has one filter slot, shared with *Show passed* / *Show ignored*.** `TestoProgressAction.applyFilter` is
   its single writer: a selected counter replaces the toggles rather than narrowing them (intersecting would answer
   "show me the passed ones" with an empty tree), and releasing it recomposes them via `hiddenByToggles` — off Testo's
@@ -432,33 +469,82 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `setCellRenderer`). Safe: `attachToModel` is the only installer and runs at form construction, and nothing in the
   test-framework packages reads the renderer back. The proxy comes off `NodeDescriptor.getElement()` for the same
   reason — same object, public class.
+- **`TestoHistoryIndex` builds its location set synchronously in `contains`**, on the daemon's background thread, so
+  the *first* code-vision pass over a freshly opened file already answers. An earlier async build left the first pass
+  empty and leaned on a later repaint, but `refreshLens` does not reliably force a daemon-bound recompute in 2026.2 —
+  so the *Show history* lens never appeared until the file was edited. The read is bounded (a few small `tests.txt`)
+  and cached per archive generation.
+- **Location hints from PSI and from Testo differ in path separators.** `getLocationHint` runs the file through the
+  local `PhpCommandLinePathProcessor`, which yields the OS-native path (`D:\…` on Windows); Testo emits the same
+  location with `/`. So any lookup of a PSI-built hint against an archived one (the history lens, *Show history*'s
+  replay) must go through `runLocationKey`, which folds separators to `/` — otherwise it never matches on Windows.
 - **`TestoHistoryIndex.refreshLens` uses the internal `ModificationStampUtil`** to force code-vision recomputation
-  after a run; a test run never touches PHP source, so neither `DaemonCodeAnalyzer.restart()` nor
-  `invalidateProvider` alone re-runs `getHint`. Wrapped in `runCatching`.
-- **Imported history needs our own console properties.** `ImportedTestConsoleProperties` does not delegate
-  `createImportActions`, so `TestoHistoryImport` reconstructs the import on `TestoImportedConsoleProperties`
-  to keep the log-level filter button. Import wiring polls for a stable node count instead of subscribing —
-  a small import can finish replaying before the augmenter hands us the console.
-- **The log-level filter is added via `createImportActions`, not `appendAdditionalActions`** — the latter is routed
-  into the gear submenu and would not survive the RunTab toolbar snapshot.
+  after a run — for editors already open when a run finishes; a test run never touches PHP source, so neither
+  `DaemonCodeAnalyzer.restart()` nor `invalidateProvider` alone re-runs `getHint`. Wrapped in `runCatching`.
+- **History is replayed, not imported.** The platform's import forces `ImportedTestConsoleProperties` and its own
+  converter, so none of our stores fill — an imported tab is a PHPUnit-looking tree. `TestoRunReplayProfile` feeds
+  the archived teamcity stream through the *live* properties instead. Three switches keep a replay from acting like
+  a run: `replayMode`, `getConfiguration()` answering the replay profile, `reportStore.startedAtOverride`.
+- **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to
+  `SMTRunnerEventsListener`: a short run finishes replaying before the augmenter hands us the console, so the
+  events are already fired and missed.
+- **Whatever our own `createImportActions` returns must survive the RunTab toolbar snapshot** — `appendAdditionalActions`
+  is routed into the gear submenu instead and would not.
+- **`createImportActions` deliberately does not call `super`.** Super's entries (`ImportTestsGroup`,
+  `ImportTestsFromFileAction`) open a saved XML through the platform import — a console with none of our UI; the
+  history and *Replay* groups are our counterparts. The array is the only writable seam onto the visible toolbar row
+  (actions land there without `PREFERRED_PLACE`) and is laid out right-to-left: listed first = furthest right, always
+  after the platform's own actions. The platform's export is gone the same way — `ToolbarPanel` builds
+  `ExportTestResultsAction` only for a real `RunConfiguration`, and `getConfiguration()` answers the replay profile.
+- **What the platform put on the test toolbar cannot be moved or removed.** `ToolbarPanel` builds those actions
+  inline (no ids, no extension point, no `CustomActionsSchema` entry) and copies its groups into the arrays `RunTab`
+  rebuilds the toolbar from — mutating the live groups afterwards changes nothing the user sees.
+- **Every executor but Run and Debug is hidden behind the "More Run/Debug" submenu** (`ExecutorRegistryImpl`; the
+  `executor.actions.submenu` registry key is global). The actions are shared instances, so copying *Run with
+  Coverage* into a popup only duplicates the submenu entry — tried in the test tree's popup and reverted.
+- **The Coverage view's *Always select opened element* cannot work for a file-based view**: it matches the PSI *leaf*
+  under the caret against nodes holding `PsiFile`/`PsiDirectory`, so nothing ever matches, and everything involved is
+  `@ApiStatus.Internal`. Hence `TestoCoverageSelectOpenedFile`: our own toggle, following the editor off the message
+  bus and selecting via `TreeUtil.promiseSelect` on the tree taken from the toolbar's target component.
+- **The Coverage view's tree has no extensible context menu** — `CoverageView.createPopupGroup` is private, built
+  inline, and holds `EditSource` alone. Anything acting on the selected row goes on the toolbar instead
+  (`createExtraToolbarActions`, `@Experimental`) and reads the selection as `CommonDataKeys.NAVIGATABLE`.
+- **A column's width comes from `getPercentage(column, rootNode)`** — a non-percentage column must still answer there
+  (the *Tests* column returns its count) or the view sizes it for "100% (1234/1234)". The user's own width then sticks
+  in `CoverageViewManager.StateBean.myColumnSize` whenever the column count matches.
+- **`CoverageViewExtension` is instantiated three times per view** (`CoverageView`, `CoverageTableModel`,
+  `CoverageViewTreeStructure`), so no instance sees another's fields — anything `getPercentage` needs must be derived
+  from the bundle, not remembered from `createColumnInfos`.
+- **The editor highlighter is installed from `applyTestoCoverage`, not from the annotator**: `onSuiteChosen` fires
+  only on reload/close, never on the session's first `chooseSuitesBundle` — which left the first coverage run of an
+  IDE session unpainted.
 - **`ConsoleFolding` instances are shared across consoles** and get no per-console reset; both foldings track
   state in a `ThreadLocal` and clear it on the first non-frame line.
 - **Debug installs channel tabs itself** (`TestoDebugRunner`): the augmenter's descriptor lookup misses debug
-  sessions. `TestoConsoleProperties.channelsInstalled` guards against a double install. The debug session also
-  gets the `Testo.RerunSplit` action handed to it explicitly, since it does not use `RunTab.TopToolbar`.
-- **Group names are a list in the model, a comma-separated string only in the editor.** `TestoRunnerSettings`
-  persists `groups`/`excludeGroups` via `@XCollection`; the comma lives in the editor's text field (`parseNames`/
-  `formatNames`) and in the pre-list persisted form. `migrateLegacyNames` folds an old `group="a,b"` attribute into
-  the list and clears it, and `TestoRunConfigurationSettings.getTestoRunnerSettings` calls it — that is the first
-  point after deserialization every reader goes through. `TestoRunnerSettingsSerializationTest` pins the XML shape.
+  sessions. `TestoConsoleProperties.channelsInstalled` guards against a double install.
+- **The debug toolbar's restart button is the overridden platform `Rerun`** (`TestoAwareRerunAction`), and it must
+  stay visible on debug tabs. The split button that normally replaces it in SPLIT_BUTTON mode lives on
+  `RunTab.TopToolbar`, which the debug tab does not use — so the action's hide branch is gated on *not* the Debug
+  executor. A descriptor's restart actions are constructor-only, so this cannot be fixed by handing the debug
+  `RunContentDescriptor` its own.
+- **Suite and group names are lists everywhere.** `TestoRunnerSettings` persists `suites`/`groups`/`excludeGroups`
+  via `@XCollection`, the editor shows them as tags (`TestoTagsField`), and a name is never split on anything — the
+  comma lives only in the legacy persisted form. `migrateLegacyNames` folds that form in, called from
+  `TestoRunConfigurationSettings.getTestoRunnerSettings` — the first point every reader passes after deserialization.
+  `TestoRunnerSettingsSerializationTest` pins the XML shape.
 - **`rerunFilters` is `@Transient`** — it lives only on the throwaway clone a "rerun failed" launch creates, and
   that clone's scope is reset to `ConfigurationFile` so no scope flag narrows the filters away.
 - **`TestoRunConfigurationType.ID` is a pinned literal**, not `::class.simpleName`: renaming the class must not
   invalidate users' saved run configurations.
-- **`TestoDataProvidersIndex.getVersion()`** must be bumped whenever indexing logic or the attribute FQN changes,
-  or stale on-disk indexes silently stay empty.
+- **`getVersion()` of both file-based indexes** (`TestoDataProvidersIndex`, `TestoGroupsIndex`) must be bumped whenever
+  indexing logic changes — for the groups index that includes `TestoRunConfigurationProducer.extractGroupNames`, which
+  it indexes through — or stale on-disk indexes silently stay empty.
 - **The run-configuration editor calls the parent editor's `resetEditorFrom`/`applyEditorTo` reflectively**
   (they are not public on `PhpTestRunConfigurationEditor`) and swallows `ReadOnlyModificationException`.
+- **Parallel is injected into the PHP editor's own form.** The *Test Runner options* row is a one-row
+  `GridLayoutManager`, so `injectParallelRow` finds it by its label (the bundle string carries a `&` mnemonic the
+  rendered label does not), rebuilds it with a second row and re-adds the children with their own constraints — that
+  keeps the label column shared. Falls back to a row of our own below the panel if the PhpStorm form changes.
 - **`TestoFrameworkType.getComposerPackageNames()` currently returns `arrayOf("php")`**, not `testo/testo` —
   deliberate (the commented-out line records the intent); changing it affects framework auto-detection.
 - **`TestoTestRunLineMarkerProviderInfo.shouldReplace = true`** so Testo's gutter icon wins over PhpStorm's

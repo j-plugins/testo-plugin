@@ -13,7 +13,8 @@ plugins {
 
 group = providers.gradleProperty("pluginGroup").get()
 
-// Which PHP coverage API to build against — see the `phpApi` comment in gradle.properties.
+// Which platform variant to build — see the `phpApi` comment in gradle.properties. Selects the platform version,
+// since/until range and per-platform modules; the two artifacts no longer differ in source (coverage is now on public API).
 val phpApi = providers.gradleProperty("phpApi").get()
 
 // The Marketplace keys uploads by version and rejects a second one carrying a version it already has, so the two
@@ -29,7 +30,6 @@ fun apiProperty(name: String) = providers.gradleProperty("$name.$phpApi")
 // Set the JVM language level used to build the project.
 kotlin {
     jvmToolchain(21)
-    sourceSets["main"].kotlin.srcDir("src/php$phpApi/kotlin")
 }
 
 // Configure project's dependencies

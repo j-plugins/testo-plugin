@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns="https://schema.phpunit.de/coverage/1.0">
+  <file name="DataCross.php" path="plugin/data/src">
+    <totals>
+      <lines total="2" executed="0" percent="0.00"/>
+    </totals>
+    <coverage/>
+  </file>
+</phpunit>

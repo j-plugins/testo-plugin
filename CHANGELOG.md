@@ -4,6 +4,74 @@
 
 ## [Unreleased]
 
+### Added
+
+- The run configuration writes an HTML report (`--log-html`, on by default) and a JUnit report (`--log-junit`, off)
+  into an IDE-managed folder on every run; both are kept in the run history, and HTML opens in a tab.
+- The run configuration chooses which coverage reports a Coverage run asks Testo for: Clover, Cobertura, coverage-xml.
+- A Coverage run applies every report it produced on its own, one per format.
+- The Coverage button on the test toolbar gathers every announced report under one click, with a checkbox per report.
+- The Coverage panel gained expand/collapse, an editor-highlighting switch, report-format badges, and a column
+  counting the tests that cover each file.
+- *Run Covering Tests* on the Coverage panel runs, with coverage, the tests covering the selected file or directory.
+- *Select Opened File* on the Coverage panel selects the file open in the editor.
+- A gutter icon on every covered method, function and class lists its covering tests, runnable together or one at a
+  time, with a switch on the Coverage panel.
+- The popup on a covered line highlights the row under the pointer and runs all of that line's covering tests.
+- The covering-tests lens on a covered declaration leads its list with *Run all covering tests*, then a jump to each.
+- Every run is archived — output, reports and parameters — and replays from *Test History* as a full Testo console.
+- *Show history* above a test pops up the archived runs containing it (the one already open in a tab in bold); each
+  entry offers *Load replay* (opens the archive and selects the test's node) and *Repeat run* (re-executes it), so a
+  bare click never launches anything.
+- How many runs the history keeps is set in *Tools | Testo* or from the history list itself, which also clears it.
+- *Expand All* / *Collapse All* now sit on the toolbar itself, next to *Show Passed* / *Show Ignored*.
+- A tab opened from the history reruns with the executor the archived run used.
+- A *Replay* button exports the run as one archive, imports one back, reveals its folder, and sets what the history
+  may do with it: keep, drop or lock.
+- Every report a run announces is archived with it — HTML with its assets — so a replay opens its own reports.
+- The history list bolds the run the tab shows, marks locked runs, and gives each entry the icon of its kind.
+- An imported run comes in locked, so retention never deletes it.
+- The run configuration keeps its coverage settings in a group of their own: the analysis level (`--coverage-level`,
+  or *auto*) and coverage-only options (`--type=!bench` by default).
+- Group and Exclude group are lists of tags, picked from the `#[Group]` names the project declares.
+- Suite is a list of tags too; a run may narrow to several suites at once, one `--suite` flag each.
+- The run configuration is laid out in groups: Parallel under Test Runner Options, then Run Options, Filter and
+  Coverage.
+
+### Removed
+
+- The Repeat field — Testo's command line has no `--repeat`.
+- The Command field — a test run is always `testo run`; other subcommands are what *Run Anything* is for.
+- Parallel no longer sends a flag Testo does not have: the field is parked at 1 until it does.
+
+### Changed
+
+- A Coverage run at level *auto* now collects branch coverage when the engine is Xdebug and a Cobertura report is on.
+- The *Log Levels* filter is now a minimum-level picker: an `info +` combo box at the right of the channel tabs row
+  shows that level and everything above it (default `info`), instead of per-level checkboxes.
+- The channel console keeps the open channel when you change the log level or switch tests, reselecting the same-named
+  tab after the rebuild; Output now leads the tabs, apart from the channel-aggregating *All*.
+
+### Fixed
+
+- The *Show history* lens shows again (it never did on Windows): the lens built its location from the OS-native path
+  (`D:\…`) while the archive stored Testo's `D:/…`, so nothing matched. Locations are now compared with unified path
+  separators, and the archive index is built when the lens is first asked rather than on a later repaint.
+- The two Code Vision lenses (test history, covering tests) now carry a name and description in *Settings | Editor |
+  Inlay Hints | Code Vision* instead of showing up blank.
+- The debug toolbar has its rerun/restart button back, during the session and after it ends; while the session runs
+  it wears the restart-debugger icon.
+- Starting a debug session no longer logs a *split debugger* error: the run descriptor now comes off the session
+  builder's result instead of the deprecated `XDebugSession.getRunContentDescriptor()`.
+- The Test Runner Options help button opens Testo's CLI reference.
+- The channel console no longer throws an EDT-threading error while streaming live output into an aggregate tab.
+- The report buttons no longer trigger a "slow operations on EDT" error.
+- The elapsed time in the run summary no longer counts up forever when a run ends before the toolbar is wired.
+- Clearing the history updates the *Replay* menu of the run it spares to *Do not keep in history*.
+- The first coverage run of an IDE session paints the editor right away.
+- Lists of covering tests name the test class without its namespace.
+- Excluding a group runs again: it goes out as `--group=!name`.
+
 ## [2026.5.262] - 2026-08-12
 
 ### Added
