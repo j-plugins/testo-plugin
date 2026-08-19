@@ -54,6 +54,8 @@
 
 ### Fixed
 
+- The data-provider indexer no longer queries the global PHP index while indexing a file (it resolved an abstract
+  base class's subclasses), which could trip "Outdated stub in index" and a cascade of IDE internal errors.
 - The *Show history* lens shows again (it never did on Windows): the lens built its location from the OS-native path
   (`D:\…`) while the archive stored Testo's `D:/…`, so nothing matched. Locations are now compared with unified path
   separators, and the archive index is built when the lens is first asked rather than on a later repaint.

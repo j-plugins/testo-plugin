@@ -31,16 +31,19 @@ fun PsiElement.isTestoFunction() = when(this) {
     else -> false
 }
 
-fun PsiElement.isTestoMethod() = when (this) {
+// resolveSubclasses is false only when called from a FileBasedIndex indexer: an indexer must be a pure function of its
+// one file and must never query a global index (hasTestoSubclass → PhpIndex.getAllSubclasses), which loads other files'
+// stubs and can trip "Outdated stub in index" and a cascade of IDE errors mid-indexing.
+fun PsiElement.isTestoMethod(resolveSubclasses: Boolean = true) = when (this) {
     is Method -> hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
             || (modifier.isPublic && name.startsWith("test"))
-            || isPublicMethodOfTestoMarkedClass()
+            || isPublicMethodOfTestoMarkedClass(resolveSubclasses)
     else -> false
 }
 
 // A public static method is a data provider (see isTestoDataProviderLike), and a #[Bench] method is a benchmark — both
 // live in test-marked classes without being tests themselves, and running either as `--type=test` would be wrong.
-private fun Method.isPublicMethodOfTestoMarkedClass() = when {
+private fun Method.isPublicMethodOfTestoMarkedClass(resolveSubclasses: Boolean) = when {
     !modifier.isPublic -> false
     modifier.isAbstract -> false
     modifier.isStatic -> false
@@ -51,7 +54,7 @@ private fun Method.isPublicMethodOfTestoMarkedClass() = when {
         when {
             cls == null -> false
             cls.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES) -> true
-            cls.isAbstract -> hasTestoSubclass(cls)
+            cls.isAbstract -> resolveSubclasses && hasTestoSubclass(cls)
             else -> false
         }
     }
@@ -75,11 +78,11 @@ fun PsiElement.isTestoDataProviderLike() = when (this) {
 fun PhpAttributesOwner.hasAttribute(fqn: String) = getAttributes(fqn).isNotEmpty()
 fun PhpAttributesOwner.hasAnyAttribute(vararg fqn: String) = attributes.any { it.fqn in fqn }
 
-fun PsiElement.isTestoClass() = when (this) {
+fun PsiElement.isTestoClass(resolveSubclasses: Boolean = true) = when (this) {
     is PhpClass -> TestoTestDescriptor.isTestClassName(name)
             || hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
             || isTestoCaseClass()
-            || ownMethods.any { it.isTestoMethod() || it.isTestoBench() }
+            || ownMethods.any { it.isTestoMethod(resolveSubclasses) || it.isTestoBench() }
     else -> false
 }
 
