@@ -398,4 +398,22 @@ class MixinPsiTest : BasePlatformTestCase() {
         assertFalse("Bench method should not be reported as a Testo test method", method.isTestoMethod())
         assertTrue("Bench method should still be detected as a Testo bench", method.isTestoBench())
     }
+
+    // ---- resolveSubclasses gate: the indexer path must not query the global PHP index ----
+
+    fun testResolveSubclasses_abstractBaseKnownOnlyByTestSubclass() {
+        myFixture.addFileToProject("FooTest.php", """<?php class FooTest extends AbstractCase {}""")
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php abstract class AbstractCase { public function provider(): array { return []; } }"""
+        )
+        val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+
+        assertTrue("A test subclass makes the abstract base a Testo class when subclasses are resolved", phpClass.isTestoClass())
+        assertTrue(method.isTestoMethod())
+
+        assertFalse("The indexer path must not resolve subclasses (no global-index query)", phpClass.isTestoClass(resolveSubclasses = false))
+        assertFalse(method.isTestoMethod(resolveSubclasses = false))
+    }
 }
