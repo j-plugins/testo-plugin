@@ -33,8 +33,7 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
         val map = mutableMapOf<String, TestoDataProvidersIndexType>()
 
         for (testClass in PhpPsiUtil.findAllClasses(inputData.psiFile)) {
-            // resolveSubclasses = false: an indexer must not query the global PhpIndex (getAllSubclasses) — doing so
-            // loads other files' stubs mid-indexing and trips "Outdated stub in index".
+            // An indexer must not query the global PhpIndex (getAllSubclasses): it loads other files' stubs mid-indexing.
             if (!testClass.isTestoClass(resolveSubclasses = false)) continue
             for (method in testClass.ownMethods) {
                 val dataProviders = getDataProvidersFromAttributes(method)
@@ -54,8 +53,8 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
     override fun getValueExternalizer(): DataExternalizer<TestoDataProvidersIndexType> =
         DataProviderUsageExternalizer.INSTANCE
 
-    // Bumped to 2 when DATA_PROVIDER_ATTRIBUTE was corrected; to 3 when the indexer stopped resolving subclasses
-    // (no global-index query mid-indexing), which changes what it produces — so stale on-disk indexes rebuild.
+    // Bump on any indexing-logic change so stale on-disk indexes rebuild: 2 corrected DATA_PROVIDER_ATTRIBUTE;
+    // 3 stopped resolving subclasses.
     override fun getVersion() = 3
 
     override fun getInputFilter() = FileBasedIndex.InputFilter { it.fileType is PhpFileType }

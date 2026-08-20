@@ -31,9 +31,6 @@ fun PsiElement.isTestoFunction() = when(this) {
     else -> false
 }
 
-// resolveSubclasses is false only when called from a FileBasedIndex indexer: an indexer must be a pure function of its
-// one file and must never query a global index (hasTestoSubclass → PhpIndex.getAllSubclasses), which loads other files'
-// stubs and can trip "Outdated stub in index" and a cascade of IDE errors mid-indexing.
 fun PsiElement.isTestoMethod(resolveSubclasses: Boolean = true) = when (this) {
     is Method -> hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
             || (modifier.isPublic && name.startsWith("test"))
