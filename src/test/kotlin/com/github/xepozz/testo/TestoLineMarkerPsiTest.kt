@@ -105,6 +105,32 @@ class TestoLineMarkerPsiTest : BasePlatformTestCase() {
         return reference.lastChild
     }
 
+    fun testGetInfo_inheritorOfAttributedBaseHasGutterIcons() {
+        myFixture.addFileToProject(
+            "BaseMailCase.php",
+            """<?php #[\Testo\Test] abstract class BaseMailCase { public function delivers(): void {} }"""
+        )
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php final class MailCase extends BaseMailCase { public function bounces(): void {} }"""
+        )
+        val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+
+        assertNotNull("The inheritor of a #[Test] base carries a class gutter", TestoTestRunLineMarkerProvider().getInfo(phpClass.nameIdentifier!!))
+        assertNotNull("Its public methods carry method gutters", TestoTestRunLineMarkerProvider().getInfo(method.nameIdentifier!!))
+    }
+
+    fun testGetInfo_methodDeclaredInAttributedAbstractBaseHasGutterIcon() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php #[\Testo\Test] abstract class BaseFtpCase { public function uploads(): void {} }"""
+        )
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+
+        assertNotNull("The declaration in the base carries the gutter", TestoTestRunLineMarkerProvider().getInfo(method.nameIdentifier!!))
+    }
+
     fun testGetInlineTestLocationHint_withDifferentIndex() {
         val psiFile = myFixture.configureByText(
             PhpFileType.INSTANCE,

@@ -379,9 +379,12 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 }
             }
 
-            if (element is Method && element.containingClass?.isAbstract == true) {
+            // `#[Group]` stays out of the inheritor chooser — a group run needs no concrete class.
+            val methodTarget = element as? Method
+                ?: (element as? PhpAttribute)?.takeIf { it.fqn != TestoClasses.FILTER_GROUP }?.owner as? Method
+            if (methodTarget != null && methodTarget.containingClass?.isAbstract == true) {
                 if (tryRunAbstract(
-                        element,
+                        methodTarget,
                         context.dataContext,
                         testRunnerSettings,
                         startRunnable,
@@ -710,8 +713,7 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
                 else -> selectedValues.filterIsInstance<PhpClass>()
             }
             if (valuesToRun.size == 1) {
-                testRunnerSettings.scope = PhpTestRunnerSettings.Scope.File
-                testRunnerSettings.filePath = valuesToRun.first().containingFile.virtualFile.presentableUrl
+                applyInheritorChoice(testRunnerSettings, testTarget, valuesToRun.first())
             } else {
 //                var testPatterns = when (testTarget) {
 //                    is PhpClass -> valuesToRun.map{  PhpUnitTestPattern.create(it) }
@@ -785,6 +787,25 @@ class TestoRunConfigurationProducer : PhpTestConfigurationProducer<TestoRunConfi
             .filter { it.isStringLiteral }
             .map { StringUtil.unquoteString(it.value) }
             .filter { it.isNotBlank() }
+
+        /**
+         * A method keeps its selector with the inheritor prepended (`\Ns\Test::foo`, a valid `--filter` shape) —
+         * the inheritor's file path alone would run everything that file holds.
+         */
+        internal fun applyInheritorChoice(
+            settings: TestoRunnerSettings,
+            testTarget: PhpNamedElement,
+            inheritor: PhpClass,
+        ) {
+            settings.filePath = inheritor.containingFile.virtualFile.presentableUrl
+            val selector = settings.methodName
+            if (testTarget is Method && !selector.isNullOrEmpty()) {
+                settings.scope = PhpTestRunnerSettings.Scope.Method
+                settings.methodName = "${inheritor.fqn}::$selector"
+            } else {
+                settings.scope = PhpTestRunnerSettings.Scope.File
+            }
+        }
 
         val METHOD = Condition<PsiElement> {
             it.isTestoExecutable() || (it is Method && TestoDataProviderUtils.isDataProvider(it))

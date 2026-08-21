@@ -6,6 +6,7 @@ import com.github.xepozz.testo.util.PsiUtil
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jetbrains.php.lang.PhpFileType
+import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.PhpAttribute
 import com.jetbrains.php.lang.psi.elements.PhpClass
 import com.jetbrains.php.testFramework.run.PhpTestRunnerSettings.Scope
@@ -360,6 +361,55 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
             listOf("db"),
             TestoRunConfigurationProducer.extractGroupNames(attribute),
         )
+    }
+
+    // ---- the inheritor chooser: an abstract case runs through the chosen concrete class ----
+
+    fun testApplyInheritorChoice_methodKeepsItsSelectorOnTheConcreteClass() {
+        val baseFile = myFixture.addFileToProject(
+            "AbstractStorageCase.php",
+            """<?php #[\Testo\Test] abstract class AbstractStorageCase { public function stores(): void {} }"""
+        )
+        val childFile = myFixture.addFileToProject(
+            "StorageTest.php",
+            """<?php final class StorageTest extends AbstractStorageCase {}"""
+        )
+        val baseMethod = PsiTreeUtil.findChildOfType(baseFile, Method::class.java)!!
+        val inheritor = PsiTreeUtil.findChildOfType(childFile, PhpClass::class.java)!!
+
+        val settings = TestoRunnerSettings().apply {
+            scope = Scope.Method
+            methodName = "stores"
+            filePath = baseFile.virtualFile.presentableUrl
+        }
+        TestoRunConfigurationProducer.applyInheritorChoice(settings, baseMethod, inheritor)
+
+        assertEquals("The method run must stay a method run", Scope.Method, settings.scope)
+        assertEquals("The selector names the concrete class", "\\StorageTest::stores", settings.methodName)
+        assertEquals("The run moves to the inheritor's file", childFile.virtualFile.presentableUrl, settings.filePath)
+    }
+
+    fun testApplyInheritorChoice_classRunsTheInheritorsFile() {
+        val baseFile = myFixture.addFileToProject(
+            "AbstractQueueCase.php",
+            """<?php #[\Testo\Test] abstract class AbstractQueueCase { public function consumes(): void {} }"""
+        )
+        val childFile = myFixture.addFileToProject(
+            "QueueTest.php",
+            """<?php final class QueueTest extends AbstractQueueCase {}"""
+        )
+        val baseClass = PsiTreeUtil.findChildOfType(baseFile, PhpClass::class.java)!!
+        val inheritor = PsiTreeUtil.findChildOfType(childFile, PhpClass::class.java)!!
+
+        val settings = TestoRunnerSettings().apply {
+            scope = Scope.File
+            filePath = baseFile.virtualFile.presentableUrl
+        }
+        TestoRunConfigurationProducer.applyInheritorChoice(settings, baseClass, inheritor)
+
+        assertEquals(Scope.File, settings.scope)
+        assertEquals(childFile.virtualFile.presentableUrl, settings.filePath)
+        assertTrue("A class run keeps no method selector", settings.methodName.isNullOrEmpty())
     }
 
     // ---- getAttributeOrder contract that the producer relies on ----

@@ -399,9 +399,9 @@ class MixinPsiTest : BasePlatformTestCase() {
         assertTrue("Bench method should still be detected as a Testo bench", method.isTestoBench())
     }
 
-    // ---- resolveSubclasses gate: the indexer path must not query the global PHP index ----
+    // ---- resolveHierarchy gate: the indexer path must not query the global PHP index ----
 
-    fun testResolveSubclasses_abstractBaseKnownOnlyByTestSubclass() {
+    fun testResolveHierarchy_abstractBaseKnownOnlyByTestSubclass() {
         myFixture.addFileToProject("FooTest.php", """<?php class FooTest extends AbstractCase {}""")
         val psiFile = myFixture.configureByText(
             PhpFileType.INSTANCE,
@@ -410,10 +410,55 @@ class MixinPsiTest : BasePlatformTestCase() {
         val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
         val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
 
-        assertTrue("A test subclass makes the abstract base a Testo class when subclasses are resolved", phpClass.isTestoClass())
+        assertTrue("A test subclass makes the abstract base a Testo class when the hierarchy is resolved", phpClass.isTestoClass())
         assertTrue(method.isTestoMethod())
 
-        assertFalse("The indexer path must not resolve subclasses (no global-index query)", phpClass.isTestoClass(resolveSubclasses = false))
-        assertFalse(method.isTestoMethod(resolveSubclasses = false))
+        assertFalse("The indexer path must not resolve the hierarchy (no global-index query)", phpClass.isTestoClass(resolveHierarchy = false))
+        assertFalse(method.isTestoMethod(resolveHierarchy = false))
+    }
+
+    // ---- #[Test] on a base class marks every inheritor a case ----
+
+    fun testIsTestoClass_inheritorOfAttributedAbstractBase() {
+        myFixture.addFileToProject(
+            "BasePersistenceCase.php",
+            """<?php #[\Testo\Test] abstract class BasePersistenceCase { public function persists(): void {} }"""
+        )
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php final class PersistenceCase extends BasePersistenceCase { public function alsoPersists(): void {} }"""
+        )
+        val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+
+        assertTrue("#[Test] on the base makes the inheritor a case", phpClass.isTestoClass())
+        assertTrue("A public method of such an inheritor is a test", method.isTestoMethod())
+
+        assertFalse("The indexer path must not resolve the hierarchy", phpClass.isTestoClass(resolveHierarchy = false))
+        assertFalse(method.isTestoMethod(resolveHierarchy = false))
+    }
+
+    fun testIsTestoClass_inheritorWithNoOwnMethods() {
+        myFixture.addFileToProject(
+            "BaseHttpCase.php",
+            """<?php #[\Testo\Test] abstract class BaseHttpCase { public function sends(): void {} }"""
+        )
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php final class HttpCase extends BaseHttpCase {}"""
+        )
+        val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
+
+        assertTrue("An inheritor running only inherited tests is still a case", phpClass.isTestoClass())
+    }
+
+    fun testIsTestoMethod_methodDeclaredInAttributedAbstractBase() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php #[\Testo\Test] abstract class BaseQueueCase { public function consumes(): void {} }"""
+        )
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+
+        assertTrue("The declaration in the base carries the gutter; the run goes through inheritors", method.isTestoMethod())
     }
 }

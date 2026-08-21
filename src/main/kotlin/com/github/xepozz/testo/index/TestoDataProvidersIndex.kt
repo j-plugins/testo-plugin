@@ -33,8 +33,8 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
         val map = mutableMapOf<String, TestoDataProvidersIndexType>()
 
         for (testClass in PhpPsiUtil.findAllClasses(inputData.psiFile)) {
-            // An indexer must not query the global PhpIndex (getAllSubclasses): it loads other files' stubs mid-indexing.
-            if (!testClass.isTestoClass(resolveSubclasses = false)) continue
+            // An indexer must not query the global PhpIndex: it loads other files' stubs mid-indexing.
+            if (!testClass.isTestoClass(resolveHierarchy = false)) continue
             for (method in testClass.ownMethods) {
                 val dataProviders = getDataProvidersFromAttributes(method)
 

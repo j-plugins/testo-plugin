@@ -31,16 +31,16 @@ fun PsiElement.isTestoFunction() = when(this) {
     else -> false
 }
 
-fun PsiElement.isTestoMethod(resolveSubclasses: Boolean = true) = when (this) {
+fun PsiElement.isTestoMethod(resolveHierarchy: Boolean = true) = when (this) {
     is Method -> hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
             || (modifier.isPublic && name.startsWith("test"))
-            || isPublicMethodOfTestoMarkedClass(resolveSubclasses)
+            || isPublicMethodOfTestoMarkedClass(resolveHierarchy)
     else -> false
 }
 
 // A public static method is a data provider (see isTestoDataProviderLike), and a #[Bench] method is a benchmark — both
 // live in test-marked classes without being tests themselves, and running either as `--type=test` would be wrong.
-private fun Method.isPublicMethodOfTestoMarkedClass(resolveSubclasses: Boolean) = when {
+private fun Method.isPublicMethodOfTestoMarkedClass(resolveHierarchy: Boolean) = when {
     !modifier.isPublic -> false
     modifier.isAbstract -> false
     modifier.isStatic -> false
@@ -51,7 +51,8 @@ private fun Method.isPublicMethodOfTestoMarkedClass(resolveSubclasses: Boolean) 
         when {
             cls == null -> false
             cls.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES) -> true
-            cls.isAbstract -> resolveSubclasses && hasTestoSubclass(cls)
+            resolveHierarchy && cls.hasTestoAncestor() -> true
+            cls.isAbstract -> resolveHierarchy && hasTestoSubclass(cls)
             else -> false
         }
     }
@@ -66,6 +67,18 @@ private fun hasTestoSubclass(cls: PhpClass): Boolean {
     }
 }
 
+// #[Test] on a base class marks every inheritor a case, even one declaring no marker of its own.
+private fun PhpClass.hasTestoAncestor(): Boolean {
+    if (DumbService.isDumb(project)) return false
+    val visited = mutableSetOf(fqn)
+    var current = superClass
+    while (current != null && visited.add(current.fqn)) {
+        if (current.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)) return true
+        current = current.superClass
+    }
+    return false
+}
+
 fun PsiElement.isTestoDataProviderLike() = when (this) {
     is Method -> modifier.isPublic && modifier.isStatic
     is Function -> true
@@ -75,11 +88,12 @@ fun PsiElement.isTestoDataProviderLike() = when (this) {
 fun PhpAttributesOwner.hasAttribute(fqn: String) = getAttributes(fqn).isNotEmpty()
 fun PhpAttributesOwner.hasAnyAttribute(vararg fqn: String) = attributes.any { it.fqn in fqn }
 
-fun PsiElement.isTestoClass(resolveSubclasses: Boolean = true) = when (this) {
+fun PsiElement.isTestoClass(resolveHierarchy: Boolean = true) = when (this) {
     is PhpClass -> TestoTestDescriptor.isTestClassName(name)
             || hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
             || isTestoCaseClass()
-            || ownMethods.any { it.isTestoMethod(resolveSubclasses) || it.isTestoBench() }
+            || ownMethods.any { it.isTestoMethod(resolveHierarchy) || it.isTestoBench() }
+            || (resolveHierarchy && hasTestoAncestor())
     else -> false
 }
 
