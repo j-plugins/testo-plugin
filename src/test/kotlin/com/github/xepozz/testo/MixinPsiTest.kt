@@ -398,4 +398,99 @@ class MixinPsiTest : BasePlatformTestCase() {
         assertFalse("Bench method should not be reported as a Testo test method", method.isTestoMethod())
         assertTrue("Bench method should still be detected as a Testo bench", method.isTestoBench())
     }
+
+    // ---- resolveHierarchy gate: the indexer path must not query the global PHP index ----
+
+    fun testResolveHierarchy_abstractBaseKnownOnlyByTestSubclass() {
+        myFixture.addFileToProject("FooTest.php", """<?php class FooTest extends AbstractCase {}""")
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php abstract class AbstractCase { public function provider(): array { return []; } }"""
+        )
+        val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+
+        assertTrue("A test subclass makes the abstract base a Testo class when the hierarchy is resolved", phpClass.isTestoClass())
+        assertTrue(method.isTestoMethod())
+
+        assertFalse("The indexer path must not resolve the hierarchy (no global-index query)", phpClass.isTestoClass(resolveHierarchy = false))
+        assertFalse(method.isTestoMethod(resolveHierarchy = false))
+    }
+
+    // ---- #[Test] on a base class marks every inheritor a case ----
+
+    fun testIsTestoClass_inheritorOfAttributedAbstractBase() {
+        myFixture.addFileToProject(
+            "BasePersistenceCase.php",
+            """<?php #[\Testo\Test] abstract class BasePersistenceCase { public function persists(): void {} }"""
+        )
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php final class PersistenceCase extends BasePersistenceCase { public function alsoPersists(): void {} }"""
+        )
+        val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+
+        assertTrue("#[Test] on the base makes the inheritor a case", phpClass.isTestoClass())
+        assertTrue("A public method of such an inheritor is a test", method.isTestoMethod())
+
+        assertFalse("The indexer path must not resolve the hierarchy", phpClass.isTestoClass(resolveHierarchy = false))
+        assertFalse(method.isTestoMethod(resolveHierarchy = false))
+    }
+
+    fun testIsTestoClass_inheritorWithNoOwnMethods() {
+        myFixture.addFileToProject(
+            "BaseHttpCase.php",
+            """<?php #[\Testo\Test] abstract class BaseHttpCase { public function sends(): void {} }"""
+        )
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php final class HttpCase extends BaseHttpCase {}"""
+        )
+        val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
+
+        assertTrue("An inheritor running only inherited tests is still a case", phpClass.isTestoClass())
+    }
+
+    fun testIsTestoClass_attributeTwoLevelsUpTheHierarchy() {
+        myFixture.addFileToProject(
+            "GrandBaseCase.php",
+            """<?php #[\Testo\Test] abstract class GrandBaseCase { public function roots(): void {} }"""
+        )
+        myFixture.addFileToProject(
+            "MidBaseCase.php",
+            """<?php abstract class MidBaseCase extends GrandBaseCase {}"""
+        )
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php final class LeafCase extends MidBaseCase { public function grows(): void {} }"""
+        )
+        val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+
+        assertTrue("The ancestor walk is transitive, not direct-parent-only", phpClass.isTestoClass())
+        assertTrue(method.isTestoMethod())
+    }
+
+    fun testIsTestoClass_cyclicHierarchyTerminates() {
+        // Invalid PHP the PSI happily holds mid-typing; the walk must terminate, not hang the read action.
+        myFixture.addFileToProject("CycleB.php", """<?php abstract class CycleB extends CycleA {}""")
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php final class CycleA extends CycleB { public function spins(): void {} }"""
+        )
+        val phpClass = PsiTreeUtil.findChildOfType(psiFile, PhpClass::class.java)!!
+
+        assertFalse("No attribute anywhere in the cycle — not a case", phpClass.isTestoClass())
+    }
+
+    fun testIsTestoMethod_methodDeclaredInAttributedAbstractBase() {
+        val psiFile = myFixture.configureByText(
+            PhpFileType.INSTANCE,
+            """<?php #[\Testo\Test] abstract class BaseQueueCase { public function consumes(): void {} }"""
+        )
+        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
+
+        assertTrue("The declaration in the base carries the gutter; the run goes through inheritors", method.isTestoMethod())
+    }
 }

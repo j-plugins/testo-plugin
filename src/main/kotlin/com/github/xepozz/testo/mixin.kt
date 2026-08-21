@@ -8,6 +8,7 @@ import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.util.CommonProcessors
 import com.jetbrains.php.lang.psi.PhpFile
 import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.Function
@@ -15,6 +16,7 @@ import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
 import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.NewExpression
 import com.jetbrains.php.lang.psi.elements.PhpClass
+import com.jetbrains.php.PhpClassHierarchyUtils
 import com.jetbrains.php.PhpIndex
 
 private val LOG = Logger.getInstance("#com.github.xepozz.testo.mixin")
@@ -31,16 +33,16 @@ fun PsiElement.isTestoFunction() = when(this) {
     else -> false
 }
 
-fun PsiElement.isTestoMethod() = when (this) {
+fun PsiElement.isTestoMethod(resolveHierarchy: Boolean = true) = when (this) {
     is Method -> hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
             || (modifier.isPublic && name.startsWith("test"))
-            || isPublicMethodOfTestoMarkedClass()
+            || isPublicMethodOfTestoMarkedClass(resolveHierarchy)
     else -> false
 }
 
 // A public static method is a data provider (see isTestoDataProviderLike), and a #[Bench] method is a benchmark — both
 // live in test-marked classes without being tests themselves, and running either as `--type=test` would be wrong.
-private fun Method.isPublicMethodOfTestoMarkedClass() = when {
+private fun Method.isPublicMethodOfTestoMarkedClass(resolveHierarchy: Boolean) = when {
     !modifier.isPublic -> false
     modifier.isAbstract -> false
     modifier.isStatic -> false
@@ -51,7 +53,8 @@ private fun Method.isPublicMethodOfTestoMarkedClass() = when {
         when {
             cls == null -> false
             cls.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES) -> true
-            cls.isAbstract -> hasTestoSubclass(cls)
+            resolveHierarchy && cls.hasTestoAncestor() -> true
+            cls.isAbstract -> resolveHierarchy && hasTestoSubclass(cls)
             else -> false
         }
     }
@@ -66,6 +69,16 @@ private fun hasTestoSubclass(cls: PhpClass): Boolean {
     }
 }
 
+// #[Test] on a base class marks every inheritor a case, even one declaring no marker of its own.
+private fun PhpClass.hasTestoAncestor(): Boolean {
+    if (DumbService.isDumb(project)) return false
+    val find = object : CommonProcessors.FindProcessor<PhpClass>() {
+        override fun accept(cls: PhpClass) = cls.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
+    }
+    PhpClassHierarchyUtils.processSuperClasses(this, false, false, find)
+    return find.isFound
+}
+
 fun PsiElement.isTestoDataProviderLike() = when (this) {
     is Method -> modifier.isPublic && modifier.isStatic
     is Function -> true
@@ -75,11 +88,12 @@ fun PsiElement.isTestoDataProviderLike() = when (this) {
 fun PhpAttributesOwner.hasAttribute(fqn: String) = getAttributes(fqn).isNotEmpty()
 fun PhpAttributesOwner.hasAnyAttribute(vararg fqn: String) = attributes.any { it.fqn in fqn }
 
-fun PsiElement.isTestoClass() = when (this) {
+fun PsiElement.isTestoClass(resolveHierarchy: Boolean = true) = when (this) {
     is PhpClass -> TestoTestDescriptor.isTestClassName(name)
             || hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
             || isTestoCaseClass()
-            || ownMethods.any { it.isTestoMethod() || it.isTestoBench() }
+            || ownMethods.any { it.isTestoMethod(resolveHierarchy) || it.isTestoBench() }
+            || (resolveHierarchy && hasTestoAncestor())
     else -> false
 }
 
