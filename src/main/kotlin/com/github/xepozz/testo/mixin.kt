@@ -8,6 +8,7 @@ import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.util.CommonProcessors
 import com.jetbrains.php.lang.psi.PhpFile
 import com.jetbrains.php.lang.psi.elements.Method
 import com.jetbrains.php.lang.psi.elements.Function
@@ -15,6 +16,7 @@ import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
 import com.jetbrains.php.lang.psi.elements.ClassReference
 import com.jetbrains.php.lang.psi.elements.NewExpression
 import com.jetbrains.php.lang.psi.elements.PhpClass
+import com.jetbrains.php.PhpClassHierarchyUtils
 import com.jetbrains.php.PhpIndex
 
 private val LOG = Logger.getInstance("#com.github.xepozz.testo.mixin")
@@ -70,13 +72,11 @@ private fun hasTestoSubclass(cls: PhpClass): Boolean {
 // #[Test] on a base class marks every inheritor a case, even one declaring no marker of its own.
 private fun PhpClass.hasTestoAncestor(): Boolean {
     if (DumbService.isDumb(project)) return false
-    val visited = mutableSetOf(fqn)
-    var current = superClass
-    while (current != null && visited.add(current.fqn)) {
-        if (current.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)) return true
-        current = current.superClass
+    val find = object : CommonProcessors.FindProcessor<PhpClass>() {
+        override fun accept(cls: PhpClass) = cls.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
     }
-    return false
+    PhpClassHierarchyUtils.processSuperClasses(this, false, false, find)
+    return find.isFound
 }
 
 fun PsiElement.isTestoDataProviderLike() = when (this) {
