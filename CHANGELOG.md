@@ -10,6 +10,9 @@
   output: numeric grids become sortable unit-aware tables with bar/line/pie charts, links/images/artifacts become
   clickable cards.
 - Metadata images and artifacts are copied into the run history, so a replay keeps them after the original files change.
+- A channel message's name can carry per-message flags after a `/` (`app.log/n`, `query.sql/c`): `s` glues it raw,
+  `b`/`n` force a line/blank-line break around it, `c` gives it its own card, `t` hides it in aggregate views.
+  Consecutive messages of one channel now merge into a single card by default, language-typed channels included.
 
 ## [2026.7.262] - 2026-08-18
 
