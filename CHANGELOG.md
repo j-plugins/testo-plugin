@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [2026.9.262] - 2026-08-26
+
 ### Added
 
 - Test metadata (`testMetadata` service messages) shows in its own *Metadata* channel tab instead of polluting the
@@ -171,7 +173,8 @@
 - Concurrent tests no longer nest inside one another in the test tree: the tree is built from the `nodeId`/`parentNodeId`
   Testo reports rather than from the order messages arrive in.
 
-[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.7.262...HEAD
+[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.9.262...HEAD
+[2026.9.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.7.262...v2026.9.262
 [2026.7.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.5.262...v2026.7.262
 [2026.5.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.4.262...v2026.5.262
 [2026.4.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.3.1...v2026.4.262
