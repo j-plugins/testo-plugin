@@ -125,14 +125,17 @@ class TestoOutputToGeneralEventsConverter(
                 val key = keyFor(attrs["name"])
                 val out = attrs["out"] ?: ""
                 val level = attrs["level"]
-                val channel = attrs["channel"]?.takeIf { it.isNotEmpty() }
+                // Split the channel into its bare name (everything keyed by channel sees this) and the per-message flags.
+                val parsed = attrs["channel"]?.takeIf { it.isNotEmpty() }?.let { parseChannel(it) }
+                val channel = parsed?.name
+                val flags = parsed?.flags ?: ChannelFlags()
                 // Tag the all-stream chunk with its channel so the aggregated All tab can highlight per message.
-                if (key != null) store.appendAll(key, out, level, channel)
+                if (key != null) store.appendAll(key, out, level, channel, flags)
 
                 if (channel != null && key != null) {
                     attrs["icon"]?.takeIf { it.isNotBlank() }?.let { store.setChannelIcon(channel, it) }
                     attrs["color"]?.takeIf { it.isNotBlank() }?.let { store.setChannelColor(channel, it) }
-                    store.append(key, channel, out, level)
+                    store.append(key, channel, out, level, flags)
                     return
                 }
                 if (key != null) store.appendOutput(key, out, level)

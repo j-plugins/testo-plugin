@@ -281,7 +281,7 @@ object TestoChannelsUi {
                 if (hasMetadata(leaves)) addMetadataTab(tabbed, viewer, leaves, showLeafLabels = true)
 
                 // All: syntax-highlighted cards, language picked per message from its own channel.
-                val allCards = newCards(null)
+                val allCards = newCards(null, aggregate = true)
                 store.header().forEach { allCards.add(it) }
                 addCardsAggregate(allCards, viewer, leaves) { key, sink -> store.attachAll(key, sink) }
                 addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
@@ -295,7 +295,7 @@ object TestoChannelsUi {
                     } ?: emptyList()
                     // Build this channel's cards only when its tab is opened — see addLazyTab.
                     addLazyTab(tabbed, humanize(channel), channelIcon(channel, sample)) {
-                        val cards = newCards(channelFileType(channel))
+                        val cards = newCards(channelFileType(channel), aggregate = true, showChannel = false)
                         addCardsAggregate(cards, viewer, leaves) { key, sink -> store.attachChannel(key, channel, sink) }
                         cards.component
                     }
@@ -321,7 +321,7 @@ object TestoChannelsUi {
             if (key != null) {
                 for ((channel, chunks) in store.channelsFor(key)) {
                     if (chunks.none { levelFilter.isVisible(it.level) }) continue
-                    val cards = newCards(channelFileType(channel))
+                    val cards = newCards(channelFileType(channel), showChannel = false)
                     subscriptions += store.attachChannel(key, channel) { cards.add(it) }
                     addComponentTab(tabbed, humanize(channel), channelIcon(channel, chunks), cards.component)
                 }
@@ -438,8 +438,8 @@ object TestoChannelsUi {
             dynamicConsoles.clear()
         }
 
-        private fun newCards(fixedFileType: FileType?): MessageCards =
-            MessageCards(fixedFileType).also { activeCards += it }
+        private fun newCards(fixedFileType: FileType?, aggregate: Boolean = false, showChannel: Boolean = true): MessageCards =
+            MessageCards(fixedFileType, aggregate, showChannel).also { activeCards += it }
 
         private fun channelsAcross(leaves: List<SMTestProxy>): Set<String> {
             val channels = LinkedHashSet<String>()
@@ -447,9 +447,12 @@ object TestoChannelsUi {
             return channels
         }
 
+        // Aggregate-only: a channel earns a tab when a shown leaf has a chunk that both passes the level filter and is
+        // not test-only (a channel of nothing but `/t` noise would give an empty tab under a suite selection).
         private fun channelHasVisible(leaves: List<SMTestProxy>, channel: String): Boolean =
             leaves.any { leaf ->
-                keyOf(leaf)?.let { store.channelsFor(it)[channel] }?.any { levelFilter.isVisible(it.level) } == true
+                keyOf(leaf)?.let { store.channelsFor(it)[channel] }
+                    ?.any { levelFilter.isVisible(it.level) && !it.flags.testOnly } == true
             }
 
         private fun hasMetadata(leaves: List<SMTestProxy>): Boolean =
@@ -464,7 +467,7 @@ object TestoChannelsUi {
             showLeafLabels: Boolean,
         ) {
             addLazyTab(tabbed, METADATA_TAB, AllIcons.General.Information) {
-                val cards = newCards(metadataFileType())
+                val cards = newCards(metadataFileType(), aggregate = showLeafLabels)
                 for (leaf in leaves) {
                     val key = keyOf(leaf) ?: continue
                     val leafLabel = if (showLeafLabels) fullName(leaf) else null
@@ -1062,7 +1065,13 @@ object TestoChannelsUi {
         // over a PSI-backed light file, so it renders with the full editor experience: language syntax highlighting,
         // folding and annotators. fixedFileType is set for single-language channel tabs; null means derive the language
         // per message from its own channel (used by the mixed All tab).
-        private inner class MessageCards(private val fixedFileType: FileType?) {
+        private inner class MessageCards(
+            private val fixedFileType: FileType?,
+            private val aggregate: Boolean = false,
+            // The card header names its channel only where cards mix channels (the All tab) or carry a group label
+            // (Metadata); a single-channel tab already names it, so it stays off there.
+            private val showChannel: Boolean = true,
+        ) {
             private val list = object : JBPanel<Nothing>(VerticalLayout(JBUI.scale(6))), Scrollable {
                 override fun getPreferredScrollableViewportSize(): Dimension = preferredSize
                 override fun getScrollableUnitIncrement(r: Rectangle, orientation: Int, direction: Int) = JBUI.scale(16)
@@ -1124,10 +1133,13 @@ object TestoChannelsUi {
             private val editors = mutableListOf<EditorEx>()
             private val fileEditors = mutableListOf<Pair<FileEditorProvider, FileEditor>>()
 
-            // The previous card, for folding consecutive format-less same-channel messages into one canvas.
-            private var lastMergeKey: String? = null
+            // The previous card, for folding consecutive same-channel messages of one test into one canvas. lastEditor is
+            // null when that card can't be appended to (a `/c` card, or a preview-bodied one); lastSeparation is the
+            // previous message's mode, which decides the break before the next one.
+            private var lastMergeKey: MergeKey? = null
             private var lastEditor: EditorEx? = null
             private var lastCard: JComponent? = null
+            private var lastSeparation: ChannelSeparation? = null
 
             // Editors aren't released by merely removing their Swing component; the controller calls this on rebuild.
             // `released` also stops a chunk task queued just before this from materializing (and leaking) a new editor.
@@ -1171,23 +1183,33 @@ object TestoChannelsUi {
             // makes the per-test name in the header navigate back to that test in the tree.
             fun add(chunk: ChannelOutputStore.Chunk, leafLabel: String? = null, onLeafClick: (() -> Unit)? = null, description: String? = null) {
                 if (released || !levelFilter.isVisible(chunk.level)) return
-                // Decode ANSI once: the plain text drives the blank check and the body; segments tint plain cards.
-                val (plain, segments) = decodeAnsi(chunk.text.trim('\n'))
-                if (plain.isBlank()) return
+                // A `/t` message shows only under its own test's selection; an aggregate (suite/root) skips it.
+                if (aggregate && chunk.flags.testOnly) return
+                // Decode ANSI once: the plain text drives the body; segments tint plain (format-less) cards. Bytes are kept
+                // as emitted — the spec joins messages by inserting breaks, it never strips what a message carries.
+                val (plain, segments) = decodeAnsi(chunk.text)
+                if (plain.isEmpty()) return
+                // Plain process output (no channel) is raw-glued; a named channel obeys its own separation flag.
+                val separation = if (chunk.channel == null) ChannelSeparation.STREAM else chunk.flags.separation
+                val ownCard = chunk.channel != null && chunk.flags.card
                 val fileType = fixedFileType ?: channelFileType(chunk.channel)
                 val app = ApplicationManager.getApplication()
                 val task = Runnable {
                     if (released) return@Runnable
-                    // Consecutive format-less messages from the same channel/test fold into one canvas: append to the
-                    // previous card's editor instead of stacking another card.
-                    val mergeKey = if (fileType == null) "${chunk.channel}\u0000$leafLabel" else null
+                    // Consecutive messages of the same channel/test fold into one canvas; a `/c` message opts out and
+                    // breaks the run so the next message starts a fresh card.
+                    val mergeKey = if (ownCard) null else MergeKey(chunk.channel, leafLabel)
                     val target = if (mergeKey != null && mergeKey == lastMergeKey) {
                         lastEditor?.takeUnless { it.isDisposed }
                     } else {
                         null
                     }
                     if (target != null) {
-                        appendToEditor(target, plain, segments)
+                        // A language card highlights from its lexer, not from ANSI, so its appends drop the segments.
+                        val appendSegments = if (fileType == null) segments else emptyList()
+                        val separator = "\n".repeat(separatorNewlines(lastSeparation, separation, target.document.charsSequence, plain))
+                        appendToEditor(target, separator, plain, appendSegments)
+                        lastSeparation = separation
                         lastCard?.revalidate()
                         list.revalidate()
                         list.repaint()
@@ -1205,7 +1227,8 @@ object TestoChannelsUi {
                     val (component, editor) = card(++index, chunk, leafLabel, onLeafClick, description, fileType, plain, segments)
                     list.add(component)
                     lastMergeKey = mergeKey
-                    lastEditor = if (mergeKey != null) editor else null
+                    lastEditor = if (ownCard) null else editor
+                    lastSeparation = separation
                     lastCard = component
                     list.revalidate()
                     list.repaint()
@@ -1269,12 +1292,20 @@ object TestoChannelsUi {
                 segments: List<AnsiSegment>,
             ): Pair<JComponent, EditorEx?> {
                 // A language message gets that language's highlighting (ANSI dropped); a format-less message keeps its
-                // ANSI colors over a plain-text viewer — and only those (mergeableEditor) fold into one canvas.
+                // ANSI colors over a plain-text viewer. Both editor-backed cards fold following messages of the same
+                // channel into one canvas; only a preview-bodied card (markdown/HTML) can't be appended to.
                 val mergeableEditor: EditorEx?
                 val body: JComponent
                 if (fileType != null) {
-                    body = previewCard(fileType, plain) ?: editorCard(fileType, plain, null).first
-                    mergeableEditor = null
+                    val preview = previewCard(fileType, plain)
+                    if (preview != null) {
+                        body = preview
+                        mergeableEditor = null
+                    } else {
+                        val (component, editor) = editorCard(fileType, plain, null)
+                        body = component
+                        mergeableEditor = editor
+                    }
                 } else {
                     val (component, editor) = editorCard(PlainTextFileType.INSTANCE, plain, segments)
                     body = component
@@ -1302,7 +1333,7 @@ object TestoChannelsUi {
                 val left = JBPanel<Nothing>(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
                     isOpaque = false
                     border = JBUI.Borders.empty(3, 6, 2, 6)
-                    val idText = buildString { append('#').append(n); chunk.channel?.let { append("  ·  ").append(it) } }
+                    val idText = buildString { append('#').append(n); if (showChannel) chunk.channel?.let { append("  ·  ").append(it) } }
                     add(JBLabel(idText).apply { font = JBUI.Fonts.smallFont(); foreground = JBColor.GRAY })
                     if (leafLabel != null) {
                         add(JBLabel("  ·  ").apply { font = JBUI.Fonts.smallFont(); foreground = JBColor.GRAY })
@@ -1563,11 +1594,11 @@ object TestoChannelsUi {
                 wrapper to editor
             }
 
-            private fun appendToEditor(editor: EditorEx, plain: String, segments: List<AnsiSegment>) {
+            private fun appendToEditor(editor: EditorEx, separator: String, plain: String, segments: List<AnsiSegment>) {
                 val document = editor.document
                 val base = document.textLength
-                WriteCommandAction.runWriteCommandAction(project) { document.insertString(base, plain) }
-                applyAnsi(editor, segments, base)
+                WriteCommandAction.runWriteCommandAction(project) { document.insertString(base, separator + plain) }
+                applyAnsi(editor, segments, base + separator.length)
             }
 
             private fun applyAnsi(editor: EditorEx, segments: List<AnsiSegment>, base: Int = 0) {
@@ -1599,6 +1630,10 @@ object TestoChannelsUi {
                 }
             }
         }
+
+        // Identifies the card a message folds into: same channel and same test. A typed key (not a joined string) keeps
+        // a null channel — the plain output stream — distinct from a channel literally named "null".
+        private data class MergeKey(val channel: String?, val leaf: String?)
 
         private class AnsiSegment(val text: String, val attributes: TextAttributes?)
 

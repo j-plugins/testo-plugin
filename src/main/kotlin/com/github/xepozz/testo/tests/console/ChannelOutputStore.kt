@@ -8,8 +8,14 @@ package com.github.xepozz.testo.tests.console
  * order without extra synchronization.
  */
 class ChannelOutputStore {
-    // channel is carried on the "all" stream too, so the aggregated All tab can pick a per-message language.
-    data class Chunk(val text: String, val level: String?, val channel: String? = null)
+    // channel is carried on the "all" stream too, so the aggregated All tab can pick a per-message language; flags ride
+    // the chunk (the converter strips them from the name), driving how it joins its neighbours and whether aggregates skip it.
+    data class Chunk(
+        val text: String,
+        val level: String?,
+        val channel: String? = null,
+        val flags: ChannelFlags = ChannelFlags(),
+    )
 
     private class LiveBuffer {
         private val chunks = mutableListOf<Chunk>()
@@ -81,14 +87,14 @@ class ChannelOutputStore {
         synchronized(lock) { return headerChunks + noticeChunks }
     }
 
-    fun append(testKey: String, channel: String, text: String, level: String?) {
+    fun append(testKey: String, channel: String, text: String, level: String?, flags: ChannelFlags = ChannelFlags()) {
         synchronized(lock) {
-            byTest.getOrPut(testKey) { LinkedHashMap() }.getOrPut(channel) { LiveBuffer() }.append(Chunk(text, level))
+            byTest.getOrPut(testKey) { LinkedHashMap() }.getOrPut(channel) { LiveBuffer() }.append(Chunk(text, level, channel, flags))
         }
     }
 
-    fun appendAll(testKey: String, text: String, level: String?, channel: String? = null) {
-        synchronized(lock) { allByTest.getOrPut(testKey) { LiveBuffer() }.append(Chunk(text, level, channel)) }
+    fun appendAll(testKey: String, text: String, level: String?, channel: String? = null, flags: ChannelFlags = ChannelFlags()) {
+        synchronized(lock) { allByTest.getOrPut(testKey) { LiveBuffer() }.append(Chunk(text, level, channel, flags)) }
     }
 
     fun appendOutput(testKey: String, text: String, level: String?) {
