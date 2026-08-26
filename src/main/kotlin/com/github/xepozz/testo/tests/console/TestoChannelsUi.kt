@@ -1185,8 +1185,8 @@ object TestoChannelsUi {
                 if (released || !levelFilter.isVisible(chunk.level)) return
                 // A `/t` message shows only under its own test's selection; an aggregate (suite/root) skips it.
                 if (aggregate && chunk.flags.testOnly) return
-                // Decode ANSI once: the plain text drives the body; segments tint plain (format-less) cards. Bytes are kept
-                // as emitted — the spec joins messages by inserting breaks, it never strips what a message carries.
+                // Decode ANSI once: the plain text drives the body; segments tint plain (format-less) cards. Bytes are
+                // kept as emitted — joining inserts breaks, it never strips what a message carries.
                 val (plain, segments) = decodeAnsi(chunk.text)
                 if (plain.isEmpty()) return
                 // Plain process output (no channel) is raw-glued; a named channel obeys its own separation flag.

@@ -1,9 +1,5 @@
 package com.github.xepozz.testo.tests.console
 
-// Per-message rendering flags carried on a channel message's `channel` attribute, after a reserved `/`.
-// `s`/`b`/`n` are mutually exclusive separation modes (last written wins); `c` gives the message its own card; `t` hides
-// it in aggregate views. The bare channel name — everything keyed by channel — never carries these; they ride the chunk.
-
 /** How a message joins the previous message of the same channel run inside a merged card. */
 enum class ChannelSeparation { STREAM, DEFAULT, BLOCK, NEW_BLOCK }
 
@@ -38,8 +34,7 @@ fun parseChannel(raw: String): ParsedChannel {
     return ParsedChannel(raw.substring(0, slash), ChannelFlags(separation, card, testOnly))
 }
 
-// Newlines a mode guarantees on each side of its message; the separator between two messages is the max of the previous
-// message's `after` and the current message's `before`, minus the breaks the text on either side already carries.
+// Newlines a mode guarantees on each side of its message.
 private fun beforeBreaks(separation: ChannelSeparation): Int = when (separation) {
     ChannelSeparation.STREAM -> 0
     ChannelSeparation.DEFAULT -> 1
@@ -69,7 +64,8 @@ private fun leadingNewlines(text: CharSequence): Int {
 
 /**
  * How many newlines to insert between [accumulated] (a card's current text) and the incoming [message], given the
- * separation mode of the previous message and of this one. Breaks already present at the boundary are never duplicated.
+ * separation mode of the previous message and of this one: the max of the previous message's `after` and this one's
+ * `before`, minus the breaks the boundary already carries — so an existing break is never duplicated.
  */
 fun separatorNewlines(
     previous: ChannelSeparation?,
