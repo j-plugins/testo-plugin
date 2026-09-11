@@ -104,6 +104,12 @@ class TestoRunnerSettings(
     companion object Companion {
         const val DEFAULT_COVERAGE_OPTIONS = "--type=!bench"
 
+        /**
+         * Default *Test Runner options* for every new Testo run configuration. `--teamcity` is required for the IDE
+         * console; `-q` keeps the banner quiet enough to scrape; `-n` disables interactive prompts.
+         */
+        const val DEFAULT_TEST_RUNNER_OPTIONS = "-q -n --teamcity"
+
         /** No `--coverage-level` flag at all: the level configured in testo.php stands. */
         const val COVERAGE_LEVEL_AUTO = "auto"
 
@@ -124,6 +130,11 @@ class TestoRunnerSettings(
         @JvmStatic
         fun formatNames(names: List<String>): String = names.joinToString(", ")
 
+        /** Options to put on the CLI: the configuration's value, or [DEFAULT_TEST_RUNNER_OPTIONS] when blank. */
+        @JvmStatic
+        fun effectiveTestRunnerOptions(options: String?): String =
+            options?.takeIf { it.isNotBlank() } ?: DEFAULT_TEST_RUNNER_OPTIONS
+
         @JvmStatic
         fun fromPhpTestRunnerSettings(settings: PhpTestRunnerSettings): TestoRunnerSettings {
             val runnerSettings = TestoRunnerSettings()
@@ -135,7 +146,9 @@ class TestoRunnerSettings(
             runnerSettings.methodName = settings.methodName
             runnerSettings.isUseAlternativeConfigurationFile = settings.isUseAlternativeConfigurationFile
             runnerSettings.configurationFilePath = settings.configurationFilePath
-            runnerSettings.testRunnerOptions = settings.testRunnerOptions
+            // Platform / producer clones often arrive with a blank options field — fill the IDE defaults so gutter
+            // runs still get `--teamcity` without the user editing the configuration.
+            runnerSettings.testRunnerOptions = effectiveTestRunnerOptions(settings.testRunnerOptions)
 
             if (settings is TestoRunnerSettings) {
                 runnerSettings.dataProviderIndex = settings.dataProviderIndex

@@ -15,8 +15,11 @@ import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
 import com.intellij.execution.ui.ConsoleView
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.util.PathUtil
+import com.intellij.util.PathMappingSettings
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
@@ -142,11 +145,60 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         return TestoTestRunConfigurationEditor(editor, this)
     }
 
+    /**
+     * Testo's working directory is the PHP/Testo project root — the parent of `testo.php` — not necessarily the
+     * PhpStorm project root. Using [Project.getBasePath] alone breaks remote interpreters whose path mapping starts
+     * at a subdirectory (Docker Compose: `…/app` → `/var/www/project`) and leaves `--path` empty after relativize.
+     *
+     * Prefer an explicit custom WD, then the active configuration file's parent, then the platform's composer /
+     * content-root fallback ([PhpTestRunConfiguration.getWorkingDirectory]).
+     *
+     * Configuration / executable paths in Test Framework settings are often already remote (`/var/www/project/…`).
+     * Those must be reverse-mapped to a local path before taking the parent — otherwise `--path` is relativized
+     * against `/var/www/project` while the test file is still a WSL/`/home/…` path and the flag is dropped.
+     */
     override fun getWorkingDirectory(
         project: Project,
         settings: PhpTestRunConfigurationSettings,
-        config: PhpTestFrameworkConfiguration?
-    ) = project.basePath
+        config: PhpTestFrameworkConfiguration?,
+    ): String? = TestoRunPaths.resolveWorkingDirectory(
+        customWorkingDirectory = settings.commandLineSettings.workingDirectory?.let { localizePath(it) },
+        configurationFilePath = getConfigurationFile(settings.runnerSettings, config)?.let { localizePath(it) },
+        fallback = { super.getWorkingDirectory(project, settings, config) },
+    )
+
+    /**
+     * Maps a path that may already be remote (as stored in Test Framework settings) back to the host filesystem.
+     *
+     * Returns an IDE-visible local form (`//wsl.localhost/…` or a Windows path) — never the bare `/home/…` inside a
+     * WSL UNC. [checkConfiguration] resolves the working directory through LocalFileSystem; `/home/…` is invisible
+     * to PhpStorm on Windows even when it is the right Linux path for `--path` relativize (that uses [TestoRunPaths.canonicalize]).
+     */
+    private fun localizePath(path: String): String {
+        val independent = FileUtil.toSystemIndependentName(path)
+
+        fun visibleLocal(p: String): String? =
+            LocalFileSystem.getInstance().findFileByPath(p)?.let { FileUtil.toSystemIndependentName(it.path) }
+
+        visibleLocal(independent)?.let { return it }
+        // Lookup via the `/home/…` form is fine; prefer the path VFS actually stores (often WSL UNC).
+        visibleLocal(TestoRunPaths.canonicalize(independent))?.let { return it }
+
+        val remoteInterpreter = interpreter?.takeIf { it.isRemote } ?: return independent
+        val mappings = pathMappings(remoteInterpreter) ?: return independent
+        val local = mappings.convertToLocal(independent)?.takeIf { it.isNotEmpty() }
+            ?: mappings.convertToLocal(TestoRunPaths.canonicalize(independent))?.takeIf { it.isNotEmpty() }
+            ?: return independent
+        val normalized = FileUtil.toSystemIndependentName(local)
+        return visibleLocal(normalized)
+            ?: visibleLocal(TestoRunPaths.canonicalize(normalized))
+            ?: normalized
+    }
+
+    private fun pathMappings(interpreter: PhpInterpreter): PathMappingSettings? {
+        val manager = PhpRemoteInterpreterManager.getInstance() ?: return null
+        return manager.createPathMappings(project, interpreter.phpSdkAdditionalData)
+    }
 
     override fun createCommand(
         interpreter: PhpInterpreter,
@@ -170,6 +222,11 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
             )
         }
 
+        // Test Framework settings often store already-remote paths (`/var/www/project/…`). Feeding those to
+        // setScript/addPathArgument makes canProcess fail and pops a false "Path mappings are not configured"
+        // warning even when Docker Compose mappings are fine — reverse-map to a local path first.
+        val localExecutable = localizePath(executablePath)
+
         val workingDirectory = getWorkingDirectory(project, settings, frameworkConfig)
         if (workingDirectory.isNullOrEmpty()) {
             throw ExecutionException(PhpBundle.message("php.interpreter.base.configuration.working.directory"))
@@ -178,13 +235,12 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
 
         myHandler.prepareArguments(arguments, testoSettings)
         addReportFlags(arguments, interpreter)
-        myHandler.prepareCommand(project, command, executablePath, null, testoSettings.runnerSettings.command)
+        myHandler.prepareCommand(project, command, localExecutable, null, testoSettings.runnerSettings.command)
 
         command.importCommandLineSettings(settings.commandLineSettings, workingDirectory)
         command.addEnvs(env)
 
         fillTestRunnerArguments(
-            project,
             workingDirectory,
             settings.runnerSettings,
             arguments,
@@ -235,58 +291,57 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
 
     companion object Companion {
         const val ID = "TestoConsoleCommandRunConfiguration"
+    }
 
-        private fun fillTestRunnerArguments(
-            project: Project,
-            workingDirectory: String,
-            testRunnerSettings: PhpTestRunnerSettings,
-            arguments: MutableList<String?>,
-            command: PhpCommandSettings,
-            configuration: PhpTestFrameworkConfiguration?,
-            handler: PhpTestRunConfigurationHandler,
-        ) {
-            val testRunnerOptions = testRunnerSettings.testRunnerOptions
-            if (StringUtil.isNotEmpty(testRunnerOptions)) {
-                command.addArguments(ParametersList.parse(testRunnerOptions!!).toList())
+    private fun fillTestRunnerArguments(
+        workingDirectory: String,
+        testRunnerSettings: PhpTestRunnerSettings,
+        arguments: MutableList<String?>,
+        command: PhpCommandSettings,
+        configuration: PhpTestFrameworkConfiguration?,
+        handler: PhpTestRunConfigurationHandler,
+    ) {
+        val testRunnerOptions = TestoRunnerSettings.effectiveTestRunnerOptions(testRunnerSettings.testRunnerOptions)
+        command.addArguments(ParametersList.parse(testRunnerOptions).toList())
+
+        command.addArguments(arguments)
+
+        val configurationFilePath = getConfigurationFile(testRunnerSettings, configuration)
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { localizePath(it) }
+        if (!configurationFilePath.isNullOrEmpty()) {
+            command.addArgument(handler.configFileOption)
+            command.addPathArgument(configurationFilePath)
+        }
+
+        when (testRunnerSettings.scope) {
+            PhpTestRunnerSettings.Scope.Type -> handler.runType(
+                project,
+                command,
+                StringUtil.notNullize(testRunnerSettings.selectedType),
+                workingDirectory,
+            )
+
+            PhpTestRunnerSettings.Scope.Directory -> handler.runDirectory(
+                project,
+                command,
+                StringUtil.notNullize(testRunnerSettings.directoryPath),
+                workingDirectory,
+            )
+
+            PhpTestRunnerSettings.Scope.File -> handler.runFile(
+                project,
+                command,
+                StringUtil.notNullize(testRunnerSettings.filePath),
+                workingDirectory,
+            )
+
+            PhpTestRunnerSettings.Scope.Method -> {
+                val filePath = StringUtil.notNullize(testRunnerSettings.filePath)
+                handler.runMethod(project, command, filePath, testRunnerSettings.methodName, workingDirectory)
             }
 
-            command.addArguments(arguments)
-
-            val configurationFilePath = getConfigurationFile(testRunnerSettings, configuration)
-            if (!configurationFilePath.isNullOrEmpty()) {
-                command.addArgument(handler.configFileOption)
-                command.addPathArgument(configurationFilePath)
-            }
-
-            when (testRunnerSettings.scope) {
-                PhpTestRunnerSettings.Scope.Type -> handler.runType(
-                    project,
-                    command,
-                    StringUtil.notNullize(testRunnerSettings.selectedType),
-                    workingDirectory,
-                )
-
-                PhpTestRunnerSettings.Scope.Directory -> handler.runDirectory(
-                    project,
-                    command,
-                    StringUtil.notNullize(testRunnerSettings.directoryPath),
-                    workingDirectory,
-                )
-
-                PhpTestRunnerSettings.Scope.File -> handler.runFile(
-                    project,
-                    command,
-                    StringUtil.notNullize(testRunnerSettings.filePath),
-                    workingDirectory,
-                )
-
-                PhpTestRunnerSettings.Scope.Method -> {
-                    val filePath = StringUtil.notNullize(testRunnerSettings.filePath)
-                    handler.runMethod(project, command, filePath, testRunnerSettings.methodName, workingDirectory)
-                }
-
-                PhpTestRunnerSettings.Scope.ConfigurationFile -> {}
-            }
+            PhpTestRunnerSettings.Scope.ConfigurationFile -> {}
         }
     }
 }

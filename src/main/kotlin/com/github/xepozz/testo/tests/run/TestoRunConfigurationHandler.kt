@@ -76,11 +76,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         workingDirectory: String
     ) {
         if (directory.isEmpty()) return
-
-        phpCommandSettings.apply {
-            addArgument("--path")
-            addRelativePathArgument(directory, workingDirectory)
-        }
+        addTestoPathArgument(phpCommandSettings, directory, workingDirectory)
     }
 
     override fun runFile(
@@ -90,11 +86,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         workingDirectory: String
     ) {
         if (file.isEmpty()) return
-
-        phpCommandSettings.apply {
-            addArgument("--path")
-            addRelativePathArgument(file, workingDirectory)
-        }
+        addTestoPathArgument(phpCommandSettings, file, workingDirectory)
     }
 
     override fun runMethod(
@@ -108,18 +100,32 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
 
         val parsed = parseMethodName(methodName)
 
-        phpCommandSettings.apply {
-            addArgument("--path")
-            addRelativePathArgument(file, workingDirectory)
-            if (parsed.method.isNotEmpty()) {
-                addArgument("--filter")
-                addArgument(parsed.method)
-            }
-            if (parsed.dataProvider.isNotEmpty()) {
-                addArgument("--data-provider")
-                addArgument(parsed.dataProvider)
-            }
+        // `--path` is Testo-relative (against the process WD), not a remote filesystem path — see [TestoRunPaths].
+        addTestoPathArgument(phpCommandSettings, file, workingDirectory)
+        if (parsed.method.isNotEmpty()) {
+            phpCommandSettings.addArgument("--filter")
+            phpCommandSettings.addArgument(parsed.method)
         }
+        if (parsed.dataProvider.isNotEmpty()) {
+            phpCommandSettings.addArgument("--data-provider")
+            phpCommandSettings.addArgument(parsed.dataProvider)
+        }
+    }
+
+    /**
+     * Adds `--path <relative>` when [path] resolves under [workingDirectory]. If relativize fails (mixed local/remote
+     * roots), falls back to a mapped absolute path via [PhpCommandSettings.addPathArgument] — never a bare `--path`.
+     */
+    fun addTestoPathArgument(command: PhpCommandSettings, path: String, workingDirectory: String) {
+        val relative = TestoRunPaths.relativePath(path, workingDirectory)
+        if (relative != null) {
+            command.addArgument("--path")
+            command.addArgument(relative)
+            return
+        }
+        // e.g. WD still remote while the file is local: map the file into the container instead of dropping --path.
+        command.addArgument("--path")
+        command.addPathArgument(path)
     }
 
     data class ParsedMethodName(

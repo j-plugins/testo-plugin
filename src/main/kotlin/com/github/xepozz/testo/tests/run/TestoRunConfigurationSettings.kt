@@ -7,7 +7,7 @@ import com.jetbrains.php.testFramework.run.PhpTestRunnerSettings
 
 class TestoRunConfigurationSettings : PhpTestRunConfigurationSettings() {
     override fun createDefault() = TestoRunnerSettings().apply {
-        testRunnerOptions = "-q -n --teamcity"
+        testRunnerOptions = TestoRunnerSettings.DEFAULT_TEST_RUNNER_OPTIONS
     }
 
     override fun getRunnerSettings() = getTestoRunnerSettings()

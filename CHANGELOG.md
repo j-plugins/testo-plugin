@@ -4,6 +4,24 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Remote interpreters (Docker Compose) with the PHP app in a project subdirectory no longer leave `--path` empty or
+  report a false "Path mappings are not configured" warning: the working directory follows `testo.php`, and `--path`
+  is computed as a Testo-relative argument instead of through the remote path mapper.
+- `--path` is kept when PhpStorm mixes WSL UNC (`//wsl.localhost/…`) and plain Linux (`/home/…`) forms of the same
+  path — previously relativize failed and the flag was omitted entirely.
+- Test Framework settings that store already-remote paths (`/var/www/project/testo.php`) are reverse-mapped to the
+  local tree before computing the working directory / `--path`; if relativize still fails, `--path` falls back to a
+  mapped absolute path instead of being dropped.
+- Working directory keeps the IDE-visible path form (e.g. `//wsl.localhost/…`) after reverse-mapping, so
+  checkConfiguration no longer reports "Working directory is not specified or invalid" on Windows+WSL.
+- Already-remote executable/config paths from Test Framework settings are reverse-mapped before
+  `setScript`/`addPathArgument`, so a false "Path mappings are not configured" warning is no longer shown when
+  Docker Compose mappings actually work.
+- Blank *Test Runner options* fall back to `-q -n --teamcity` (including temporary gutter runs), so `--teamcity` is
+  present without editing the configuration by hand.
+
 ## [2026.9.262] - 2026-08-26
 
 ### Added
