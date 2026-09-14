@@ -3,6 +3,7 @@ package com.github.xepozz.testo
 import com.github.xepozz.testo.tests.run.TestoRunConfigurationHandler
 import com.github.xepozz.testo.tests.run.TestoRunConfigurationSettings
 import com.github.xepozz.testo.tests.run.TestoRunnerSettings
+import com.intellij.execution.ExecutionException
 import junit.framework.TestCase
 
 class TestoRunConfigurationHandlerTest : TestCase() {
@@ -314,5 +315,72 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertEquals("unit", arguments[3])
         assertEquals("--group", arguments[4])
         assertEquals("fast", arguments[5])
+    }
+
+    fun testTestoPathArguments_inside() {
+        assertEquals(
+            listOf("--path", "tests/FooTest.php"),
+            TestoRunConfigurationHandler.INSTANCE.testoPathArguments(
+                "/repo/app/tests/FooTest.php", "/repo/app", directoryScope = false,
+            ),
+        )
+    }
+
+    fun testTestoPathArguments_directoryRootEmitsNothing() {
+        assertEquals(
+            emptyList<String>(),
+            TestoRunConfigurationHandler.INSTANCE.testoPathArguments(
+                "/repo/app", "/repo/app", directoryScope = true,
+            ),
+        )
+    }
+
+    fun testTestoPathArguments_directoryAncestorEmitsNothing() {
+        assertEquals(
+            emptyList<String>(),
+            TestoRunConfigurationHandler.INSTANCE.testoPathArguments(
+                "/repo", "/repo/app", directoryScope = true,
+            ),
+        )
+    }
+
+    fun testTestoPathArguments_fileEqualToRootIsRejected() {
+        try {
+            TestoRunConfigurationHandler.INSTANCE.testoPathArguments(
+                "/repo/app", "/repo/app", directoryScope = false,
+            )
+            fail("a file/method run of the working directory itself must fail")
+        } catch (_: ExecutionException) {
+        }
+    }
+
+    fun testTestoPathArguments_fileAncestorIsRejected() {
+        try {
+            TestoRunConfigurationHandler.INSTANCE.testoPathArguments(
+                "/repo", "/repo/app", directoryScope = false,
+            )
+            fail("a file/method run of an ancestor of the working directory must fail")
+        } catch (_: ExecutionException) {
+        }
+    }
+
+    fun testTestoPathArguments_siblingOutsideThrows() {
+        try {
+            TestoRunConfigurationHandler.INSTANCE.testoPathArguments(
+                "/repo/tests/FooTest.php", "/repo/app", directoryScope = true,
+            )
+            fail("a sibling outside the working directory must fail rather than emit a bare --path")
+        } catch (_: ExecutionException) {
+        }
+    }
+
+    fun testTestoPathArguments_outsideThrows() {
+        try {
+            TestoRunConfigurationHandler.INSTANCE.testoPathArguments(
+                "/other/tests/FooTest.php", "/repo/app", directoryScope = true,
+            )
+            fail("a target outside the working directory must fail rather than emit a bare --path")
+        } catch (_: ExecutionException) {
+        }
     }
 }
