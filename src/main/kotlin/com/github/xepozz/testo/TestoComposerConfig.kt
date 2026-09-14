@@ -11,7 +11,7 @@ import com.jetbrains.php.testFramework.PhpTestFrameworkSettingsManager
 import kotlin.io.path.Path
 
 class TestoComposerConfig : PhpTestFrameworkComposerConfig(TestoFrameworkType.INSTANCE, PACKAGE, RELATIVE_PATH) {
-    override fun getDefaultConfigName() = "testo.php"
+    override fun getDefaultConfigName() = DEFAULT_CONFIG_NAME
 
     override fun getConfigurationType() = TestoRunConfigurationType.INSTANCE
 
@@ -37,6 +37,7 @@ class TestoComposerConfig : PhpTestFrameworkComposerConfig(TestoFrameworkType.IN
     }
 
     companion object Companion {
+        const val DEFAULT_CONFIG_NAME = "testo.php"
         private const val PACKAGE = "testo/testo"
         private const val RELATIVE_PATH = "bin/testo"
     }

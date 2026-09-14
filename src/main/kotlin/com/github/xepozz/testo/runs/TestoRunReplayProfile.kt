@@ -81,6 +81,7 @@ internal class TestoRunReplayProfile(
             props.replayMode = true
             props.replayProfile = this
             props.reportStore.startedAtOverride = manifest.startedAt
+            props.workingDirectory = manifest.workingDirectory.takeIf { it.isNotBlank() }
             // The toolbar clock shows the archived run, frozen: the replayed stream would otherwise restamp every mark
             // with today's time, and a replay that outruns the toolbar's own wiring would leave it counting forever.
             // An archive from before the marks were recorded still has the two the recording itself brackets it with.

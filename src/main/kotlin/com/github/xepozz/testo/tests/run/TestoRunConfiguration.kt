@@ -16,6 +16,7 @@ import com.intellij.execution.ui.ConsoleView
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.util.PathMappingSettings
 import com.intellij.util.PathUtil
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
@@ -142,11 +143,37 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         return TestoTestRunConfigurationEditor(editor, this)
     }
 
+    // createCommand runs before createTestConsoleProperties for every executor, so the console sees this run's cwd.
+    @Volatile
+    private var lastWorkingDirectory: String? = null
+
     override fun getWorkingDirectory(
         project: Project,
         settings: PhpTestRunConfigurationSettings,
         config: PhpTestFrameworkConfiguration?
-    ) = project.basePath
+    ): String? = TestoRunPaths.resolveWorkingDirectory(
+        customWorkingDirectory = settings.commandLineSettings.workingDirectory,
+        configurationFilePath = localConfigurationFile(settings, config),
+        fallback = { super.getWorkingDirectory(project, settings, config) },
+    )
+
+    private fun localConfigurationFile(
+        settings: PhpTestRunConfigurationSettings,
+        config: PhpTestFrameworkConfiguration?,
+    ): String? {
+        val path = getConfigurationFile(settings.runnerSettings, config)?.takeIf { it.isNotEmpty() } ?: return null
+        if (settings.runnerSettings.isUseAlternativeConfigurationFile) return path
+
+        val remote = interpreter?.takeIf { it.isRemote } ?: return path
+        val mappings = pathMappings(remote) ?: return path
+        // convertToLocal returns the input unchanged when no mapping matches; a container path is no working directory.
+        return mappings.convertToLocal(path).takeIf { it != path }
+    }
+
+    private fun pathMappings(interpreter: PhpInterpreter): PathMappingSettings? =
+        runCatching {
+            PhpRemoteInterpreterManager.getInstance()?.createPathMappings(project, interpreter.phpSdkAdditionalData)
+        }.getOrNull()
 
     override fun createCommand(
         interpreter: PhpInterpreter,
@@ -175,6 +202,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
             throw ExecutionException(PhpBundle.message("php.interpreter.base.configuration.working.directory"))
         }
         command.setWorkingDir(workingDirectory)
+        lastWorkingDirectory = workingDirectory
 
         myHandler.prepareArguments(arguments, testoSettings)
         addReportFlags(arguments, interpreter)
@@ -230,7 +258,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
             this,
             executor,
             pathMapper,
-        )
+        ).also { it.workingDirectory = lastWorkingDirectory }
     }
 
     companion object Companion {

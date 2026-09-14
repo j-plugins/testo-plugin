@@ -308,6 +308,22 @@ class TestoReportStoreTest {
     }
 
     @Test
+    fun relativeFormResolvesAgainstTheWorkingDirectoryNotTheProjectRoot() {
+        val candidates = reportPathCandidates(
+            ref("/var/www/project/runtime/report/index.html", relativePath = "runtime/report/index.html"),
+            projectBasePath = "/home/me/project/app",
+        ) { null }
+
+        assertEquals(
+            listOf(
+                "/var/www/project/runtime/report/index.html",
+                Path.of("/home/me/project/app", "runtime/report/index.html").toString(),
+            ),
+            candidates,
+        )
+    }
+
+    @Test
     fun unmappedPathWithoutRelativeFormLeavesOnlyItself() {
         val candidates = reportPathCandidates(
             ref("/app/report/index.html"),

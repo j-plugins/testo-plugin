@@ -33,8 +33,9 @@ internal fun autoApplyCoverage(project: Project, props: TestoConsoleProperties, 
     ApplicationManager.getApplication().executeOnPooledThread {
         val mapToLocal: (String) -> String? = { runCatching { props.pathMapper.getLocalPath(it) }.getOrNull() }
         val writtenAfter = props.reportStore.runStartedAt
+        val baseDirectory = props.workingDirectory ?: project.basePath
         val resolved = props.reportStore.coverage().mapNotNull { ref ->
-            resolveCoverageDataFile(ref, project, mapToLocal, writtenAfter)?.let { ref to it }
+            resolveCoverageDataFile(ref, baseDirectory, mapToLocal, writtenAfter)?.let { ref to it }
         }
         val flagKeys = flagLocalPaths.map { TestoCoverageKeys.normalize(it.toString()) }.toSet()
         // Filter by the checkboxes before the per-format dedup, not after: otherwise an unchecked flag report wins the

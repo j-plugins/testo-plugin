@@ -197,4 +197,68 @@ class TestoRunPathsTest {
         assertSame(PathResolution.Unrelated, TestoRunPaths.relativePath("", "/repo/app"))
         assertSame(PathResolution.Unrelated, TestoRunPaths.relativePath("/repo/app/tests/Foo.php", ""))
     }
+
+    @Test
+    fun resolveWorkingDirectoryPrefersCustom() {
+        assertEquals(
+            "/custom/wd",
+            TestoRunPaths.resolveWorkingDirectory("/custom/wd", "/repo/app/testo.php") { "/repo" },
+        )
+    }
+
+    @Test
+    fun resolveWorkingDirectoryUsesConfigFileParent() {
+        assertEquals(
+            "/repo/app",
+            TestoRunPaths.resolveWorkingDirectory(null, "/repo/app/testo.php") { "/repo" },
+        )
+    }
+
+    @Test
+    fun resolveWorkingDirectoryBlankCustomFallsToConfigFileParent() {
+        assertEquals(
+            "/repo/app",
+            TestoRunPaths.resolveWorkingDirectory("", "/repo/app/testo.php") { "/repo" },
+        )
+    }
+
+    @Test
+    fun resolveWorkingDirectoryFallsBackWithoutConfigFile() {
+        assertEquals(
+            "/repo",
+            TestoRunPaths.resolveWorkingDirectory(null, null) { "/repo" },
+        )
+    }
+
+    @Test
+    fun parentOfConfigurationFileKeepsWslUncForm() {
+        assertEquals(
+            "//wsl.localhost/Ubuntu/home/user/project/app",
+            TestoRunPaths.parentOfConfigurationFile("//wsl.localhost/Ubuntu/home/user/project/app/testo.php"),
+        )
+    }
+
+    @Test
+    fun parentOfConfigurationFileNullWhenMissing() {
+        assertSame(null, TestoRunPaths.parentOfConfigurationFile(null))
+        assertSame(null, TestoRunPaths.parentOfConfigurationFile(""))
+    }
+
+    @Test
+    fun parentOfConfigurationFileNullForNonDefaultName() {
+        assertSame(null, TestoRunPaths.parentOfConfigurationFile("/repo/tests/suites.php"))
+    }
+
+    @Test
+    fun parentOfConfigurationFileNameIsCaseInsensitive() {
+        assertEquals("/repo/app", TestoRunPaths.parentOfConfigurationFile("/repo/app/TESTO.PHP"))
+    }
+
+    @Test
+    fun resolveWorkingDirectoryFallsBackForNonDefaultConfig() {
+        assertEquals(
+            "/repo",
+            TestoRunPaths.resolveWorkingDirectory(null, "/repo/tests/suites.php") { "/repo" },
+        )
+    }
 }
