@@ -255,7 +255,13 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
             val configurationFilePath = getConfigurationFile(testRunnerSettings, configuration)
             if (!configurationFilePath.isNullOrEmpty()) {
                 command.addArgument(handler.configFileOption)
-                command.addPathArgument(configurationFilePath)
+                // A remote interpreter's framework paths are already remote; mapping them flags
+                // a false "Path mappings are not configured".
+                if (testRunnerSettings.isUseAlternativeConfigurationFile) {
+                    command.addPathArgument(configurationFilePath)
+                } else {
+                    command.addArgument(configurationFilePath)
+                }
             }
 
             when (testRunnerSettings.scope) {

@@ -24,7 +24,8 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         command: String,
     ) {
         commandSettings.apply {
-            setScript(exe, true)
+            // Framework paths of a remote interpreter are already remote — see fillTestRunnerArguments.
+            setScript(exe, !isRemote)
             addArgument(command)
         }
     }
