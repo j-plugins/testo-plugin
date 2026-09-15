@@ -2,8 +2,6 @@ package com.github.xepozz.testo.tests.run
 
 import com.github.xepozz.testo.TestoComposerConfig
 import com.intellij.openapi.util.io.FileUtil
-import com.intellij.openapi.util.io.OSAgnosticPathUtil
-import com.intellij.util.PathUtil
 
 /** `--path` is relative to the process cwd, so it is computed from local paths, off the interpreter's path mapper. */
 object TestoRunPaths {
@@ -18,6 +16,10 @@ object TestoRunPaths {
     }
 
     private val WSL_UNC = Regex("^//wsl(?:\\.localhost|\\$)/([^/]+)(/.*)?$", RegexOption.IGNORE_CASE)
+
+    // These paths are Windows-shaped but the unit tests and CI run on Linux, so every helper must be pure string
+    // work: OSAgnosticPathUtil/PathUtilRt branch on the host OS (Platform.CURRENT feeds isWindowsUNCRoot).
+    private val WINDOWS_DRIVE = Regex("^[A-Za-z]:(?:/|$)")
 
     private data class Canonical(val distro: String?, val path: String)
 
@@ -36,9 +38,9 @@ object TestoRunPaths {
         // Keep //wsl.localhost/… as is: LocalFileSystem on Windows cannot see the bare /home/… form.
         val independent = FileUtil.toSystemIndependentName(configurationFilePath)
         // Testo resolves a config's paths against getcwd(), not the file, so only the default testo.php marks the root.
-        val name = PathUtil.getFileName(independent)
+        val name = independent.substringAfterLast('/')
         if (!name.equals(TestoComposerConfig.DEFAULT_CONFIG_NAME, ignoreCase = true)) return null
-        return OSAgnosticPathUtil.getParent(independent)
+        return parentPath(independent)
     }
 
     fun relativePath(targetPath: String, workingDirectory: String): PathResolution {
@@ -70,15 +72,29 @@ object TestoRunPaths {
         else PathResolution.Unrelated
     }
 
-    // canonicalize has already peeled a WSL path down to its Linux inner path, so isUncPath cannot misfire on it.
-    private fun isWindowsForm(path: String): Boolean =
-        OSAgnosticPathUtil.startsWithWindowsDrive(path) || OSAgnosticPathUtil.isUncPath(path)
+    private fun startsWithWindowsDrive(path: String): Boolean = WINDOWS_DRIVE.containsMatchIn(path)
+
+    // canonicalize has already peeled a WSL path down to its Linux inner path, so // here is a plain UNC share.
+    private fun isWindowsForm(path: String): Boolean = startsWithWindowsDrive(path) || path.startsWith("//")
+
+    private fun parentPath(independent: String): String? {
+        val cut = independent.lastIndexOf('/')
+        if (cut < 0) return null
+        val parent = independent.substring(0, cut)
+        return when {
+            parent.isEmpty() -> "/"
+            parent.length == 2 && startsWithWindowsDrive(parent) -> "$parent/"
+            // A cut above //host/share leaves no valid parent; the share root itself (3 separators) is kept.
+            independent.startsWith("//") && parent.count { it == '/' } < 3 -> null
+            else -> parent
+        }
+    }
 
     private fun canonicalize(path: String): Canonical {
         val trimmed = FileUtil.toSystemIndependentName(path).trimEnd('/')
         // A trimmed drive root ("D:") is the drive's current directory, not its root; keep the slash.
         val independent =
-            if (OSAgnosticPathUtil.startsWithWindowsDrive(trimmed) && trimmed.length == 2) "$trimmed/"
+            if (trimmed.length == 2 && startsWithWindowsDrive(trimmed)) "$trimmed/"
             else trimmed.ifEmpty { "/" }
         val match = WSL_UNC.matchEntire(independent) ?: return Canonical(null, independent)
         return Canonical(match.groupValues[1], match.groupValues[2].ifEmpty { "/" })
