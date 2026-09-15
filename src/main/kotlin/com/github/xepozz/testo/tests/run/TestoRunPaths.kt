@@ -2,6 +2,7 @@ package com.github.xepozz.testo.tests.run
 
 import com.github.xepozz.testo.TestoComposerConfig
 import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapi.util.io.OSAgnosticPathUtil
 import com.intellij.util.PathUtil
 
 /** `--path` is relative to the process cwd, so it is computed from local paths, off the interpreter's path mapper. */
@@ -37,7 +38,7 @@ object TestoRunPaths {
         // Testo resolves a config's paths against getcwd(), not the file, so only the default testo.php marks the root.
         val name = PathUtil.getFileName(independent)
         if (!name.equals(TestoComposerConfig.DEFAULT_CONFIG_NAME, ignoreCase = true)) return null
-        return PathUtil.getParentPath(independent).takeIf { it.isNotEmpty() }
+        return OSAgnosticPathUtil.getParent(independent)
     }
 
     fun relativePath(targetPath: String, workingDirectory: String): PathResolution {
@@ -51,8 +52,8 @@ object TestoRunPaths {
             return PathResolution.Unrelated
         }
 
-        // Linux paths (incl. the WSL inner path) are case-sensitive, Windows drive paths are not.
-        val caseSensitive = base.path.startsWith("/") && target.path.startsWith("/")
+        // Linux and WSL inner paths are case-sensitive even on a Windows host; only Windows drive/UNC forms are not.
+        val caseSensitive = !isWindowsForm(base.path) && !isWindowsForm(target.path)
         val relative = FileUtil.getRelativePath(base.path, target.path, '/', caseSensitive)
             ?: return PathResolution.Unrelated
 
@@ -69,8 +70,16 @@ object TestoRunPaths {
         else PathResolution.Unrelated
     }
 
+    // canonicalize has already peeled a WSL path down to its Linux inner path, so isUncPath cannot misfire on it.
+    private fun isWindowsForm(path: String): Boolean =
+        OSAgnosticPathUtil.startsWithWindowsDrive(path) || OSAgnosticPathUtil.isUncPath(path)
+
     private fun canonicalize(path: String): Canonical {
-        val independent = FileUtil.toSystemIndependentName(path).trimEnd('/')
+        val trimmed = FileUtil.toSystemIndependentName(path).trimEnd('/')
+        // A trimmed drive root ("D:") is the drive's current directory, not its root; keep the slash.
+        val independent =
+            if (OSAgnosticPathUtil.startsWithWindowsDrive(trimmed) && trimmed.length == 2) "$trimmed/"
+            else trimmed.ifEmpty { "/" }
         val match = WSL_UNC.matchEntire(independent) ?: return Canonical(null, independent)
         return Canonical(match.groupValues[1], match.groupValues[2].ifEmpty { "/" })
     }

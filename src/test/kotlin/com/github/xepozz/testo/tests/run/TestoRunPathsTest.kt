@@ -261,4 +261,51 @@ class TestoRunPathsTest {
             TestoRunPaths.resolveWorkingDirectory(null, "/repo/tests/suites.php") { "/repo" },
         )
     }
+
+    @Test
+    fun parentOfConfigurationFileKeepsWindowsDriveRoot() {
+        assertEquals("C:/", TestoRunPaths.parentOfConfigurationFile("C:/testo.php"))
+    }
+
+    @Test
+    fun parentOfConfigurationFileKeepsFilesystemRoot() {
+        assertEquals("/", TestoRunPaths.parentOfConfigurationFile("/testo.php"))
+    }
+
+    @Test
+    fun parentOfConfigurationFileKeepsWslUncRoot() {
+        assertEquals(
+            "//wsl.localhost/Ubuntu",
+            TestoRunPaths.parentOfConfigurationFile("\\\\wsl.localhost\\Ubuntu\\testo.php"),
+        )
+    }
+
+    @Test
+    fun uncPairCaseInsensitiveRelativizes() {
+        assertEquals(
+            "tests/FooTest.php",
+            relative("//SERVER/Share/app/tests/FooTest.php", "//server/share/app"),
+        )
+    }
+
+    @Test
+    fun linuxPairCaseSensitiveIsUnrelated() {
+        assertSame(
+            PathResolution.Unrelated,
+            TestoRunPaths.relativePath("/home/u/App/tests/FooTest.php", "/home/u/app"),
+        )
+    }
+
+    @Test
+    fun wslInnerPathIsCaseSensitiveUnrelated() {
+        assertSame(
+            PathResolution.Unrelated,
+            TestoRunPaths.relativePath("//wsl.localhost/Ubuntu/home/u/App/tests/FooTest.php", "/home/u/app"),
+        )
+    }
+
+    @Test
+    fun driveRootWorkingDirectoryRelativizes() {
+        assertEquals("tests/FooTest.php", relative("D:/tests/FooTest.php", "D:/"))
+    }
 }
