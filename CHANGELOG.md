@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [2026.10.262] - 2026-09-17
+
 ### Fixed
 
 - The run working directory now follows `testo.php`, so runs of a PHP app in a project subdirectory work instead of
@@ -181,7 +183,8 @@
 - Concurrent tests no longer nest inside one another in the test tree: the tree is built from the `nodeId`/`parentNodeId`
   Testo reports rather than from the order messages arrive in.
 
-[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.9.262...HEAD
+[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.10.262...HEAD
+[2026.10.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.9.262...v2026.10.262
 [2026.9.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.7.262...v2026.9.262
 [2026.7.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.5.262...v2026.7.262
 [2026.5.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.4.262...v2026.5.262
