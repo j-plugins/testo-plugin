@@ -98,6 +98,7 @@ class TestoRunStoreTest {
             configuration = "<configuration name=\"All tests\" />",
             startedAt = 1000,
             finishedAt = 2000,
+            workingDirectory = "/repo/app",
             timings = TestoRunTimings.Marks(1010, 1100, 1900, 1990),
             statuses = mapOf("passed" to 103, "failed" to 42),
             reports = listOf(

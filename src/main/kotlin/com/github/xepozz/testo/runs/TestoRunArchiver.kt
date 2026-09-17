@@ -52,8 +52,9 @@ internal object TestoRunArchiver {
                 // an HTML report is as much part of a run as its coverage. The one exception is a coverage report that
                 // lost the one-per-format dedup: it is the same run's data under a second path, and it is the loser
                 // the applied bundle already ignored.
+                val baseDirectory = props.workingDirectory ?: project.basePath
                 val resolved = props.reportStore.coverage().mapNotNull { ref ->
-                    resolveCoverageDataFile(ref, project, mapToLocal, writtenAfter)?.let { ref to it }
+                    resolveCoverageDataFile(ref, baseDirectory, mapToLocal, writtenAfter)?.let { ref to it }
                 }
                 val flagKeys = props.coverageFlagPaths.map { TestoCoverageKeys.normalize(it.toString()) }.toSet()
                 val winners = dedupeCoverageByFormat(resolved, flagKeys).toMap()
@@ -61,7 +62,7 @@ internal object TestoRunArchiver {
                 val reports = props.reportStore.all().map { ref ->
                     val local = when {
                         ref.isCoverage -> winners[ref]
-                        else -> resolveReport(ref, project, mapToLocal, writtenAfter)
+                        else -> resolveReport(ref, baseDirectory, mapToLocal, writtenAfter)
                     }
                     val stored = local?.let { capture(recording, ref, it, usedNames) }
                     StoredReport(ref.format, ref.name, ref.path, ref.relativePath, stored)
@@ -77,6 +78,7 @@ internal object TestoRunArchiver {
                         configuration = serializeConfiguration(props),
                         startedAt = recording.startedAt,
                         finishedAt = finishedAt,
+                        workingDirectory = props.workingDirectory.orEmpty(),
                         timings = runMarks(props, recording, finishedAt),
                         retention = recording.retention,
                         statuses = props.statusStore.counts().entries.associate { it.key.wireName to it.value },

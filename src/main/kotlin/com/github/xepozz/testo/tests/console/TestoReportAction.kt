@@ -57,6 +57,7 @@ import javax.swing.Timer
 class TestoReportsAction(
     private val reports: TestoReportStore,
     private val project: Project,
+    private val baseDirectory: () -> String?,
     private val mapToLocal: (String) -> String?,
 ) : AnAction(), CustomComponentAction, RightAlignedToolbarAction, DumbAware {
 
@@ -211,7 +212,7 @@ class TestoReportsAction(
             val cellRef = ref
             resolveReportOffEdt(
                 project, reports, resolving,
-                resolve = { startedAt -> resolveReport(cellRef, project, mapToLocal, startedAt) },
+                resolve = { startedAt -> resolveReport(cellRef, baseDirectory(), mapToLocal, startedAt) },
                 apply = { applyResolved(it, true) },
             )
         }
@@ -334,8 +335,8 @@ class TestoReportsAction(
                         add(openGroup("testo.report.open.webview", AllIcons.Actions.Preview, ReportOpenWay.WEB_VIEW))
                     }
                     add(openGroup("testo.report.open.browser", AllIcons.Nodes.PpWeb, ReportOpenWay.BROWSER))
-                    add(RevealReportAction({ ref }, project, mapToLocal, reports))
-                    add(CopyReportPathAction({ ref }, project, mapToLocal, reports))
+                    add(RevealReportAction({ ref }, baseDirectory, mapToLocal, reports))
+                    add(CopyReportPathAction({ ref }, baseDirectory, mapToLocal, reports))
                 }
             )
             JBPopupFactory.getInstance()
@@ -396,7 +397,9 @@ class TestoReportsAction(
                 resolve = { startedAt ->
                     val found = LinkedHashMap<String, Path>()
                     for (ref in coverage) {
-                        resolveCoverageDataFile(ref, project, mapToLocal, startedAt)?.let { found[ref.path] = it }
+                        resolveCoverageDataFile(ref, baseDirectory(), mapToLocal, startedAt)?.let {
+                            found[ref.path] = it
+                        }
                     }
                     found
                 },
@@ -584,7 +587,7 @@ private class AutoOpenToggle(
 
 private class RevealReportAction(
     private val target: () -> TestoReportRef,
-    private val project: Project,
+    private val baseDirectory: () -> String?,
     private val mapToLocal: (String) -> String?,
     private val reports: TestoReportStore,
 ) : AnAction(RevealFileAction.getActionName(), null, AllIcons.Nodes.Folder), DumbAware {
@@ -600,12 +603,12 @@ private class RevealReportAction(
         RevealFileAction.openFile(resolve() ?: return)
     }
 
-    private fun resolve(): Path? = resolveReport(target(), project, mapToLocal, reports.runStartedAt)
+    private fun resolve(): Path? = resolveReport(target(), baseDirectory(), mapToLocal, reports.runStartedAt)
 }
 
 private class CopyReportPathAction(
     private val target: () -> TestoReportRef,
-    private val project: Project,
+    private val baseDirectory: () -> String?,
     private val mapToLocal: (String) -> String?,
     private val reports: TestoReportStore,
 ) : AnAction(TestoBundle.message("testo.report.copy.path"), null, AllIcons.Actions.Copy), DumbAware {
@@ -622,7 +625,7 @@ private class CopyReportPathAction(
         CopyPasteManager.getInstance().setContents(StringSelection(path.toString()))
     }
 
-    private fun resolve(): Path? = resolveReport(target(), project, mapToLocal, reports.runStartedAt)
+    private fun resolve(): Path? = resolveReport(target(), baseDirectory(), mapToLocal, reports.runStartedAt)
 }
 
 // Via toUri(), not browse(File): the latter percent-encodes Windows separators and no browser resolves the result.
@@ -634,12 +637,12 @@ private fun browseReport(path: Path) = BrowserUtil.browse(path.toUri())
  */
 internal fun resolveCoverageDataFile(
     ref: TestoReportRef,
-    project: Project,
+    baseDirectory: String?,
     mapToLocal: (String) -> String?,
     writtenAfter: Long,
 ): Path? {
     val coverageXml = ref.coverageFormat == CoverageFormat.COVERAGE_XML
-    return reportPathCandidates(ref, project.basePath) { runCatching { mapToLocal(it) }.getOrNull() }
+    return reportPathCandidates(ref, baseDirectory) { runCatching { mapToLocal(it) }.getOrNull() }
         .asSequence()
         .mapNotNull { runCatching { Path.of(it) }.getOrNull() }
         .map { if (coverageXml && !it.fileName?.toString().equals("index.xml", ignoreCase = true)) it.resolve("index.xml") else it }
@@ -649,12 +652,12 @@ internal fun resolveCoverageDataFile(
 /** The announced report as a local file this run wrote, or `null` while there is none. Touches the filesystem. */
 internal fun resolveReport(
     ref: TestoReportRef,
-    project: Project,
+    baseDirectory: String?,
     mapToLocal: (String) -> String?,
     writtenAfter: Long,
 ): Path? =
     // The PHP plugin's mapper may throw over a path it does not know; that must not take the toolbar with it.
-    reportPathCandidates(ref, project.basePath) { runCatching { mapToLocal(it) }.getOrNull() }
+    reportPathCandidates(ref, baseDirectory) { runCatching { mapToLocal(it) }.getOrNull() }
         .asSequence()
         .mapNotNull { runCatching { Path.of(it) }.getOrNull() }
         .firstOrNull { isReportOf(it, writtenAfter) }

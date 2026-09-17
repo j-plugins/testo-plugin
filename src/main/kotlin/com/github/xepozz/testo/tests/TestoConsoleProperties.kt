@@ -73,6 +73,9 @@ class TestoConsoleProperties(
     // or every replay would spawn a new platform-history entry (and re-write per-test states).
     var replayProfile: com.intellij.execution.configurations.RunProfile? = null
 
+    @Volatile
+    var workingDirectory: String? = null
+
     // The coverage report files each `--coverage-*` flag of this run points at, set by the Coverage runner. They win
     // the one-per-format dedup — over a report a testo.php writer put somewhere the IDE does not control.
     @Volatile
@@ -84,7 +87,12 @@ class TestoConsoleProperties(
     var metadataArtifactPaths: Map<String, String> = emptyMap()
 
     // getLocalPath, not getLocalFile: the report was written moments ago and the VFS may not know the file yet.
-    val reportsAction = TestoReportsAction(reportStore, project) { path -> pathMapper.getLocalPath(path) }
+    val reportsAction =
+        TestoReportsAction(
+            reportStore,
+            project,
+            { workingDirectory ?: project.basePath },
+        ) { path -> pathMapper.getLocalPath(path) }
 
     // Guards the channel-tab install: set once whoever wires the tabs first (the run-path ExecutionListener or the
     // debug runner, which installs them directly), so the other side is a no-op instead of a double install.

@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- The run working directory now follows `testo.php`, so runs of a PHP app in a project subdirectory work instead of
+  starting from the project root.
+- Running a single test, file, or directory no longer drops `--path` on remote (Docker Compose) and WSL interpreters,
+  which had silently run the whole suite.
+- Remote interpreters no longer show a false "Path mappings are not configured" warning when the mappings are correct.
+
 ## [2026.9.262] - 2026-08-26
 
 ### Added

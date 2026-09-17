@@ -47,6 +47,7 @@ data class TestoRunManifest(
     val configuration: String = "",
     val startedAt: Long = 0,
     val finishedAt: Long = 0,
+    val workingDirectory: String = "",
     /**
      * The toolbar clock's own marks. Kept apart from [startedAt]/[finishedAt], which bracket the *archive*: these are
      * what the run summary renders (and breaks into startup / tests / post-processing).
@@ -64,6 +65,6 @@ data class TestoRunManifest(
     val metadataArtifacts: Map<String, String> = emptyMap(),
 ) {
     companion object {
-        const val VERSION = 4
+        const val VERSION = 5
     }
 }

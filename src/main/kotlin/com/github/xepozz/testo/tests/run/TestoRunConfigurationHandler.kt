@@ -1,5 +1,7 @@
 package com.github.xepozz.testo.tests.run
 
+import com.github.xepozz.testo.TestoBundle
+import com.intellij.execution.ExecutionException
 import com.intellij.openapi.project.Project
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
 import com.jetbrains.php.testFramework.run.PhpTestRunConfigurationHandler
@@ -24,7 +26,8 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         command: String,
     ) {
         commandSettings.apply {
-            setScript(exe, true)
+            // Framework paths of a remote interpreter are already remote — see fillTestRunnerArguments.
+            setScript(exe, !isRemote)
             addArgument(command)
         }
     }
@@ -76,11 +79,8 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         workingDirectory: String
     ) {
         if (directory.isEmpty()) return
-
-        phpCommandSettings.apply {
-            addArgument("--path")
-            addRelativePathArgument(directory, workingDirectory)
-        }
+        testoPathArguments(directory, workingDirectory, directoryScope = true)
+            .forEach { phpCommandSettings.addArgument(it) }
     }
 
     override fun runFile(
@@ -90,11 +90,8 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         workingDirectory: String
     ) {
         if (file.isEmpty()) return
-
-        phpCommandSettings.apply {
-            addArgument("--path")
-            addRelativePathArgument(file, workingDirectory)
-        }
+        testoPathArguments(file, workingDirectory, directoryScope = false)
+            .forEach { phpCommandSettings.addArgument(it) }
     }
 
     override fun runMethod(
@@ -109,8 +106,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         val parsed = parseMethodName(methodName)
 
         phpCommandSettings.apply {
-            addArgument("--path")
-            addRelativePathArgument(file, workingDirectory)
+            testoPathArguments(file, workingDirectory, directoryScope = false).forEach { addArgument(it) }
             if (parsed.method.isNotEmpty()) {
                 addArgument("--filter")
                 addArgument(parsed.method)
@@ -121,6 +117,21 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
             }
         }
     }
+
+    // A bare `--path` would silently run the whole suite, so an unresolvable target fails the run instead.
+    fun testoPathArguments(
+        path: String,
+        workingDirectory: String,
+        directoryScope: Boolean,
+    ): List<String> = when (val resolution = TestoRunPaths.relativePath(path, workingDirectory)) {
+        is TestoRunPaths.PathResolution.Relative -> listOf("--path", resolution.path)
+        TestoRunPaths.PathResolution.WorkingDirectory, TestoRunPaths.PathResolution.Ancestor ->
+            if (directoryScope) emptyList() else throw outsideWorkingDirectory(path, workingDirectory)
+        TestoRunPaths.PathResolution.Unrelated -> throw outsideWorkingDirectory(path, workingDirectory)
+    }
+
+    private fun outsideWorkingDirectory(path: String, workingDirectory: String) =
+        ExecutionException(TestoBundle.message("testo.run.path.outside", path, workingDirectory))
 
     data class ParsedMethodName(
         val method: String,
