@@ -16,6 +16,7 @@ import com.intellij.execution.ui.ConsoleView
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.util.PathMappingSettings
 import com.intellij.util.PathUtil
 import com.jetbrains.php.PhpBundle
@@ -154,8 +155,20 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     ): String? = TestoRunPaths.resolveWorkingDirectory(
         customWorkingDirectory = settings.commandLineSettings.workingDirectory,
         configurationFilePath = localConfigurationFile(settings, config),
+        executableRoot = { executableProjectRoot(config) },
         fallback = { super.getWorkingDirectory(project, settings, config) },
     )
+
+    private fun executableProjectRoot(config: PhpTestFrameworkConfiguration?): String? {
+        val executable = config?.executablePath?.takeIf { it.isNotEmpty() } ?: return null
+        val basePath = project.basePath ?: return null
+        val local = interpreter?.takeIf { it.isRemote }?.let { pathMappings(it)?.convertToLocal(executable) }
+            ?: executable
+
+        return TestoRunPaths.projectRootOfExecutable(local, basePath) {
+            LocalFileSystem.getInstance().findFileByPath(it) != null
+        }
+    }
 
     private fun localConfigurationFile(
         settings: PhpTestRunConfigurationSettings,
@@ -204,9 +217,17 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         command.setWorkingDir(workingDirectory)
         lastWorkingDirectory = workingDirectory
 
+        val mappings = interpreter.takeIf { it.isRemote }?.let { pathMappings(it) }
+
         myHandler.prepareArguments(arguments, testoSettings)
         addReportFlags(arguments, interpreter)
-        myHandler.prepareCommand(project, command, executablePath, null, testoSettings.runnerSettings.command)
+        myHandler.prepareCommand(
+            project,
+            command,
+            toRemoteIfMapped(executablePath, mappings),
+            null,
+            testoSettings.runnerSettings.command,
+        )
 
         command.importCommandLineSettings(settings.commandLineSettings, workingDirectory)
         command.addEnvs(env)
@@ -219,6 +240,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
             command,
             frameworkConfig,
             myHandler,
+            mappings,
         )
 
         return command
@@ -264,6 +286,11 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     companion object Companion {
         const val ID = "TestoConsoleCommandRunConfiguration"
 
+        // convertToRemote returns the input unchanged when no mapping matches, which is what an already-remote
+        // framework path needs; a host path (a per-interpreter configuration fabricated from the local one) is mapped.
+        private fun toRemoteIfMapped(path: String, mappings: PathMappingSettings?) =
+            mappings?.convertToRemote(path) ?: path
+
         private fun fillTestRunnerArguments(
             project: Project,
             workingDirectory: String,
@@ -272,6 +299,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
             command: PhpCommandSettings,
             configuration: PhpTestFrameworkConfiguration?,
             handler: PhpTestRunConfigurationHandler,
+            mappings: PathMappingSettings?,
         ) {
             val testRunnerOptions = testRunnerSettings.testRunnerOptions
             if (StringUtil.isNotEmpty(testRunnerOptions)) {
@@ -283,12 +311,12 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
             val configurationFilePath = getConfigurationFile(testRunnerSettings, configuration)
             if (!configurationFilePath.isNullOrEmpty()) {
                 command.addArgument(handler.configFileOption)
-                // A remote interpreter's framework paths are already remote; mapping them flags
-                // a false "Path mappings are not configured".
+                // A remote interpreter's framework paths are usually already remote; running them through the path
+                // processor flags a false "Path mappings are not configured", so map only when a mapping matches.
                 if (testRunnerSettings.isUseAlternativeConfigurationFile) {
                     command.addPathArgument(configurationFilePath)
                 } else {
-                    command.addArgument(configurationFilePath)
+                    command.addArgument(toRemoteIfMapped(configurationFilePath, mappings))
                 }
             }
 

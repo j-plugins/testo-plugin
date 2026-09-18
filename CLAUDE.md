@@ -275,10 +275,11 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
 - `--log-html`/`--log-junit` at an IDE-managed path (`TestoReportFlags`, `logHtml` on / `logJunit` off by default),
   emitted from `createCommand` so every executor gets them — local interpreters only, and the archive copies the
   reports into history the same way it does coverage. Not in `prepareArguments`: that has no project/interpreter.
-- `--config <file>` when an alternative configuration file is set (`getConfigFileOption()`). Framework-settings paths
-  are already in the interpreter's filesystem for a remote interpreter, so the executable and the framework's own
-  config file are passed **unmapped** (raw `setScript`/`addArgument`); only the *alternative* file is forward-mapped
-  (`addPathArgument`). Mapping an already-remote path pops a false "Path mappings are not configured" warning.
+- `--config <file>` when an alternative configuration file is set (`getConfigFileOption()`). A remote interpreter's
+  framework-settings paths (executable, its own config file) are normally already remote, so they never go through the
+  path processor (`setScript(exe, false)` / `addArgument`) — that pops a false "Path mappings are not configured". They
+  are forward-mapped with `convertToRemote` only when a mapping matches: a per-interpreter configuration the platform
+  fabricates from the local one carries host paths. Only the *alternative* file goes through `addPathArgument`.
 - Scope flags: `Type` → `--suite <type>`; `Directory`/`File` → `--path <relative path>`;
   `Method` → `--path <file> --filter <method> [--data-provider <name>]`; `ConfigurationFile` → nothing
   (the config file argument alone drives the run). `--path` is computed **locally** by `TestoRunPaths` (never through
@@ -290,7 +291,9 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
   INI options depending on `coverageEngine`.
 - Working directory (`getWorkingDirectory` → `TestoRunPaths`): a custom cwd, else the parent of a configured `testo.php`
   (reverse-mapped for a remote interpreter and kept as `//wsl.localhost/…`, never bare `/home/…` — `LocalFileSystem` on
-  Windows cannot see the inner Linux path), else the platform fallback (composer parent / content root / base path).
+  Windows cannot see the inner Linux path), else the project root above the executable (`projectRootOfExecutable`: the
+  nearest ancestor of the reverse-mapped executable holding `testo.php`/`composer.json`, within `project.basePath`),
+  else the platform fallback (composer parent / content root / base path).
 
 `methodName` is an encoded selector, not just a name:
 

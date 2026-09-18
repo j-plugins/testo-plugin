@@ -21,17 +21,40 @@ object TestoRunPaths {
     // work: OSAgnosticPathUtil/PathUtilRt branch on the host OS (Platform.CURRENT feeds isWindowsUNCRoot).
     private val WINDOWS_DRIVE = Regex("^[A-Za-z]:(?:/|$)")
 
+    private const val COMPOSER_MANIFEST = "composer.json"
+
     private data class Canonical(val distro: String?, val path: String)
 
     fun resolveWorkingDirectory(
         customWorkingDirectory: String?,
         configurationFilePath: String?,
+        executableRoot: () -> String? = { null },
         fallback: () -> String?,
     ): String? {
         if (!customWorkingDirectory.isNullOrEmpty()) return customWorkingDirectory
         parentOfConfigurationFile(configurationFilePath)?.let { return it }
+        executableRoot()?.let { return it }
         return fallback()
     }
+
+    // The platform fallback is the content root, which a nested project's interpreter may not even map.
+    fun projectRootOfExecutable(executable: String, basePath: String, exists: (String) -> Boolean): String? {
+        // A globally installed binary (~/.composer/vendor/bin/testo) says nothing about this project's root.
+        if (relativePath(executable, basePath) !is PathResolution.Relative) return null
+
+        var directory = parentPath(FileUtil.toSystemIndependentName(executable).trimEnd('/'))
+        while (directory != null) {
+            if (exists(childPath(directory, TestoComposerConfig.DEFAULT_CONFIG_NAME))
+                || exists(childPath(directory, COMPOSER_MANIFEST))
+            ) return directory
+            if (relativePath(directory, basePath) == PathResolution.WorkingDirectory) return null
+            directory = parentPath(directory)
+        }
+        return null
+    }
+
+    private fun childPath(directory: String, name: String) =
+        if (directory.endsWith('/')) "$directory$name" else "$directory/$name"
 
     fun parentOfConfigurationFile(configurationFilePath: String?): String? {
         if (configurationFilePath.isNullOrEmpty()) return null
