@@ -4,11 +4,16 @@
 
 ## [Unreleased]
 
+## [2026.11.262] - 2026-09-20
+
 ### Fixed
 
-- Remote interpreters whose Testo settings still hold host paths (a fabricated per-interpreter configuration, typically
-  Docker Compose in `run` mode) now get the executable mapped and the working directory taken from the project root
-  above it.
+- Docker Compose interpreters in `run` lifecycle mode no longer launch the host `vendor/bin/testo`: when the Testo
+  settings bound to a remote interpreter still hold host paths, the executable and its config file are mapped into
+  the container before the run starts.
+- In a monorepo with `vendor/bin/testo` at the root and a test inside a nested Composer package, the run now starts
+  from the repository root rather than from the package directory, where `vendor/autoload.php` does not exist. The
+  working directory used to follow the IDE's Composer project list, so two checkouts of one repository ran differently.
 
 ## [2026.10.262] - 2026-09-17
 
@@ -189,7 +194,8 @@
 - Concurrent tests no longer nest inside one another in the test tree: the tree is built from the `nodeId`/`parentNodeId`
   Testo reports rather than from the order messages arrive in.
 
-[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.10.262...HEAD
+[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.11.262...HEAD
+[2026.11.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.10.262...v2026.11.262
 [2026.10.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.9.262...v2026.10.262
 [2026.9.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.7.262...v2026.9.262
 [2026.7.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.5.262...v2026.7.262
