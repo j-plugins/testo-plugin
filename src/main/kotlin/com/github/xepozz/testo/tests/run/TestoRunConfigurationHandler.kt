@@ -26,7 +26,7 @@ class TestoRunConfigurationHandler : PhpTestRunConfigurationHandler {
         command: String,
     ) {
         commandSettings.apply {
-            // Framework paths of a remote interpreter are already remote — see fillTestRunnerArguments.
+            // The caller already mapped the executable if a mapping matched — see TestoRunConfiguration.createCommand.
             setScript(exe, !isRemote)
             addArgument(command)
         }

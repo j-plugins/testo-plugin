@@ -308,4 +308,117 @@ class TestoRunPathsTest {
     fun driveRootWorkingDirectoryRelativizes() {
         assertEquals("tests/FooTest.php", relative("D:/tests/FooTest.php", "D:/"))
     }
+
+    private fun existing(vararg paths: String): (String) -> Boolean {
+        val present = paths.toSet()
+        return { present.contains(it) }
+    }
+
+    @Test
+    fun projectRootOfExecutableFindsNestedComposerProject() {
+        assertEquals(
+            "/Users/e/geo/app",
+            TestoRunPaths.projectRootOfExecutable(
+                "/Users/e/geo/app/vendor/bin/testo",
+                "/Users/e/geo",
+                existing("/Users/e/geo/app/composer.json", "/Users/e/geo/composer.json"),
+            ),
+        )
+    }
+
+    @Test
+    fun projectRootOfExecutableAcceptsTestoConfigAsMarker() {
+        assertEquals(
+            "/Users/e/geo/app",
+            TestoRunPaths.projectRootOfExecutable(
+                "/Users/e/geo/app/vendor/bin/testo",
+                "/Users/e/geo",
+                existing("/Users/e/geo/app/testo.php"),
+            ),
+        )
+    }
+
+    @Test
+    fun projectRootOfExecutableOutsideBaseIsNull() {
+        assertSame(
+            null,
+            TestoRunPaths.projectRootOfExecutable(
+                "/Users/e/.composer/vendor/bin/testo",
+                "/Users/e/geo",
+                existing("/Users/e/.composer/composer.json"),
+            ),
+        )
+    }
+
+    @Test
+    fun projectRootOfExecutableWithoutMarkersIsNull() {
+        assertSame(
+            null,
+            TestoRunPaths.projectRootOfExecutable(
+                "/Users/e/geo/app/vendor/bin/testo",
+                "/Users/e/geo",
+                existing("/Users/e/composer.json"),
+            ),
+        )
+    }
+
+    @Test
+    fun projectRootOfExecutableStopsAtBase() {
+        assertEquals(
+            "/Users/e/geo",
+            TestoRunPaths.projectRootOfExecutable(
+                "/Users/e/geo/vendor/bin/testo",
+                "/Users/e/geo",
+                existing("/Users/e/geo/composer.json"),
+            ),
+        )
+    }
+
+    @Test
+    fun projectRootOfExecutableWindowsFormIsCaseInsensitive() {
+        assertEquals(
+            "D:/proj/app",
+            TestoRunPaths.projectRootOfExecutable(
+                "D:/proj/app/vendor/bin/testo",
+                "d:/proj",
+                existing("D:/proj/app/composer.json"),
+            ),
+        )
+    }
+
+    @Test
+    fun projectRootOfExecutableKeepsWslUncForm() {
+        assertEquals(
+            "//wsl.localhost/Ubuntu/home/u/proj",
+            TestoRunPaths.projectRootOfExecutable(
+                "//wsl.localhost/Ubuntu/home/u/proj/vendor/bin/testo",
+                "/home/u/proj",
+                existing("//wsl.localhost/Ubuntu/home/u/proj/testo.php"),
+            ),
+        )
+    }
+
+    @Test
+    fun resolveWorkingDirectoryPrefersConfigParentOverExecutableRoot() {
+        assertEquals(
+            "/repo/app",
+            TestoRunPaths.resolveWorkingDirectory(null, "/repo/app/testo.php", { "/repo/other" }) { "/repo" },
+        )
+    }
+
+    @Test
+    fun resolveWorkingDirectoryPrefersExecutableRootOverFallback() {
+        assertEquals(
+            "/repo/app",
+            TestoRunPaths.resolveWorkingDirectory(null, null, { "/repo/app" }) { "/repo" },
+        )
+    }
+
+    @Test
+    fun resolveWorkingDirectoryFallsBackWithoutExecutableRoot() {
+        assertEquals(
+            "/repo",
+            TestoRunPaths.resolveWorkingDirectory(null, null, { null }) { "/repo" },
+        )
+    }
 }

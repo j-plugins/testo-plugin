@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Remote interpreters whose Testo settings still hold host paths (a fabricated per-interpreter configuration, typically
+  Docker Compose in `run` mode) now get the executable mapped and the working directory taken from the project root
+  above it.
+
 ## [2026.10.262] - 2026-09-17
 
 ### Fixed
