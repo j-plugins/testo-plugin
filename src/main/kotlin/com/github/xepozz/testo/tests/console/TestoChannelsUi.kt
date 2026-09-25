@@ -85,7 +85,6 @@ import java.awt.Rectangle
 import java.awt.Image
 import java.awt.RenderingHints
 import java.lang.reflect.Field
-import java.util.concurrent.ConcurrentHashMap
 import javax.imageio.ImageIO
 import javax.swing.Icon
 import javax.swing.ImageIcon
@@ -331,11 +330,10 @@ object TestoChannelsUi {
             qualifies: (ChannelOutputStore.Chunk) -> Boolean,
             addTab: (String) -> Unit,
         ): (ChannelOutputStore.Chunk) -> Unit {
-            val known = ConcurrentHashMap.newKeySet<String>().apply { addAll(tabbedChannels) }
+            val detector = NewChannelDetector(tabbedChannels) { levelFilter.isVisible(it.level) && qualifies(it) }
             val generation = renderGeneration
             return { chunk ->
-                val channel = chunk.channel
-                if (channel != null && levelFilter.isVisible(chunk.level) && qualifies(chunk) && known.add(channel)) {
+                detector.offer(chunk)?.let { channel ->
                     ApplicationManager.getApplication().invokeLater {
                         if (generation == renderGeneration) addTab(channel)
                     }
