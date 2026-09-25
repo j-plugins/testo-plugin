@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Channels a test starts writing to after it was selected — a bench's result tables — now get their tabs.
+
 ## [2026.11.262] - 2026-09-20
 
 ### Fixed
