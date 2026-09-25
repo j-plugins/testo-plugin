@@ -85,6 +85,7 @@ import java.awt.Rectangle
 import java.awt.Image
 import java.awt.RenderingHints
 import java.lang.reflect.Field
+import java.util.concurrent.ConcurrentHashMap
 import javax.imageio.ImageIO
 import javax.swing.Icon
 import javax.swing.ImageIcon
@@ -230,6 +231,8 @@ object TestoChannelsUi {
         private var currentSelected: SMTestProxy? = null
         private var currentModel: TestFrameworkRunningModel? = null
         private var currentViewer: TestResultsViewer? = null
+        // Bumped on every re-render, so a tab scheduled by the previous one's watcher is dropped.
+        private var renderGeneration = 0
 
         init {
             // Toggling a log level rebuilds the shown tabs: hidden-only channels disappear, re-enabled ones return.
@@ -261,6 +264,7 @@ object TestoChannelsUi {
             tabbed.removeAllTabs()
             lazyTabs.clear()
             disposeDynamicConsoles()
+            renderGeneration++
             currentSelected = selected
             currentModel = model
             currentViewer = viewer
@@ -271,7 +275,7 @@ object TestoChannelsUi {
             }
 
             if (!selected.isLeaf) {
-                val leaves = selected.allTests.filter { it !== selected && it.isLeaf }
+                val leaves = leavesOf(selected)
 
                 // Output first: it is the raw process console, outside the channel-aggregating "All" scope.
                 val outputTab =
@@ -283,23 +287,16 @@ object TestoChannelsUi {
                 // All: syntax-highlighted cards, language picked per message from its own channel.
                 val allCards = newCards(null, aggregate = true)
                 store.header().forEach { allCards.add(it) }
-                addCardsAggregate(allCards, viewer, leaves) { key, sink -> store.attachAll(key, sink) }
+                val channels = channelsAcross(leaves).filter { channelHasVisible(leaves, it) }
+                val onNewChannel = newChannelWatcher(channels, { !it.flags.testOnly }) { addAggregateChannelTab(tabbed, viewer, selected, it) }
+                addCardsAggregate(allCards, viewer, leaves) { key, sink ->
+                    store.attachAll(key) { chunk -> sink(chunk); onNewChannel(chunk) }
+                }
                 addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
 
                 // Every channel renders as cards (one per test, that test's messages merged); only the Output tab above
                 // stays a console. A language channel highlights each card; a format-less one keeps its ANSI.
-                for (channel in channelsAcross(leaves)) {
-                    if (!channelHasVisible(leaves, channel)) continue
-                    val sample = leaves.firstNotNullOfOrNull { leaf ->
-                        keyOf(leaf)?.let { store.channelsFor(it)[channel] }?.takeIf { it.isNotEmpty() }
-                    } ?: emptyList()
-                    // Build this channel's cards only when its tab is opened — see addLazyTab.
-                    addLazyTab(tabbed, humanize(channel), channelIcon(channel, sample)) {
-                        val cards = newCards(channelFileType(channel), aggregate = true, showChannel = false)
-                        addCardsAggregate(cards, viewer, leaves) { key, sink -> store.attachChannel(key, channel, sink) }
-                        cards.component
-                    }
-                }
+                channels.forEach { addAggregateChannelTab(tabbed, viewer, selected, it) }
                 selectPreferredTab(tabbed, previousTitle, outputTab)
                 return
             }
@@ -310,24 +307,63 @@ object TestoChannelsUi {
             // Metadata second, when this test reported some.
             if (hasMetadata(listOf(selected))) addMetadataTab(tabbed, viewer, listOf(selected), showLeafLabels = false)
             val header = store.header()
+            val channels = key?.let { store.channelsFor(it) }.orEmpty()
+                .filterValues { chunks -> chunks.any { levelFilter.isVisible(it.level) } }.keys
             // All: highlighted cards (per-message language). Header chunks first, then the live "all" stream replays
             // and keeps appending, so a streaming test's messages show up as they arrive.
             if (key != null || header.isNotEmpty()) {
                 val allCards = newCards(null)
                 header.forEach { allCards.add(it) }
-                if (key != null) subscriptions += store.attachAll(key) { allCards.add(it) }
+                if (key != null) {
+                    val onNewChannel = newChannelWatcher(channels, { true }) { addLeafChannelTab(tabbed, key, it) }
+                    subscriptions += store.attachAll(key) { chunk -> allCards.add(chunk); onNewChannel(chunk) }
+                }
                 addComponentTab(tabbed, ALL_TAB, AllIcons.Actions.Show, allCards.component)
             }
-            if (key != null) {
-                for ((channel, chunks) in store.channelsFor(key)) {
-                    if (chunks.none { levelFilter.isVisible(it.level) }) continue
-                    val cards = newCards(channelFileType(channel), showChannel = false)
-                    subscriptions += store.attachChannel(key, channel) { cards.add(it) }
-                    addComponentTab(tabbed, humanize(channel), channelIcon(channel, chunks), cards.component)
-                }
-            }
+            if (key != null) channels.forEach { addLeafChannelTab(tabbed, key, it) }
             selectPreferredTab(tabbed, previousTitle, outputTab)
         }
+
+        // The platform selects a test as it starts, so its tabs are built before a late channel exists — a bench
+        // prints its tables only once every iteration has run.
+        private fun newChannelWatcher(
+            tabbedChannels: Collection<String>,
+            qualifies: (ChannelOutputStore.Chunk) -> Boolean,
+            addTab: (String) -> Unit,
+        ): (ChannelOutputStore.Chunk) -> Unit {
+            val known = ConcurrentHashMap.newKeySet<String>().apply { addAll(tabbedChannels) }
+            val generation = renderGeneration
+            return { chunk ->
+                val channel = chunk.channel
+                if (channel != null && levelFilter.isVisible(chunk.level) && qualifies(chunk) && known.add(channel)) {
+                    ApplicationManager.getApplication().invokeLater {
+                        if (generation == renderGeneration) addTab(channel)
+                    }
+                }
+            }
+        }
+
+        private fun addLeafChannelTab(tabbed: JBEditorTabs, key: String, channel: String) {
+            val cards = newCards(channelFileType(channel), showChannel = false)
+            subscriptions += store.attachChannel(key, channel) { cards.add(it) }
+            addComponentTab(tabbed, humanize(channel), channelIcon(channel, store.channelsFor(key)[channel].orEmpty()), cards.component)
+        }
+
+        private fun addAggregateChannelTab(tabbed: JBEditorTabs, viewer: TestResultsViewer, selected: SMTestProxy, channel: String) {
+            val sample = leavesOf(selected).firstNotNullOfOrNull { leaf ->
+                keyOf(leaf)?.let { store.channelsFor(it)[channel] }?.takeIf { it.isNotEmpty() }
+            } ?: emptyList()
+            // Build this channel's cards only when its tab is opened — see addLazyTab. The leaves are read then too, so
+            // the ones added since the selection are in.
+            addLazyTab(tabbed, humanize(channel), channelIcon(channel, sample)) {
+                val cards = newCards(channelFileType(channel), aggregate = true, showChannel = false)
+                addCardsAggregate(cards, viewer, leavesOf(selected)) { key, sink -> store.attachChannel(key, channel, sink) }
+                cards.component
+            }
+        }
+
+        private fun leavesOf(selected: SMTestProxy): List<SMTestProxy> =
+            selected.allTests.filter { it !== selected && it.isLeaf }
 
         // Reselect the tab whose title the user last had open, so a rebuild keeps their channel; Output when it is gone.
         private fun selectPreferredTab(tabbed: JBEditorTabs, preferredTitle: String?, fallback: TabInfo?) {
