@@ -4,9 +4,12 @@
 
 ## [Unreleased]
 
+## [2026.12.262] - 2026-09-25
+
 ### Fixed
 
-- Channels a test starts writing to after it was selected — a bench's result tables — now get their tabs.
+- Bench result tables and other channels a test starts writing to after its node was selected now get
+  their tabs right away, instead of only after selecting the node again.
 
 ## [2026.11.262] - 2026-09-20
 
@@ -198,7 +201,8 @@
 - Concurrent tests no longer nest inside one another in the test tree: the tree is built from the `nodeId`/`parentNodeId`
   Testo reports rather than from the order messages arrive in.
 
-[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.11.262...HEAD
+[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.12.262...HEAD
+[2026.12.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.11.262...v2026.12.262
 [2026.11.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.10.262...v2026.11.262
 [2026.10.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.9.262...v2026.10.262
 [2026.9.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.7.262...v2026.9.262
