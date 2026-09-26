@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Test-file icons no longer parse every PHP file in the project view, which raised "Outdated stub in index" errors.
+
 ## [2026.12.262] - 2026-09-25
 
 ### Fixed

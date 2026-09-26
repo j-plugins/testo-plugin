@@ -3,6 +3,7 @@ package com.github.xepozz.testo.ui
 import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.TestoUtil
 import com.github.xepozz.testo.isTestoFile
+import com.github.xepozz.testo.topLevelClasses
 import com.intellij.ide.IconProvider
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.progress.ProcessCanceledException
@@ -10,9 +11,7 @@ import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.Iconable
 import com.intellij.psi.PsiElement
 import com.intellij.psi.search.GlobalSearchScopesCore
-import com.intellij.psi.util.PsiTreeUtil
 import com.jetbrains.php.lang.psi.PhpFile
-import com.jetbrains.php.lang.psi.elements.PhpClass
 import javax.swing.Icon
 
 class TestoIconProvider : IconProvider() {
@@ -38,7 +37,7 @@ class TestoIconProvider : IconProvider() {
                 return null
             }
 
-            val phpClasses = PsiTreeUtil.findChildrenOfType(phpFile, PhpClass::class.java)
+            val phpClasses = phpFile.topLevelClasses()
 
             when {
                 phpClasses.isEmpty() -> TestoIcons.Layered.FUNCTION

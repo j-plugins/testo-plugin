@@ -123,7 +123,6 @@ fun PsiFile.isTestoFile(): Boolean {
     return try {
         isTestoClassFile()
             || isTestoFunctionFile()
-            || isTestBenchFile()
             || isTestoConfigFile()
     } catch (e: ProcessCanceledException) {
         throw e
@@ -133,17 +132,19 @@ fun PsiFile.isTestoFile(): Boolean {
     }
 }
 
-fun PhpFile.isTestoConfigFile() = PsiTreeUtil.findChildrenOfType(this, ClassReference::class.java)
-    .any { it.parent is NewExpression && it.fqn == TestoClasses.APPLICATION_CONFIG }
+// No AST walks unless unavoidable: isTestoFile runs for every file the project view paints, and loading an AST behind
+// a stale stub index is what the platform reports as "Outdated stub in index".
+fun PhpFile.isTestoConfigFile() = viewProvider.contents.contains(APPLICATION_CONFIG_SHORT_NAME)
+    && PsiTreeUtil.findChildrenOfType(this, ClassReference::class.java)
+        .any { it.parent is NewExpression && it.fqn == TestoClasses.APPLICATION_CONFIG }
 
-fun PhpFile.isTestoClassFile() = PsiTreeUtil.findChildrenOfType(this, PhpClass::class.java)
-    .any { it.isTestoClass() }
+private val APPLICATION_CONFIG_SHORT_NAME = TestoClasses.APPLICATION_CONFIG.substringAfterLast('\\')
 
-fun PhpFile.isTestoFunctionFile() = PsiTreeUtil.findChildrenOfType(this, Function::class.java)
-    .any { it.isTestoFunction() }
+fun PhpFile.topLevelClasses() = topLevelDefs.values().filterIsInstance<PhpClass>()
 
-fun PhpFile.isTestBenchFile() = PsiTreeUtil.findChildrenOfType(this, Function::class.java)
-    .any { it.isTestoBench() }
+fun PhpFile.isTestoClassFile() = topLevelClasses().any { it.isTestoClass() }
+
+fun PhpFile.isTestoFunctionFile() = topLevelDefs.values().any { it is Function && it.isTestoFunction() }
 
 fun <T> Sequence<T>.takeWhileInclusive(predicate: (T) -> Boolean) = sequence {
     with(iterator()) {
