@@ -209,6 +209,38 @@ class MixinPsiTest : BasePlatformTestCase() {
         assertFalse("File without test class should not be a Testo class file", psiFile.isTestoClassFile())
     }
 
+    fun testIsTestoFile_namespacedBenchClass() {
+        val psiFile = myFixture.configureByText(
+            "Benchmarks.php",
+            """<?php namespace App\Perf { class Sorting { #[\Testo\Bench] public function sort(): void {} } }"""
+        )
+        assertTrue("A namespaced class holding a bench makes a Testo file", psiFile.isTestoFile())
+    }
+
+    fun testIsTestoFile_namespacedTestFunction() {
+        val psiFile = myFixture.configureByText(
+            "checks.php",
+            """<?php namespace App; #[\Testo\Test] function checksSomething(): void {}"""
+        )
+        assertTrue("A namespaced test function makes a Testo file", psiFile.isTestoFile())
+    }
+
+    fun testIsTestoFile_configFile() {
+        val psiFile = myFixture.configureByText(
+            "testo.php",
+            """<?php use Testo\Application\Config\ApplicationConfig; return new ApplicationConfig();"""
+        )
+        assertTrue("A file building an ApplicationConfig is a Testo file", psiFile.isTestoFile())
+    }
+
+    fun testIsTestoFile_anonymousTestClassIsIgnored() {
+        val psiFile = myFixture.configureByText(
+            "factory.php",
+            """<?php return new class { public function testA(): void {} };"""
+        )
+        assertFalse("An anonymous class is no test case", psiFile.isTestoFile())
+    }
+
     // ---- Multiple methods in one class ----
 
     fun testMultipleMethods_mixedTestAndNonTest() {
