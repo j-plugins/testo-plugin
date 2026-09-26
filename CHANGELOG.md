@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [2026.13.262] - 2026-09-27
+
 ### Fixed
 
 - Test-file icons no longer parse every PHP file in the project view, which raised "Outdated stub in index" errors.
@@ -205,7 +207,8 @@
 - Concurrent tests no longer nest inside one another in the test tree: the tree is built from the `nodeId`/`parentNodeId`
   Testo reports rather than from the order messages arrive in.
 
-[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.12.262...HEAD
+[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.13.262...HEAD
+[2026.13.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.12.262...v2026.13.262
 [2026.12.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.11.262...v2026.12.262
 [2026.11.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.10.262...v2026.11.262
 [2026.10.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.9.262...v2026.10.262
