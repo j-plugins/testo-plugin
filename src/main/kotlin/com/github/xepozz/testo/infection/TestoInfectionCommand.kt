@@ -14,6 +14,7 @@ internal class TestoInfectionLaunch(
     val ready: TestoMutationReadiness.Ready,
     val sourceFiles: List<String>,
     val workDir: Path,
+    val options: TestoInfectionOptions = TestoInfectionOptions(),
 ) {
     val coverageDir: Path get() = workDir.resolve("coverage")
     val htmlReport: Path get() = workDir.resolve("report.html")
@@ -59,7 +60,7 @@ internal object TestoInfectionCommand {
             settings.commandLineSettings,
             env,
             withDebugger,
-            TestoInfectionArguments.build(shared.path, launch.sourceFiles, html?.path, text?.path),
+            TestoInfectionArguments.build(shared.path, launch.sourceFiles, html?.path, text?.path, launch.options),
         )
     }
 

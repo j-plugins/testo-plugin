@@ -56,8 +56,6 @@ class TestoConsoleProperties(
 
     val progressAction = TestoProgressAction()
 
-    val mutationProgressAction = com.github.xepozz.testo.infection.TestoMutationProgressAction(this)
-
     // The run being archived (runs.TestoRunStore) — created lazily by the converter on the first output chunk,
     // finalized by TestoRunArchiver on process termination. Null on replays and before any output.
     @Volatile
@@ -117,7 +115,8 @@ class TestoConsoleProperties(
             reportStore,
             project,
             { workingDirectory ?: project.basePath },
-        ) { path -> reportLocalPath(path) }
+            { path -> reportLocalPath(path) },
+        ) { com.github.xepozz.testo.infection.TestoMutationCell(this) }
 
     // Guards the channel-tab install: set once whoever wires the tabs first (the run-path ExecutionListener or the
     // debug runner, which installs them directly), so the other side is a no-op instead of a double install.
@@ -183,7 +182,6 @@ class TestoConsoleProperties(
             com.github.xepozz.testo.tests.console.TestoTreeCollapseAction(),
             com.github.xepozz.testo.tests.console.TestoTreeExpandAction(),
             reportsAction,
-            mutationProgressAction,
             progressAction,
         )
 }

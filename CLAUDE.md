@@ -123,7 +123,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   └── TestoDataProviderUtils.kt   # isDataProvider / findDataProviderUsages / usage index
 │
 ├── infection/                      # mutation testing: Infection over an archived run's coverage-xml + JUnit
-│   ├── TestoMutateAction.kt        # the run toolbar button; enabled by TestoInfectionReports.readiness
+│   ├── TestoMutationCell.kt        # the reports row's last cell: button + options dropdown + progress (TestoReportsRowCell)
 │   ├── TestoInfectionCommand.kt    # the launch (TestoRunConfiguration.infectionLaunch) and its command
 │   ├── TestoInfectionReports.kt    # readiness off run.json, covered sources, the --coverage directory
 │   ├── TestoInfectionArguments.kt  # CLI flags; where the infection binary is looked for
@@ -132,8 +132,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoMutationTextLog.kt     # `--logger-text` report: every mutant's diff and test output, read at the end
 │   ├── TestoMutationToolWindow.kt  # the *Mutations* tool window, registered on first use, one tab per Testo run
 │   ├── TestoMutationPanel.kt       # own tree (StructureTreeModel) + escaped-mutant diff; toolbar group ids
-│   ├── TestoMutationActions.kt     # that toolbar and popup (Testo.Mutations.Toolbar / .Popup in plugin.xml)
-│   └── TestoMutationProgressAction.kt  # ring / MSI at the right end of the Testo run toolbar, opens the window
+│   └── TestoMutationActions.kt     # that toolbar and popup (Testo.Mutations.Toolbar / .Popup in plugin.xml)
 │
 ├── php/
 │   └── PhpToolLauncher.kt          # any vendor/bin script on any interpreter: paths both ways, the command

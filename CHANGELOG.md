@@ -6,7 +6,8 @@
 
 ### Added
 
-- *Run Mutation Testing* on the run toolbar: Infection over the run's own coverage-xml and JUnit reports, without re-running the tests. Its progress shows at the right end of the toolbar; the mutants go to a *Mutations* tool window, each with its diff and the test output it caused.
+- Mutation testing: an *Infection* button after *Coverage* runs Infection over the run's own coverage-xml and JUnit reports, without re-running the tests. Its progress shows beside it; the mutants go to a *Mutations* tool window, each with its diff and the test output it caused.
+- Infection options — what to mutate, threads, flags, mutators — in the button's dropdown and in the run configuration's new *Mutation Testing* section.
 
 ### Changed
 

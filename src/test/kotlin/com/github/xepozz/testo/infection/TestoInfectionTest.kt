@@ -2,6 +2,7 @@ package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.runs.StoredReport
 import com.github.xepozz.testo.runs.TestoRunManifest
+import com.github.xepozz.testo.tests.run.TestoRunnerSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Rule
@@ -34,6 +35,45 @@ class TestoInfectionTest {
                 "/tmp/report.html",
                 "/tmp/mutations.log",
             ),
+        )
+    }
+
+    @Test
+    fun `options map onto their flags, the extra ones last`() {
+        val options = TestoInfectionOptions(
+            scope = TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES,
+            gitDiffBase = "origin/main",
+            threads = "max",
+            onlyCoveringTestCases = true,
+            withUncovered = true,
+            timeoutsAsEscaped = true,
+            mutators = "@default,-MethodCallRemoval",
+            extra = "--min-msi=80 --debug",
+        )
+
+        assertEquals(
+            listOf(
+                "--coverage=/c",
+                "--skip-initial-tests",
+                "--test-framework=testo",
+                "--teamcity",
+                "--no-progress",
+                "--no-interaction",
+                "--git-diff-lines",
+                "--git-diff-base=origin/main",
+                "--threads=max",
+                "--only-covering-test-cases",
+                "--with-uncovered",
+                "--with-timeouts",
+                "--mutators=@default,-MethodCallRemoval",
+                "--min-msi=80",
+                "--debug",
+            ),
+            TestoInfectionArguments.build("/c", listOf("src/A.php"), null, null, options),
+        )
+        assertEquals(
+            listOf("--coverage=/c", "--skip-initial-tests", "--test-framework=testo", "--teamcity", "--no-progress", "--no-interaction"),
+            TestoInfectionArguments.build("/c", listOf("src/A.php"), null, null, TestoInfectionOptions(scope = TestoRunnerSettings.INFECTION_SCOPE_ALL)),
         )
     }
 

@@ -59,6 +59,7 @@ class TestoReportsAction(
     private val project: Project,
     private val baseDirectory: () -> String?,
     private val mapToLocal: (String) -> String?,
+    private val trailing: (() -> TestoReportsRowCell)? = null,
 ) : AnAction(), CustomComponentAction, RightAlignedToolbarAction, DumbAware {
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
@@ -76,6 +77,7 @@ class TestoReportsAction(
         private val cells = LinkedHashMap<String, ReportCell>()
         private var coverageCell: CoverageGroupCell? = null
         private val timer = Timer(REFRESH_MS) { tick() }
+        private val trailingCell = trailing?.invoke()?.also { add(it.component) }
 
         init {
             isOpaque = false
@@ -121,7 +123,13 @@ class TestoReportsAction(
 
         override fun doLayout() {
             var x = insets.left
-            for (child in components) {
+            // The trailing cell was added first but always ends the row, after cells that appear with later reports.
+            val trailingComponent = trailingCell?.component
+            for (child in components.filter { it !== trailingComponent } + listOfNotNull(trailingComponent)) {
+                if (!child.isVisible) {
+                    child.setBounds(x, 0, 0, 0)
+                    continue
+                }
                 val size = child.preferredSize
                 child.setBounds(x, (height - size.height) / 2, size.width, size.height)
                 x += size.width
@@ -146,7 +154,10 @@ class TestoReportsAction(
             }
             cell?.refresh(coverage)
 
-            isVisible = cells.isNotEmpty() || coverageCell != null
+            val trailingVisible = trailingCell?.refresh() == true
+            trailingCell?.component?.isVisible = trailingVisible
+
+            isVisible = cells.isNotEmpty() || coverageCell != null || trailingVisible
 
             // Re-laid out only when the row changed shape — this runs twice a second.
             val width = preferredSize.width
@@ -691,4 +702,11 @@ private fun <T> resolveReportOffEdt(
             ModalityState.any(),
         ) { project.isDisposed }
     }
+}
+
+/** A cell another feature ends the reports row with; [refresh] runs on the row's tick and answers whether to show it. */
+interface TestoReportsRowCell {
+    val component: JComponent
+
+    fun refresh(): Boolean
 }

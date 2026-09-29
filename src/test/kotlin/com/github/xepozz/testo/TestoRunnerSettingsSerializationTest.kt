@@ -52,6 +52,24 @@ class TestoRunnerSettingsSerializationTest : TestCase() {
         assertFalse(deserialize(optedOut).logJunit)
     }
 
+    fun testInfectionDefaultsStayOutOfTheXmlAndOptionsRoundTrip() {
+        assertFalse(serialize(TestoRunnerSettings()).contains("infection_"))
+
+        val settings = TestoRunnerSettings(
+            infectionScope = TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES,
+            infectionThreads = "4",
+            infectionWithUncovered = true,
+            infectionOptions = "--debug",
+        )
+        val restored = deserialize(serialize(settings))
+
+        assertEquals(TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES, restored.infectionScope)
+        assertEquals("4", restored.infectionThreads)
+        assertTrue(restored.infectionWithUncovered)
+        assertEquals("--debug", restored.infectionOptions)
+        assertEquals("4", TestoRunnerSettings.fromPhpTestRunnerSettings(settings).infectionThreads)
+    }
+
     fun testGroupsRoundTrip() {
         val settings = TestoRunnerSettings().apply {
             groups = mutableListOf("db", "a,b")

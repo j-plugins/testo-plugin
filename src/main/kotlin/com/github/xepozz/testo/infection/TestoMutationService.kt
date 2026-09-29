@@ -36,20 +36,26 @@ class TestoMutationService(private val project: Project) {
     fun runFor(sourceRunDir: Path?): TestoMutationRun? = sourceRunDir?.let(runs::get)
 
     /** Runs Infection over [ready], the reports of [configuration]'s run archived at [runDir]. Call on the EDT. */
-    internal fun start(configuration: TestoRunConfiguration, runDir: Path, ready: TestoMutationReadiness.Ready) {
+    internal fun start(
+        configuration: TestoRunConfiguration,
+        runDir: Path,
+        ready: TestoMutationReadiness.Ready,
+        /** Where the Infection options live: the saved configuration, which the tab's may only be a copy of. */
+        optionsFrom: TestoRunConfiguration,
+    ) {
         runs[runDir]?.takeIf { it.isRunning }?.let { return TestoMutationToolWindow.show(project, it) }
 
         val sources = runCatching { TestoInfectionReports.coveredSourceFiles(ready.coverageXml) }
             .onFailure { thisLogger().warn("Could not read the covered sources of ${ready.coverageXml}", it) }
             .getOrDefault(emptyList())
         val clone = configuration.clone() as TestoRunConfiguration
-        val launch = TestoInfectionLaunch(ready, sources, workDir(runDir))
+        val launch = TestoInfectionLaunch(ready, sources, workDir(runDir), TestoInfectionOptions.of(optionsFrom.testoSettings.runnerSettings))
         clone.infectionLaunch = launch
         val interpreter = clone.interpreter
         val launcher = interpreter?.let { PhpToolLauncher(project, it) }
 
         val run = TestoMutationRun(configuration.name, runDir, launch.htmlReport) { launcher?.toLocal(it) }
-        run.restart = { start(configuration, runDir, ready) }
+        run.restart = { start(configuration, runDir, ready, optionsFrom) }
         if (runs.size >= MAX_RUNS) {
             runs.entries.filter { !it.value.isRunning }.minByOrNull { it.value.startedAt }?.let { runs.remove(it.key) }
         }

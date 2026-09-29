@@ -67,6 +67,24 @@ class TestoTestRunConfigurationEditor(
     private val coverageXmlBox = JBCheckBox("coverage-xml")
     private val coverageLevelField = ComboBox(TestoRunnerSettings.COVERAGE_LEVELS.toTypedArray())
     private val coverageOptionsField = JBTextField()
+    private val infectionScopeField = ComboBox(TestoRunnerSettings.INFECTION_SCOPES.toTypedArray()).apply {
+        renderer = SimpleListCellRenderer.create("") { scope ->
+            when (scope) {
+                TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES -> TestoBundle.message("infection.scope.gitLines")
+                TestoRunnerSettings.INFECTION_SCOPE_ALL -> TestoBundle.message("infection.scope.all")
+                else -> TestoBundle.message("infection.scope.covered")
+            }
+        }
+    }
+    private val infectionGitDiffBaseField = JBTextField()
+    private val infectionThreadsField = ComboBox(TestoRunnerSettings.INFECTION_THREADS.toTypedArray()).apply {
+        isEditable = true
+    }
+    private val infectionOnlyCoveringBox = JBCheckBox("--only-covering-test-cases")
+    private val infectionWithUncoveredBox = JBCheckBox("--with-uncovered")
+    private val infectionTimeoutsBox = JBCheckBox("--with-timeouts")
+    private val infectionMutatorsField = JBTextField()
+    private val infectionOptionsField = JBTextField()
 
     private val parallelInjected = injectParallelRow()
 
@@ -162,6 +180,61 @@ class TestoTestRunConfigurationEditor(
                 .layout(RowLayout.PARENT_GRID)
                 .rowComment("Arguments added to Coverage runs only, e.g. --coverage-level=branch. The default keeps benchmarks out of coverage")
         }
+
+        group("Mutation Testing (Infection)") {
+            row {
+                label("Mutate")
+                    .gap(RightGap.COLUMNS)
+                cell(infectionScopeField)
+            }
+                .layout(RowLayout.PARENT_GRID)
+                .rowComment("--filter with the files the run covers, --git-diff-lines, or no filter at all; Infection takes only one of them")
+
+            row {
+                label("Git base")
+                    .gap(RightGap.COLUMNS)
+                cell(infectionGitDiffBaseField)
+                    .align(AlignX.FILL)
+            }
+                .layout(RowLayout.PARENT_GRID)
+                .rowComment("--git-diff-base for \"Lines changed in git\", e.g. origin/main; empty is Infection's default")
+
+            row {
+                label("Threads")
+                    .gap(RightGap.COLUMNS)
+                cell(infectionThreadsField)
+            }
+                .layout(RowLayout.PARENT_GRID)
+                .rowComment("--threads=<n|max>; empty leaves it to infection.json5")
+
+            row {
+                label("Flags")
+                    .gap(RightGap.COLUMNS)
+                cell(infectionOnlyCoveringBox)
+                cell(infectionWithUncoveredBox)
+                cell(infectionTimeoutsBox)
+            }
+                .layout(RowLayout.PARENT_GRID)
+                .rowComment("Run only the tests covering the mutated line; mutate uncovered code too; count timeouts as escaped")
+
+            row {
+                label("Mutators")
+                    .gap(RightGap.COLUMNS)
+                cell(infectionMutatorsField)
+                    .align(AlignX.FILL)
+            }
+                .layout(RowLayout.PARENT_GRID)
+                .rowComment("--mutators, e.g. @default,-MethodCallRemoval; empty leaves it to infection.json5")
+
+            row {
+                label("Additional options")
+                    .gap(RightGap.COLUMNS)
+                cell(infectionOptionsField)
+                    .align(AlignX.FILL)
+            }
+                .layout(RowLayout.PARENT_GRID)
+                .rowComment("Appended to the Infection command line last, so they win over the fields above")
+        }
     }
 
     init {
@@ -174,6 +247,14 @@ class TestoTestRunConfigurationEditor(
         groupField.addChangeListener(listener)
         excludeGroupField.addChangeListener(listener)
         coverageOptionsField.document.addDocumentListener(documentAdapter)
+        infectionGitDiffBaseField.document.addDocumentListener(documentAdapter)
+        infectionMutatorsField.document.addDocumentListener(documentAdapter)
+        infectionOptionsField.document.addDocumentListener(documentAdapter)
+        infectionScopeField.addActionListener { listener() }
+        infectionThreadsField.addActionListener { listener() }
+        infectionOnlyCoveringBox.addActionListener { listener() }
+        infectionWithUncoveredBox.addActionListener { listener() }
+        infectionTimeoutsBox.addActionListener { listener() }
         parallelField.addChangeListener { listener() }
         htmlReportBox.addActionListener { listener() }
         junitReportBox.addActionListener { listener() }
@@ -200,6 +281,14 @@ class TestoTestRunConfigurationEditor(
                 || coverageXmlBox.isSelected != runner.coverageXml
                 || coverageLevelField.selectedItem != runner.coverageLevel
                 || coverageOptionsField.text != runner.coverageOptions
+                || infectionScopeField.selectedItem != runner.infectionScope
+                || infectionGitDiffBaseField.text != runner.infectionGitDiffBase
+                || infectionThreads() != runner.infectionThreads
+                || infectionOnlyCoveringBox.isSelected != runner.infectionOnlyCoveringTestCases
+                || infectionWithUncoveredBox.isSelected != runner.infectionWithUncovered
+                || infectionTimeoutsBox.isSelected != runner.infectionTimeoutsAsEscaped
+                || infectionMutatorsField.text != runner.infectionMutators
+                || infectionOptionsField.text != runner.infectionOptions
                 || parentEditor.isSpecificallyModified
     }
 
@@ -217,6 +306,14 @@ class TestoTestRunConfigurationEditor(
         coverageXmlBox.isSelected = runnerSettings.coverageXml
         coverageLevelField.selectedItem = runnerSettings.coverageLevel
         coverageOptionsField.text = runnerSettings.coverageOptions
+        infectionScopeField.selectedItem = runnerSettings.infectionScope
+        infectionGitDiffBaseField.text = runnerSettings.infectionGitDiffBase
+        infectionThreadsField.selectedItem = runnerSettings.infectionThreads
+        infectionOnlyCoveringBox.isSelected = runnerSettings.infectionOnlyCoveringTestCases
+        infectionWithUncoveredBox.isSelected = runnerSettings.infectionWithUncovered
+        infectionTimeoutsBox.isSelected = runnerSettings.infectionTimeoutsAsEscaped
+        infectionMutatorsField.text = runnerSettings.infectionMutators
+        infectionOptionsField.text = runnerSettings.infectionOptions
 
         parentEditor.javaClass.declaredMethods.find { it.name == "resetEditorFrom" && it.parameterCount == 1 }?.let {
             it.isAccessible = true
@@ -251,7 +348,18 @@ class TestoTestRunConfigurationEditor(
         runnerSettings.coverageLevel = coverageLevelField.selectedItem as? String
             ?: TestoRunnerSettings.COVERAGE_LEVEL_AUTO
         runnerSettings.coverageOptions = coverageOptionsField.text
+        runnerSettings.infectionScope = infectionScopeField.selectedItem as? String ?: TestoRunnerSettings.INFECTION_SCOPE_COVERED
+        runnerSettings.infectionGitDiffBase = infectionGitDiffBaseField.text
+        runnerSettings.infectionThreads = infectionThreads()
+        runnerSettings.infectionOnlyCoveringTestCases = infectionOnlyCoveringBox.isSelected
+        runnerSettings.infectionWithUncovered = infectionWithUncoveredBox.isSelected
+        runnerSettings.infectionTimeoutsAsEscaped = infectionTimeoutsBox.isSelected
+        runnerSettings.infectionMutators = infectionMutatorsField.text
+        runnerSettings.infectionOptions = infectionOptionsField.text
     }
+
+    // Editable: any count Infection takes, not only the offered ones.
+    private fun infectionThreads(): String = (infectionThreadsField.editor.item ?: infectionThreadsField.selectedItem)?.toString()?.trim().orEmpty()
 
     /**
      * Puts Parallel into the PHP editor's own *Test Runner options* row, where the rest of the runner's flags are.

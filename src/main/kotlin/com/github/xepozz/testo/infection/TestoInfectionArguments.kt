@@ -1,5 +1,33 @@
 package com.github.xepozz.testo.infection
 
+import com.github.xepozz.testo.tests.run.TestoRunnerSettings
+import com.intellij.execution.configurations.ParametersList
+
+/** The Infection flags a run configuration asks for, beyond the ones every mutation run needs. */
+internal data class TestoInfectionOptions(
+    val scope: String = TestoRunnerSettings.INFECTION_SCOPE_COVERED,
+    val gitDiffBase: String = "",
+    val threads: String = "",
+    val onlyCoveringTestCases: Boolean = false,
+    val withUncovered: Boolean = false,
+    val timeoutsAsEscaped: Boolean = false,
+    val mutators: String = "",
+    val extra: String = "",
+) {
+    companion object {
+        fun of(settings: TestoRunnerSettings) = TestoInfectionOptions(
+            scope = settings.infectionScope,
+            gitDiffBase = settings.infectionGitDiffBase,
+            threads = settings.infectionThreads,
+            onlyCoveringTestCases = settings.infectionOnlyCoveringTestCases,
+            withUncovered = settings.infectionWithUncovered,
+            timeoutsAsEscaped = settings.infectionTimeoutsAsEscaped,
+            mutators = settings.infectionMutators,
+            extra = settings.infectionOptions,
+        )
+    }
+}
+
 internal object TestoInfectionArguments {
     // Windows caps a whole command line at 32 KB; past this the filter is dropped and Infection mutates everything the
     // coverage covers, which is the same set, only slower to generate.
@@ -10,6 +38,7 @@ internal object TestoInfectionArguments {
         sourceFiles: List<String>,
         htmlReport: String?,
         textLog: String? = null,
+        options: TestoInfectionOptions = TestoInfectionOptions(),
     ): List<String> = buildList {
         add("--coverage=$coverageDirectory")
         add("--skip-initial-tests")
@@ -17,12 +46,26 @@ internal object TestoInfectionArguments {
         add("--teamcity")
         add("--no-progress")
         add("--no-interaction")
-        filter(sourceFiles)?.let { add("--filter=$it") }
+        when (options.scope) {
+            TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES -> {
+                add("--git-diff-lines")
+                options.gitDiffBase.trim().takeIf { it.isNotEmpty() }?.let { add("--git-diff-base=$it") }
+            }
+            TestoRunnerSettings.INFECTION_SCOPE_ALL -> Unit
+            else -> filter(sourceFiles)?.let { add("--filter=$it") }
+        }
+        options.threads.trim().takeIf { it.isNotEmpty() }?.let { add("--threads=$it") }
+        if (options.onlyCoveringTestCases) add("--only-covering-test-cases")
+        if (options.withUncovered) add("--with-uncovered")
+        if (options.timeoutsAsEscaped) add("--with-timeouts")
+        options.mutators.trim().takeIf { it.isNotEmpty() }?.let { add("--mutators=$it") }
         htmlReport?.let { add("--logger-html=$it") }
         textLog?.let {
             add("--logger-text=$it")
             add("--log-verbosity=all")
         }
+        // Last, so a flag typed here wins over the same flag set above.
+        addAll(ParametersList.parse(options.extra))
     }
 
     fun filter(sourceFiles: List<String>): String? =

@@ -145,10 +145,6 @@
             <add-to-group group-id="RunTab.TopToolbar" anchor="before" relative-to-action="Rerun"/>
         </action>
 
-        <action id="Testo.Mutate" class="com.github.xepozz.testo.infection.TestoMutateAction">
-            <add-to-group group-id="RunTab.TopToolbar" anchor="after" relative-to-action="Testo.RerunSplit"/>
-        </action>
-
         <!-- The Mutations tool window (TestoMutationPanel): its toolbar and its tree's context menu. -->
         <group id="Testo.Mutations.Toolbar">
             <action id="Testo.Mutations.Rerun" class="com.github.xepozz.testo.infection.TestoMutationRerunAction"/>
