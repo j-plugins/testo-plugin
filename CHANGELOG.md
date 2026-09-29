@@ -7,6 +7,7 @@
 ### Fixed
 
 - Coverage on WSL and SSH interpreters writes its reports where the IDE reads them, instead of into the project root.
+- Coverage reports written in Docker or WSL match project files, instead of showing "No coverage result".
 
 ### Added
 

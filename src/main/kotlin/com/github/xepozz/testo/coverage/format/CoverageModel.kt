@@ -67,4 +67,20 @@ data class ParsedReport(
     val perTest: PerTestCoverage?,
 )
 
+/** The same report with every source path, per-test ones included, passed through [map] once per distinct path. */
+fun ParsedReport.mapPaths(map: (String) -> String): ParsedReport {
+    val cache = HashMap<String, String>()
+    val mapped = { path: String -> cache.getOrPut(path) { map(path) } }
+    val line = { source: SourceLine -> source.copy(filePath = mapped(source.filePath)) }
+    return copy(
+        files = files.map { it.copy(filePath = mapped(it.filePath)) },
+        perTest = perTest?.let { tests ->
+            PerTestCoverage(
+                byTest = tests.byTest.mapValues { (_, lines) -> lines.mapTo(LinkedHashSet(), line) },
+                byLine = tests.byLine.mapKeys { (source, _) -> line(source) },
+            )
+        },
+    )
+}
+
 class CoverageParseException(message: String, cause: Throwable? = null) : Exception(message, cause)
