@@ -46,7 +46,7 @@ internal object TestoRunArchiver {
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
                 recording.closeOutput()
-                val mapToLocal: (String) -> String? = { runCatching { props.pathMapper.getLocalPath(it) }.getOrNull() }
+                val mapToLocal: (String) -> String? = { runCatching { props.reportLocalPath(it) }.getOrNull() }
                 val writtenAfter = props.reportStore.runStartedAt
                 // Every report the run announced is kept — the archive is what a replay reads instead of the log, and
                 // an HTML report is as much part of a run as its coverage. The one exception is a coverage report that

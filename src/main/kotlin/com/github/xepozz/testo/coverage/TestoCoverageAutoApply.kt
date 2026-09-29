@@ -31,7 +31,7 @@ fun dedupeCoverageByFormat(
  */
 internal fun autoApplyCoverage(project: Project, props: TestoConsoleProperties, flagLocalPaths: List<Path>) {
     ApplicationManager.getApplication().executeOnPooledThread {
-        val mapToLocal: (String) -> String? = { runCatching { props.pathMapper.getLocalPath(it) }.getOrNull() }
+        val mapToLocal: (String) -> String? = { runCatching { props.reportLocalPath(it) }.getOrNull() }
         val writtenAfter = props.reportStore.runStartedAt
         val baseDirectory = props.workingDirectory ?: project.basePath
         val resolved = props.reportStore.coverage().mapNotNull { ref ->
