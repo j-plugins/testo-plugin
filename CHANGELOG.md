@@ -8,10 +8,12 @@
 
 - Coverage on WSL and SSH interpreters writes its reports where the IDE reads them, instead of into the project root.
 - Coverage reports written in Docker or WSL match project files, instead of showing "No coverage result".
+- A replayed run shows the verdict it ended with; a failed run could replay as passed.
 
 ### Added
 
 - HTML and JUnit reports on WSL and SSH interpreters, previously produced on local ones only.
+- The run archive records the exit code, the interpreter and the plugin and Testo versions of each run.
 
 ## [2026.13.262] - 2026-09-27
 

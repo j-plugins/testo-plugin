@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.runs
 
 import com.github.xepozz.testo.tests.console.TestoRunTimings
+import com.github.xepozz.testo.tests.console.TestoTestStatus
 import com.google.gson.annotations.SerializedName
 
 /**
@@ -63,8 +64,23 @@ data class TestoRunManifest(
      * so an image survives the original file being overwritten or deleted. URLs are not captured (they stay live).
      */
     val metadataArtifacts: Map<String, String> = emptyMap(),
+    /** The process exit code; null in an archive from before it was recorded. */
+    val exitCode: Int? = null,
+    val interpreterName: String = "",
+    /** `local`, or the remote connection type's own name (`Docker Compose`, `SSH`, `WSL`, …). */
+    val interpreterType: String = "",
+    val pluginVersion: String = "",
+    /** Off Testo's banner; empty when the run printed none. */
+    val testoVersion: String = "",
 ) {
+    /**
+     * What a replay's stand-in process exits with. The verdict prefers the exit code over the tests, so an archive
+     * without one gets the code its own tally implies instead of the stand-in's default 0 — which read as a pass.
+     */
+    fun replayExitCode(): Int = exitCode
+        ?: if (statuses.any { (status, count) -> count > 0 && TestoTestStatus.fromWire(status)?.isProblem == true }) 1 else 0
+
     companion object {
-        const val VERSION = 5
+        const val VERSION = 6
     }
 }

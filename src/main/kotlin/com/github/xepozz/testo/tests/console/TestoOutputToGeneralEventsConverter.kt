@@ -53,7 +53,10 @@ class TestoOutputToGeneralEventsConverter(
     private var recordingBroken = false
 
     override fun process(text: String, outputType: Key<*>) {
-        if (runnerVersion == null) runnerVersion = TestoProtocolGate.parseVersion(text)
+        if (runnerVersion == null) {
+            runnerVersion = TestoProtocolGate.parseVersion(text)
+            runnerVersion?.let { version -> testoProperties?.testoVersion = version }
+        }
         // Second route: a message behind a colour escape never reaches parseServiceMessage. The store dedups by path.
         if (!isReplay) TestoReportRef.fromServiceMessageLine(text)?.let { reportStore.note(it) }
         recordChunk(text, outputType)

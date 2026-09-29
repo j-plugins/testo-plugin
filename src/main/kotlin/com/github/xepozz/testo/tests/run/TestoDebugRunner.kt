@@ -83,7 +83,7 @@ class TestoDebugRunner : PhpTestDebugRunner<TestoRunConfiguration>(TestoRunConfi
             // Same reason for the run archive: the augmenter's processTerminated never finds this session.
             processHandler.addProcessListener(object : com.intellij.execution.process.ProcessAdapter() {
                 override fun processTerminated(event: com.intellij.execution.process.ProcessEvent) {
-                    com.github.xepozz.testo.runs.TestoRunArchiver.finalizeRun(project, properties)
+                    com.github.xepozz.testo.runs.TestoRunArchiver.finalizeRun(project, properties, event.exitCode)
                 }
             })
 

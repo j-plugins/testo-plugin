@@ -77,6 +77,9 @@ class TestoConsoleProperties(
     @Volatile
     var workingDirectory: String? = null
 
+    @Volatile
+    var testoVersion: String? = null
+
     // The coverage report files each `--coverage-*` flag of this run points at, set by the Coverage runner. They win
     // the one-per-format dedup — over a report a testo.php writer put somewhere the IDE does not control.
     @Volatile
