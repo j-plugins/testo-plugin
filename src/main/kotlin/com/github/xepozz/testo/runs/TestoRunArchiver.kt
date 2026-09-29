@@ -11,10 +11,14 @@ import com.github.xepozz.testo.tests.console.isMetadataUrl
 import com.github.xepozz.testo.tests.console.resolveCoverageDataFile
 import com.github.xepozz.testo.tests.console.resolveReport
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
+import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.JDOMUtil
+import com.intellij.remote.RemoteSdkAdditionalData
+import com.jetbrains.php.config.interpreters.PhpInterpreter
 import org.jdom.Element
 import java.nio.file.Files
 import java.nio.file.Path
@@ -38,8 +42,9 @@ internal object TestoRunArchiver {
     // A metadata artifact larger than this is left where it is (the replay falls back to its original path): the archive
     // sits under the IDE system dir and rotates, so it should not swallow a multi-hundred-MB video dump.
     private const val MAX_CAPTURE_BYTES = 32L * 1024 * 1024
+    private const val PLUGIN_ID = "com.github.xepozz.testo"
 
-    fun finalizeRun(project: Project, props: TestoConsoleProperties) {
+    fun finalizeRun(project: Project, props: TestoConsoleProperties, exitCode: Int?) {
         if (props.replayMode) return
         val recording = props.recording ?: return
         if (!recording.tryBeginFinish()) return
@@ -71,6 +76,7 @@ internal object TestoRunArchiver {
                 val metadataArtifacts = captureMetadataArtifacts(recording, props, mapToLocal)
                 recording.writeLocations()
                 val finishedAt = System.currentTimeMillis()
+                val interpreter = (props.configuration as? TestoRunConfiguration)?.interpreter
                 recording.writeManifest(
                     TestoRunManifest(
                         configurationName = recording.configurationName,
@@ -85,6 +91,11 @@ internal object TestoRunArchiver {
                         statuses = props.statusStore.counts().entries.associate { it.key.wireName to it.value },
                         reports = reports,
                         metadataArtifacts = metadataArtifacts,
+                        exitCode = exitCode,
+                        interpreterName = interpreter?.name.orEmpty(),
+                        interpreterType = interpreterType(interpreter),
+                        pluginVersion = PluginManagerCore.getPlugin(PluginId.getId(PLUGIN_ID))?.version.orEmpty(),
+                        testoVersion = props.testoVersion.orEmpty(),
                     )
                 )
                 TestoRunStore.getInstance(project).prune()
@@ -143,6 +154,14 @@ internal object TestoRunArchiver {
      * The run configuration as XML — the same form the IDE persists it in, so a replay can restore it and rerun the
      * real thing. Empty when this console is not backed by a Testo configuration (nothing to rerun then).
      */
+    private fun interpreterType(interpreter: PhpInterpreter?): String = when {
+        interpreter == null -> ""
+        !interpreter.isRemote -> "local"
+        else -> (interpreter.phpSdkAdditionalData as? RemoteSdkAdditionalData)
+            ?.let { data -> runCatching { data.remoteConnectionType.name }.getOrNull() }
+            ?: interpreter.phpSdkAdditionalData?.javaClass?.simpleName.orEmpty()
+    }
+
     private fun serializeConfiguration(props: TestoConsoleProperties): String =
         (props.configuration as? TestoRunConfiguration)?.let { configuration ->
             runCatching {

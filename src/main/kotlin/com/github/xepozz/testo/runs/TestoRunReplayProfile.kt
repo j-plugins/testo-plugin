@@ -97,7 +97,10 @@ internal class TestoRunReplayProfile(
                 props.channelStore.setHeader(TestoConsoleAugmenter.runHeader(commandLine, manifest.startedAt))
             }
 
-            val handler = NopProcessHandler()
+            val exitCode = manifest.replayExitCode()
+            val handler = object : NopProcessHandler() {
+                override fun destroyProcessImpl() = notifyProcessTerminated(exitCode)
+            }
             val console = SMTestRunnerConnectionUtil.createAndAttachConsole("Testo", handler, props)
             handler.addProcessListener(object : ProcessAdapter() {
                 override fun startNotified(event: ProcessEvent) {

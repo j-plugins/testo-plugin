@@ -105,9 +105,28 @@ class TestoRunStoreTest {
                 StoredReport("cobertura", "Cobertura coverage", "/app/r.xml", "r.xml", "reports/cobertura.xml"),
                 StoredReport("html", "HTML report", "/app/report", null, null),
             ),
+            exitCode = 1,
+            interpreterName = "PHP 8.4 (app)",
+            interpreterType = "Docker Compose",
+            pluginVersion = "2026.13.262",
+            testoVersion = "0.10.40",
         )
         val parsed = gson.fromJson(gson.toJson(manifest), TestoRunManifest::class.java)
         assertEquals(manifest, parsed)
+    }
+
+    @Test
+    fun replayExitsWithTheRecordedCode() {
+        assertEquals(3, TestoRunManifest(exitCode = 3, statuses = mapOf("passed" to 1)).replayExitCode())
+    }
+
+    @Test
+    fun replayOfAnArchiveWithoutAnExitCodeFollowsItsTally() {
+        // Before the exit code was recorded; the stand-in process would otherwise exit 0 and turn every such run green.
+        val parsed = gson.fromJson("""{"v":5,"statuses":{"passed":3,"failed":1}}""", TestoRunManifest::class.java)
+        assertNull(parsed.exitCode)
+        assertEquals(1, parsed.replayExitCode())
+        assertEquals(0, TestoRunManifest(statuses = mapOf("passed" to 3, "skipped" to 1)).replayExitCode())
     }
 
     @Test
