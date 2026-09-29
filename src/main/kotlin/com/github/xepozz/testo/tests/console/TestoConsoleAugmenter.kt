@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.tests.console
 
 import com.github.xepozz.testo.runs.TestoRunArchiver
+import com.github.xepozz.testo.runs.isStoppedFromIde
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.intellij.execution.ExecutionListener
 import com.intellij.execution.ExecutorRegistry
@@ -33,7 +34,7 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
             val props = console.properties as? TestoConsoleProperties ?: return@invokeLater
             // Close the run archive: reports are on disk by process exit, and the archiver is idempotent across the
             // debug runner's own hook. It refreshes the "Show history" lens itself, once the archive is complete.
-            TestoRunArchiver.finalizeRun(project, props, exitCode)
+            TestoRunArchiver.finalizeRun(project, props, exitCode, handler.isStoppedFromIde())
         }
     }
 

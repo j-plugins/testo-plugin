@@ -111,6 +111,7 @@ class TestoOutputToGeneralEventsConverter(
                 val name = attrs["name"]
                 val location = attrs["locationHint"]
                 val nodeId = attrs["nodeId"]
+                nodeId?.let { testoProperties?.unfinishedNodes?.add(it) }
                 if (name != null) {
                     if (location != null) {
                         store.rememberLocation(name, location)
@@ -188,6 +189,10 @@ class TestoOutputToGeneralEventsConverter(
 
         // A group node closes with its children's outcome rolled up: worth drawing, but filed apart from the tally —
         // one arrives per case, per batch and per suite, and counting them as tests would inflate every number.
+        if (message.messageName == TEST_FINISHED || message.messageName == TEST_SUITE_FINISHED) {
+            attrs["nodeId"]?.let { testoProperties?.unfinishedNodes?.remove(it) }
+        }
+
         if (message.messageName == TEST_SUITE_FINISHED) {
             attrs["nodeId"]?.let { nodeId ->
                 TestoTestStatus.fromWire(attrs["status"])?.let { statusStore.noteSuite(nodeId, it) }

@@ -106,6 +106,7 @@ class TestoRunStoreTest {
                 StoredReport("html", "HTML report", "/app/report", null, null),
             ),
             exitCode = 1,
+            cancelled = true,
             interpreterName = "PHP 8.4 (app)",
             interpreterType = "Docker Compose",
             pluginVersion = "2026.13.262",

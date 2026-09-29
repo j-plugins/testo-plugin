@@ -14,6 +14,7 @@
 
 - HTML and JUnit reports on WSL and SSH interpreters, previously produced on local ones only.
 - The run archive records the exit code, the interpreter and the plugin and Testo versions of each run.
+- The run history colours each run by how it ended: green passed, red failed, grey stopped.
 
 ## [2026.13.262] - 2026-09-27
 

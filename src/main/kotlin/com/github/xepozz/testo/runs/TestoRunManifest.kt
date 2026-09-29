@@ -66,6 +66,8 @@ data class TestoRunManifest(
     val metadataArtifacts: Map<String, String> = emptyMap(),
     /** The process exit code; null in an archive from before it was recorded. */
     val exitCode: Int? = null,
+    /** Stopped from the IDE — the Stop button, or a rerun that replaced it — rather than exiting by itself. */
+    val cancelled: Boolean = false,
     val interpreterName: String = "",
     /** `local`, or the remote connection type's own name (`Docker Compose`, `SSH`, `WSL`, …). */
     val interpreterType: String = "",

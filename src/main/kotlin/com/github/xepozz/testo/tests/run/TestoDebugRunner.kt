@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.tests.run
 
+import com.github.xepozz.testo.runs.isStoppedFromIde
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoConsoleAugmenter
 import com.intellij.execution.ExecutionException
@@ -83,7 +84,9 @@ class TestoDebugRunner : PhpTestDebugRunner<TestoRunConfiguration>(TestoRunConfi
             // Same reason for the run archive: the augmenter's processTerminated never finds this session.
             processHandler.addProcessListener(object : com.intellij.execution.process.ProcessAdapter() {
                 override fun processTerminated(event: com.intellij.execution.process.ProcessEvent) {
-                    com.github.xepozz.testo.runs.TestoRunArchiver.finalizeRun(project, properties, event.exitCode)
+                    com.github.xepozz.testo.runs.TestoRunArchiver.finalizeRun(
+                        project, properties, event.exitCode, processHandler.isStoppedFromIde(),
+                    )
                 }
             })
 
