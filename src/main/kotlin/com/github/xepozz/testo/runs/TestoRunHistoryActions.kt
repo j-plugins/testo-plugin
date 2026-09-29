@@ -30,12 +30,15 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.util.JDOMUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.ui.ColoredListCellRenderer
+import com.intellij.ui.JBColor
 import com.intellij.ui.LayeredIcon
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.awt.RelativePoint
+import com.intellij.util.IconUtil
 import com.intellij.util.text.DateFormatUtil
 import java.awt.event.MouseEvent
 import java.nio.file.Path
@@ -138,8 +141,25 @@ internal fun runKindIcon(kind: TestoRunKind): Icon = when (kind) {
     TestoRunKind.RUN -> AllIcons.Toolwindows.ToolWindowRun
 }
 
+internal enum class TestoRunOutcome { PASSED, FAILED, CANCELLED }
+
+// The exit code the replay would end with, so the list and the replayed tab never disagree.
+internal fun runOutcomeOf(manifest: TestoRunManifest): TestoRunOutcome = when {
+    manifest.cancelled -> TestoRunOutcome.CANCELLED
+    manifest.replayExitCode() != 0 -> TestoRunOutcome.FAILED
+    else -> TestoRunOutcome.PASSED
+}
+
+private val PASSED_COLOR = JBColor(0x59A869, 0x499C54)
+private val FAILED_COLOR = JBColor(0xDB5860, 0xC75450)
+
 internal fun runHistoryIcon(manifest: TestoRunManifest): Icon {
-    val base = runKindIcon(runKindOf(manifest.executorId))
+    val kind = runKindIcon(runKindOf(manifest.executorId))
+    val base = when (runOutcomeOf(manifest)) {
+        TestoRunOutcome.PASSED -> IconUtil.colorize(kind, PASSED_COLOR)
+        TestoRunOutcome.FAILED -> IconUtil.colorize(kind, FAILED_COLOR)
+        TestoRunOutcome.CANCELLED -> IconLoader.getDisabledIcon(kind)
+    }
     if (manifest.retention != RunRetention.LOCKED) return base
     return LayeredIcon.layeredIcon { arrayOf(base, AllIcons.Nodes.Locked) }
 }

@@ -11,6 +11,7 @@ import com.github.xepozz.testo.tests.console.isMetadataUrl
 import com.github.xepozz.testo.tests.console.resolveCoverageDataFile
 import com.github.xepozz.testo.tests.console.resolveReport
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
+import com.intellij.execution.process.ProcessHandler
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
@@ -44,7 +45,7 @@ internal object TestoRunArchiver {
     private const val MAX_CAPTURE_BYTES = 32L * 1024 * 1024
     private const val PLUGIN_ID = "com.github.xepozz.testo"
 
-    fun finalizeRun(project: Project, props: TestoConsoleProperties, exitCode: Int?) {
+    fun finalizeRun(project: Project, props: TestoConsoleProperties, exitCode: Int?, stoppedFromIde: Boolean) {
         if (props.replayMode) return
         val recording = props.recording ?: return
         if (!recording.tryBeginFinish()) return
@@ -92,6 +93,7 @@ internal object TestoRunArchiver {
                         reports = reports,
                         metadataArtifacts = metadataArtifacts,
                         exitCode = exitCode,
+                        cancelled = stoppedFromIde || props.unfinishedNodes.isNotEmpty(),
                         interpreterName = interpreter?.name.orEmpty(),
                         interpreterType = interpreterType(interpreter),
                         pluginVersion = PluginManagerCore.getPlugin(PluginId.getId(PLUGIN_ID))?.version.orEmpty(),
@@ -215,3 +217,6 @@ internal object TestoRunArchiver {
         }
     }
 }
+
+/** Set by the platform's `stopProcess` — the Stop button, or a rerun replacing the run — and never on an exit of its own. */
+internal fun ProcessHandler.isStoppedFromIde(): Boolean = getUserData(ProcessHandler.TERMINATION_REQUESTED) == true

@@ -23,6 +23,23 @@ class TestoRunHistoryPresentationTest {
     }
 
     @Test
+    fun aStoppedRunIsCancelledWhateverItsTestsSaid() {
+        assertEquals(TestoRunOutcome.CANCELLED, runOutcomeOf(TestoRunManifest(cancelled = true, exitCode = 1, statuses = mapOf("failed" to 2))))
+    }
+
+    @Test
+    fun theExitCodeDecidesBetweenPassedAndFailed() {
+        assertEquals(TestoRunOutcome.FAILED, runOutcomeOf(TestoRunManifest(exitCode = 255, statuses = mapOf("passed" to 3))))
+        assertEquals(TestoRunOutcome.PASSED, runOutcomeOf(TestoRunManifest(exitCode = 0, statuses = mapOf("passed" to 3))))
+    }
+
+    @Test
+    fun anArchiveWithoutAnExitCodeIsJudgedByItsTests() {
+        assertEquals(TestoRunOutcome.FAILED, runOutcomeOf(manifest("passed" to 3, "error" to 1)))
+        assertEquals(TestoRunOutcome.PASSED, runOutcomeOf(manifest("passed" to 3, "risky" to 1)))
+    }
+
+    @Test
     fun failuresAreCountedAcrossEveryProblemStatus() {
         // error and aborted are failures too; risky, flaky and skipped are not.
         val summary = runResultSummary(

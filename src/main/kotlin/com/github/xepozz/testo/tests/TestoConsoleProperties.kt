@@ -80,6 +80,10 @@ class TestoConsoleProperties(
     @Volatile
     var testoVersion: String? = null
 
+    // Nodes the stream opened and has not closed yet. Any left at the end mean the run was cut short, which is how a
+    // debug session's Stop shows: it destroys the process without the platform's stop-requested mark.
+    internal val unfinishedNodes: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
     // The coverage report files each `--coverage-*` flag of this run points at, set by the Coverage runner. They win
     // the one-per-format dedup — over a report a testo.php writer put somewhere the IDE does not control.
     @Volatile
