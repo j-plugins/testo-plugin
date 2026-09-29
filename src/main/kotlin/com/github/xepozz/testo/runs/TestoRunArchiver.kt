@@ -12,10 +12,9 @@ import com.github.xepozz.testo.tests.console.resolveCoverageDataFile
 import com.github.xepozz.testo.tests.console.resolveReport
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.process.ProcessHandler
-import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.ide.plugins.cl.PluginAwareClassLoader
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.JDOMUtil
 import com.intellij.remote.RemoteSdkAdditionalData
@@ -43,7 +42,6 @@ internal object TestoRunArchiver {
     // A metadata artifact larger than this is left where it is (the replay falls back to its original path): the archive
     // sits under the IDE system dir and rotates, so it should not swallow a multi-hundred-MB video dump.
     private const val MAX_CAPTURE_BYTES = 32L * 1024 * 1024
-    private const val PLUGIN_ID = "com.github.xepozz.testo"
 
     fun finalizeRun(project: Project, props: TestoConsoleProperties, exitCode: Int?, stoppedFromIde: Boolean) {
         if (props.replayMode) return
@@ -96,7 +94,7 @@ internal object TestoRunArchiver {
                         cancelled = stoppedFromIde || props.unfinishedNodes.isNotEmpty(),
                         interpreterName = interpreter?.name.orEmpty(),
                         interpreterType = interpreterType(interpreter),
-                        pluginVersion = PluginManagerCore.getPlugin(PluginId.getId(PLUGIN_ID))?.version.orEmpty(),
+                        pluginVersion = pluginVersion(),
                         testoVersion = props.testoVersion.orEmpty(),
                     )
                 )
@@ -151,6 +149,11 @@ internal object TestoRunArchiver {
             finishedAt = marks.finishedAt.takeIf { it > 0 } ?: finishedAt,
         )
     }
+
+    // Off our own class loader: every PluginManager lookup by id or class is @ApiStatus.Internal on 262 and fails
+    // verifyPlugin there.
+    private fun pluginVersion(): String =
+        (javaClass.classLoader as? PluginAwareClassLoader)?.pluginDescriptor?.version.orEmpty()
 
     /**
      * The run configuration as XML — the same form the IDE persists it in, so a replay can restore it and rerun the
