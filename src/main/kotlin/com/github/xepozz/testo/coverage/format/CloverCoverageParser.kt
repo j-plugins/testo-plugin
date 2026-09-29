@@ -21,7 +21,7 @@ object CloverCoverageParser : TestoCoverageParser {
                 val num = lineEl.getAttribute("num").toIntOrNull() ?: return@mapNotNull null
                 val branch = if (lineEl.getAttribute("type") == "cond") conditionOf(lineEl) else null
                 if (branch != null) hasBranches = true
-                // Testo writes a line's count as 0/1 only, so an edge taken is as much as `count` would have said.
+                // Testo's counts are 0/1 anyway, so a taken edge says as much as a `count` would.
                 val hits = lineEl.getAttribute("count").toIntOrNull() ?: branch?.let { if (it.covered > 0) 1 else 0 } ?: 0
                 LineCoverage(num, hits, branch)
             }

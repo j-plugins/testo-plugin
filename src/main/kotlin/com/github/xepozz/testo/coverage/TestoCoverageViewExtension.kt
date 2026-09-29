@@ -14,10 +14,12 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.project.Project
 import com.intellij.util.ui.ColumnInfo
 
-/** Covered out of total, in whatever unit the column counts. */
 data class CoverageTally(val covered: Int, val total: Int)
 
-/** A node's numbers in the Coverage view; see [TestoCoverageAnnotator.coverageOf] for when each is null. */
+/**
+ * A node's numbers in the Coverage view. A tally is null where it does not apply: [files] on a file, [lines] without
+ * executable lines, [branches] where the report carries none.
+ */
 data class NodeCoverage(val files: CoverageTally?, val lines: CoverageTally?, val branches: CoverageTally?)
 
 /**
@@ -28,10 +30,8 @@ fun CoverageTally.cellText(): String? =
     if (total <= 0) null else "${covered.coerceIn(0, total).toLong() * 100 / total}% ($covered/$total)"
 
 /**
- * The platform's file tree plus the Testo columns and toolbar: `Files` (filled on directories only), `Lines`,
- * `Branches` only for reports that carry branch data (cobertura, clover), and `Tests` — distinct covering tests per
- * file, directories as the union — only when the shown bundle holds a coverage-xml suite *and* the per-test index has
- * data, so neither optional column ever renders all-empty.
+ * The platform's file tree plus the Testo columns and toolbar. `Branches` and `Tests` appear only when the shown bundle
+ * has data for them, so no column renders all-empty.
  */
 class TestoCoverageViewExtension(
     private val project: Project,

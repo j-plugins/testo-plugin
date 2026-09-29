@@ -92,11 +92,7 @@ class TestoCoverageAnnotator(project: Project) : RemappingCoverageAnnotator(proj
     override fun getLinesCoverageInformationString(info: BaseCoverageAnnotator.FileCoverageInfo): String? =
         if (info.totalLineCount == 0) null else super.getLinesCoverageInformationString(info)
 
-    /**
-     * The Coverage view's numbers for a file, or for everything under a directory. A tally is null where it does not
-     * apply: [NodeCoverage.files] on a file, [NodeCoverage.lines] without executable lines, [NodeCoverage.branches]
-     * where the report carries none.
-     */
+    /** The Coverage view's numbers for a file, or for everything under a directory. */
     fun coverageOf(file: VirtualFile, currentSuite: CoverageSuitesBundle): NodeCoverage? {
         val index = indexFor(currentSuite) ?: return null
         val branches = index.branches.lookup(file)?.let { CoverageTally(it.coveredBranchCount, it.totalBranchCount) }
