@@ -1,6 +1,5 @@
 package com.github.xepozz.testo.coverage
 
-import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.editor.TestoCoverageEditorHighlighter
 import com.github.xepozz.testo.coverage.format.LineTotals
 import com.intellij.coverage.BaseCoverageAnnotator
@@ -73,8 +72,7 @@ class TestoCoverageAnnotator(project: Project) : RemappingCoverageAnnotator(proj
         currentSuite: CoverageSuitesBundle,
         manager: CoverageDataManager,
     ): String? {
-        val files = indexFor(currentSuite)?.files ?: return null
-        val info = files[key(file.path)] ?: files[key(file.canonicalPath ?: return null)] ?: return null
+        val info = indexFor(currentSuite)?.files?.lookup(file) ?: return null
         return getLinesCoverageInformationString(info)
     }
 
@@ -84,8 +82,7 @@ class TestoCoverageAnnotator(project: Project) : RemappingCoverageAnnotator(proj
         currentSuite: CoverageSuitesBundle,
         manager: CoverageDataManager,
     ): String? {
-        val dirs = indexFor(currentSuite)?.dirs ?: return null
-        val info = dirs[key(directory.path)] ?: dirs[key(directory.canonicalPath ?: return null)] ?: return null
+        val info = indexFor(currentSuite)?.dirs?.lookup(directory) ?: return null
         val filesInfo = getFilesCoverageInformationString(info) ?: return null
         val linesInfo = getLinesCoverageInformationString(info) ?: return filesInfo
         return "$filesInfo, $linesInfo"
@@ -95,18 +92,28 @@ class TestoCoverageAnnotator(project: Project) : RemappingCoverageAnnotator(proj
     override fun getLinesCoverageInformationString(info: BaseCoverageAnnotator.FileCoverageInfo): String? =
         if (info.totalLineCount == 0) null else super.getLinesCoverageInformationString(info)
 
-    /** Branch coverage of a file or of everything under a directory; null when the report carries no branches for it. */
-    fun getBranchCoverageInformationString(file: VirtualFile, currentSuite: CoverageSuitesBundle): String? {
-        val branches = indexFor(currentSuite)?.branches ?: return null
-        val stat = branches[key(file.path)] ?: branches[key(file.canonicalPath ?: return null)] ?: return null
-        val percent = stat.coveredBranchCount * 100 / stat.totalBranchCount
-        return TestoBundle.message(
-            "testo.coverage.view.branches.covered",
-            percent,
-            stat.coveredBranchCount,
-            stat.totalBranchCount,
-        )
+    /**
+     * The Coverage view's numbers for a file, or for everything under a directory. A tally is null where it does not
+     * apply: [NodeCoverage.files] on a file, [NodeCoverage.lines] without executable lines, [NodeCoverage.branches]
+     * where the report carries none.
+     */
+    fun coverageOf(file: VirtualFile, currentSuite: CoverageSuitesBundle): NodeCoverage? {
+        val index = indexFor(currentSuite) ?: return null
+        val branches = index.branches.lookup(file)?.let { CoverageTally(it.coveredBranchCount, it.totalBranchCount) }
+        if (file.isDirectory) {
+            val dir = index.dirs.lookup(file) ?: return null
+            return NodeCoverage(
+                files = CoverageTally(dir.coveredFilesCount, dir.totalFilesCount),
+                lines = CoverageTally(dir.coveredLineCount, dir.totalLineCount),
+                branches = branches,
+            )
+        }
+        val info = index.files.lookup(file) ?: return null
+        return NodeCoverage(files = null, lines = CoverageTally(info.coveredLineCount, info.totalLineCount), branches)
     }
+
+    private fun <T> Map<String, T>.lookup(file: VirtualFile): T? =
+        this[key(file.path)] ?: file.canonicalPath?.let { this[key(it)] }
 
     private fun indexFor(bundle: CoverageSuitesBundle): Index? {
         val data = bundle.coverageData ?: return null

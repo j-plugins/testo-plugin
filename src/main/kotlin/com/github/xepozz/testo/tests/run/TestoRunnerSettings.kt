@@ -25,7 +25,7 @@ class TestoRunnerSettings(
     var testoType: String = "",
 
     // Which coverage reports a Coverage run requests via CLI flags. Clover is off by default: cobertura carries
-    // everything clover does plus branch data. coverage-xml adds the per-test overlay.
+    // the same lines and branches. coverage-xml adds the per-test overlay.
     @Attribute("coverage_clover")
     var coverageClover: Boolean = false,
 
