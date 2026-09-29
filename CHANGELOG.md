@@ -8,6 +8,10 @@
 
 - Coverage on WSL and SSH interpreters writes its reports where the IDE reads them, instead of into the project root.
 
+### Added
+
+- HTML and JUnit reports on WSL and SSH interpreters, previously produced on local ones only.
+
 ## [2026.13.262] - 2026-09-27
 
 ### Fixed

@@ -3,6 +3,7 @@ package com.github.xepozz.testo.coverage
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.tests.TestoConsoleProperties
+import com.github.xepozz.testo.tests.run.TestoReportTarget
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.github.xepozz.testo.tests.run.TestoRunnerSettings
 import com.intellij.coverage.CoverageRunnerData
@@ -22,20 +23,15 @@ import com.intellij.execution.runners.GenericProgramRunner
 import com.intellij.execution.runners.RunContentBuilder
 import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.openapi.project.Project
-import com.intellij.remote.RemoteSdkAdditionalData
 import com.intellij.util.PathMappingSettings
 import com.intellij.util.PathUtil
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
 import com.jetbrains.php.config.commandLine.PhpCommandSettingsBuilder
 import com.jetbrains.php.config.interpreters.PhpInterpreter
 import com.jetbrains.php.debug.xdebug.options.XdebugConfigurationOptionsManager
-import com.jetbrains.php.phpunit.coverage.PhpCoverageResultManager
 import com.jetbrains.php.phpunit.coverage.PhpUnitCoverageEngine.CoverageEngine
 import com.jetbrains.php.run.PhpConfigurationOption
-import com.jetbrains.php.run.remote.PhpRemoteInterpreterManager
 
 /**
  * Runs a Testo configuration under the Coverage executor. Extends the public [GenericProgramRunner] instead of the
@@ -69,7 +65,7 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
         val localCoverage = coverageConfiguration.coverageFilePath
         val settings = runConfiguration.testoSettings.getTestoRunnerSettings()
         val flags = coverageFlagLocalPaths(settings, localCoverage)
-        val targets = flags.map { (_, local) -> resolveTarget(runConfiguration, interpreter, local) }
+        val targets = flags.map { (_, local) -> TestoReportTarget.resolve(runConfiguration.project, interpreter, local) }
         val reportArguments = when {
             // No base path (runner missing) or every report unchecked: a bare --coverage still makes any
             // testo.php-configured writer collect, and the announce path picks the reports up.
@@ -83,7 +79,7 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
             interpreter,
             coverageArguments,
             localCoverage,
-            localCoverage?.takeIf { it.isNotEmpty() }?.let { resolveTarget(runConfiguration, interpreter, it).path },
+            localCoverage?.takeIf { it.isNotEmpty() }?.let { TestoReportTarget.resolve(runConfiguration.project, interpreter, it).path },
         )
         runConfiguration.checkConfiguration()
 
@@ -96,14 +92,13 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
         val props = (executionResult.executionConsole as? SMTRunnerConsoleView)?.properties as? TestoConsoleProperties
         // Handed over rather than kept here: the run archive dedupes the same way, and it only sees the properties.
         props?.coverageFlagPaths = flagDataFiles
-        // Testo announces a flag report under the path it was given, which the interpreter's mappings may not cover.
-        props?.coverageTargetPaths = flags.zip(targets) { (_, local), target -> target.path to local }.toMap()
+        props?.let { it.reportTargets += targets }
         executionResult.processHandler.addProcessListener(object : ProcessAdapter() {
             override fun processTerminated(event: ProcessEvent) {
-                val project = runConfiguration.project
                 ApplicationManager.getApplication().executeOnPooledThread {
-                    targets.forEach { it.copyToLocal(project) }
-                    autoApplyCoverage(project, props ?: return@executeOnPooledThread, flagDataFiles)
+                    val properties = props ?: return@executeOnPooledThread
+                    properties.copyReportsToLocal()
+                    autoApplyCoverage(runConfiguration.project, properties, flagDataFiles)
                 }
             }
         })
@@ -183,36 +178,6 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
             command.setAdditionalMapping(
                 PathMappingSettings.PathMapping(PathUtil.getParentPath(localCoverage), PathUtil.getParentPath(targetCoverage)),
             )
-        }
-    }
-
-    // One manager per report: the SSH one remembers a single local/remote pair.
-    private fun resolveTarget(runConfiguration: TestoRunConfiguration, interpreter: PhpInterpreter, localCoverage: String): CoverageTarget {
-        val data = interpreter.phpSdkAdditionalData
-        if (data !is RemoteSdkAdditionalData) return CoverageTarget(localCoverage, null)
-        val remoteManager = PhpRemoteInterpreterManager.getInstance() ?: return CoverageTarget(localCoverage, null)
-        // Throws when no coverage manager accepts the interpreter type; its path mappings are all that is left then.
-        runCatching { remoteManager.getCoverageResultManager(data) }.getOrNull()?.let { manager ->
-            return CoverageTarget(manager.processCoverageFile(localCoverage), manager)
-        }
-        return CoverageTarget(remoteManager.createPathMappings(runConfiguration.project, data).convertToRemote(localCoverage), null)
-    }
-
-    private class CoverageTarget(val path: String, private val manager: PhpCoverageResultManager?) {
-        // copyFromRemote is protected; the public route, attachToProcess, also loads the report through the PHPUnit
-        // coverage runner, which would race our own merged apply.
-        fun copyToLocal(project: Project) {
-            val manager = manager ?: return
-            val copy = generateSequence<Class<*>>(manager.javaClass) { it.superclass }
-                .firstNotNullOfOrNull { type ->
-                    type.declaredMethods.firstOrNull {
-                        it.name == "copyFromRemote" && it.parameterTypes.contentEquals(arrayOf(Project::class.java))
-                    }
-                } ?: return
-            runCatching {
-                copy.isAccessible = true
-                copy.invoke(manager, project)
-            }.onFailure { thisLogger().warn("Could not copy the coverage report $path back from the interpreter", it) }
         }
     }
 }

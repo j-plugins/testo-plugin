@@ -273,8 +273,12 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
   exclusion, which is the only exclusion form its CLI has. A name is opaque: whatever `#[Group]` spells reaches the
   CLI untouched.
 - `--log-html`/`--log-junit` at an IDE-managed path (`TestoReportFlags`, `logHtml` on / `logJunit` off by default),
-  emitted from `createCommand` so every executor gets them — local interpreters only, and the archive copies the
-  reports into history the same way it does coverage. Not in `prepareArguments`: that has no project/interpreter.
+  emitted from `createCommand` so every executor gets them, and the archive copies the reports into history the same
+  way it does coverage. Not in `prepareArguments`: that has no project/interpreter.
+- Every IDE-managed report path (`--log-*`, `--coverage-*`) goes to the interpreter through `TestoReportTarget`, i.e.
+  the PHP plugin's `getCoverageResultManager(...).processCoverageFile` — the IDE system dir sits under no path mapping,
+  so `convertToRemote` hands a WSL run the Windows path verbatim. SSH writes remotely and is downloaded back by
+  `TestoConsoleProperties.copyReportsToLocal` before anything reads the reports.
 - `--config <file>` when an alternative configuration file is set (`getConfigFileOption()`). A remote interpreter's
   framework-settings paths (executable, its own config file) are normally already remote, so they never go through the
   path processor (`setScript(exe, false)` / `addArgument`) — that pops a false "Path mappings are not configured". They
