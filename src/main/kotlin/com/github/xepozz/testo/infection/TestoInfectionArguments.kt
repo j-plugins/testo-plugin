@@ -5,7 +5,12 @@ internal object TestoInfectionArguments {
     // coverage covers, which is the same set, only slower to generate.
     const val MAX_FILTER_LENGTH = 8_000
 
-    fun build(coverageDirectory: String, sourceFiles: List<String>, htmlReport: String?): List<String> = buildList {
+    fun build(
+        coverageDirectory: String,
+        sourceFiles: List<String>,
+        htmlReport: String?,
+        textLog: String? = null,
+    ): List<String> = buildList {
         add("--coverage=$coverageDirectory")
         add("--skip-initial-tests")
         add("--test-framework=testo")
@@ -14,6 +19,10 @@ internal object TestoInfectionArguments {
         add("--no-interaction")
         filter(sourceFiles)?.let { add("--filter=$it") }
         htmlReport?.let { add("--logger-html=$it") }
+        textLog?.let {
+            add("--logger-text=$it")
+            add("--log-verbosity=all")
+        }
     }
 
     fun filter(sourceFiles: List<String>): String? =

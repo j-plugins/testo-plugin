@@ -25,8 +25,15 @@ class TestoInfectionTest {
                 "--no-interaction",
                 "--filter=src/A.php,src/B.php",
                 "--logger-html=/tmp/report.html",
+                "--logger-text=/tmp/mutations.log",
+                "--log-verbosity=all",
             ),
-            TestoInfectionArguments.build("/app/.idea/testo/staging/run", listOf("src/A.php", "src/B.php"), "/tmp/report.html"),
+            TestoInfectionArguments.build(
+                "/app/.idea/testo/staging/run",
+                listOf("src/A.php", "src/B.php"),
+                "/tmp/report.html",
+                "/tmp/mutations.log",
+            ),
         )
     }
 
@@ -130,12 +137,12 @@ class TestoInfectionTest {
     @Test
     fun `locations point at the mutated offset or the file`() {
         assertEquals(
-            InfectionLocation("D:\\p\\src\\A.php", 1335),
-            parseInfectionLocation("infection", "D:\\p\\src\\A.php::1335-1339"),
+            InfectionLocation("D:\\p\\src\\A.php", 1335, 1339),
+            parseInfectionLocation("infection://D:\\p\\src\\A.php::1335-1339"),
         )
-        assertEquals(InfectionLocation("/app/src/A.php", null), parseInfectionLocation("file", "/app/src/A.php"))
-        assertNull(parseInfectionLocation("infection", "no-range"))
-        assertNull(parseInfectionLocation("php_qn", "/app/src/A.php"))
+        assertEquals(InfectionLocation("/app/src/A.php", null, null), parseInfectionLocation("file:///app/src/A.php"))
+        assertNull(parseInfectionLocation("infection://no-range"))
+        assertNull(parseInfectionLocation("php_qn:///app/src/A.php"))
     }
 
 }

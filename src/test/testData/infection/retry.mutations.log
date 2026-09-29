@@ -1,0 +1,1866 @@
+Note: Pass `--debug` to log test-framework output.
+
+Escaped mutants:
+================
+
+1) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:80    [M] ReturnRemoval [ID] 7fef23dae843ecb8be780d94655a9f77
+
+@@ @@
+                 goto run;
+             }
+
+-            return $result->withSummary($result->summary->merge($discarded));
++
+         }
+
+         $result = $isFlaky && $this->options->markFlaky && $result->status->isSuccessful()
+
+  {
+      "status": "passed",
+      "duration": 0.036032915115356445,
+      "totals": {
+          "total": 21,
+          "passed": 21
+      },
+      "failures": []
+  }
+
+
+Timed Out mutants:
+==================
+
+1) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:57    [M] Decrement [ID] 682c68d627a0fbe870414c3238a36ece
+
+@@ @@
+
+         $attempt = 1;
+         run:
+-        --$attempts;
++        ++$attempts;
+         /** @var TestResult $result */
+         $result = $next($info);
+
+  
+
+
+2) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:63    [M] GreaterThanNegotiation [ID] f271dba1172c7e28fa77cf930dc3b485
+
+@@ @@
+
+         if ($result->status->isFailure()) {
+             # Test failed, check if we can retry
+-            if ($attempts > 0) {
++            if ($attempts <= 0) {
+                 # The attempt's own output went into the dropped fork; leave a breadcrumb in the
+                 # parent scope so the discarded attempt still leaves a trace in the test's output.
+                 $this->channel->warning(
+
+  
+
+
+Skipped mutants:
+================
+
+Killed by Test Framework mutants:
+=================================
+
+1) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:48    [M] FalseValue [ID] 8ce204542deccf0c3b1e29ad6792a3a0
+
+@@ @@
+     public function runTest(TestInfo $info, callable $next): TestResult
+     {
+         $attempts = $this->options->maxAttempts;
+-        $isFlaky = false;
++        $isFlaky = true;
+
+         # The test still counts as a single test, but the assertions and duration of the discarded
+         # attempts are real work — accumulate their summaries (counts stay empty at this point, so
+
+  {
+      "status": "failed",
+      "duration": 0.05460309982299805,
+      "totals": {
+          "total": 24,
+          "failed": 2,
+          "passed": 22
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::noRetryWhenFirstAttemptPasses",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:47: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->noRetryWhenFirstAttemptPasses()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `1` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesFirstTimeReturnsPassed",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:31: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesFirstTimeReturnsPassed()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+2) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:55    [M] IncrementInteger [ID] d8cb7def3d21c7c95f511b8988e65358
+
+@@ @@
+         # only metrics and duration carry over) and fold them into the result that is returned.
+         $discarded = new Summary();
+
+-        $attempt = 1;
++        $attempt = 2;
+         run:
+         --$attempts;
+         /** @var TestResult $result */
+
+  {
+      "status": "failed",
+      "duration": 0.04059410095214844,
+      "totals": {
+          "total": 24,
+          "passed": 23,
+          "failed": 1
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::dispatchesTestRetryingEventPerRetry",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `array(3)` is the same as `array(3)`: expected `array(3)`, got `array(3)`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:179: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->dispatchesTestRetryingEventPerRetry()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `3` is the same.\n  ✓ Successful assertion that `true` is exactly `true`.\n  ✓ Successful assertion that `Testo\\Core\\Context\\TestInfo` is the same.\n  ✓ Successful assertion that `true` is exactly `true`.\n  ✓ Successful assertion that `Testo\\Core\\Context\\TestInfo` is the same.\n  ✓ Successful assertion that `true` is exactly `true`.\n  ✓ Successful assertion that `Testo\\Core\\Context\\TestInfo` is the same.\n  ✗ Failed assertion that `array(3)` is the same as `array(3)`: expected `array(3)`, got `array(3)`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+3) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:61    [M] IfNegation [ID] 522806a73b60ba585ccc978a8640024a
+
+@@ @@
+         /** @var TestResult $result */
+         $result = $next($info);
+
+-        if ($result->status->isFailure()) {
++        if (!$result->status->isFailure()) {
+             # Test failed, check if we can retry
+             if ($attempts > 0) {
+                 # The attempt's own output went into the dropped fork; leave a breadcrumb in the
+@@ @@
+                 );
+                 goto run;
+             }
+-
+             return $result->withSummary($result->summary->merge($discarded));
+         }
+
+  {
+      "status": "failed",
+      "duration": 0.035578250885009766,
+      "totals": {
+          "total": 24,
+          "failed": 20,
+          "passed": 4
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::noRetryWhenFirstAttemptPasses",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `3` is the same as `1`: expected `1`, got `3`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:46: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->noRetryWhenFirstAttemptPasses()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `3` is the same as `1`: expected `1`, got `3`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::failingTestExhaustsAllAttempts",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `1` is the same as `3`: expected `3`, got `1`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:64: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->failingTestExhaustsAllAttempts()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `1` is the same as `3`: expected `3`, got `1`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryMarksAsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `1` is the same as `2`: expected `2`, got `1`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:85: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryMarksAsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `1` is the same as `2`: expected `2`, got `1`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryStaysPassedWhenMarkFlakyIsFalse",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `1` is the same as `2`: expected `2`, got `1`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:109: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryStaysPassedWhenMarkFlakyIsFalse()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `1` is the same as `2`: expected `2`, got `1`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::statusTriggersRetry",
+              "status": "failed"
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::dispatchesTestRetryingEventPerRetry",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `0` is the same as `3`: expected `3`, got `0`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:170: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->dispatchesTestRetryingEventPerRetry()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `0` is the same as `3`: expected `3`, got `0`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::eventCarriesPreviousFailedResult",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `0` is the same as `1`: expected `1`, got `0`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:195: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->eventCarriesPreviousFailedResult()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `0` is the same as `1`: expected `1`, got `0`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passesTestInfoToNext",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `1` is the same as `2`: expected `2`, got `1`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:215: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passesTestInfoToNext()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `1` is the same as `2`: expected `2`, got `1`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::logsBreadcrumbForEachDiscardedAttempt",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `0` is the same as `2`: expected `2`, got `0`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:231: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->logsBreadcrumbForEachDiscardedAttempt()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `0` is the same as `2`: expected `2`, got `0`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnSecondAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Failed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Failed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:38: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnSecondAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Failed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Failed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnThirdAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Failed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Failed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:45: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnThirdAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Failed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Failed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::markFlakyFalseKeepsPassedStatus",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Failed` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Failed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:66: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->markFlakyFalseKeepsPassedStatus()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Failed` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Failed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::classLevelRetryAppliesToTests",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Failed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Failed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:73: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->classLevelRetryAppliesToTests()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Failed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Failed`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+4) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:63    [M] GreaterThan [ID] cb184967fbb5b3d5eea7910049f5c082
+
+@@ @@
+
+         if ($result->status->isFailure()) {
+             # Test failed, check if we can retry
+-            if ($attempts > 0) {
++            if ($attempts >= 0) {
+                 # The attempt's own output went into the dropped fork; leave a breadcrumb in the
+                 # parent scope so the discarded attempt still leaves a trace in the test's output.
+                 $this->channel->warning(
+
+  {
+      "status": "failed",
+      "duration": 0.0380706787109375,
+      "totals": {
+          "total": 23,
+          "failed": 8,
+          "passed": 15
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::failingTestExhaustsAllAttempts",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `4` is the same as `3`: expected `3`, got `4`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:64: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->failingTestExhaustsAllAttempts()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `4` is the same as `3`: expected `3`, got `4`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::singleAttemptDoesNotRetry",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `2` is the same as `1`: expected `1`, got `2`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:126: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->singleAttemptDoesNotRetry()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `2` is the same as `1`: expected `1`, got `2`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::statusTriggersRetry",
+              "status": "failed"
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::dispatchesTestRetryingEventPerRetry",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `4` is the same as `3`: expected `3`, got `4`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:170: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->dispatchesTestRetryingEventPerRetry()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `4` is the same as `3`: expected `3`, got `4`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::eventCarriesPreviousFailedResult",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `2` is the same as `1`: expected `1`, got `2`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:195: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->eventCarriesPreviousFailedResult()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `2` is the same as `1`: expected `1`, got `2`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passesTestInfoToNext",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `3` is the same as `2`: expected `2`, got `3`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:215: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passesTestInfoToNext()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `3` is the same as `2`: expected `2`, got `3`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::logsBreadcrumbForEachDiscardedAttempt",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `3` is the same as `2`: expected `2`, got `3`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:231: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->logsBreadcrumbForEachDiscardedAttempt()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `3` is the same as `2`: expected `2`, got `3`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+5) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:66    [M] MethodCallRemoval [ID] 26e6db879cd6150c190a94883d58ee2f
+
+@@ @@
+         if ($result->status->isFailure()) {
+             # Test failed, check if we can retry
+             if ($attempts > 0) {
+-                # The attempt's own output went into the dropped fork; leave a breadcrumb in the
+-                # parent scope so the discarded attempt still leaves a trace in the test's output.
+-                $this->channel->warning(
+-                    $result->failure === null
+-                        ? "Attempt $attempt failed.\n"
+-                        : "Attempt $attempt failed: {$result->failure->getMessage()}\n",
+-                );
++
+
+                 $isFlaky = true;
+                 $discarded = $discarded->merge($result->summary);
+
+  {
+      "status": "failed",
+      "duration": 0.041951894760131836,
+      "totals": {
+          "total": 22,
+          "passed": 21,
+          "failed": 1
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::logsBreadcrumbForEachDiscardedAttempt",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `0` is the same as `2`: expected `2`, got `0`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:231: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->logsBreadcrumbForEachDiscardedAttempt()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `0` is the same as `2`: expected `2`, got `0`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+6) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:67    [M] Ternary [ID] 034afd54f386114058e03197ba017785
+
+@@ @@
+                 # The attempt's own output went into the dropped fork; leave a breadcrumb in the
+                 # parent scope so the discarded attempt still leaves a trace in the test's output.
+                 $this->channel->warning(
+-                    $result->failure === null
+-                        ? "Attempt $attempt failed.\n"
+-                        : "Attempt $attempt failed: {$result->failure->getMessage()}\n",
++                    $result->failure === null ? "Attempt $attempt failed: {$result->failure->getMessage()}\n" : "Attempt $attempt failed.\n",
+                 );
+
+                 $isFlaky = true;
+
+  {
+      "status": "failed",
+      "duration": 0.05135655403137207,
+      "totals": {
+          "total": 22,
+          "error": 9,
+          "passed": 13
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::failingTestExhaustsAllAttempts",
+              "status": "error",
+              "exception": "Error",
+              "message": "Call to a member function getMessage() on null",
+              "file": "D:\\git\\testo\\testo\\plugin\\retry\\src\\Interceptor\\RetryPolicyRunInterceptor.php",
+              "line": 67,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:62: Testo\\Retry\\Interceptor\\RetryPolicyRunInterceptor->runTest()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->failingTestExhaustsAllAttempts()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  No assertions were made."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryMarksAsFlaky",
+              "status": "error",
+              "exception": "Error",
+              "message": "Call to a member function getMessage() on null",
+              "file": "D:\\git\\testo\\testo\\plugin\\retry\\src\\Interceptor\\RetryPolicyRunInterceptor.php",
+              "line": 67,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:83: Testo\\Retry\\Interceptor\\RetryPolicyRunInterceptor->runTest()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryMarksAsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  No assertions were made."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryStaysPassedWhenMarkFlakyIsFalse",
+              "status": "error",
+              "exception": "Error",
+              "message": "Call to a member function getMessage() on null",
+              "file": "D:\\git\\testo\\testo\\plugin\\retry\\src\\Interceptor\\RetryPolicyRunInterceptor.php",
+              "line": 67,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:107: Testo\\Retry\\Interceptor\\RetryPolicyRunInterceptor->runTest()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryStaysPassedWhenMarkFlakyIsFalse()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  No assertions were made."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::statusTriggersRetry",
+              "status": "failed"
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::dispatchesTestRetryingEventPerRetry",
+              "status": "error",
+              "exception": "Error",
+              "message": "Call to a member function getMessage() on null",
+              "file": "D:\\git\\testo\\testo\\plugin\\retry\\src\\Interceptor\\RetryPolicyRunInterceptor.php",
+              "line": 67,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:168: Testo\\Retry\\Interceptor\\RetryPolicyRunInterceptor->runTest()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->dispatchesTestRetryingEventPerRetry()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  No assertions were made."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::eventCarriesPreviousFailedResult",
+              "status": "error",
+              "exception": "Error",
+              "message": "Call to a member function getMessage() on null",
+              "file": "D:\\git\\testo\\testo\\plugin\\retry\\src\\Interceptor\\RetryPolicyRunInterceptor.php",
+              "line": 67,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:193: Testo\\Retry\\Interceptor\\RetryPolicyRunInterceptor->runTest()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->eventCarriesPreviousFailedResult()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  No assertions were made."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passesTestInfoToNext",
+              "status": "error",
+              "exception": "Error",
+              "message": "Call to a member function getMessage() on null",
+              "file": "D:\\git\\testo\\testo\\plugin\\retry\\src\\Interceptor\\RetryPolicyRunInterceptor.php",
+              "line": 67,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:213: Testo\\Retry\\Interceptor\\RetryPolicyRunInterceptor->runTest()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passesTestInfoToNext()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  No assertions were made."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::logsBreadcrumbForEachDiscardedAttempt",
+              "status": "error",
+              "exception": "Error",
+              "message": "Call to a member function getMessage() on null",
+              "file": "D:\\git\\testo\\testo\\plugin\\retry\\src\\Interceptor\\RetryPolicyRunInterceptor.php",
+              "line": 67,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:227: Testo\\Retry\\Interceptor\\RetryPolicyRunInterceptor->runTest()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->logsBreadcrumbForEachDiscardedAttempt()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  No assertions were made."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+7) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:72    [M] TrueValue [ID] 49028eab86d8bf7832b9f62a793f988f
+
+@@ @@
+                         : "Attempt $attempt failed: {$result->failure->getMessage()}\n",
+                 );
+
+-                $isFlaky = true;
++                $isFlaky = false;
+                 $discarded = $discarded->merge($result->summary);
+                 $this->eventDispatcher->dispatch(
+                     new TestRetrying($info, ++$attempt, $result),
+
+  {
+      "status": "failed",
+      "duration": 0.04130196571350098,
+      "totals": {
+          "total": 22,
+          "passed": 18,
+          "failed": 4
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryMarksAsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:86: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryMarksAsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `2` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnSecondAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:38: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnSecondAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnThirdAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:45: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnThirdAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::classLevelRetryAppliesToTests",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:73: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->classLevelRetryAppliesToTests()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+8) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:74    [M] MethodCallRemoval [ID] de49219f0fbf7e3218791908a815c88a
+
+@@ @@
+
+                 $isFlaky = true;
+                 $discarded = $discarded->merge($result->summary);
+-                $this->eventDispatcher->dispatch(
+-                    new TestRetrying($info, ++$attempt, $result),
+-                );
++
+                 goto run;
+             }
+
+  {
+      "status": "failed",
+      "duration": 0.0403289794921875,
+      "totals": {
+          "total": 22,
+          "failed": 4,
+          "passed": 18
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::failingTestExhaustsAllAttempts",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `0` is the same as `2`: expected `2`, got `0`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:66: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->failingTestExhaustsAllAttempts()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `3` is the same.\n  ✓ Successful assertion that `Testo\\Core\\Value\\Status::Failed` is the same.\n  ✗ Failed assertion that `0` is the same as `2`: expected `2`, got `0`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryMarksAsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `0` is the same as `1`: expected `1`, got `0`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:87: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryMarksAsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `2` is the same.\n  ✓ Successful assertion that `Testo\\Core\\Value\\Status::Flaky` is the same.\n  ✗ Failed assertion that `0` is the same as `1`: expected `1`, got `0`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::dispatchesTestRetryingEventPerRetry",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `0` is the same as `3`: expected `3`, got `0`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:170: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->dispatchesTestRetryingEventPerRetry()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `0` is the same as `3`: expected `3`, got `0`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::eventCarriesPreviousFailedResult",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `0` is the same as `1`: expected `1`, got `0`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:195: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->eventCarriesPreviousFailedResult()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `0` is the same as `1`: expected `1`, got `0`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+9) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:75    [M] Increment [ID] 61834f4d49c8d1eb0ec47c43db12a209
+
+@@ @@
+                 $isFlaky = true;
+                 $discarded = $discarded->merge($result->summary);
+                 $this->eventDispatcher->dispatch(
+-                    new TestRetrying($info, ++$attempt, $result),
++                    new TestRetrying($info, --$attempt, $result),
+                 );
+                 goto run;
+             }
+
+  {
+      "status": "failed",
+      "duration": 0.04357123374938965,
+      "totals": {
+          "total": 22,
+          "passed": 21,
+          "failed": 1
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::dispatchesTestRetryingEventPerRetry",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `array(3)` is the same as `array(3)`: expected `array(3)`, got `array(3)`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:179: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->dispatchesTestRetryingEventPerRetry()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `3` is the same.\n  ✓ Successful assertion that `true` is exactly `true`.\n  ✓ Successful assertion that `Testo\\Core\\Context\\TestInfo` is the same.\n  ✓ Successful assertion that `true` is exactly `true`.\n  ✓ Successful assertion that `Testo\\Core\\Context\\TestInfo` is the same.\n  ✓ Successful assertion that `true` is exactly `true`.\n  ✓ Successful assertion that `Testo\\Core\\Context\\TestInfo` is the same.\n  ✗ Failed assertion that `array(3)` is the same as `array(3)`: expected `array(3)`, got `array(3)`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+10) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:83    [M] LogicalAnd [ID] ab780b477e451419f4cded41fca00785
+
+@@ @@
+             return $result->withSummary($result->summary->merge($discarded));
+         }
+
+-        $result = $isFlaky && $this->options->markFlaky && $result->status->isSuccessful()
++        $result = ($isFlaky || $this->options->markFlaky) && $result->status->isSuccessful()
+             ? $result->with(status: Status::Flaky)
+             : $result;
+
+  {
+      "status": "failed",
+      "duration": 0.03545975685119629,
+      "totals": {
+          "total": 18,
+          "failed": 4,
+          "passed": 14
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::noRetryWhenFirstAttemptPasses",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:47: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->noRetryWhenFirstAttemptPasses()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `1` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryStaysPassedWhenMarkFlakyIsFalse",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:110: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryStaysPassedWhenMarkFlakyIsFalse()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `2` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesFirstTimeReturnsPassed",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:31: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesFirstTimeReturnsPassed()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::markFlakyFalseKeepsPassedStatus",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:66: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->markFlakyFalseKeepsPassedStatus()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+11) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:83    [M] LogicalAnd [ID] 8f0d3d2bca476ef866892e2ea96e76fa
+
+@@ @@
+             return $result->withSummary($result->summary->merge($discarded));
+         }
+
+-        $result = $isFlaky && $this->options->markFlaky && $result->status->isSuccessful()
++        $result = $isFlaky && $this->options->markFlaky || $result->status->isSuccessful()
+             ? $result->with(status: Status::Flaky)
+             : $result;
+
+  {
+      "status": "failed",
+      "duration": 0.03685402870178223,
+      "totals": {
+          "total": 18,
+          "failed": 4,
+          "passed": 14
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::noRetryWhenFirstAttemptPasses",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:47: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->noRetryWhenFirstAttemptPasses()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `1` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryStaysPassedWhenMarkFlakyIsFalse",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:110: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryStaysPassedWhenMarkFlakyIsFalse()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `2` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesFirstTimeReturnsPassed",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:31: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesFirstTimeReturnsPassed()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::markFlakyFalseKeepsPassedStatus",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:66: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->markFlakyFalseKeepsPassedStatus()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+12) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:83    [M] LogicalAndAllSubExprNegation [ID] 7cd6e5d3c8e6826a98db508e2e1259c7
+
+@@ @@
+             return $result->withSummary($result->summary->merge($discarded));
+         }
+
+-        $result = $isFlaky && $this->options->markFlaky && $result->status->isSuccessful()
++        $result = !$isFlaky && !$this->options->markFlaky && !$result->status->isSuccessful()
+             ? $result->with(status: Status::Flaky)
+             : $result;
+
+  {
+      "status": "failed",
+      "duration": 0.03648805618286133,
+      "totals": {
+          "total": 18,
+          "passed": 14,
+          "failed": 4
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryMarksAsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:86: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryMarksAsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `2` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnSecondAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:38: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnSecondAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnThirdAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:45: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnThirdAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::classLevelRetryAppliesToTests",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:73: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->classLevelRetryAppliesToTests()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+13) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:83    [M] LogicalAndNegation [ID] acce00bdd44acddc4f2a6da7e6000ac3
+
+@@ @@
+             return $result->withSummary($result->summary->merge($discarded));
+         }
+
+-        $result = $isFlaky && $this->options->markFlaky && $result->status->isSuccessful()
++        $result = !($isFlaky && $this->options->markFlaky && $result->status->isSuccessful())
+             ? $result->with(status: Status::Flaky)
+             : $result;
+
+  {
+      "status": "failed",
+      "duration": 0.036370038986206055,
+      "totals": {
+          "total": 18,
+          "failed": 8,
+          "passed": 10
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::noRetryWhenFirstAttemptPasses",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:47: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->noRetryWhenFirstAttemptPasses()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `1` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryMarksAsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:86: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryMarksAsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `2` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryStaysPassedWhenMarkFlakyIsFalse",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:110: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryStaysPassedWhenMarkFlakyIsFalse()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `2` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesFirstTimeReturnsPassed",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:31: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesFirstTimeReturnsPassed()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnSecondAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:38: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnSecondAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnThirdAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:45: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnThirdAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::markFlakyFalseKeepsPassedStatus",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:66: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->markFlakyFalseKeepsPassedStatus()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::classLevelRetryAppliesToTests",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:73: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->classLevelRetryAppliesToTests()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+14) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:83    [M] LogicalAndSingleSubExprNegation [ID] d35e541c4f9e0a25a067fbbca391ebed
+
+@@ @@
+             return $result->withSummary($result->summary->merge($discarded));
+         }
+
+-        $result = $isFlaky && $this->options->markFlaky && $result->status->isSuccessful()
++        $result = !$isFlaky && $this->options->markFlaky && $result->status->isSuccessful()
+             ? $result->with(status: Status::Flaky)
+             : $result;
+
+  {
+      "status": "failed",
+      "duration": 0.03348517417907715,
+      "totals": {
+          "total": 18,
+          "failed": 6,
+          "passed": 12
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::noRetryWhenFirstAttemptPasses",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:47: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->noRetryWhenFirstAttemptPasses()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `1` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryMarksAsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:86: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryMarksAsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `2` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesFirstTimeReturnsPassed",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:31: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesFirstTimeReturnsPassed()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnSecondAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:38: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnSecondAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnThirdAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:45: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnThirdAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::classLevelRetryAppliesToTests",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:73: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->classLevelRetryAppliesToTests()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+15) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:83    [M] LogicalAndSingleSubExprNegation [ID] 8442c39ba14269aa07c8e942c0752616
+
+@@ @@
+             return $result->withSummary($result->summary->merge($discarded));
+         }
+
+-        $result = $isFlaky && $this->options->markFlaky && $result->status->isSuccessful()
++        $result = $isFlaky && $this->options->markFlaky && !$result->status->isSuccessful()
+             ? $result->with(status: Status::Flaky)
+             : $result;
+
+  {
+      "status": "failed",
+      "duration": 0.06583428382873535,
+      "totals": {
+          "total": 18,
+          "passed": 14,
+          "failed": 4
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryMarksAsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:86: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryMarksAsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `2` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnSecondAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:38: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnSecondAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnThirdAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:45: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnThirdAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::classLevelRetryAppliesToTests",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:73: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->classLevelRetryAppliesToTests()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+16) D:\git\testo\testo\plugin\retry\src\Interceptor\RetryPolicyRunInterceptor.php:83    [M] Ternary [ID] 7d7078e8b466ad45725dfc4b9efd8e0c
+
+@@ @@
+             return $result->withSummary($result->summary->merge($discarded));
+         }
+
+-        $result = $isFlaky && $this->options->markFlaky && $result->status->isSuccessful()
+-            ? $result->with(status: Status::Flaky)
+-            : $result;
++        $result = $isFlaky && $this->options->markFlaky && $result->status->isSuccessful() ? $result : $result->with(status: Status::Flaky);
+
+         return $result->withSummary($result->summary->merge($discarded));
+     }
+
+  {
+      "status": "failed",
+      "duration": 0.03426098823547363,
+      "totals": {
+          "total": 18,
+          "failed": 8,
+          "passed": 10
+      },
+      "failures": [
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::noRetryWhenFirstAttemptPasses",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:47: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->noRetryWhenFirstAttemptPasses()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `1` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryMarksAsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:86: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryMarksAsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `2` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest::passOnRetryStaysPassedWhenMarkFlakyIsFalse",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Unit\\RetryPolicyRunInterceptorTest.php:110: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest->passOnRetryStaysPassedWhenMarkFlakyIsFalse()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✓ Successful assertion that `2` is the same.\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesFirstTimeReturnsPassed",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:31: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesFirstTimeReturnsPassed()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnSecondAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:38: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnSecondAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::passesOnThirdAttemptReturnsFlaky",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:45: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->passesOnThirdAttemptReturnsFlaky()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::markFlakyFalseKeepsPassedStatus",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:66: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->markFlakyFalseKeepsPassedStatus()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Flaky` is the same as `Testo\\Core\\Value\\Status::Passed`: expected `Testo\\Core\\Value\\Status::Passed`, got `Testo\\Core\\Value\\Status::Flaky`."
+                  }
+              ]
+          },
+          {
+              "test": "Tests\\Retry\\Feature\\RetryFeatureTest::classLevelRetryAppliesToTests",
+              "status": "failed",
+              "exception": "Testo\\Assert\\State\\Assertion\\ComparisonFailure",
+              "message": "Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`.",
+              "file": "D:\\git\\testo\\testo\\plugin\\assert\\Assert.php",
+              "line": 55,
+              "trace": [
+                  "#0 D:\\git\\testo\\testo\\plugin\\retry\\tests\\Feature\\RetryFeatureTest.php:73: Testo\\Assert::same()",
+                  "#1 [internal function]: Tests\\Retry\\Feature\\RetryFeatureTest->classLevelRetryAppliesToTests()"
+              ],
+              "output": [
+                  {
+                      "channel": "assert-history",
+                      "content": "Assertion history:\n  ✗ Failed assertion that `Testo\\Core\\Value\\Status::Passed` is the same as `Testo\\Core\\Value\\Status::Flaky`: expected `Testo\\Core\\Value\\Status::Flaky`, got `Testo\\Core\\Value\\Status::Passed`."
+                  }
+              ]
+          }
+      ]
+  }
+
+
+Killed by Static Analysis mutants:
+==================================
+
+Errors mutants:
+===============
+
+Syntax Errors mutants:
+======================

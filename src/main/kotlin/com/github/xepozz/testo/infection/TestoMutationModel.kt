@@ -1,0 +1,201 @@
+package com.github.xepozz.testo.infection
+
+import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.TestoIcons
+import com.intellij.ui.AnimatedIcon
+import java.nio.file.Path
+import java.util.concurrent.CopyOnWriteArrayList
+import javax.swing.Icon
+
+/** Infection's `DetectionStatus`, by the value its TeamCity logger prints after `Mutation result:`. */
+enum class MutantStatus(val wireName: String, private val labelKey: String, val icon: Icon) {
+    KILLED("killed by tests", "infection.status.killed", TestoIcons.Status.PASSED),
+    KILLED_BY_SA("killed by SA", "infection.status.killedBySa", TestoIcons.Status.PASSED),
+    ESCAPED("escaped", "infection.status.escaped", TestoIcons.Status.FAILED),
+    TIMED_OUT("timed out", "infection.status.timedOut", TestoIcons.Status.RISKY),
+    ERROR("error", "infection.status.error", TestoIcons.Status.ERROR),
+    SYNTAX_ERROR("syntax error", "infection.status.syntaxError", TestoIcons.Status.ERROR),
+    NOT_COVERED("not covered", "infection.status.notCovered", TestoIcons.Status.CANCELLED),
+    SKIPPED("skipped", "infection.status.skipped", TestoIcons.Status.SKIPPED),
+    IGNORED("ignored", "infection.status.ignored", TestoIcons.Status.SKIPPED);
+
+    val label: String get() = TestoBundle.message(labelKey)
+
+    /** Counted as a win for the tests by Infection's MSI. */
+    val isDefeated: Boolean get() = this in DEFEATED
+
+    /** Left out of the MSI's denominator altogether. */
+    val isExcluded: Boolean get() = this == SKIPPED || this == IGNORED
+
+    companion object {
+        private val DEFEATED = setOf(KILLED, KILLED_BY_SA, TIMED_OUT, ERROR, SYNTAX_ERROR)
+
+        fun fromWire(value: String): MutantStatus? = entries.firstOrNull { it.wireName == value.trim() }
+
+        /** The status a `Mutation result: …` line names, anywhere in [text]. */
+        fun fromMessage(text: String): MutantStatus? = text.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.startsWith(RESULT_PREFIX) }
+            ?.let { fromWire(it.removePrefix(RESULT_PREFIX)) }
+
+        private const val RESULT_PREFIX = "Mutation result:"
+
+        val RUNNING_ICON: Icon get() = AnimatedIcon.Default.INSTANCE
+        val UNFINISHED_ICON: Icon get() = TestoIcons.Status.ABORTED
+    }
+}
+
+/** A source file Infection mutates; [path] is as the interpreter sees it. */
+class MutatedFile(val nodeId: String, val name: String, val path: String) {
+    val mutants: MutableList<Mutant> = CopyOnWriteArrayList()
+}
+
+class Mutant(
+    val nodeId: String,
+    val file: MutatedFile,
+    /** `Infection\Mutator\Boolean\FalseValue`. */
+    val mutatorClass: String,
+    val hash: String,
+    /** Offsets of the mutated code in the source file. */
+    val start: Int?,
+    val end: Int?,
+) {
+    val mutator: String get() = mutatorClass.substringAfterLast('\\')
+
+    @Volatile
+    var status: MutantStatus? = null
+
+    @Volatile
+    var finished = false
+
+    /** Only an escaped mutant carries its code: the original and the mutated snippet, with context lines. */
+    @Volatile
+    var original: String? = null
+
+    @Volatile
+    var mutated: String? = null
+
+    @Volatile
+    var durationMs: Long? = null
+
+    /** What the test run against this mutant printed; read off the text log once Infection is done. */
+    @Volatile
+    var output: String? = null
+}
+
+/** Infection's own metrics, over what the stream has reported so far. */
+data class MutationScore(val counts: Map<MutantStatus, Int>) {
+    val defeated: Int get() = counts.filterKeys { it.isDefeated }.values.sum()
+    private val considered: Int get() = counts.filterKeys { !it.isExcluded }.values.sum()
+    private val covered: Int get() = considered - (counts[MutantStatus.NOT_COVERED] ?: 0)
+
+    val escaped: Int get() = counts[MutantStatus.ESCAPED] ?: 0
+
+    /** Mutation Score Indicator, 0..100, or null before anything counts. */
+    val msi: Int? get() = percent(defeated, considered)
+
+    val coveredMsi: Int? get() = percent(defeated, covered)
+
+    private fun percent(part: Int, whole: Int): Int? = if (whole <= 0) null else part * 100 / whole
+}
+
+/** One Infection process and everything its stream has told so far. Written by the stream, read by the UI. */
+class TestoMutationRun(
+    val title: String,
+    /** The archived Testo run whose reports this mutates. */
+    val sourceRunDir: Path,
+    val htmlReport: Path,
+    private val toLocalPath: (String) -> String?,
+) {
+    val files: MutableList<MutatedFile> = CopyOnWriteArrayList()
+
+    private val listeners = CopyOnWriteArrayList<() -> Unit>()
+
+    /** Everything that is not a service message: Infection's banner, summary, and any error it dies with. */
+    private val log = StringBuffer()
+
+    @Volatile
+    var expected: Int = 0
+
+    @Volatile
+    var exitCode: Int? = null
+
+    @Volatile
+    var stopRequested = false
+
+    @Volatile
+    var startedAt: Long = System.currentTimeMillis()
+
+    @Volatile
+    var finishedAt: Long? = null
+
+    /** Starts this run over again, on the same reports. */
+    @Volatile
+    var restart: (() -> Unit)? = null
+
+    @Volatile
+    internal var stopper: (() -> Unit)? = null
+
+    val isRunning: Boolean get() = finishedAt == null
+
+    val mutants: List<Mutant> get() = files.flatMap { it.mutants }
+
+    fun localPath(path: String): String? = toLocalPath(path)
+
+    fun score(): MutationScore = MutationScore(mutants.mapNotNull { it.status }.groupingBy { it }.eachCount())
+
+    fun finishedCount(): Int = mutants.count { it.finished }
+
+    fun log(): String = log.toString()
+
+    internal fun appendLog(line: String) {
+        log.append(line).append('\n')
+    }
+
+    fun stop() {
+        stopRequested = true
+        stopper?.invoke()
+    }
+
+    fun addListener(listener: () -> Unit) {
+        listeners += listener
+    }
+
+    fun removeListener(listener: () -> Unit) {
+        listeners -= listener
+    }
+
+    internal fun changed() = listeners.forEach { it() }
+
+    internal fun finish(exitCode: Int?) {
+        this.exitCode = exitCode
+        finishedAt = System.currentTimeMillis()
+        changed()
+    }
+
+    fun elapsedMs(): Long = (finishedAt ?: System.currentTimeMillis()) - startedAt
+}
+
+internal data class InfectionLocation(val file: String, val start: Int?, val end: Int?)
+
+/** `infection://<file>::<start>-<end>` (offsets of the mutated code) and `file://<file>`, the protocol stripped. */
+internal fun parseInfectionLocation(hint: String): InfectionLocation? {
+    val protocol = hint.substringBefore("://", "")
+    val path = hint.substringAfter("://")
+    return when (protocol) {
+        "file" -> path.takeIf { it.isNotEmpty() }?.let { InfectionLocation(it, null, null) }
+        "infection" -> {
+            val separator = path.lastIndexOf("::")
+            if (separator <= 0) null
+            else {
+                val range = path.substring(separator + 2)
+                InfectionLocation(
+                    path.substring(0, separator),
+                    range.substringBefore('-').toIntOrNull(),
+                    range.substringAfter('-', "").toIntOrNull(),
+                )
+            }
+        }
+        else -> null
+    }
+}

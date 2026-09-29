@@ -6,7 +6,7 @@
 
 ### Added
 
-- *Run Mutation Testing* on the run toolbar: Infection over the run's own coverage-xml and JUnit reports, without re-running the tests.
+- *Run Mutation Testing* on the run toolbar: Infection over the run's own coverage-xml and JUnit reports, without re-running the tests. Its progress shows at the right end of the toolbar; the mutants go to a *Mutations* tool window, each with its diff and the test output it caused.
 
 ### Changed
 

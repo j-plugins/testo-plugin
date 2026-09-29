@@ -127,7 +127,13 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoInfectionCommand.kt    # the launch (TestoRunConfiguration.infectionLaunch) and its command
 │   ├── TestoInfectionReports.kt    # readiness off run.json, covered sources, the --coverage directory
 │   ├── TestoInfectionArguments.kt  # CLI flags; where the infection binary is looked for
-│   └── TestoInfectionConsoleProperties.kt  # its console: converter, infection:// locator, report link
+│   ├── TestoMutationService.kt     # starts Infection as a background task, no Run tab; runs by source run dir
+│   ├── TestoMutationStream.kt      # `--teamcity` output → TestoMutationModel (files, mutants, statuses, MSI)
+│   ├── TestoMutationTextLog.kt     # `--logger-text` report: every mutant's diff and test output, read at the end
+│   ├── TestoMutationToolWindow.kt  # the *Mutations* tool window, registered on first use, one tab per Testo run
+│   ├── TestoMutationPanel.kt       # own tree (StructureTreeModel) + escaped-mutant diff; toolbar group ids
+│   ├── TestoMutationActions.kt     # that toolbar and popup (Testo.Mutations.Toolbar / .Popup in plugin.xml)
+│   └── TestoMutationProgressAction.kt  # ring / MSI at the right end of the Testo run toolbar, opens the window
 │
 ├── php/
 │   └── PhpToolLauncher.kt          # any vendor/bin script on any interpreter: paths both ways, the command
@@ -509,11 +515,14 @@ Non-obvious constraints already paid for in blood — read before touching the r
   converter, so none of our stores fill — an imported tab is a PHPUnit-looking tree. `TestoRunReplayProfile` feeds
   the archived teamcity stream through the *live* properties instead. Three switches keep a replay from acting like
   a run: `replayMode`, `getConfiguration()` answering the replay profile, `reportStore.startedAtOverride`.
-- **A mutation run is a `TestoRunConfiguration` clone with `infectionLaunch` set**, so it inherits the interpreter,
-  working directory and PHP run machinery; `testoRunProfile()` answers null for it, which keeps every Testo toolbar
-  action, the coverage runner and the augmenter off its tab. Its console is not Testo's: Infection sends `testStdOut`
-  without a `nodeId`, which `TestoProtocolGate` would read as a pre-0.10.39 Testo — `TestoInfectionEventsConverter`
-  places that output by name instead.
+- **A mutation run never gets a Run tab.** Its command comes from a `TestoRunConfiguration` clone with `infectionLaunch`
+  set (so it inherits the interpreter and working directory), but `TestoMutationService` starts it through
+  `PhpRunConfiguration.createProcessHandler` itself — which still handles Docker/WSL/SSH. Run through the executor,
+  it took over the tab and the Run button of the Testo run it mutates. The stream is read by `TestoMutationStream`,
+  not the SM runner: Infection sends a mutant's `testStdOut` without a `nodeId`, and its offsets count bytes.
+  The stream carries a mutant's code only when it escaped (`actual`/`expected`); the rest comes from the
+  `--logger-text` report at `--log-verbosity=all`, whose diff has no end marker — `TestoMutationTextLog` closes a hunk
+  after sebastian/diff's three context lines. The HTML report's `replacement` is only the `+` lines, not a diff.
 - **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to
   `SMTRunnerEventsListener`: a short run finishes replaying before the augmenter hands us the console, so the
   events are already fired and missed.

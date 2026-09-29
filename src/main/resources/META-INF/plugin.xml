@@ -62,6 +62,10 @@
                 isLogByDefault="false"
                 bundle="messages.TestoBundle"
                 key="notification.group"/>
+        <!-- Unavailable until the first mutation run (TestoMutationToolWindow), like Coverage's. -->
+        <toolWindow id="Mutations" anchor="right" secondary="false" canCloseContents="true" doNotActivateOnStart="true"
+                    icon="/icons/testo/mutate.svg"
+                    factoryClass="com.github.xepozz.testo.infection.TestoMutationToolWindowFactory"/>
 
         <!--                <pathMacroFilter implementation="com.jetbrains.php.phpunit.PhpUnitPathMacroFilter" />-->
         <!--        <iconProvider implementation="com.github.xepozz.testo.ui.TestoIconProvider"/>-->
@@ -144,6 +148,20 @@
         <action id="Testo.Mutate" class="com.github.xepozz.testo.infection.TestoMutateAction">
             <add-to-group group-id="RunTab.TopToolbar" anchor="after" relative-to-action="Testo.RerunSplit"/>
         </action>
+
+        <!-- The Mutations tool window (TestoMutationPanel): its toolbar and its tree's context menu. -->
+        <group id="Testo.Mutations.Toolbar">
+            <action id="Testo.Mutations.Rerun" class="com.github.xepozz.testo.infection.TestoMutationRerunAction"/>
+            <action id="Testo.Mutations.Stop" class="com.github.xepozz.testo.infection.TestoMutationStopAction"/>
+            <separator/>
+            <action id="Testo.Mutations.EscapedOnly" class="com.github.xepozz.testo.infection.TestoMutationEscapedOnlyAction"/>
+            <action id="Testo.Mutations.OpenReport" class="com.github.xepozz.testo.infection.TestoMutationOpenReportAction"/>
+        </group>
+        <group id="Testo.Mutations.Popup">
+            <reference ref="EditSource"/>
+            <separator/>
+            <action id="Testo.Mutations.CopyId" class="com.github.xepozz.testo.infection.TestoMutationCopyIdAction"/>
+        </group>
 
         <!-- Override the platform "Rerun" so it can step aside for the split button in variant B. -->
         <action id="Rerun" overrides="true"

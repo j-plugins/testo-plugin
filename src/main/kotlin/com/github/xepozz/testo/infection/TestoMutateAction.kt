@@ -7,19 +7,13 @@ import com.github.xepozz.testo.runs.TestoRunStore
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.actions.testoRunProfile
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
-import com.intellij.execution.ProgramRunnerUtil
-import com.intellij.execution.RunManager
-import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ExecutionDataKeys
 import com.intellij.openapi.actionSystem.LangDataKeys
-import com.intellij.openapi.application.PathManager
-import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.io.FileUtil
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -39,8 +33,9 @@ class TestoMutateAction : DumbAwareAction(
         e.presentation.isVisible = context != null
         if (context == null) return
         val readiness = readiness(context.configuration.project, context.runDir)
-        e.presentation.isEnabled = readiness is TestoMutationReadiness.Ready
-        e.presentation.description = when (readiness) {
+        val running = TestoMutationService.getInstance(context.configuration.project).runFor(context.runDir)?.isRunning == true
+        e.presentation.isEnabled = readiness is TestoMutationReadiness.Ready && !running
+        e.presentation.description = if (running) TestoBundle.message("infection.running") else when (readiness) {
             is TestoMutationReadiness.Ready -> TestoBundle.message("action.testo.mutate.description")
             TestoMutationReadiness.Missing.NOT_FINISHED -> TestoBundle.message("infection.missing.notFinished")
             TestoMutationReadiness.Missing.NOT_PASSED -> TestoBundle.message("infection.missing.notPassed")
@@ -52,16 +47,7 @@ class TestoMutateAction : DumbAwareAction(
     override fun actionPerformed(e: AnActionEvent) {
         val context = context(e) ?: return
         val ready = readiness(context.configuration.project, context.runDir) as? TestoMutationReadiness.Ready ?: return
-        val sources = runCatching { TestoInfectionReports.coveredSourceFiles(ready.coverageXml) }
-            .onFailure { thisLogger().warn("Could not read the covered sources of ${ready.coverageXml}", it) }
-            .getOrDefault(emptyList())
-
-        val clone = context.configuration.clone() as TestoRunConfiguration
-        clone.name = TestoBundle.message("infection.run.name", context.configuration.name)
-        clone.infectionLaunch = TestoInfectionLaunch(ready, sources, workDir(clone.project, context.runDir))
-        val factory = clone.factory ?: return
-        val settings = RunManager.getInstance(clone.project).createConfiguration(clone, factory)
-        ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
+        TestoMutationService.getInstance(context.configuration.project).start(context.configuration, context.runDir, ready)
     }
 
     // Re-read only when run.json changes: it appears once the archive completes, and update runs on every repaint.
@@ -83,12 +69,4 @@ class TestoMutateAction : DumbAwareAction(
         val runDir = runCatching { properties.currentRunDir() }.getOrNull() ?: return null
         return Context(configuration, runDir)
     }
-
-    private fun workDir(project: Project, runDir: Path): Path = Path.of(
-        PathManager.getSystemPath(),
-        "testo",
-        "infection",
-        project.locationHash,
-        FileUtil.sanitizeFileName(runDir.fileName.toString()),
-    )
 }

@@ -2,7 +2,6 @@ package com.github.xepozz.testo.tests.run
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.infection.TestoInfectionCommand
-import com.github.xepozz.testo.infection.TestoInfectionConsoleProperties
 import com.github.xepozz.testo.infection.TestoInfectionLaunch
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.php.PhpToolLauncher
@@ -15,7 +14,6 @@ import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ParametersList
 import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.configurations.RuntimeConfigurationError
-import com.intellij.execution.testframework.actions.AbstractRerunFailedTestsAction
 import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
 import com.intellij.execution.ui.ConsoleView
 import com.intellij.openapi.options.SettingsEditor
@@ -140,8 +138,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     override fun createRerunAction(
         consoleView: ConsoleView,
         properties: SMTRunnerConsoleProperties,
-    ): AbstractRerunFailedTestsAction? =
-        if (infectionLaunch != null) null else TestoRerunFailedTestsAction(consoleView, properties)
+    ) = TestoRerunFailedTestsAction(consoleView, properties)
 
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> {
         val editor = super.getConfigurationEditor() as PhpTestRunConfigurationEditor
@@ -158,7 +155,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     @Volatile
     private var lastReportTargets: List<TestoReportTarget> = emptyList()
 
-    /** Set on the throwaway clone a mutation run launches: the process is Infection, over this configuration's reports. */
+    /** Set on the throwaway clone a mutation run is built from: the command is Infection, over this configuration's reports. */
     @Volatile
     internal var infectionLaunch: TestoInfectionLaunch? = null
 
@@ -285,7 +282,6 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         } ?: PhpCommandLinePathProcessor.LOCAL
 
         val pathMapper = pathProcessor.createPathMapper(this.project)
-        infectionLaunch?.let { return TestoInfectionConsoleProperties(this, executor, pathMapper, it) }
         return TestoConsoleProperties(
             this,
             executor,

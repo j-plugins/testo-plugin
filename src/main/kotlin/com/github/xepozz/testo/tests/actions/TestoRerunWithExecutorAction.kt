@@ -30,7 +30,7 @@ import javax.swing.Icon
 // visible and gives executor runners (notably coverage) a profile they accept, with the failed-subset filters intact.
 internal fun ExecutionEnvironment.testoRunProfile(): RunProfile? =
     when (val profile = runProfile) {
-        is TestoRunConfiguration -> profile.takeIf { it.infectionLaunch == null }
+        is TestoRunConfiguration -> profile
         is WrappingRunConfiguration<*> -> profile.peer as? TestoRunConfiguration
         // A replayed archive: rerun runs the configuration the archived run was started with, restored from its
         // manifest. (An archive that predates that recording restores a bare template — it reruns nothing useful,

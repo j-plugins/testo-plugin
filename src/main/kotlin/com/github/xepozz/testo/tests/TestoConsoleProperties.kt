@@ -56,6 +56,8 @@ class TestoConsoleProperties(
 
     val progressAction = TestoProgressAction()
 
+    val mutationProgressAction = com.github.xepozz.testo.infection.TestoMutationProgressAction(this)
+
     // The run being archived (runs.TestoRunStore) — created lazily by the converter on the first output chunk,
     // finalized by TestoRunArchiver on process termination. Null on replays and before any output.
     @Volatile
@@ -181,6 +183,7 @@ class TestoConsoleProperties(
             com.github.xepozz.testo.tests.console.TestoTreeCollapseAction(),
             com.github.xepozz.testo.tests.console.TestoTreeExpandAction(),
             reportsAction,
+            mutationProgressAction,
             progressAction,
         )
 }
