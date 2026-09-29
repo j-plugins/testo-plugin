@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.coverage.format.CoverageParseException
+import com.github.xepozz.testo.coverage.format.mapPaths
 import com.github.xepozz.testo.coverage.format.parseCoverageReport
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
 import com.intellij.coverage.CoverageEngine
@@ -36,11 +37,15 @@ class TestoCoverageRunner : CoverageRunner() {
     ): CoverageLoadingResult {
         val suite = baseCoverageSuite as? TestoCoverageSuite
         return try {
-            val report = parseCoverageReport(sessionDataFile.toPath(), suite?.format)
-            suite?.project?.let { TestoCoverageByTestIndex.getInstance(it).update(report.perTest) }
             // Key each ClassData by the resolved VirtualFile path so it matches how TestoCoverageAnnotator looks files up.
             val lfs = LocalFileSystem.getInstance()
-            val resolvePath = { path: String -> lfs.findFileByPath(path)?.path ?: path }
+            val toLocal = suite?.project?.let { coverageSourcePathMappers(it) }.orEmpty()
+            val resolvePath = { path: String ->
+                val local = resolveCoverageSourcePath(path, toLocal) { lfs.findFileByPath(it) != null }
+                lfs.findFileByPath(local)?.path ?: local
+            }
+            val report = parseCoverageReport(sessionDataFile.toPath(), suite?.format).mapPaths(resolvePath)
+            suite?.project?.let { TestoCoverageByTestIndex.getInstance(it).update(report.perTest) }
             val projectData = report.toProjectData(resolvePath)
             val lineTotals = report.files.mapNotNull { file -> file.totals?.let { resolvePath(file.filePath) to it } }
             suite?.applyParsed(report.hasBranches, lineTotals.toMap())
