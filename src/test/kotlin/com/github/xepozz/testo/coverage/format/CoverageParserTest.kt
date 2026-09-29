@@ -38,10 +38,25 @@ class CoverageParserTest {
         val f = report.file(interceptor)
         assertEquals(1, f.hits(40))
         assertEquals(0, f.hits(70))   // count="0" -> uncovered
-        assertNull(f.branch(40))       // Clover carries no branch data
+        assertNull(f.branch(40))       // a line-level report has no cond lines
 
         assertEquals(listOf(1, 1), report.file(multipleResult).lines.map { it.hits })
         assertEquals(listOf(0, 0), report.file(dataCross).lines.map { it.hits })
+    }
+
+    @Test
+    fun cloverParsesCondLinesAsBranches() {
+        val report = parseCoverageReport(dir.resolve("clover-branches.xml"), CoverageFormat.CLOVER)
+        val f = report.file("D:/git/testo/testo/src/Calculator.php")
+
+        assertTrue(report.hasBranches)
+        assertNull(f.branch(10))
+        assertEquals(BranchCoverage(2, 2), f.branch(11))
+        assertEquals(BranchCoverage(1, 2), f.branch(12))
+        assertEquals(BranchCoverage(2, 4), f.branch(13))
+        assertEquals(BranchCoverage(0, 2), f.branch(14))
+        // A cond line has no count: it is executed exactly when an edge out of it was taken.
+        assertEquals(listOf(1, 1, 1, 1, 0, 0), f.lines.map { it.hits })
     }
 
     // ---- Cobertura ------------------------------------------------------------------------------------------------

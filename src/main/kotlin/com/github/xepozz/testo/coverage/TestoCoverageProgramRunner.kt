@@ -128,12 +128,14 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
     /**
      * The `--coverage-level` to send, or null for none. An explicit choice wins. On *auto* the level is normally left
      * to testo.php — except when branch coverage is both achievable and carried: the Xdebug engine (PCOV collects
-     * lines only) together with a Cobertura report (the format that stores branch data). Then auto means branch.
+     * lines only) together with a Cobertura or Clover report (the formats that store branch data). Then auto means
+     * branch.
      */
     fun resolveCoverageLevel(settings: TestoRunnerSettings): String? {
         val level = settings.coverageLevel.trim()
         if (level.isNotEmpty() && level != TestoRunnerSettings.COVERAGE_LEVEL_AUTO) return level
-        if (settings.coverageEngine == CoverageEngine.XDEBUG && settings.coverageCobertura) return "branch"
+        val carriesBranches = settings.coverageCobertura || settings.coverageClover
+        if (settings.coverageEngine == CoverageEngine.XDEBUG && carriesBranches) return "branch"
         return null
     }
 

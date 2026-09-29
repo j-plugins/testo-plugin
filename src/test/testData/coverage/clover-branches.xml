@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1789000000">
+  <project timestamp="1789000000">
+    <file name="D:\git\testo\testo\src\Calculator.php">
+      <line num="10" type="stmt" count="1"/>
+      <line num="11" type="cond" truecount="2" falsecount="0"/>
+      <line num="12" type="cond" truecount="1" falsecount="1"/>
+      <line num="13" type="cond" truecount="2" falsecount="2"/>
+      <line num="14" type="cond" truecount="0" falsecount="2"/>
+      <line num="15" type="stmt" count="0"/>
+      <metrics statements="6" coveredstatements="4" conditionals="10" coveredconditionals="5" elements="16" coveredelements="9"/>
+    </file>
+    <metrics files="1" statements="6" coveredstatements="4" conditionals="10" coveredconditionals="5" elements="16" coveredelements="9"/>
+  </project>
+</coverage>

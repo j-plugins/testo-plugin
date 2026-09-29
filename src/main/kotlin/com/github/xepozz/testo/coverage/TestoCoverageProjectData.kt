@@ -10,7 +10,8 @@ import com.intellij.rt.coverage.data.ProjectData
  * number-indexed array. The key comes from [keyFor], which the runner uses to resolve the report path to the matching
  * `VirtualFile.getPath()` so [com.github.xepozz.testo.coverage.TestoCoverageAnnotator] can look it up by the same path.
  *
- * Branch data is approximate by construction — Cobertura reports only `covered/total`, not *which* outcomes — so a
+ * Branch data is approximate by construction — Cobertura and Clover report only `covered/total`, not *which*
+ * outcomes — so a
  * two-way line becomes a [com.intellij.rt.coverage.data.JumpData] and an n-way line a
  * [com.intellij.rt.coverage.data.SwitchData]; touching the default slot only when fully covered keeps a fully-covered
  * decision line green rather than partial.

@@ -97,6 +97,11 @@ class TestoCoverageArgumentsTest : TestoCoverageProgramRunner() {
     }
 
     @Test
+    fun autoWithXdebugAndCloverCollectsBranches() {
+        assertEquals("branch", resolveCoverageLevel(TestoRunnerSettings(coverageCobertura = false, coverageClover = true)))
+    }
+
+    @Test
     fun autoWithoutCoberturaSendsNoLevelFlag() {
         val settings = TestoRunnerSettings(coverageCobertura = false)
         assertEquals(null, resolveCoverageLevel(settings))
