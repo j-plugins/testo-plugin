@@ -2,6 +2,7 @@ package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
+import com.intellij.openapi.util.io.NioFiles
 import com.intellij.ui.AnimatedIcon
 import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
@@ -104,9 +105,26 @@ class TestoMutationRun(
     val title: String,
     /** The archived Testo run whose reports this mutates. */
     val sourceRunDir: Path,
-    val htmlReport: Path,
+    /** This run's own files: the staged coverage, the reports Infection writes. */
+    val workDir: Path,
     private val toLocalPath: (String) -> String?,
 ) {
+    val htmlReport: Path get() = workDir.resolve(TestoInfectionLaunch.HTML_REPORT)
+
+    /** Set once the tab is closed: the files go as soon as nothing writes them any more. */
+    @Volatile
+    var discarded = false
+        private set
+
+    fun discardFiles() {
+        discarded = true
+        if (isRunning) stop() else deleteFiles()
+    }
+
+    internal fun deleteFiles() {
+        runCatching { NioFiles.deleteRecursively(workDir) }
+    }
+
     val files: MutableList<MutatedFile> = CopyOnWriteArrayList()
 
     private val listeners = CopyOnWriteArrayList<() -> Unit>()

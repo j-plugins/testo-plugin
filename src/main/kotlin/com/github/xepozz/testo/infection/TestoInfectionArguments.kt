@@ -52,7 +52,9 @@ internal object TestoInfectionArguments {
                 options.gitDiffBase.trim().takeIf { it.isNotEmpty() }?.let { add("--git-diff-base=$it") }
             }
             TestoRunnerSettings.INFECTION_SCOPE_ALL -> Unit
-            else -> filter(sourceFiles)?.let { add("--filter=$it") }
+            // Without --with-uncovered, Infection skips every file this run's coverage has no test for before parsing it, so
+            // the deprecated --filter would change nothing. With it, the filter is what keeps the other files out.
+            else -> if (options.withUncovered) filter(sourceFiles)?.let { add("--filter=$it") }
         }
         options.threads.trim().takeIf { it.isNotEmpty() }?.let { add("--threads=$it") }
         if (options.onlyCoveringTestCases) add("--only-covering-test-cases")

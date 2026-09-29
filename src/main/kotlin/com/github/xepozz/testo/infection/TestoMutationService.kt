@@ -23,6 +23,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapi.util.io.NioFiles
 import com.jetbrains.php.run.PhpRunConfiguration
 import java.nio.file.Files
 import java.nio.file.Path
@@ -32,6 +33,17 @@ import java.util.concurrent.ConcurrentHashMap
 @Service(Service.Level.PROJECT)
 class TestoMutationService(private val project: Project) {
     private val runs = ConcurrentHashMap<Path, TestoMutationRun>()
+
+    init {
+        // No tab outlives the IDE, so whatever the last session left is garbage. Listed now, deleted later: a run started
+        // meanwhile writes into a directory this listing does not hold.
+        val stale = children(root).flatMap(::children)
+        if (stale.isNotEmpty()) {
+            ApplicationManager.getApplication().executeOnPooledThread {
+                stale.forEach { runCatching { NioFiles.deleteRecursively(it) } }
+            }
+        }
+    }
 
     fun runFor(sourceRunDir: Path?): TestoMutationRun? = sourceRunDir?.let(runs::get)
 
@@ -54,7 +66,7 @@ class TestoMutationService(private val project: Project) {
         val interpreter = clone.interpreter
         val launcher = interpreter?.let { PhpToolLauncher(project, it) }
 
-        val run = TestoMutationRun(configuration.name, runDir, launch.htmlReport) { launcher?.toLocal(it) }
+        val run = TestoMutationRun(configuration.name, runDir, launch.workDir) { launcher?.toLocal(it) }
         run.restart = { start(configuration, runDir, ready, optionsFrom) }
         if (runs.size >= MAX_RUNS) {
             runs.entries.filter { !it.value.isRunning }.minByOrNull { it.value.startedAt }?.let { runs.remove(it.key) }
@@ -77,6 +89,7 @@ class TestoMutationService(private val project: Project) {
                     notifyFailed(run, e.message ?: e.javaClass.simpleName)
                 } finally {
                     launch.shared?.release()
+                    if (run.discarded) run.deleteFiles()
                 }
                 if (run.exitCode != null) notifyFinished(run)
             }
@@ -91,7 +104,9 @@ class TestoMutationService(private val project: Project) {
         indicator: ProgressIndicator,
     ) {
         val command = clone.createCommand(interpreter, mutableMapOf(), mutableListOf(), false)
-        val handler = PhpRunConfiguration.createProcessHandler(project, command, false, false, command.createGeneralCommandLine(false))
+        val commandLine = command.createGeneralCommandLine(false)
+        run.appendLog("$ ${commandLine.commandLineString}")
+        val handler = PhpRunConfiguration.createProcessHandler(project, command, false, false, commandLine)
         val stream = TestoMutationStream(run)
         handler.addProcessListener(object : ProcessListener {
             override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
@@ -170,13 +185,14 @@ class TestoMutationService(private val project: Project) {
         }
     }
 
-    private fun workDir(runDir: Path): Path = Path.of(
-        PathManager.getSystemPath(),
-        "testo",
-        "infection",
-        project.locationHash,
-        FileUtil.sanitizeFileName(runDir.fileName.toString()),
-    )
+    // One per mutation run, not per Testo run: a pinned tab keeps its reports while the next run of the same Testo run
+    // writes its own.
+    private fun workDir(runDir: Path): Path =
+        root.resolve(FileUtil.sanitizeFileName(runDir.fileName.toString())).resolve(System.currentTimeMillis().toString())
+
+    private fun children(dir: Path): List<Path> = runCatching { Files.list(dir).use { it.toList() } }.getOrDefault(emptyList())
+
+    private val root: Path get() = Path.of(PathManager.getSystemPath(), "testo", "infection", project.locationHash)
 
     companion object {
         private const val POLL_MS = 200L

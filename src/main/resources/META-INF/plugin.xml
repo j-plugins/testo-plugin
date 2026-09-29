@@ -152,6 +152,8 @@
             <separator/>
             <action id="Testo.Mutations.EscapedOnly" class="com.github.xepozz.testo.infection.TestoMutationEscapedOnlyAction"/>
             <action id="Testo.Mutations.OpenReport" class="com.github.xepozz.testo.infection.TestoMutationOpenReportAction"/>
+            <separator/>
+            <action id="Testo.Mutations.Pin" class="com.github.xepozz.testo.infection.TestoMutationPinAction"/>
         </group>
         <group id="Testo.Mutations.Popup">
             <reference ref="EditSource"/>

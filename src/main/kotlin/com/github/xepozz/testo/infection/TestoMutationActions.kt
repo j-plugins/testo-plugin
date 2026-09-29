@@ -89,3 +89,26 @@ class TestoMutationEscapedOnlyAction : DumbAwareToggleAction() {
         e.presentation.isEnabled = e.getData(TestoMutationPanel.PANEL) != null
     }
 }
+
+/** The tab's own pin, the same one its context menu has: a pinned tab stays when the next run of its Testo run starts. */
+class TestoMutationPinAction : DumbAwareToggleAction() {
+    init {
+        templatePresentation.icon = AllIcons.General.Pin_tab
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+    private fun content(e: AnActionEvent) =
+        e.getData(TestoMutationPanel.PANEL)?.let { TestoMutationToolWindow.contentOf(it.project, it) }
+
+    override fun isSelected(e: AnActionEvent): Boolean = content(e)?.isPinned == true
+
+    override fun setSelected(e: AnActionEvent, state: Boolean) {
+        content(e)?.isPinned = state
+    }
+
+    override fun update(e: AnActionEvent) {
+        super.update(e)
+        e.presentation.isEnabled = content(e) != null
+    }
+}

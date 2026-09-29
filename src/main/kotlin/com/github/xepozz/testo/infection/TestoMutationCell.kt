@@ -219,16 +219,19 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
 
     private fun textWidth(text: String) = getFontMetrics(font).stringWidth(text)
 
-    private fun zoneAt(x: Int): Zone? = when {
-        x < arrowStart() -> Zone.BUTTON
-        x < buttonWidth() -> Zone.ARROW
-        x < buttonWidth() + progressWidth() -> Zone.PROGRESS
-        else -> null
+    private fun zoneAt(position: Int): Zone? = position.minus(LEAD).let { x ->
+        when {
+            x < 0 -> null
+            x < arrowStart() -> Zone.BUTTON
+            x < buttonWidth() -> Zone.ARROW
+            x < buttonWidth() + progressWidth() -> Zone.PROGRESS
+            else -> null
+        }
     }
 
     override fun getPreferredSize(): Dimension {
         val metrics = getFontMetrics(font)
-        return Dimension(buttonWidth() + progressWidth(), maxOf(metrics.height, RING, MUTATE.iconHeight) + JBUI.scale(4))
+        return Dimension(LEAD + buttonWidth() + progressWidth(), maxOf(metrics.height, RING, MUTATE.iconHeight) + JBUI.scale(4))
     }
 
     override fun getMinimumSize(): Dimension = preferredSize
@@ -238,6 +241,12 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         val g2 = g.create() as Graphics2D
         try {
             GraphicsUtil.setupAAPainting(g2)
+            // Fences Infection off from Coverage on its left, the way the row itself is fenced off.
+            g2.color = JBColor.border()
+            val inset = JBUI.scale(4)
+            g2.fillRect(JBUI.scale(4), inset, JBUI.scale(1), height - 2 * inset)
+            g2.translate(LEAD, 0)
+
             val arc = JBUI.scale(6)
             val button = buttonWidth()
             hovered?.let { zone ->
@@ -373,6 +382,7 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         private val PADDING get() = JBUI.scale(5)
         private val GAP get() = JBUI.scale(4)
         private val RING get() = JBUI.scale(16)
+        private val LEAD get() = JBUI.scale(9)
 
         private val RING_TRACK = JBColor.namedColor("ProgressBar.trackColor", JBColor(0xD5D5D5, 0x4E5157))
         private val RING_PROGRESS = JBColor.namedColor("ProgressBar.progressColor", JBColor(0x389FD6, 0x3592C4))

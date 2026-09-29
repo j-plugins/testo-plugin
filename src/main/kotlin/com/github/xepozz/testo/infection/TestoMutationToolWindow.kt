@@ -5,6 +5,7 @@ import com.github.xepozz.testo.ui.TestoReportViewer
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
@@ -22,18 +23,28 @@ internal object TestoMutationToolWindow {
 
     private val RUN_KEY = Key.create<TestoMutationRun>("testo.mutation.run")
 
-    /** Shows [run] in its tab — a rerun of the same Testo run takes over the tab its last run had — without focusing. */
+    /**
+     * Shows [run] without focusing. A rerun of the same Testo run takes over the tab its last run had, unless that tab
+     * is pinned: a pinned tab keeps its run and cannot be closed until unpinned.
+     */
     fun add(project: Project, run: TestoMutationRun): Content {
         val window = window(project)
         val manager = window.contentManager
         val panel = TestoMutationPanel(project, run)
-        val content = ContentFactory.getInstance().createContent(panel, run.title, false).apply {
+        val content = ContentFactory.getInstance().createContent(panel, title(manager.contents, run), false).apply {
             putUserData(RUN_KEY, run)
             isCloseable = true
-            setDisposer(panel)
+            isPinnable = true
+            addPropertyChangeListener { event ->
+                if (event.propertyName == Content.PROP_PINNED) isCloseable = !isPinned
+            }
+            setDisposer {
+                Disposer.dispose(panel)
+                run.discardFiles()
+            }
             preferredFocusableComponent = panel.preferredFocus
         }
-        val previous = manager.contents.firstOrNull { it.getUserData(RUN_KEY)?.sourceRunDir == run.sourceRunDir }
+        val previous = manager.contents.firstOrNull { !it.isPinned && it.getUserData(RUN_KEY)?.sourceRunDir == run.sourceRunDir }
         if (previous != null) {
             val index = manager.getIndexOfContent(previous)
             manager.addContent(content, index)
@@ -45,12 +56,21 @@ internal object TestoMutationToolWindow {
         return content
     }
 
+    // Pinned tabs of the same Testo run stay beside the new one, which is numbered to tell them apart.
+    private fun title(contents: Array<Content>, run: TestoMutationRun): String {
+        val pinned = contents.count { it.isPinned && it.getUserData(RUN_KEY)?.sourceRunDir == run.sourceRunDir }
+        return if (pinned == 0) run.title else "${run.title} (${pinned + 1})"
+    }
+
     fun show(project: Project, run: TestoMutationRun) {
         val window = window(project)
         val content = window.contentManager.contents.firstOrNull { it.getUserData(RUN_KEY) === run } ?: add(project, run)
         window.contentManager.setSelectedContent(content, true)
         window.activate(null)
     }
+
+    fun contentOf(project: Project, panel: TestoMutationPanel): Content? =
+        ToolWindowManager.getInstance(project).getToolWindow(ID)?.contentManager?.contents?.firstOrNull { it.component === panel }
 
     fun openReport(project: Project, run: TestoMutationRun) {
         val report = run.htmlReport.takeIf(Files::isRegularFile) ?: return

@@ -17,7 +17,7 @@ internal class TestoInfectionLaunch(
     val options: TestoInfectionOptions = TestoInfectionOptions(),
 ) {
     val coverageDir: Path get() = workDir.resolve("coverage")
-    val htmlReport: Path get() = workDir.resolve("report.html")
+    val htmlReport: Path get() = workDir.resolve(HTML_REPORT)
     val textLog: Path get() = workDir.resolve("mutations.log")
 
     @Volatile
@@ -28,6 +28,10 @@ internal class TestoInfectionLaunch(
 
     @Volatile
     internal var textTarget: TestoReportTarget? = null
+
+    companion object {
+        const val HTML_REPORT = "report.html"
+    }
 }
 
 internal object TestoInfectionCommand {

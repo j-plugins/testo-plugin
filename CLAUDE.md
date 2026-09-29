@@ -522,6 +522,10 @@ Non-obvious constraints already paid for in blood — read before touching the r
   The stream carries a mutant's code only when it escaped (`actual`/`expected`); the rest comes from the
   `--logger-text` report at `--log-verbosity=all`, whose diff has no end marker — `TestoMutationTextLog` closes a hunk
   after sebastian/diff's three context lines. The HTML report's `replacement` is only the `+` lines, not a diff.
+  Every mutation run has its own work directory (a pinned tab keeps its reports while the next run writes new ones); it
+  is deleted when its tab closes, and what a previous IDE session left is cleared when the service starts.
+  No `--filter` unless `--with-uncovered`: Infection skips a file its coverage has no test for before parsing it, and
+  the positional replacement for the deprecated flag hands paths outside infection.json5's `source` to Testo as tests.
 - **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to
   `SMTRunnerEventsListener`: a short run finishes replaying before the augmenter hands us the console, so the
   events are already fired and missed.

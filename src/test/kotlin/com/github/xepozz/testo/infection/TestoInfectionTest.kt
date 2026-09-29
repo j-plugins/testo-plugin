@@ -24,7 +24,6 @@ class TestoInfectionTest {
                 "--teamcity",
                 "--no-progress",
                 "--no-interaction",
-                "--filter=src/A.php,src/B.php",
                 "--logger-html=/tmp/report.html",
                 "--logger-text=/tmp/mutations.log",
                 "--log-verbosity=all",
@@ -35,6 +34,16 @@ class TestoInfectionTest {
                 "/tmp/report.html",
                 "/tmp/mutations.log",
             ),
+        )
+    }
+
+    @Test
+    fun `the covered files are filtered only when uncovered code is mutated too`() {
+        assertEquals(
+            listOf("--with-uncovered", "--filter=src/A.php,src/B.php"),
+            TestoInfectionArguments.build("/c", listOf("src/A.php", "src/B.php"), null, null, TestoInfectionOptions(withUncovered = true))
+                .filter { it.startsWith("--with-uncovered") || it.startsWith("--filter") }
+                .sortedDescending(),
         )
     }
 

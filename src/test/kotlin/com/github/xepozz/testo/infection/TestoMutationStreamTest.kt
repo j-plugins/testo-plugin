@@ -11,7 +11,7 @@ import java.nio.file.Path
 class TestoMutationStreamTest {
 
     private fun replay(chunk: Int): TestoMutationRun {
-        val run = TestoMutationRun("retry", Path.of("run"), Path.of("report.html")) { it }
+        val run = TestoMutationRun("retry", Path.of("run"), Path.of("work")) { it }
         val stream = TestoMutationStream(run)
         val text = Files.readString(Path.of("src/test/testData/infection/retry.teamcity.txt"))
         text.chunked(chunk).forEach { stream.feed(it, stdout = true) }
