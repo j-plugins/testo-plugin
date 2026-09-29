@@ -43,8 +43,8 @@ import javax.swing.SwingUtilities
  * platform's `CoverageLineMarkerRenderer` (`@ApiStatus.Internal`). Same geometry: `Position.LEFT`, the
  * stripe filled with the standard coverage colour keys, so the user's Colors & Fonts settings apply unchanged.
  *
- * A click inside the line-marker area pops the line's story: coverage status, hit count, branch tally (Cobertura, Clover),
- * and — when the per-test index holds the line — the covering tests, navigable like the code-vision lens.
+ * A click inside the line-marker area pops the line's story: coverage status, hit count, branch tally (Cobertura,
+ * Clover), and — when the per-test index holds the line — the covering tests, navigable like the code-vision lens.
  */
 internal class TestoCoverageGutterRenderer(
     private val project: Project,
