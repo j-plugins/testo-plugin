@@ -47,4 +47,13 @@ class TestoReportTargetTest : TestCase() {
         assertEquals("C:\\ide\\junit.xml", TestoReportTarget.localPathOf("/mnt/c/ide/junit.xml", targets))
         assertNull(TestoReportTarget.localPathOf("/srv/app/build/report.html", targets))
     }
+
+    fun testLocalPathOfFileInsideADirectoryTarget() {
+        val targets = listOf(TestoReportTarget("C:\\ide\\run-coverage-xml", "/opt/phpstorm-coverage/run-coverage-xml", null, true))
+        assertEquals(
+            "C:\\ide\\run-coverage-xml/index.xml",
+            TestoReportTarget.localPathOf("/opt/phpstorm-coverage/run-coverage-xml/index.xml", targets),
+        )
+        assertNull(TestoReportTarget.localPathOf("/opt/phpstorm-coverage/run-coverage-xml-old/index.xml", targets))
+    }
 }

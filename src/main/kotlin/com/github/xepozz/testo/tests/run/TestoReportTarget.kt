@@ -37,8 +37,18 @@ internal class TestoReportTarget(
     }
 
     companion object {
-        /** The local path of the report announced at [path], if one of [targets] is it. */
-        fun localPathOf(path: String, targets: List<TestoReportTarget>): String? = targets.firstOrNull { it.path == path }?.local
+        /**
+         * The local path of the report announced at [path], if one of [targets] is it or holds it: coverage-xml targets
+         * a directory and is announced as the `index.xml` inside. Pure string work, whatever the host OS.
+         */
+        fun localPathOf(path: String, targets: List<TestoReportTarget>): String? = targets.firstNotNullOfOrNull { target ->
+            val directory = target.path.trimEnd('/') + "/"
+            when {
+                path == target.path -> target.local
+                path.startsWith(directory) -> target.local.trimEnd('/', '\\') + "/" + path.removePrefix(directory)
+                else -> null
+            }
+        }
 
         // One manager per report: the SSH one remembers a single local/remote pair.
         fun resolve(project: Project, interpreter: PhpInterpreter, local: String): TestoReportTarget {
