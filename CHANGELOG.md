@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- *Run Mutation Testing* on the run toolbar: Infection over the run's own coverage-xml and JUnit reports, without re-running the tests.
+
+### Changed
+
+- The JUnit report is written by default, including in existing run configurations that never turned it on.
+
 ## [2026.14.262] - 2026-09-29
 
 ### Fixed

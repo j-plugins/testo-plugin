@@ -141,6 +141,10 @@
             <add-to-group group-id="RunTab.TopToolbar" anchor="before" relative-to-action="Rerun"/>
         </action>
 
+        <action id="Testo.Mutate" class="com.github.xepozz.testo.infection.TestoMutateAction">
+            <add-to-group group-id="RunTab.TopToolbar" anchor="after" relative-to-action="Testo.RerunSplit"/>
+        </action>
+
         <!-- Override the platform "Rerun" so it can step aside for the split button in variant B. -->
         <action id="Rerun" overrides="true"
                 class="com.github.xepozz.testo.tests.actions.TestoAwareRerunAction"/>

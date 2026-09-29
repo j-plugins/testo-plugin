@@ -43,6 +43,15 @@ class TestoRunnerSettingsSerializationTest : TestCase() {
         assertFalse("Empty lists are the default and must stay out of the XML: $xml", xml.contains("groups"))
     }
 
+    fun testJunitIsOnByDefaultAndAnOptOutIsKept() {
+        assertTrue("A configuration saved without the attribute logs JUnit", deserialize("<TestoRunnerSettings />").logJunit)
+
+        val optedOut = serialize(TestoRunnerSettings(logJunit = false))
+
+        assertTrue(optedOut, optedOut.contains("log_junit=\"false\""))
+        assertFalse(deserialize(optedOut).logJunit)
+    }
+
     fun testGroupsRoundTrip() {
         val settings = TestoRunnerSettings().apply {
             groups = mutableListOf("db", "a,b")

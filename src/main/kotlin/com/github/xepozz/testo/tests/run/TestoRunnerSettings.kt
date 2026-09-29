@@ -47,12 +47,12 @@ class TestoRunnerSettings(
     var coverageOptions: String = DEFAULT_COVERAGE_OPTIONS,
 
     // Reports written into an IDE-managed folder on every run (`--log-html` / `--log-junit`) and copied into history.
-    // HTML is on by default (it opens in a tab); JUnit is off — it exists for external tooling (mutation testing).
+    // JUnit is on by default: with coverage-xml it is what lets mutation testing skip Infection's own initial test run.
     @Attribute("log_html")
     var logHtml: Boolean = true,
 
     @Attribute("log_junit")
-    var logJunit: Boolean = false,
+    var logJunit: Boolean = true,
 ) : PhpTestRunnerSettings() {
     /** Suite names to run, one `--suite` flag each (Testo ORs them). A name is opaque — spaces and all. */
     @get:XCollection(propertyElementName = "suites", style = XCollection.Style.v2)

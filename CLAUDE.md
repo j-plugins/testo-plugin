@@ -122,6 +122,16 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoGroupsIndex.kt         # FileBasedIndex: every name a #[Filter\Group] in the project spells
 │   └── TestoDataProviderUtils.kt   # isDataProvider / findDataProviderUsages / usage index
 │
+├── infection/                      # mutation testing: Infection over an archived run's coverage-xml + JUnit
+│   ├── TestoMutateAction.kt        # the run toolbar button; enabled by TestoInfectionReports.readiness
+│   ├── TestoInfectionCommand.kt    # the launch (TestoRunConfiguration.infectionLaunch) and its command
+│   ├── TestoInfectionReports.kt    # readiness off run.json, covered sources, the --coverage directory
+│   ├── TestoInfectionArguments.kt  # CLI flags; where the infection binary is looked for
+│   └── TestoInfectionConsoleProperties.kt  # its console: converter, infection:// locator, report link
+│
+├── php/
+│   └── PhpToolLauncher.kt          # any vendor/bin script on any interpreter: paths both ways, the command
+│
 ├── references/
 │   └── TestFunctionImplicitUsageProvider.kt  # tests/classes are never "unused"
 │
@@ -272,7 +282,7 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
   **lists** (`@XCollection`), one `--group` flag each — Testo ORs repeated `--group`s and reads a `!name` prefix as an
   exclusion, which is the only exclusion form its CLI has. A name is opaque: whatever `#[Group]` spells reaches the
   CLI untouched.
-- `--log-html`/`--log-junit` at an IDE-managed path (`TestoReportFlags`, `logHtml` on / `logJunit` off by default),
+- `--log-html`/`--log-junit` at an IDE-managed path (`TestoReportFlags`, both on by default),
   emitted from `createCommand` so every executor gets them, and the archive copies the reports into history the same
   way it does coverage. Not in `prepareArguments`: that has no project/interpreter.
 - Every IDE-managed report path (`--log-*`, `--coverage-*`) goes to the interpreter through `TestoReportTarget`, i.e.
@@ -499,6 +509,11 @@ Non-obvious constraints already paid for in blood — read before touching the r
   converter, so none of our stores fill — an imported tab is a PHPUnit-looking tree. `TestoRunReplayProfile` feeds
   the archived teamcity stream through the *live* properties instead. Three switches keep a replay from acting like
   a run: `replayMode`, `getConfiguration()` answering the replay profile, `reportStore.startedAtOverride`.
+- **A mutation run is a `TestoRunConfiguration` clone with `infectionLaunch` set**, so it inherits the interpreter,
+  working directory and PHP run machinery; `testoRunProfile()` answers null for it, which keeps every Testo toolbar
+  action, the coverage runner and the augmenter off its tab. Its console is not Testo's: Infection sends `testStdOut`
+  without a `nodeId`, which `TestoProtocolGate` would read as a pre-0.10.39 Testo — `TestoInfectionEventsConverter`
+  places that output by name instead.
 - **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to
   `SMTRunnerEventsListener`: a short run finishes replaying before the augmenter hands us the console, so the
   events are already fired and missed.

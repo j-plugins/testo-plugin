@@ -1,7 +1,11 @@
 package com.github.xepozz.testo.tests.run
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.infection.TestoInfectionCommand
+import com.github.xepozz.testo.infection.TestoInfectionConsoleProperties
+import com.github.xepozz.testo.infection.TestoInfectionLaunch
 import com.github.xepozz.testo.isTestoExecutable
+import com.github.xepozz.testo.php.PhpToolLauncher
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.TestoFrameworkType
 import com.github.xepozz.testo.tests.actions.TestoRerunFailedTestsAction
@@ -11,6 +15,7 @@ import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ParametersList
 import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.configurations.RuntimeConfigurationError
+import com.intellij.execution.testframework.actions.AbstractRerunFailedTestsAction
 import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
 import com.intellij.execution.ui.ConsoleView
 import com.intellij.openapi.options.SettingsEditor
@@ -22,7 +27,6 @@ import com.intellij.util.PathUtil
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
-import com.jetbrains.php.config.commandLine.PhpCommandSettingsBuilder
 import com.jetbrains.php.config.interpreters.PhpInterpreter
 import com.jetbrains.php.run.PhpAsyncRunConfiguration
 import com.jetbrains.php.run.remote.PhpRemoteInterpreterManager
@@ -136,7 +140,8 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     override fun createRerunAction(
         consoleView: ConsoleView,
         properties: SMTRunnerConsoleProperties,
-    ) = TestoRerunFailedTestsAction(consoleView, properties)
+    ): AbstractRerunFailedTestsAction? =
+        if (infectionLaunch != null) null else TestoRerunFailedTestsAction(consoleView, properties)
 
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> {
         val editor = super.getConfigurationEditor() as PhpTestRunConfigurationEditor
@@ -152,6 +157,10 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
 
     @Volatile
     private var lastReportTargets: List<TestoReportTarget> = emptyList()
+
+    /** Set on the throwaway clone a mutation run launches: the process is Infection, over this configuration's reports. */
+    @Volatile
+    internal var infectionLaunch: TestoInfectionLaunch? = null
 
     override fun getWorkingDirectory(
         project: Project,
@@ -189,9 +198,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     }
 
     private fun pathMappings(interpreter: PhpInterpreter): PathMappingSettings? =
-        runCatching {
-            PhpRemoteInterpreterManager.getInstance()?.createPathMappings(project, interpreter.phpSdkAdditionalData)
-        }.getOrNull()
+        PhpToolLauncher(project, interpreter).mappings
 
     override fun createCommand(
         interpreter: PhpInterpreter,
@@ -200,17 +207,13 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         frameworkConfig: PhpTestFrameworkConfiguration?,
         withDebugger: Boolean
     ): PhpCommandSettings {
-        val command = PhpCommandSettingsBuilder(project, interpreter)
-            .loadAndStartDebug(withDebugger)
-            .build()
-
         val executablePath = frameworkConfig?.executablePath
         if (frameworkConfig == null || executablePath.isNullOrEmpty()) {
             throw ExecutionException(
                 PhpBundle.message(
                     "php.interpreter.base.configuration.is.not.provided.or.empty",
                     frameworkName,
-                    if (command.isRemote) "'${interpreter.name}' interpreter" else "local machine",
+                    if (interpreter.isRemote) "'${interpreter.name}' interpreter" else "local machine",
                 )
             )
         }
@@ -219,23 +222,24 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         if (workingDirectory.isNullOrEmpty()) {
             throw ExecutionException(PhpBundle.message("php.interpreter.base.configuration.working.directory"))
         }
-        command.setWorkingDir(workingDirectory)
         lastWorkingDirectory = workingDirectory
 
-        val mappings = interpreter.takeIf { it.isRemote }?.let { pathMappings(it) }
+        val launcher = PhpToolLauncher(project, interpreter)
+        infectionLaunch?.let {
+            return TestoInfectionCommand.create(launcher, it, executablePath, workingDirectory, settings, env, withDebugger)
+        }
 
         myHandler.prepareArguments(arguments, testoSettings)
         addReportFlags(arguments, interpreter)
-        myHandler.prepareCommand(
-            project,
-            command,
-            toRemoteIfMapped(executablePath, mappings),
-            null,
-            testoSettings.runnerSettings.command,
+        val command = launcher.command(
+            executablePath,
+            workingDirectory,
+            settings.commandLineSettings,
+            env,
+            withDebugger,
+            listOf(testoSettings.runnerSettings.command),
         )
-
-        command.importCommandLineSettings(settings.commandLineSettings, workingDirectory)
-        command.addEnvs(env)
+        val mappings = launcher.mappings
 
         fillTestRunnerArguments(
             project,
@@ -281,6 +285,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         } ?: PhpCommandLinePathProcessor.LOCAL
 
         val pathMapper = pathProcessor.createPathMapper(this.project)
+        infectionLaunch?.let { return TestoInfectionConsoleProperties(this, executor, pathMapper, it) }
         return TestoConsoleProperties(
             this,
             executor,

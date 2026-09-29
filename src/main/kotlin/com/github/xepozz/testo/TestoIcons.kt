@@ -11,6 +11,9 @@ object TestoIcons {
     @JvmField
     val TESTO = IconLoader.getIcon("/icons/testo/icon.svg", this::class.java)
 
+    @JvmField
+    val MUTATE = IconLoader.getIcon("/icons/testo/mutate.svg", this::class.java)
+
     // One icon per Testo\Core\Value\Status case, plus the pair the run is judged by. Five shapes cover the eight:
     // check, exclamation and crossed-out circle each serve two and are told apart by colour, baked into the SVGs
     // rather than tinted at runtime.
