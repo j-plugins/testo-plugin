@@ -13,7 +13,7 @@ import com.jetbrains.php.run.remote.PhpRemoteInterpreterManager
  * it, coverage or not: WSL gets the `/mnt/…` view of the same file, SSH a file under the remote helpers directory that
  * [copyToLocal] downloads.
  */
-internal class TestoReportTarget private constructor(
+internal class TestoReportTarget(
     val local: String,
     val path: String,
     private val manager: PhpCoverageResultManager?,
@@ -37,6 +37,9 @@ internal class TestoReportTarget private constructor(
     }
 
     companion object {
+        /** The local path of the report announced at [path], if one of [targets] is it. */
+        fun localPathOf(path: String, targets: List<TestoReportTarget>): String? = targets.firstOrNull { it.path == path }?.local
+
         // One manager per report: the SSH one remembers a single local/remote pair.
         fun resolve(project: Project, interpreter: PhpInterpreter, local: String): TestoReportTarget {
             val data = interpreter.phpSdkAdditionalData

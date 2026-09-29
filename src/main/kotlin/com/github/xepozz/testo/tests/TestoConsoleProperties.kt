@@ -89,7 +89,7 @@ class TestoConsoleProperties(
 
     /** An announced report path as a local one; the PHP plugin's mapper may throw over a path it does not know. */
     fun reportLocalPath(path: String): String? =
-        reportTargets.firstOrNull { it.path == path }?.local ?: pathMapper.getLocalPath(path)
+        TestoReportTarget.localPathOf(path, reportTargets) ?: pathMapper.getLocalPath(path)
 
     // Once per run, whoever needs the reports first: a caller arriving mid-download waits for it.
     private val reportsCopied = lazy { reportTargets.forEach { it.copyToLocal(project) } }
