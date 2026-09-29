@@ -34,6 +34,7 @@ import com.jetbrains.php.testFramework.run.PhpTestRunConfigurationSettings
 import com.jetbrains.php.testFramework.run.PhpTestRunnerConfigurationEditor
 import com.jetbrains.php.testFramework.run.PhpTestRunnerSettings
 import java.nio.file.Files
+import java.nio.file.Path
 
 class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : PhpTestRunConfiguration(
     project,
@@ -144,9 +145,13 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         return TestoTestRunConfigurationEditor(editor, this)
     }
 
-    // createCommand runs before createTestConsoleProperties for every executor, so the console sees this run's cwd.
+    // createCommand runs before createTestConsoleProperties for every executor, so the console sees this run's cwd and
+    // report targets.
     @Volatile
     private var lastWorkingDirectory: String? = null
+
+    @Volatile
+    private var lastReportTargets: List<TestoReportTarget> = emptyList()
 
     override fun getWorkingDirectory(
         project: Project,
@@ -248,22 +253,22 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
 
     /**
      * Adds `--log-html` / `--log-junit` for the checked reports, pointed at an IDE-managed folder ([TestoReportFlags]).
-     * Local interpreters only: a remote one would write these to a host path it never maps back, so there the reports
-     * are left to whatever testo.php configures — no worse than before the flags existed.
+     * Skipped on an interpreter the folder cannot be translated for: it would write to a host path it never maps back,
+     * so there the reports are left to whatever testo.php configures.
      */
     private fun addReportFlags(arguments: MutableList<String?>, interpreter: PhpInterpreter) {
-        if (interpreter.isRemote) return
+        lastReportTargets = emptyList()
         val runner = testoSettings.runnerSettings
         if (!runner.logHtml && !runner.logJunit) return
 
-        val htmlPath = TestoReportFlags.htmlReportFile(project, name)
-        val junitPath = TestoReportFlags.junitReportFile(project, name)
+        val html = TestoReportTarget.resolve(project, interpreter, TestoReportFlags.htmlReportFile(project, name).toString())
+        val junit = TestoReportTarget.resolve(project, interpreter, TestoReportFlags.junitReportFile(project, name).toString())
+        if (!html.isReachable || !junit.isReachable) return
         // Testo's report writers create the parent themselves, but a missing directory is the one avoidable failure
         // between here and a written report, so make sure of it.
-        runCatching { Files.createDirectories(htmlPath.parent) }
-        arguments.addAll(
-            TestoReportFlags.reportFlagArguments(runner.logHtml, runner.logJunit, htmlPath.toString(), junitPath.toString())
-        )
+        runCatching { Files.createDirectories(Path.of(html.local).parent) }
+        arguments.addAll(TestoReportFlags.reportFlagArguments(runner.logHtml, runner.logJunit, html.path, junit.path))
+        lastReportTargets = listOfNotNull(html.takeIf { runner.logHtml }, junit.takeIf { runner.logJunit })
     }
 
     override fun createTestConsoleProperties(executor: Executor): SMTRunnerConsoleProperties {
@@ -280,7 +285,10 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
             this,
             executor,
             pathMapper,
-        ).also { it.workingDirectory = lastWorkingDirectory }
+        ).also {
+            it.workingDirectory = lastWorkingDirectory
+            it.reportTargets = lastReportTargets
+        }
     }
 
     companion object Companion {

@@ -12,6 +12,7 @@ import com.github.xepozz.testo.tests.console.TestoReportsAction
 import com.github.xepozz.testo.tests.console.TestoRunTimings
 import com.github.xepozz.testo.tests.console.TestoStatusStore
 import com.github.xepozz.testo.tests.console.TestoTargetStore
+import com.github.xepozz.testo.tests.run.TestoReportTarget
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.Executor
 import com.intellij.execution.Location
@@ -81,11 +82,20 @@ class TestoConsoleProperties(
     @Volatile
     var coverageFlagPaths: List<java.nio.file.Path> = emptyList()
 
+    // The reports this run's own flags point at. Testo announces each under its interpreter-side path, which the
+    // interpreter's mappings may not cover.
     @Volatile
-    var coverageTargetPaths: Map<String, String> = emptyMap()
+    internal var reportTargets: List<TestoReportTarget> = emptyList()
 
     /** An announced report path as a local one; the PHP plugin's mapper may throw over a path it does not know. */
-    fun reportLocalPath(path: String): String? = coverageTargetPaths[path] ?: pathMapper.getLocalPath(path)
+    fun reportLocalPath(path: String): String? =
+        reportTargets.firstOrNull { it.path == path }?.local ?: pathMapper.getLocalPath(path)
+
+    // Once per run, whoever needs the reports first: a caller arriving mid-download waits for it.
+    private val reportsCopied = lazy { reportTargets.forEach { it.copyToLocal(project) } }
+
+    /** Brings reports an SSH interpreter wrote remotely to their local paths. Blocking; off the EDT. */
+    fun copyReportsToLocal() = reportsCopied.value
 
     // Replay only: a metadata image/artifact's original value → the archived copy's local absolute path. Empty on a
     // live run (the files are still at their original paths); the channel UI consults this before the deployment mapper.
