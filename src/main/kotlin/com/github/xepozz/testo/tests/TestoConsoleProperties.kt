@@ -81,6 +81,12 @@ class TestoConsoleProperties(
     @Volatile
     var coverageFlagPaths: List<java.nio.file.Path> = emptyList()
 
+    @Volatile
+    var coverageTargetPaths: Map<String, String> = emptyMap()
+
+    /** An announced report path as a local one; the PHP plugin's mapper may throw over a path it does not know. */
+    fun reportLocalPath(path: String): String? = coverageTargetPaths[path] ?: pathMapper.getLocalPath(path)
+
     // Replay only: a metadata image/artifact's original value → the archived copy's local absolute path. Empty on a
     // live run (the files are still at their original paths); the channel UI consults this before the deployment mapper.
     @Volatile
@@ -92,7 +98,7 @@ class TestoConsoleProperties(
             reportStore,
             project,
             { workingDirectory ?: project.basePath },
-        ) { path -> pathMapper.getLocalPath(path) }
+        ) { path -> reportLocalPath(path) }
 
     // Guards the channel-tab install: set once whoever wires the tabs first (the run-path ExecutionListener or the
     // debug runner, which installs them directly), so the other side is a no-op instead of a double install.

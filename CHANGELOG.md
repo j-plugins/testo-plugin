@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Coverage on WSL and SSH interpreters writes its reports where the IDE reads them, instead of into the project root.
+
 ## [2026.13.262] - 2026-09-27
 
 ### Fixed
