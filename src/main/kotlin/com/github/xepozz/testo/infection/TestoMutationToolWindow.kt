@@ -38,9 +38,10 @@ internal object TestoMutationToolWindow {
             addPropertyChangeListener { event ->
                 if (event.propertyName == Content.PROP_PINNED) isCloseable = !isPinned
             }
+            // The files stay: they belong to the Testo run's archive. A run still going stops with its tab.
             setDisposer {
                 Disposer.dispose(panel)
-                run.discardFiles()
+                if (run.isRunning) run.stop()
             }
             preferredFocusableComponent = panel.preferredFocus
         }

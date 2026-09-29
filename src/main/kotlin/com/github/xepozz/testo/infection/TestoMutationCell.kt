@@ -119,6 +119,12 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         readiness = readiness(current.runDir)
         val mutation = TestoMutationService.getInstance(project).runFor(current.runDir)
         run = mutation
+        // A run read back from the archive has no recipe of its own; this tab knows how to run its Testo run's reports again.
+        if (mutation != null && mutation.restart == null) {
+            (readiness as? TestoMutationReadiness.Ready)?.let { ready ->
+                mutation.restart = { TestoMutationService.getInstance(project).start(current.configuration, current.runDir, ready, current.options) }
+            }
+        }
         updateProgress(mutation)
         if (mutation?.isRunning == true) spinner.start() else spinner.stop()
         toolTipText = tooltip(hovered)

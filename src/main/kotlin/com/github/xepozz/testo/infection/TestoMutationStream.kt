@@ -8,7 +8,11 @@ import jetbrains.buildServer.messages.serviceMessages.ServiceMessage
  *
  * A mutant's `testStdOut` carries a name but no `nodeId`, so mutants are looked up by name as well.
  */
-internal class TestoMutationStream(private val run: TestoMutationRun) {
+internal class TestoMutationStream(
+    private val run: TestoMutationRun,
+    /** Every complete line, as it was read: what [TestoMutationArchive] keeps. */
+    private val onLine: ((String) -> Unit)? = null,
+) {
     private val files = HashMap<String, MutatedFile>()
     private val byId = HashMap<String, Mutant>()
     private val byName = HashMap<String, Mutant>()
@@ -35,6 +39,7 @@ internal class TestoMutationStream(private val run: TestoMutationRun) {
     }
 
     private fun line(line: String) {
+        onLine?.invoke(line)
         val message = line.trim().takeIf { it.startsWith("##teamcity[") }
             ?.let { runCatching { ServiceMessage.parse(it) }.getOrNull() }
         if (message == null) {

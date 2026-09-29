@@ -34,18 +34,33 @@ import java.util.concurrent.ConcurrentHashMap
 class TestoMutationService(private val project: Project) {
     private val runs = ConcurrentHashMap<Path, TestoMutationRun>()
 
+    // Testo runs whose archive has been looked into for a mutation run, so a replay reads its files once.
+    private val probed = ConcurrentHashMap.newKeySet<Path>()
+
     init {
-        // No tab outlives the IDE, so whatever the last session left is garbage. Listed now, deleted later: a run started
-        // meanwhile writes into a directory this listing does not hold.
-        val stale = children(root).flatMap(::children)
-        if (stale.isNotEmpty()) {
-            ApplicationManager.getApplication().executeOnPooledThread {
-                stale.forEach { runCatching { NioFiles.deleteRecursively(it) } }
-            }
+        // Before mutation runs moved into the run archive they lived here; nothing reads that any more.
+        val legacy = Path.of(PathManager.getSystemPath(), "testo", "infection", project.locationHash)
+        if (Files.isDirectory(legacy)) {
+            ApplicationManager.getApplication().executeOnPooledThread { runCatching { NioFiles.deleteRecursively(legacy) } }
         }
     }
 
-    fun runFor(sourceRunDir: Path?): TestoMutationRun? = sourceRunDir?.let(runs::get)
+    /**
+     * The latest mutation run of the Testo run archived at [sourceRunDir]. One from an earlier session is read back from
+     * the archive in the background, so the first call for it answers null and a later one has it.
+     */
+    fun runFor(sourceRunDir: Path?): TestoMutationRun? {
+        if (sourceRunDir == null) return null
+        runs[sourceRunDir]?.let { return it }
+        if (probed.add(sourceRunDir)) {
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val latest = TestoMutationArchive.runs(sourceRunDir).lastOrNull() ?: return@executeOnPooledThread
+                val loaded = TestoMutationArchive.load(sourceRunDir, latest) ?: return@executeOnPooledThread
+                runs.putIfAbsent(sourceRunDir, loaded)
+            }
+        }
+        return null
+    }
 
     /** Runs Infection over [ready], the reports of [configuration]'s run archived at [runDir]. Call on the EDT. */
     internal fun start(
@@ -61,7 +76,8 @@ class TestoMutationService(private val project: Project) {
             .onFailure { thisLogger().warn("Could not read the covered sources of ${ready.coverageXml}", it) }
             .getOrDefault(emptyList())
         val clone = configuration.clone() as TestoRunConfiguration
-        val launch = TestoInfectionLaunch(ready, sources, workDir(runDir), TestoInfectionOptions.of(optionsFrom.testoSettings.runnerSettings))
+        TestoMutationArchive.prune(runDir, TestoMutationArchive.KEEP - 1)
+        val launch = TestoInfectionLaunch(ready, sources, TestoMutationArchive.newRunDir(runDir, System.currentTimeMillis()), TestoInfectionOptions.of(optionsFrom.testoSettings.runnerSettings))
         clone.infectionLaunch = launch
         val interpreter = clone.interpreter
         val launcher = interpreter?.let { PhpToolLauncher(project, it) }
@@ -69,7 +85,10 @@ class TestoMutationService(private val project: Project) {
         val run = TestoMutationRun(configuration.name, runDir, launch.workDir) { launcher?.toLocal(it) }
         run.restart = { start(configuration, runDir, ready, optionsFrom) }
         if (runs.size >= MAX_RUNS) {
-            runs.entries.filter { !it.value.isRunning }.minByOrNull { it.value.startedAt }?.let { runs.remove(it.key) }
+            runs.entries.filter { !it.value.isRunning }.minByOrNull { it.value.startedAt }?.let {
+                runs.remove(it.key)
+                probed.remove(it.key)
+            }
         }
         runs[runDir] = run
         TestoMutationToolWindow.add(project, run)
@@ -89,7 +108,8 @@ class TestoMutationService(private val project: Project) {
                     notifyFailed(run, e.message ?: e.javaClass.simpleName)
                 } finally {
                     launch.shared?.release()
-                    if (run.discarded) run.deleteFiles()
+                    // A copy of the Testo run's own reports, which the archive already has.
+                    runCatching { NioFiles.deleteRecursively(launch.coverageDir) }
                 }
                 if (run.exitCode != null) notifyFinished(run)
             }
@@ -105,9 +125,24 @@ class TestoMutationService(private val project: Project) {
     ) {
         val command = clone.createCommand(interpreter, mutableMapOf(), mutableListOf(), false)
         val commandLine = command.createGeneralCommandLine(false)
-        run.appendLog("$ ${commandLine.commandLineString}")
         val handler = PhpRunConfiguration.createProcessHandler(project, command, false, false, commandLine)
-        val stream = TestoMutationStream(run)
+        TestoMutationArchive.Recorder(launch.workDir).use { recorder ->
+            val stream = TestoMutationStream(run, recorder::line)
+            val header = "$ ${commandLine.commandLineString}"
+            recorder.line(header)
+            run.appendLog(header)
+            watch(handler, stream, run, launch, indicator)
+            recorder.summary(run)
+        }
+    }
+
+    private fun watch(
+        handler: com.intellij.execution.process.ProcessHandler,
+        stream: TestoMutationStream,
+        run: TestoMutationRun,
+        launch: TestoInfectionLaunch,
+        indicator: ProgressIndicator,
+    ) {
         handler.addProcessListener(object : ProcessListener {
             override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
                 if (outputType == ProcessOutputTypes.SYSTEM) return
@@ -131,23 +166,8 @@ class TestoMutationService(private val project: Project) {
         stream.flush()
         launch.htmlTarget?.copyToLocal(project)
         launch.textTarget?.copyToLocal(project)
-        readTextLog(launch.textLog, run)
+        TestoMutationArchive.applyTextLog(launch.textLog, run)
         run.finish(handler.exitCode)
-    }
-
-    private fun readTextLog(file: Path, run: TestoMutationRun) {
-        if (!Files.isRegularFile(file)) return
-        val entries = runCatching { TestoMutationTextLog.parse(Files.readString(file)) }
-            .onFailure { thisLogger().warn("Could not read the mutation log $file", it) }
-            .getOrNull() ?: return
-        run.mutants.forEach { mutant ->
-            val entry = entries[mutant.hash] ?: return@forEach
-            if (mutant.original == null) {
-                mutant.original = entry.original
-                mutant.mutated = entry.mutated
-            }
-            mutant.output = entry.output
-        }
     }
 
     private fun notifyFinished(run: TestoMutationRun) {
@@ -184,15 +204,6 @@ class TestoMutationService(private val project: Project) {
             notification.notify(project)
         }
     }
-
-    // One per mutation run, not per Testo run: a pinned tab keeps its reports while the next run of the same Testo run
-    // writes its own.
-    private fun workDir(runDir: Path): Path =
-        root.resolve(FileUtil.sanitizeFileName(runDir.fileName.toString())).resolve(System.currentTimeMillis().toString())
-
-    private fun children(dir: Path): List<Path> = runCatching { Files.list(dir).use { it.toList() } }.getOrDefault(emptyList())
-
-    private val root: Path get() = Path.of(PathManager.getSystemPath(), "testo", "infection", project.locationHash)
 
     companion object {
         private const val POLL_MS = 200L
