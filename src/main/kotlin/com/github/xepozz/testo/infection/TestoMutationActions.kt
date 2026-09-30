@@ -10,6 +10,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.KeepPopupOnPerform
+import com.intellij.openapi.actionSystem.RightAlignedToolbarAction
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.SplitButtonAction
 import com.intellij.openapi.ide.CopyPasteManager
@@ -19,6 +20,7 @@ import com.intellij.openapi.project.DumbAwareToggleAction
 import java.awt.datatransfer.StringSelection
 import java.nio.file.Files
 import javax.swing.Icon
+import kotlin.reflect.KMutableProperty0
 
 /** Base of the *Mutations* tool window's actions: they act on the tab they are invoked from. */
 abstract class TestoMutationAction : DumbAwareAction() {
@@ -273,12 +275,52 @@ class TestoMutationMutatorFilterGroup : ActionGroup(), DumbAware {
     }
 }
 
-/** The mutants in the editor: gutter marks and escaped-code underlines, for the run of the selected tab. */
-class TestoMutationEditorMarksAction : DumbAwareToggleAction() {
+/** The toolbar's right-edge menu: which parts under the tree the tabs show. */
+class TestoMutationViewOptionsGroup : DefaultActionGroup(), RightAlignedToolbarAction, DumbAware {
+    init {
+        templatePresentation.text = TestoBundle.message("infection.view.options")
+        templatePresentation.icon = AllIcons.General.Menu
+        templatePresentation.isPopupGroup = true
+        add(DetailsToggle(TestoBundle.message("infection.view.diff"), TestoMutationDetails::showDiff))
+        add(DetailsToggle(TestoBundle.message("infection.view.output"), TestoMutationDetails::showOutput))
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+    private class DetailsToggle(text: String, private val shown: KMutableProperty0<Boolean>) : DumbAwareToggleAction(text) {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun isSelected(e: AnActionEvent): Boolean = shown.get()
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) = shown.set(state)
+    }
+}
+
+/**
+ * The mutants in the editor: gutter marks and escaped-code underlines, for the run of the selected tab. The button
+ * switches them on and off; its dropdown picks the statuses they show.
+ */
+class TestoMutationEditorMarksAction : SplitButtonAction(
+    DefaultActionGroup(TestoMutationEditorMarks.STATUSES.map(::EditorMarksStatusToggle))
+) {
+    private val main = EditorMarksToggle()
+
     init {
         templatePresentation.icon = TestoIcons.MUTATION
     }
 
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+    override fun useDynamicSplitButton(): Boolean = false
+
+    override fun getMainAction(e: AnActionEvent): AnAction = main
+}
+
+private class EditorMarksToggle : DumbAwareToggleAction(
+    TestoBundle.message("action.Testo.Mutations.EditorMarks.text"),
+    TestoBundle.message("action.Testo.Mutations.EditorMarks.description"),
+    TestoIcons.MUTATION,
+) {
     override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
     override fun isSelected(e: AnActionEvent): Boolean =
@@ -286,5 +328,23 @@ class TestoMutationEditorMarksAction : DumbAwareToggleAction() {
 
     override fun setSelected(e: AnActionEvent, state: Boolean) {
         e.project?.let { TestoMutationEditorMarks.getInstance(it).enabled = state }
+    }
+}
+
+private class EditorMarksStatusToggle(private val status: MutantStatus) : DumbAwareToggleAction() {
+    init {
+        templatePresentation.setText { status.label }
+        templatePresentation.icon = status.icon
+        templatePresentation.keepPopupOnPerform = KeepPopupOnPerform.Always
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+    override fun isSelected(e: AnActionEvent): Boolean =
+        e.project?.let { status !in TestoMutationEditorMarks.getInstance(it).hiddenStatuses } == true
+
+    override fun setSelected(e: AnActionEvent, state: Boolean) {
+        val marks = e.project?.let(TestoMutationEditorMarks::getInstance) ?: return
+        marks.hiddenStatuses = if (state) marks.hiddenStatuses - status else marks.hiddenStatuses + status
     }
 }

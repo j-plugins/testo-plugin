@@ -69,6 +69,15 @@ class TestoMutationEditorMarks(private val project: Project) : Disposable {
             refresh()
         }
 
+    /** The statuses left out of the marks; a mutant still running is always shown. Kept for the next session. */
+    var hiddenStatuses: Set<MutantStatus>
+        get() = PropertiesComponent.getInstance().getList(HIDDEN_KEY).orEmpty()
+            .mapNotNullTo(HashSet()) { name -> MutantStatus.entries.firstOrNull { it.name == name } }
+        set(value) {
+            PropertiesComponent.getInstance().setList(HIDDEN_KEY, value.map { it.name }.sorted())
+            refresh()
+        }
+
     init {
         EditorFactory.getInstance().addEditorFactoryListener(object : EditorFactoryListener {
             override fun editorCreated(event: EditorFactoryEvent) {
@@ -99,7 +108,8 @@ class TestoMutationEditorMarks(private val project: Project) : Disposable {
         if (project.isDisposed) return
         val run = if (enabled) TestoMutationService.getInstance(project).current() else null
         watch(run)
-        val marks = run?.let(::marksOf).orEmpty()
+        val hidden = hiddenStatuses
+        val marks = run?.let { marksOf(it, hidden) }.orEmpty()
         ApplicationManager.getApplication().invokeLater({ apply(run, marks) }, project.disposed)
     }
 
@@ -116,14 +126,14 @@ class TestoMutationEditorMarks(private val project: Project) : Disposable {
         run.localPath(file.path)?.let(FileUtil::toSystemIndependentName)
 
     /** Each mutated file still holding the code Infection read, by host path: where its mutants sit. */
-    private fun marksOf(run: TestoMutationRun): Map<String, FileMarks> = run.files.mapNotNull { file ->
+    private fun marksOf(run: TestoMutationRun, hidden: Set<MutantStatus>): Map<String, FileMarks> = run.files.mapNotNull { file ->
         val local = localOf(run, file) ?: return@mapNotNull null
         val bytes = runCatching { Files.readAllBytes(Path.of(local)) }.getOrNull() ?: return@mapNotNull null
         val expected = run.fingerprints[file.path]
         if (expected != null && fingerprintOf(Path.of(local)) != expected) return@mapNotNull null
         if (isUnsaved(local)) return@mapNotNull null
         val lines = TestoByteLines(bytes)
-        val placed = file.mutants.mapNotNull { mutant ->
+        val placed = file.mutants.filter { it.status !in hidden }.mapNotNull { mutant ->
             val start = mutant.start ?: return@mapNotNull null
             // Infection's end is the mutated node's last byte.
             val end = (mutant.end ?: start) + 1
@@ -259,6 +269,7 @@ class TestoMutationEditorMarks(private val project: Project) : Disposable {
     companion object {
         private const val REFRESH_MS = 300
         private const val ENABLED_KEY = "testo.mutations.editor.marks"
+        private const val HIDDEN_KEY = "testo.mutations.editor.hidden"
 
         private val MARKS_KEY = Key.create<List<RangeHighlighter>>("testo.mutations.editor.marks")
 
@@ -280,6 +291,9 @@ class TestoMutationEditorMarks(private val project: Project) : Disposable {
         )
 
         private fun severity(status: MutantStatus?): Int = SEVERITY.indexOf(status)
+
+        /** Every status, worst first. */
+        val STATUSES: List<MutantStatus> = SEVERITY.filterNotNull()
 
         fun getInstance(project: Project): TestoMutationEditorMarks = project.service()
     }

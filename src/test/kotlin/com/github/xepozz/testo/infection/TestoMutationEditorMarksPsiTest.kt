@@ -44,5 +44,22 @@ class TestoMutationEditorMarksPsiTest : BasePlatformTestCase() {
 
         val underline = editor.markupModel.allHighlighters.single { it.gutterIconRenderer == null && it.endOffset > it.startOffset }
         assertEquals("\$a > 1", editor.document.text.substring(underline.startOffset, underline.endOffset))
+
+        val marks = TestoMutationEditorMarks.getInstance(project)
+        marks.hiddenStatuses = setOf(MutantStatus.ESCAPED)
+        try {
+            val hiddenBy = System.currentTimeMillis() + 5_000
+            while (editor.markupModel.allHighlighters.any { it.endOffset > it.startOffset && it.gutterIconRenderer == null } &&
+                System.currentTimeMillis() < hiddenBy
+            ) {
+                PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+                Thread.sleep(50)
+            }
+            assertTrue(editor.markupModel.allHighlighters.none { it.endOffset > it.startOffset && it.gutterIconRenderer == null })
+            val tooltip2 = (editor.markupModel.allHighlighters.single { it.gutterIconRenderer != null }.gutterIconRenderer as GutterIconRenderer).tooltipText.orEmpty()
+            assertFalse(tooltip2, tooltip2.contains("GreaterThan"))
+        } finally {
+            marks.hiddenStatuses = emptySet()
+        }
     }
 }

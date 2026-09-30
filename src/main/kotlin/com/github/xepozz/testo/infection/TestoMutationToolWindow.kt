@@ -27,7 +27,7 @@ internal object TestoMutationToolWindow {
     private val RUN_KEY = Key.create<TestoMutationRun>("testo.mutation.run")
 
     /**
-     * Shows [run] without focusing. A rerun of the same Testo run takes over the tab its last run had, unless that tab
+     * Opens the window on [run]'s tab without taking the focus. A rerun of the same Testo run takes over the tab its last run had, unless that tab
      * is pinned: a pinned tab keeps its run and cannot be closed until unpinned.
      */
     fun add(project: Project, run: TestoMutationRun, title: String? = null): Content {
@@ -61,6 +61,7 @@ internal object TestoMutationToolWindow {
             manager.addContent(content)
         }
         manager.setSelectedContent(content)
+        window.show()
         TestoMutationEditorMarks.getInstance(project).refresh()
         return content
     }

@@ -62,6 +62,7 @@ import java.awt.CardLayout
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.IntUnaryOperator
 import javax.swing.JComponent
@@ -110,12 +111,17 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         lineWrap = false
         border = JBUI.Borders.empty(6, 8)
     }
-    private val diff = DiffManager.getInstance().createRequestPanel(project, this, null)
+    internal val diff = DiffManager.getInstance().createRequestPanel(project, this, null)
     private val output = JBTextArea().apply {
         isEditable = false
         lineWrap = false
         border = JBUI.Borders.empty(6, 8)
     }
+    private val textPane = ScrollPaneFactory.createScrollPane(text, true)
+    internal val outputPane = ScrollPaneFactory.createScrollPane(output, true)
+    private val diffSplitter = OnePixelSplitter(true, 0.6f)
+    private val mainSplitter = OnePixelSplitter(true, 0.55f)
+    private var diffShown = false
     private var shown: Any? = null
 
     private val lines = ConcurrentHashMap<String, TestoByteLines?>()
@@ -134,23 +140,19 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     private var checkedFinished = false
 
     init {
-        details.add(ScrollPaneFactory.createScrollPane(text, true), TEXT_CARD)
-        details.add(
-            OnePixelSplitter(true, 0.6f).apply {
-                firstComponent = diff.component
-                secondComponent = ScrollPaneFactory.createScrollPane(output, true)
-            },
-            DIFF_CARD,
-        )
+        diffSplitter.firstComponent = diff.component
+        diffSplitter.secondComponent = outputPane
+        details.add(textPane, TEXT_CARD)
+        details.add(diffSplitter, DIFF_CARD)
+        mainSplitter.secondComponent = details
 
-        val treePane = JPanel(BorderLayout()).apply {
+        mainSplitter.firstComponent = JPanel(BorderLayout()).apply {
             add(summary, BorderLayout.NORTH)
             add(ScrollPaneFactory.createScrollPane(tree, true), BorderLayout.CENTER)
         }
-        setContent(OnePixelSplitter(true, 0.55f).apply {
-            firstComponent = treePane
-            secondComponent = details
-        })
+        setContent(mainSplitter)
+        layoutDetails()
+        TestoMutationDetails.addListener(this, ::layoutDetails)
         toolbar = createToolbar()
 
         EditSourceOnDoubleClickHandler.install(tree)
@@ -223,6 +225,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
             addSeparator()
             add(CommonActionsManager.getInstance().createExpandAllAction(expander, tree))
             add(CommonActionsManager.getInstance().createCollapseAllAction(expander, tree))
+            add(TestoMutationViewOptionsGroup())
         }
         return manager.createActionToolbar(PLACE, group, true).apply { targetComponent = this@TestoMutationPanel }.component
     }
@@ -312,6 +315,8 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
             output.text = describe(mutant)
             output.caretPosition = 0
             cards.show(details, DIFF_CARD)
+            diffShown = true
+            layoutDetails()
             return
         }
         text.text = when (element) {
@@ -322,6 +327,19 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         }
         text.caretPosition = 0
         cards.show(details, TEXT_CARD)
+        diffShown = false
+        layoutDetails()
+    }
+
+    // Parts are hidden rather than taken out: moving the diff panel in and out of the hierarchy redrew it over and over.
+    private fun layoutDetails() {
+        val showDiff = TestoMutationDetails.showDiff
+        val showOutput = TestoMutationDetails.showOutput
+        diff.component.isVisible = showDiff
+        outputPane.isVisible = showOutput
+        details.isVisible = showOutput || diffShown && showDiff
+        diffSplitter.revalidate()
+        mainSplitter.revalidate()
     }
 
     // The snippet is a few lines of the file; its gutter counts them where the file has them.
@@ -571,6 +589,35 @@ enum class TestoMutationGrouping(private val labelKey: String) {
             PropertiesComponent.getInstance().getValue(KEY)?.let { name -> entries.firstOrNull { it.name == name } } ?: FILE
 
         fun store(grouping: TestoMutationGrouping) = PropertiesComponent.getInstance().setValue(KEY, grouping.name, FILE.name)
+    }
+}
+
+/** Which parts under the *Mutations* tree are shown, in every tab; kept for the next session. */
+internal object TestoMutationDetails {
+    private const val DIFF_KEY = "testo.mutations.details.diff"
+    private const val OUTPUT_KEY = "testo.mutations.details.output"
+
+    private val listeners = CopyOnWriteArrayList<() -> Unit>()
+
+    /** The selected mutant's diff. */
+    var showDiff: Boolean
+        get() = PropertiesComponent.getInstance().getBoolean(DIFF_KEY, true)
+        set(value) {
+            PropertiesComponent.getInstance().setValue(DIFF_KEY, value, true)
+            listeners.forEach { it() }
+        }
+
+    /** The raw text: a mutant's details and test output, a file's or group's summary, the run's log. */
+    var showOutput: Boolean
+        get() = PropertiesComponent.getInstance().getBoolean(OUTPUT_KEY, false)
+        set(value) {
+            PropertiesComponent.getInstance().setValue(OUTPUT_KEY, value, false)
+            listeners.forEach { it() }
+        }
+
+    fun addListener(parent: Disposable, listener: () -> Unit) {
+        listeners += listener
+        Disposer.register(parent) { listeners -= listener }
     }
 }
 

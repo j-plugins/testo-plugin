@@ -57,6 +57,53 @@ class TestoMutationPanelPsiTest : BasePlatformTestCase() {
         assertFalse("undone and saved", panel.isChanged(file))
     }
 
+    fun testTheDiffFillsTheDetailsWhenTheOutputIsSwitchedOffBeforeAMutantIsSelected() {
+        val dir = Files.createTempDirectory("testo-mutation")
+        val run = TestoMutationRun("t", dir, dir) { it }
+        val file = MutatedFile("f1", "C.php", dir.resolve("C.php").toString())
+        val mutant = Mutant("m1", file, "Infection\\Mutator\\Number\\DecrementInteger", "h1", 0, 1).apply {
+            status = MutantStatus.ESCAPED
+            finished = true
+            original = "<?php return 1;"
+            mutated = "<?php return 0;"
+        }
+        file.mutants += mutant
+        run.files += file
+        run.finish(0)
+        val panel = TestoMutationPanel(project, run)
+        Disposer.register(testRootDisposable, panel)
+        panel.setSize(400, 600)
+        TestoMutationDetails.showOutput = false
+        try {
+            layOut(panel)
+            panel.select(mutant)
+            waitFor { panel.diff.component.isShowing && panel.diff.component.height > 0 }
+            layOut(panel)
+
+            assertFalse(panel.outputPane.isVisible)
+            assertTrue(panel.diff.component.isVisible)
+            assertTrue(panel.diff.component.height > 0)
+            val heightAfterSelection = panel.diff.component.height
+            repeat(5) {
+                PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+                Thread.sleep(100)
+            }
+            layOut(panel)
+            assertEquals(heightAfterSelection, panel.diff.component.height)
+            assertFalse(panel.outputPane.isVisible)
+        } finally {
+            TestoMutationDetails.showOutput = false
+        }
+    }
+
+    // Headless: nothing lays the panel out on its own.
+    private fun layOut(component: java.awt.Component) {
+        if (component is java.awt.Container) {
+            component.doLayout()
+            component.components.forEach(::layOut)
+        }
+    }
+
     private fun waitFor(done: () -> Boolean) {
         val deadline = System.currentTimeMillis() + 3_000
         while (!done() && System.currentTimeMillis() < deadline) {
