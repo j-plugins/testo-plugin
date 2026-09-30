@@ -49,6 +49,12 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.Timer
 
+/** The report buttons' document-with-a-magnifier, shared with the mutation report's: grey, and blue once on disk. */
+internal object TestoReportIcons {
+    val REPORT: Icon = AllIcons.General.IndentDetected
+    val READY: Icon = IconUtil.colorize(REPORT, JBColor(0x3574F0, 0x548AF7))
+}
+
 /**
  * The report buttons at the far right of the test toolbar — one per report Testo announced. Hand-drawn like the run
  * summary beside it: an expanded `ActionGroup` loses [RightAlignedToolbarAction] on its children. A click before the
@@ -519,11 +525,11 @@ class TestoReportsAction(
     private companion object {
         private const val REFRESH_MS = 500
 
-        private val ICON: Icon = AllIcons.General.IndentDetected
+        private val ICON: Icon = TestoReportIcons.REPORT
         private val ARROW: Icon = AllIcons.General.LinkDropTriangle
 
         /** The icon's three colours: grey (nothing to open), blue (this run's report is on disk), green (scheduled). */
-        private val READY_ICON: Icon = IconUtil.colorize(ICON, JBColor(0x3574F0, 0x548AF7))
+        private val READY_ICON: Icon = TestoReportIcons.READY
         private val SCHEDULED_ICON: Icon = IconUtil.colorize(ICON, JBColor(0x59A869, 0x499C54))
 
         // Coverage cell: the normal coverage icon once the report is on disk, greyed while it is still pending.

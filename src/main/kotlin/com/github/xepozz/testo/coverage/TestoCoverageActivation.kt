@@ -8,9 +8,13 @@ import com.intellij.coverage.CoverageRunner
 import com.intellij.coverage.CoverageSuite
 import com.intellij.coverage.CoverageSuitesBundle
 import com.intellij.coverage.DefaultCoverageFileProvider
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.NotNullLazyKey
+import java.lang.ref.Reference
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicLong
 
 /** One already-written coverage report to load: how Testo announced it plus where it landed on this machine. */
 data class TestoCoverageReport(val name: String?, val format: CoverageFormat?, val dataFile: Path)
@@ -28,13 +32,40 @@ data class TestoCoverageReport(val name: String?, val format: CoverageFormat?, v
  * throws `InvalidPathException` on the second drive letter and breaks *all* coverage init. A chosen-but-unregistered
  * bundle shows the same annotation, updates the per-test index, and never persists — the reports are transient anyway.
  *
+ * The reports are read in the background first: `chooseSuitesBundle` loads each suite's data on the EDT, and the loader
+ * resolves every source through the VFS. A suite keeps what it loaded, so the platform finds it there. Of several
+ * applies in flight only the latest is handed over.
+ *
  * Returns false when the coverage module is absent (the runner is registered only by `coverage.xml`) or no report was
- * given; the format falls back to sniffing when unknown. Call on the EDT — `chooseSuitesBundle` opens UI.
+ * given; the format falls back to sniffing when unknown.
  */
 fun applyTestoCoverage(project: Project, reports: List<TestoCoverageReport>, runDir: Path? = null): Boolean {
     if (reports.isEmpty()) return false
     val runner = CoverageRunner.getInstance(TestoCoverageRunner::class.java) ?: return false
-    val suites = reports.mapNotNull { report ->
+    val generation = APPLIES.getValue(project).incrementAndGet()
+    ApplicationManager.getApplication().executeOnPooledThread {
+        val suites = createSuites(project, runner, reports, runDir)
+        if (suites.isEmpty()) return@executeOnPooledThread
+        val manager = CoverageDataManager.getInstance(project)
+        // Held until handed over: the suite keeps its data behind a soft reference only.
+        val loaded = suites.map { it.getCoverageData(manager) }
+        ApplicationManager.getApplication().invokeLater({
+            if (APPLIES.getValue(project).get() != generation) return@invokeLater
+            // Before the bundle is handed over, not after: the highlighter paints on `coverageDataCalculated`, and that
+            // fires from inside chooseSuitesBundle. Its other install point, the annotator's onSuiteChosen, is not
+            // reached on the first bundle of a session at all — the platform calls it only when a bundle is reloaded or closed.
+            TestoCoverageEditorHighlighter.getInstance(project).install()
+            manager.chooseSuitesBundle(CoverageSuitesBundle(suites.toTypedArray<CoverageSuite>()))
+            Reference.reachabilityFence(loaded)
+        }, project.disposed)
+    }
+    return true
+}
+
+private val APPLIES = NotNullLazyKey.createLazyKey<AtomicLong, Project>("testo.coverage.applies") { AtomicLong() }
+
+private fun createSuites(project: Project, runner: CoverageRunner, reports: List<TestoCoverageReport>, runDir: Path?): List<TestoCoverageSuite> =
+    reports.mapNotNull { report ->
         val timestamp = runCatching { Files.getLastModifiedTime(report.dataFile).toMillis() }.getOrDefault(0L)
         // The File ctor is the one present on both 252 and 262 — Path was added only on 262.
         val provider = DefaultCoverageFileProvider(report.dataFile.toFile())
@@ -45,14 +76,6 @@ fun applyTestoCoverage(project: Project, reports: List<TestoCoverageReport>, run
         suite.runDir = runDir
         suite
     }
-    if (suites.isEmpty()) return false
-    // Before the bundle is handed over, not after: the highlighter paints on `coverageDataCalculated`, and that fires
-    // from inside chooseSuitesBundle. Its other install point, the annotator's onSuiteChosen, is not reached on the
-    // first bundle of a session at all — the platform calls it only when a bundle is reloaded or closed.
-    TestoCoverageEditorHighlighter.getInstance(project).install()
-    CoverageDataManager.getInstance(project).chooseSuitesBundle(CoverageSuitesBundle(suites.toTypedArray<CoverageSuite>()))
-    return true
-}
 
 /**
  * Applies the shown Testo bundle again when it is [runDir]'s coverage, so the Coverage view is built anew: its columns
@@ -67,6 +90,7 @@ fun reapplyTestoCoverage(project: Project, runDir: Path) {
 
 /** Closes the active Testo bundle, if any — the "no reports checked" state. */
 fun closeTestoCoverage(project: Project) {
+    APPLIES.getValue(project).incrementAndGet()
     val manager = CoverageDataManager.getInstance(project)
     manager.activeSuites().filter { it.coverageEngine is TestoCoverageEngine }.forEach { manager.closeSuitesBundle(it) }
 }

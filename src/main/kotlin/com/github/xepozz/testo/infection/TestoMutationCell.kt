@@ -7,6 +7,7 @@ import com.github.xepozz.testo.runs.TestoRunStore
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.actions.testoRunProfile
 import com.github.xepozz.testo.tests.console.TestoProgressAction
+import com.github.xepozz.testo.tests.console.TestoReportIcons
 import com.github.xepozz.testo.tests.console.TestoReportsRowCell
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.github.xepozz.testo.tests.run.TestoRunConfigurationType
@@ -506,8 +507,8 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         private val ESCAPED: Icon = TestoIcons.Status.FAILED
         private val ARROW: Icon = AllIcons.General.LinkDropTriangle
         private val ARROW_DISABLED: Icon = IconLoader.getDisabledIcon(ARROW)
-        private val REPORT: Icon = AllIcons.General.Web
-        private val REPORT_DISABLED: Icon = IconLoader.getDisabledIcon(REPORT)
+        private val REPORT: Icon = TestoReportIcons.READY
+        private val REPORT_DISABLED: Icon = TestoReportIcons.REPORT
 
         private val PADDING get() = JBUI.scale(5)
         private val GAP get() = JBUI.scale(4)

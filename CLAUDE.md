@@ -572,6 +572,9 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **`CoverageViewExtension` is instantiated three times per view** (`CoverageView`, `CoverageTableModel`,
   `CoverageViewTreeStructure`), so no instance sees another's fields — anything `getPercentage` needs must be derived
   from the bundle, not remembered from `createColumnInfos`.
+- **`applyTestoCoverage` reads the reports on a pooled thread before `chooseSuitesBundle`**: the platform loads each
+  suite's data inside that call on the EDT, and the runner resolves every source through the VFS (a slow-operation
+  error). A suite keeps its loaded data behind a soft reference, so it is held until the bundle is handed over.
 - **The editor highlighter is installed from `applyTestoCoverage`, not from the annotator**: `onSuiteChosen` fires
   only on reload/close, never on the session's first `chooseSuitesBundle` — which left the first coverage run of an
   IDE session unpainted.

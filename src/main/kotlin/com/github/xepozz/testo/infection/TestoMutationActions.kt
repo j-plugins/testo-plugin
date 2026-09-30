@@ -2,6 +2,7 @@ package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
+import com.github.xepozz.testo.tests.console.TestoReportIcons
 import com.intellij.ide.BrowserUtil
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionGroup
@@ -104,12 +105,12 @@ class TestoMutationOpenReportAction : SplitButtonAction(
         },
     )
 ) {
-    private val main = TestoMutationReportAction(null, AllIcons.General.Web) { panel ->
+    private val main = TestoMutationReportAction(null, TestoReportIcons.READY) { panel ->
         TestoMutationToolWindow.openReport(panel.project, panel.run)
     }
 
     init {
-        templatePresentation.icon = AllIcons.General.Web
+        templatePresentation.icon = TestoReportIcons.READY
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.EDT

@@ -25,6 +25,7 @@
 ### Fixed
 
 - A coverage-xml report of code that runs `eval()` is kept in the run history on Windows, so mutation testing can start from it; the evaluated code is left out of what Infection reads.
+- Applying coverage — after a run, from the report button or a replay — no longer reads the reports on the UI thread (a "slow operations on EDT" error).
 
 ## [2026.14.262] - 2026-09-29
 
