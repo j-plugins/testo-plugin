@@ -21,7 +21,7 @@ internal object TestoInfectionHtmlReport {
         runCatching {
             FileChannel.open(report, StandardOpenOption.READ, StandardOpenOption.WRITE).use { channel ->
                 val head = ByteBuffer.allocate(minOf(HEAD_BYTES.toLong(), channel.size()).toInt())
-                while (head.hasRemaining() && channel.read(head) >= 0) Unit
+                while (head.hasRemaining() && channel.read(head) >= 0) {}
                 val at = backLinkOffset(head.array())
                 if (at >= 0) channel.write(ByteBuffer.wrap(ByteArray(BACK_LINK.size) { ' '.code.toByte() }), at.toLong())
             }

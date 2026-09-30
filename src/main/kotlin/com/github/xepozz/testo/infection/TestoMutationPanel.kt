@@ -117,7 +117,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     private var diffShown = false
     private var shown: Any? = null
 
-    private val lines = ConcurrentHashMap<String, TestoByteLines?>()
+    private val lines = ConcurrentHashMap<String, TestoByteLines>()
     private val alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, this)
     private val scheduled = AtomicBoolean()
     private val dirty = AtomicBoolean(true)
@@ -187,9 +187,6 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
 
     /** Whether [file]'s code is no longer what Infection mutated, as last checked. */
     internal fun isChanged(file: MutatedFile): Boolean = file.path in changed
-
-    /** Whether [mutant] is written into its file, as last checked. */
-    internal fun isApplied(mutant: Mutant): Boolean = mutant.nodeId in applied
 
     private fun localPaths(): Set<String> =
         run.files.mapNotNullTo(HashSet()) { file -> run.localPath(file.path)?.let(FileUtil::toSystemIndependentName) }
@@ -421,9 +418,9 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     private fun position(mutant: Mutant): Pair<Int, Int>? {
         val offset = mutant.start ?: return null
         val local = run.localPath(mutant.file.path) ?: return null
-        val index = lines.computeIfAbsent(local) { path ->
-            runCatching { TestoByteLines(Files.readAllBytes(Path.of(path))) }.getOrNull()
-        } ?: return null
+        val index = lines[local]
+            ?: runCatching { TestoByteLines(Files.readAllBytes(Path.of(local))) }.getOrNull()?.also { lines[local] = it }
+            ?: return null
         return index.position(offset)
     }
 
