@@ -134,6 +134,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoMutationArchive.kt     # `<run dir>/infection/<started at>/`: recorder, loader, pruning (5 per Testo run)
 │   ├── TestoMutationToolWindow.kt  # the *Mutations* tool window, registered on first use, one tab per Testo run
 │   ├── TestoMutationPanel.kt       # own tree (StructureTreeModel) + escaped-mutant diff; toolbar group ids
+│   ├── TestoMutationEditorMarks.kt # gutter marks + escaped-code underlines in the editor, for TestoMutationService.current()
 │   └── TestoMutationActions.kt     # that toolbar and popup (Testo.Mutations.Toolbar / .Popup in plugin.xml)
 │
 ├── php/

@@ -303,3 +303,20 @@ internal fun mutationVerdict(running: Boolean, stopped: Boolean, escaped: Int, e
 internal fun fingerprintOf(file: Path): String? = runCatching {
     MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)).joinToString("") { "%02x".format(it) }
 }.getOrNull()
+
+/** A file's line starts by byte offset: Infection's offsets count bytes, so they are resolved on the file's bytes. */
+internal class TestoByteLines(private val bytes: ByteArray) {
+    private val starts: IntArray = buildList {
+        add(0)
+        bytes.forEachIndexed { i, b -> if (b == '\n'.code.toByte()) add(i + 1) }
+    }.toIntArray()
+
+    /** 0-based line and column, in characters, of [offset]. */
+    fun position(offset: Int): Pair<Int, Int> {
+        val bounded = offset.coerceIn(0, bytes.size)
+        val found = starts.binarySearch(bounded)
+        val line = if (found >= 0) found else -found - 2
+        val start = starts[line]
+        return line to String(bytes, start, bounded - start, Charsets.UTF_8).length
+    }
+}

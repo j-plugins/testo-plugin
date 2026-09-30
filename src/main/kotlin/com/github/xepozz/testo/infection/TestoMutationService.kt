@@ -60,6 +60,7 @@ class TestoMutationService(private val project: Project) {
                 val latest = TestoMutationArchive.runs(sourceRunDir).lastOrNull() ?: return@executeOnPooledThread
                 val loaded = TestoMutationArchive.load(sourceRunDir, latest) ?: return@executeOnPooledThread
                 runs.putIfAbsent(sourceRunDir, loaded)
+                TestoMutationEditorMarks.getInstance(project).refresh()
             }
         }
         return null
@@ -122,13 +123,7 @@ class TestoMutationService(private val project: Project) {
 
         val run = TestoMutationRun(recipe.configuration.name, runDir, launch.workDir) { launcher?.toLocal(it) }
         run.recipe = recipe
-        if (runs.size >= MAX_RUNS) {
-            runs.entries.filter { !it.value.isBusy }.minByOrNull { it.value.startedAt }?.let {
-                runs.remove(it.key)
-                probed.remove(it.key)
-            }
-        }
-        runs[runDir] = run
+        track(run)
         TestoMutationToolWindow.add(project, run)
 
         object : Task.Backgroundable(project, TestoBundle.message("infection.task.title", recipe.configuration.name), true) {
@@ -158,6 +153,18 @@ class TestoMutationService(private val project: Project) {
                 if (run.exitCode != null) notifyFinished(run)
             }
         }.queue()
+    }
+
+    /** Makes [run] the latest of its Testo run, the one [runFor] and [current] answer. */
+    internal fun track(run: TestoMutationRun) {
+        if (runs.size >= MAX_RUNS) {
+            runs.entries.filter { !it.value.isBusy && it.key != run.sourceRunDir }.minByOrNull { it.value.startedAt }?.let {
+                runs.remove(it.key)
+                probed.remove(it.key)
+            }
+        }
+        runs[run.sourceRunDir] = run
+        TestoMutationEditorMarks.getInstance(project).refresh()
     }
 
     fun restart(run: TestoMutationRun) {

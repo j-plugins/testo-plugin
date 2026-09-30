@@ -154,6 +154,7 @@
             <action id="Testo.Mutations.EscapedOnly" class="com.github.xepozz.testo.infection.TestoMutationEscapedOnlyAction"/>
             <group id="Testo.Mutations.GroupBy" class="com.github.xepozz.testo.infection.TestoMutationGroupByGroup"/>
             <group id="Testo.Mutations.MutatorFilter" class="com.github.xepozz.testo.infection.TestoMutationMutatorFilterGroup"/>
+            <action id="Testo.Mutations.EditorMarks" class="com.github.xepozz.testo.infection.TestoMutationEditorMarksAction"/>
             <action id="Testo.Mutations.OpenReport" class="com.github.xepozz.testo.infection.TestoMutationOpenReportAction"/>
             <separator/>
             <action id="Testo.Mutations.Pin" class="com.github.xepozz.testo.infection.TestoMutationPinAction"/>

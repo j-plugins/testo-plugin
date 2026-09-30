@@ -12,6 +12,8 @@ import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
+import com.intellij.ui.content.ContentManagerEvent
+import com.intellij.ui.content.ContentManagerListener
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -59,6 +61,7 @@ internal object TestoMutationToolWindow {
             manager.addContent(content)
         }
         manager.setSelectedContent(content)
+        TestoMutationEditorMarks.getInstance(project).refresh()
         return content
     }
 
@@ -86,6 +89,13 @@ internal object TestoMutationToolWindow {
 
     private fun contentOf(window: ToolWindow, workDir: Path): Content? =
         window.contentManager.contents.firstOrNull { it.getUserData(RUN_KEY)?.workDir == workDir }
+
+    /** Brings up [run]'s tab with [mutant] selected in it. */
+    fun reveal(project: Project, run: TestoMutationRun, mutant: Mutant) {
+        show(project, run)
+        val window = window(project)
+        (contentOf(window, run.workDir)?.component as? TestoMutationPanel)?.select(mutant)
+    }
 
     /** The run on the selected tab, if the window has one. */
     fun selectedRun(project: Project): TestoMutationRun? =
@@ -115,6 +125,10 @@ class TestoMutationToolWindowFactory : ToolWindowFactory, DumbAware {
 
     override fun init(toolWindow: ToolWindow) {
         toolWindow.setToHideOnEmptyContent(true)
+        // The editor marks follow the selected tab.
+        toolWindow.addContentManagerListener(object : ContentManagerListener {
+            override fun selectionChanged(event: ContentManagerEvent) = TestoMutationEditorMarks.getInstance(toolWindow.project).refresh()
+        })
     }
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) = Unit

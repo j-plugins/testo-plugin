@@ -118,7 +118,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     }
     private var shown: Any? = null
 
-    private val lines = ConcurrentHashMap<String, LineIndex?>()
+    private val lines = ConcurrentHashMap<String, TestoByteLines?>()
     private val alarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, this)
     private val scheduled = AtomicBoolean()
     private val dirty = AtomicBoolean(true)
@@ -177,6 +177,15 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
                 if (file.path in localPaths()) requestCheck()
             }
         }, this)
+    }
+
+    /** Selects [mutant]'s row, first letting it through any toggle that hides it. */
+    fun select(mutant: Mutant) {
+        if (!shown(mutant)) {
+            escapedOnly = false
+            hiddenMutators = emptySet()
+        }
+        structureModel.select(mutant, tree) { path -> tree.scrollPathToVisible(path) }
     }
 
     /** Whether [file]'s code is no longer what Infection mutated, as last checked. */
@@ -366,7 +375,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         val offset = mutant.start ?: return null
         val local = run.localPath(mutant.file.path) ?: return null
         val index = lines.computeIfAbsent(local) { path ->
-            runCatching { LineIndex(Files.readAllBytes(Path.of(path))) }.getOrNull()
+            runCatching { TestoByteLines(Files.readAllBytes(Path.of(path))) }.getOrNull()
         } ?: return null
         return index.position(offset)
     }
@@ -522,22 +531,6 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
                     presentation.tooltip = value.mutatorClass
                 }
             }
-        }
-    }
-
-    /** Line starts of a file, by byte offset. */
-    private class LineIndex(private val bytes: ByteArray) {
-        private val starts: IntArray = buildList {
-            add(0)
-            bytes.forEachIndexed { i, b -> if (b == '\n'.code.toByte()) add(i + 1) }
-        }.toIntArray()
-
-        fun position(offset: Int): Pair<Int, Int> {
-            val bounded = offset.coerceIn(0, bytes.size)
-            val found = starts.binarySearch(bounded)
-            val line = if (found >= 0) found else -found - 2
-            val start = starts[line]
-            return line to String(bytes, start, bounded - start, Charsets.UTF_8).length
         }
     }
 

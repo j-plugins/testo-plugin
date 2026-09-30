@@ -272,3 +272,19 @@ class TestoMutationMutatorFilterGroup : ActionGroup(), DumbAware {
         }
     }
 }
+
+/** The mutants in the editor: gutter marks and escaped-code underlines, for the run of the selected tab. */
+class TestoMutationEditorMarksAction : DumbAwareToggleAction() {
+    init {
+        templatePresentation.icon = TestoIcons.MUTATION
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+    override fun isSelected(e: AnActionEvent): Boolean =
+        e.project?.let { TestoMutationEditorMarks.getInstance(it).enabled } == true
+
+    override fun setSelected(e: AnActionEvent, state: Boolean) {
+        e.project?.let { TestoMutationEditorMarks.getInstance(it).enabled = state }
+    }
+}
