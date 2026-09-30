@@ -45,7 +45,7 @@ import java.nio.file.Path
 import javax.swing.Icon
 
 /**
- * Marks in the editor for the mutation run the Coverage view scores by ([TestoMutationService.current]): a gutter icon
+ * Marks in the editor for the mutation run of the selected *Mutations* tab, else the latest ([TestoMutationService.current]): a gutter icon
  * on each line a mutant sits on, the worst status first, and an underline over the code of the escaped ones. A file
  * whose code is no longer what Infection mutated gets none: Infection's byte offsets would land on other code.
  */
@@ -292,7 +292,6 @@ class TestoMutationEditorMarks(private val project: Project) : Disposable {
 
         private fun severity(status: MutantStatus?): Int = SEVERITY.indexOf(status)
 
-        /** Every status, worst first. */
         val STATUSES: List<MutantStatus> = SEVERITY.filterNotNull()
 
         fun getInstance(project: Project): TestoMutationEditorMarks = project.service()

@@ -2,7 +2,6 @@ package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
-import com.intellij.openapi.util.io.FileUtil
 import com.intellij.ui.AnimatedIcon
 import java.nio.file.Files
 import java.nio.file.Path
@@ -72,7 +71,7 @@ class Mutant(
     @Volatile
     var finished = false
 
-    /** Only an escaped mutant carries its code: the original and the mutated snippet, with context lines. */
+    /** The original and the mutated snippet, with context lines: off the text log, which the stream has only for escaped ones. */
     @Volatile
     var original: String? = null
 
@@ -185,20 +184,6 @@ class TestoMutationRun(
     fun score(): MutationScore = MutationScore(mutants.mapNotNull { it.status }.groupingBy { it }.eachCount())
 
     fun finishedCount(): Int = mutants.count { it.finished }
-
-    /**
-     * The score of the mutated files at [localPath], a host path: the file itself, or everything beneath a directory.
-     * Null when none of this run's files is there.
-     */
-    fun scoreUnder(localPath: String, directory: Boolean): MutationScore? {
-        val target = FileUtil.toSystemIndependentName(localPath).trimEnd('/')
-        val under = files.filter { file ->
-            val local = localPath(file.path)?.let(FileUtil::toSystemIndependentName) ?: return@filter false
-            if (directory) local.startsWith("$target/") else local == target
-        }
-        if (under.isEmpty()) return null
-        return MutationScore(under.flatMap { it.mutants }.mapNotNull { it.status }.groupingBy { it }.eachCount())
-    }
 
     fun log(): String = log.toString()
 

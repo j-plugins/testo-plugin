@@ -28,7 +28,6 @@ internal object TestoInfectionHtmlReport {
         }.onFailure { logger<TestoInfectionHtmlReport>().warn("Could not clean the mutation report $report", it) }
     }
 
-    /** Where the link starts in [head], or -1. */
     fun backLinkOffset(head: ByteArray): Int {
         outer@ for (i in 0..head.size - BACK_LINK.size) {
             for (j in BACK_LINK.indices) if (head[i + j] != BACK_LINK[j]) continue@outer

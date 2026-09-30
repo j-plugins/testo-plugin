@@ -72,7 +72,7 @@ class TestoMutationService(private val project: Project) {
         return null
     }
 
-    /** The run the Coverage view scores files by: the *Mutations* window's selected tab, else the latest started. */
+    /** The run the editor marks show: the *Mutations* window's selected tab, else the latest started. */
     fun current(): TestoMutationRun? =
         TestoMutationToolWindow.selectedRun(project) ?: runs.values.maxByOrNull { it.startedAt }
 

@@ -6,18 +6,13 @@
 
 ### Added
 
-- Mutation testing: a *Mutation* group after *Coverage* — an Infection button that runs Infection over the run's own coverage-xml and JUnit reports without re-running the tests, then the latest mutation run's progress and elapsed time. The mutants go to a *Mutations* tool window, each with its diff and the test output it caused.
-- Infection options — what to mutate, threads, flags, mutators — in the button's dropdown and in the run configuration's new *Mutation Testing* section.
-- *Run with Mutation*: a Coverage run with the coverage-xml and JUnit reports forced on that starts mutation testing as soon as its tests pass.
-- A *Mutations* tab can be pinned: it cannot be closed, and the next mutation run of the same tests opens a tab of its own.
-- *Rerun Mutant* (tree context menu) and *Rerun Escaped Mutants* (Mutations toolbar) run each mutant alone again and update it in its tab, showing the change (`Escaped → Killed`); the reruns are kept with the run. A file edited since its mutation run is marked "changed since the run" in the tree: its mutants may no longer match the code.
-- A mutant's diff numbers its lines as the file does; the mutation report opens from a split button (WebView, browser, copy path) in the *Mutations* toolbar and beside the progress in the *Mutation* group, and loses Infection's "Back" link, which led to the drive root.
-- The *Mutations* tree groups by file, mutator or status (remembered across sessions) and filters by mutator; `--static-analysis-tool` joins the *Mutation Testing* options; the Coverage view gains an MSI column per file and directory for the Testo run whose coverage it shows, each file scored by whichever of its mutation runs or reruns judged it last; it appears and refreshes when a mutation run ends.
-- The editor marks each line a mutant sits on in the gutter, the worst status first (a click lists them, reveals one in the tree or reruns them), and underlines the code of escaped mutants; a file changed since the run gets no marks. Toggled from the *Mutations* toolbar, whose dropdown picks the statuses shown.
-- *Mutate Selected* in the Coverage view mutates the selected file or directory alone, from the reports of the run the view shows; it sits beside *Run Covering Tests*, split off from the view's toggles.
-- A mutant's details list the tests that killed it and the ones that ran over its code, and its context menu's *Tests* opens any of them or runs the covering ones — the tests to strengthen for an escaped mutant.
-- The *Mutations* window opens as soon as a mutation run starts; its right-edge menu hides the diff or the raw output under the tree.
-- Mutation runs are kept in the run history beside the run they mutate, the last five of each: the group's history button lists them and opens one in its tab, a replayed run shows its MSI, and an exported run carries them along.
+- Mutation testing with Infection over a finished run's own coverage-xml and JUnit reports, without running the tests again: a *Mutation* group after *Coverage* (run button, options, history, progress with MSI, report) and *Run with Mutation*, a Coverage run that goes on to mutate once its tests pass.
+- Infection options — scope, threads, flags, mutators, static analysis tool — in the button's dropdown and in the run configuration's *Mutation Testing* section.
+- A *Mutations* tool window, one tab per mutated run: mutants grouped by file, mutator or status, each with its diff, test output, killing and covering tests; a file changed since the run is marked.
+- Rerunning single mutants or all escaped ones, updated in place (`Escaped → Killed`).
+- Mutants in the editor: a gutter mark per line, worst status first, and escaped code underlined; the statuses shown are picked on the *Mutations* toolbar.
+- An MSI column in the Coverage view per file and directory, and *Mutate Selected* for the selected file or directory.
+- Mutation runs are kept in the run history with the run they mutate: listed in the *Mutation* group, replayed and exported along.
 
 ### Changed
 
@@ -25,8 +20,9 @@
 
 ### Fixed
 
-- A coverage-xml report of code that runs `eval()` is kept in the run history on Windows, so mutation testing can start from it; the evaluated code is left out of what Infection reads.
-- Applying coverage — after a run, from the report button or a replay — no longer reads the reports on the UI thread (a "slow operations on EDT" error).
+- A coverage-xml report of code that runs `eval()` is kept in the run history on Windows.
+- Applying coverage no longer reads the reports on the UI thread (a "slow operations on EDT" error).
+- A covering test opens again from the coverage gutter popup and the *Covered by tests* lens.
 
 ## [2026.14.262] - 2026-09-29
 

@@ -145,7 +145,7 @@ class TestoRunnerSettings(
     companion object Companion {
         const val DEFAULT_COVERAGE_OPTIONS = "--type=!bench"
 
-        /** `--filter` with the files the mutated run covers. */
+        /** What the run's coverage covers: Infection skips the rest itself, or is given `--filter` with `--with-uncovered`. */
         const val INFECTION_SCOPE_COVERED = "covered"
 
         /** `--git-diff-lines`: only lines changed against the git base. Infection refuses it together with `--filter`. */

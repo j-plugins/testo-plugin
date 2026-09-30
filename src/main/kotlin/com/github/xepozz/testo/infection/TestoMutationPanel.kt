@@ -73,7 +73,6 @@ import javax.swing.tree.TreePath
 class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     SimpleToolWindowPanel(true, true), UiDataProvider, Disposable {
 
-    /** Show only the mutants the tests let through. */
     var escapedOnly = false
         set(value) {
             field = value
@@ -400,7 +399,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
 
     private fun localFile(file: MutatedFile) = run.localPath(file.path)?.let(LocalFileSystem.getInstance()::findFileByPath)
 
-    /** 0-based line and column of the mutated code; Infection's offsets count bytes, so they are resolved on bytes. */
+    /** 0-based line and column of the mutated code. */
     private fun position(mutant: Mutant): Pair<Int, Int>? {
         val offset = mutant.start ?: return null
         val local = run.localPath(mutant.file.path) ?: return null
@@ -614,7 +613,6 @@ internal object TestoMutationDetails {
 
     private val listeners = CopyOnWriteArrayList<() -> Unit>()
 
-    /** The selected mutant's diff. */
     var showDiff: Boolean
         get() = PropertiesComponent.getInstance().getBoolean(DIFF_KEY, true)
         set(value) {

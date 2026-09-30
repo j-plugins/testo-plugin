@@ -27,8 +27,8 @@ internal object TestoMutationToolWindow {
     private val RUN_KEY = Key.create<TestoMutationRun>("testo.mutation.run")
 
     /**
-     * Opens the window on [run]'s tab without taking the focus. A rerun of the same Testo run takes over the tab its last run had, unless that tab
-     * is pinned: a pinned tab keeps its run and cannot be closed until unpinned.
+     * Opens the window on [run]'s tab without taking the focus. A rerun of the same Testo run takes over the tab its last
+     * run had, unless that tab is pinned: a pinned tab keeps its run and cannot be closed until unpinned.
      */
     fun add(project: Project, run: TestoMutationRun, title: String? = null): Content {
         val window = window(project)
@@ -91,14 +91,12 @@ internal object TestoMutationToolWindow {
     private fun contentOf(window: ToolWindow, workDir: Path): Content? =
         window.contentManager.contents.firstOrNull { it.getUserData(RUN_KEY)?.workDir == workDir }
 
-    /** Brings up [run]'s tab with [mutant] selected in it. */
     fun reveal(project: Project, run: TestoMutationRun, mutant: Mutant) {
         show(project, run)
         val window = window(project)
         (contentOf(window, run.workDir)?.component as? TestoMutationPanel)?.select(mutant)
     }
 
-    /** The run on the selected tab, if the window has one. */
     fun selectedRun(project: Project): TestoMutationRun? =
         ToolWindowManager.getInstance(project).getToolWindow(ID)?.contentManager?.selectedContent?.getUserData(RUN_KEY)
 
