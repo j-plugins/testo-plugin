@@ -112,6 +112,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoCoverageAnnotator.kt   # per-file/dir percentages behind the Coverage view's columns
 │   ├── TestoCoverageViewExtension.kt  # the view's columns (Branches, Tests) and its extra toolbar
 │   ├── TestoCoverageViewActions.kt    # those toolbar actions: highlight, gutters, run covering, badges
+│   ├── TestoCoverageMutation.kt    # a mutation run narrowed to a file or directory, off the shown coverage's run
 │   ├── TestoCoverageSelectOpenedFile.kt  # our own "select the opened file" (the platform's cannot work here)
 │   ├── editor/                     # the editor side: stripes, the line popup, the covering-tests gutter
 │   ├── format/                     # clover / cobertura / coverage-xml parsers → one model
@@ -131,6 +132,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoMutationService.kt     # starts Infection as a background task, no Run tab; runs by source run dir
 │   ├── TestoMutationStream.kt      # `--teamcity` output → TestoMutationModel (files, mutants, statuses, MSI)
 │   ├── TestoMutationTextLog.kt     # `--logger-text` report: every mutant's diff and test output, read at the end
+│   ├── TestoMutationApply.kt       # Apply / Revert Mutation: a mutant written into its file where the file still reads its snippet
 │   ├── TestoMutantTests.kt         # a mutant's killing tests (Testo's JSON in its output) and covering ones (the run's coverage-xml)
 │   ├── TestoMutationArchive.kt     # `<run dir>/infection/<started at>/`: recorder, loader, pruning (5 per Testo run)
 │   ├── TestoMutationToolWindow.kt  # the *Mutations* tool window, registered on first use, one tab per Testo run

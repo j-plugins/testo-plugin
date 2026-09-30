@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
+import com.intellij.icons.AllIcons
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionPlaces
@@ -246,6 +247,13 @@ class TestoMutationEditorMarks(private val project: Project) : Disposable {
                         TestoMutationToolWindow.show(project, run)
                     }
                 })
+                mutants.singleOrNull()?.takeIf { TestoMutationApply.canApply(run, it) }?.let { mutant ->
+                    group.add(object : DumbAwareAction(TestoBundle.message("infection.apply.action"), null, AllIcons.Actions.Edit) {
+                        override fun actionPerformed(e: AnActionEvent) {
+                            TestoMutationApply.apply(project, run, mutant)
+                        }
+                    })
+                }
                 val popup = JBPopupFactory.getInstance().createActionGroupPopup(
                     TestoBundle.message("infection.editor.line", (line + 1).toString()),
                     group,

@@ -245,7 +245,7 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
 
     // Layout: Mutation [logo][▾] [history ▾] then, with a run, [ring label ✗ n  elapsed] [report][▾].
     private fun segments(): List<Pair<Zone, Int>> = buildList {
-        add(Zone.LABEL to PADDING + textWidth(LABEL) + GAP)
+        add(Zone.LABEL to PADDING + getFontMetrics(labelFont).stringWidth(LABEL) + GAP)
         add(Zone.BUTTON to PADDING + LOGO.iconWidth + GAP)
         add(Zone.ARROW to ARROW.iconWidth + PADDING)
         add(Zone.HISTORY to PADDING + HISTORY.iconWidth + ARROW.iconWidth + PADDING)
@@ -264,6 +264,8 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
     }
 
     private fun textWidth(text: String) = getFontMetrics(font).stringWidth(text)
+
+    private val labelFont: Font get() = font.deriveFont(Font.BOLD)
 
     private fun start(zone: Zone): Int {
         var x = 0
@@ -314,7 +316,9 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
 
             // Whether this run can be mutated at all; a mutation run going on does not change that.
             g2.color = if (readiness is TestoMutationReadiness.Ready) UIUtil.getLabelForeground() else UIUtil.getLabelDisabledForeground()
+            g2.font = labelFont
             g2.drawString(LABEL, PADDING, baseline)
+            g2.font = font
 
             var x = start(Zone.BUTTON) + PADDING
             val logo = if (isReady || run?.isBusy == true) LOGO else LOGO_DISABLED

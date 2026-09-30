@@ -35,7 +35,10 @@ abstract class TestoMutationAction : DumbAwareAction() {
     final override fun update(e: AnActionEvent) {
         val panel = panel(e)
         e.presentation.isEnabled = panel != null && isEnabled(panel)
+        panel?.let { updatePresentation(e, it) }
     }
+
+    protected open fun updatePresentation(e: AnActionEvent, panel: TestoMutationPanel) = Unit
 
     final override fun actionPerformed(e: AnActionEvent) {
         panel(e)?.let(::perform)
@@ -67,6 +70,26 @@ class TestoMutationRerunSelectedAction : TestoMutationAction() {
 
     override fun perform(panel: TestoMutationPanel) =
         TestoMutationService.getInstance(panel.project).rerun(panel.run, panel.selectedMutants())
+}
+
+/** Writes the selected mutant into its file, or puts the original back where it is written: whichever the file reads. */
+class TestoMutationApplyAction : TestoMutationAction() {
+    override fun isEnabled(panel: TestoMutationPanel): Boolean {
+        val mutant = panel.selectedMutants().singleOrNull() ?: return false
+        return TestoMutationApply.isApplied(panel.run, mutant) || TestoMutationApply.canApply(panel.run, mutant)
+    }
+
+    override fun updatePresentation(e: AnActionEvent, panel: TestoMutationPanel) {
+        val applied = panel.selectedMutants().singleOrNull()?.let { TestoMutationApply.isApplied(panel.run, it) } == true
+        e.presentation.text = TestoBundle.message(if (applied) "infection.revert.action" else "infection.apply.action")
+        e.presentation.icon = if (applied) AllIcons.Actions.Rollback else AllIcons.Actions.Edit
+    }
+
+    override fun perform(panel: TestoMutationPanel) {
+        val mutant = panel.selectedMutants().singleOrNull() ?: return
+        if (TestoMutationApply.isApplied(panel.run, mutant)) TestoMutationApply.revert(panel.project, panel.run, mutant)
+        else TestoMutationApply.apply(panel.project, panel.run, mutant)
+    }
 }
 
 /** Every escaped mutant alone, updated in place in this tab. */

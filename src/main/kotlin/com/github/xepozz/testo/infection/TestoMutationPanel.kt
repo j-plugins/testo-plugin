@@ -7,6 +7,7 @@ import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.contents.DocumentContent
 import com.intellij.diff.requests.SimpleDiffRequest
+import com.intellij.diff.util.DiffUserDataKeys
 import com.intellij.diff.util.DiffUserDataKeysEx
 import com.intellij.ide.CommonActionsManager
 import com.intellij.ide.DefaultTreeExpander
@@ -128,6 +129,9 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
 
     // Files whose code is no longer what Infection mutated, by the interpreter's path: their mutants may not match it.
     private val changed = ConcurrentHashMap.newKeySet<String>()
+
+    // Mutants written into their file with Apply Mutation, by node id: told off the file's text, so an undo counts too.
+    private val applied = ConcurrentHashMap.newKeySet<String>()
     private val checkAlarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
     private var checkedFinished = false
 
@@ -184,6 +188,9 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     /** Whether [file]'s code is no longer what Infection mutated, as last checked. */
     internal fun isChanged(file: MutatedFile): Boolean = file.path in changed
 
+    /** Whether [mutant] is written into its file, as last checked. */
+    internal fun isApplied(mutant: Mutant): Boolean = mutant.nodeId in applied
+
     private fun localPaths(): Set<String> =
         run.files.mapNotNullTo(HashSet()) { file -> run.localPath(file.path)?.let(FileUtil::toSystemIndependentName) }
 
@@ -201,9 +208,14 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
             val unsaved = virtual != null && ApplicationManager.getApplication().runReadAction(Computable { FileDocumentManager.getInstance().isFileModified(virtual) })
             unsaved || fingerprintOf(Path.of(local)) != expected
         }.mapTo(HashSet()) { it.path }
-        if (now == changed) return
+        val appliedNow = ApplicationManager.getApplication().runReadAction(Computable {
+            run.files.filter { it.path in now }.flatMap { it.mutants }.filter { TestoMutationApply.isApplied(run, it) }.mapTo(HashSet()) { it.nodeId }
+        })
+        if (now == changed && appliedNow == applied) return
         changed.retainAll(now)
         changed.addAll(now)
+        applied.retainAll(appliedNow)
+        applied.addAll(appliedNow)
         lines.clear()
         listener()
     }
@@ -282,7 +294,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         val original = mutant?.original
         val mutated = mutant?.mutated
         val key = when (element) {
-            is Mutant -> "m|${element.nodeId}|${element.file.path in changed}|${element.status}|${element.previousStatus}|${element.rerunning}|${original != null}|${element.firstLine}|${element.output != null}"
+            is Mutant -> "m|${element.nodeId}|${element.file.path in changed}|${element.nodeId in applied}|${element.status}|${element.previousStatus}|${element.rerunning}|${original != null}|${element.firstLine}|${element.output != null}"
             is MutatedFile -> "f|${element.nodeId}|${element.path in changed}|${element.mutants.count { it.finished }}"
             is MutantGroup -> "g|${element.grouping}|${element.key}|${mutantsOf(element).count { it.finished }}"
             else -> run.log()
@@ -300,7 +312,10 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
                     numbered(factory.create(project, mutated, fileType), mutant.firstLine),
                     TestoBundle.message("infection.diff.original"),
                     TestoBundle.message("infection.diff.mutant"),
-                )
+                ).apply {
+                    // The diff's own toolbar: Apply turns into Revert once the file reads the mutant.
+                    ActionManager.getInstance().getAction(APPLY_ACTION)?.let { putUserData(DiffUserDataKeys.CONTEXT_ACTIONS, listOf(it)) }
+                }
             )
             output.text = describe(mutant)
             output.caretPosition = 0
@@ -361,7 +376,10 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         val position = position(mutant)
         appendLine(if (position != null) "${mutant.file.name}:${position.first + 1}" else mutant.file.name)
         appendLine(TestoBundle.message("infection.details.id", mutant.hash))
-        if (mutant.file.path in changed) appendLine(TestoBundle.message("infection.file.changed"))
+        when {
+            mutant.nodeId in applied -> appendLine(TestoBundle.message("infection.details.applied"))
+            mutant.file.path in changed -> appendLine(TestoBundle.message("infection.file.changed"))
+        }
         mutant.durationMs?.let { appendLine(TestoBundle.message("infection.details.duration", it.toString())) }
         tests?.killing?.takeIf { it.isNotEmpty() }?.let { appendTests(TestoBundle.message("infection.details.killedBy", it.size), it) }
         tests?.covering?.takeIf { it.isNotEmpty() }?.let { appendTests(TestoBundle.message("infection.details.coveredBy", it.size), it) }
@@ -555,7 +573,9 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
                         )
                     }
                     label?.let { presentation.addText("  $it", SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES) }
-                    if (grouping != TestoMutationGrouping.FILE && value.file.path in changed) {
+                    if (value.nodeId in applied) {
+                        presentation.addText("  " + TestoBundle.message("infection.node.applied"), CHANGED)
+                    } else if (grouping != TestoMutationGrouping.FILE && value.file.path in changed) {
                         presentation.addText("  " + TestoBundle.message("infection.node.changed"), CHANGED)
                     }
                     presentation.tooltip = value.mutatorClass
@@ -568,6 +588,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         const val PLACE = "TestoMutations"
         const val TOOLBAR_GROUP = "Testo.Mutations.Toolbar"
         const val POPUP_GROUP = "Testo.Mutations.Popup"
+        const val APPLY_ACTION = "Testo.Mutations.Apply"
 
         @JvmField
         val PANEL: DataKey<TestoMutationPanel> = DataKey.create("testo.mutations.panel")
