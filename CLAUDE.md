@@ -530,7 +530,10 @@ Non-obvious constraints already paid for in blood — read before touching the r
   replay reads it back through the same parsers. A pinned tab keeps its directory while the next run writes its own.
   Rerunning single mutants is a sub-run of that run: `--id` takes one ID (a repeated one: the last wins), so one process
   per mutant, each archived under `reruns/` and replayed over the run in order; that stream updates the run's own
-  mutants by ID and adds none.
+  mutants by ID and adds none. A snippet's line numbers come from the text log's `file:line` header less the context
+  lines above the first change (`DiffUserDataKeysEx.LINE_NUMBER_CONVERTOR`), so a mutant takes its snippet from that log
+  even when the stream had one. Infection's report template carries `<a href="/">Back</a>`, the drive root over
+  `file://`: it is blanked with spaces in place once the report is written, not cut out.
   No `--filter` unless `--with-uncovered`: Infection skips a file its coverage has no test for before parsing it, and
   the positional replacement for the deprecated flag hands paths outside infection.json5's `source` to Testo as tests.
 - **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to

@@ -18,6 +18,15 @@ class TestoMutationTextLogTest {
     }
 
     @Test
+    fun `a snippet starts at the file's line the context above the change begins on`() {
+        // Header line 80, three context lines above the removed return: the file's lines 77-80 are the snippet's first.
+        val removal = entries.getValue("7fef23dae843ecb8be780d94655a9f77")
+
+        assertEquals(77, removal.firstLine)
+        assertTrue(removal.original.startsWith("                goto run;\n"))
+    }
+
+    @Test
     fun `a timed out mutant gets its code`() {
         val decrement = entries.getValue("682c68d627a0fbe870414c3238a36ece")
 

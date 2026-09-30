@@ -78,6 +78,10 @@ class Mutant(
     @Volatile
     var mutated: String? = null
 
+    /** The file's line, 1-based, that [original] and [mutated] start at; known once the text log is read. */
+    @Volatile
+    var firstLine: Int? = null
+
     @Volatile
     var durationMs: Long? = null
 

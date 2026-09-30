@@ -1,14 +1,20 @@
 package com.github.xepozz.testo.infection
 
+import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
+import com.intellij.ide.BrowserUtil
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.SplitButtonAction
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.DumbAwareToggleAction
 import java.awt.datatransfer.StringSelection
 import java.nio.file.Files
+import javax.swing.Icon
 
 /** Base of the *Mutations* tool window's actions: they act on the tab they are invoked from. */
 abstract class TestoMutationAction : DumbAwareAction() {
@@ -78,14 +84,55 @@ class TestoMutationStopAction : TestoMutationAction() {
     override fun perform(panel: TestoMutationPanel) = panel.run.stop()
 }
 
-class TestoMutationOpenReportAction : TestoMutationAction() {
+/** Opens the report in a WebView tab, like a click on it does; its dropdown opens it in the browser or copies its path. */
+class TestoMutationOpenReportAction : SplitButtonAction(
+    DefaultActionGroup(
+        TestoMutationReportAction(TestoBundle.message("testo.report.open.webview"), AllIcons.Actions.Preview) { panel ->
+            TestoMutationToolWindow.openReport(panel.project, panel.run)
+        },
+        TestoMutationReportAction(TestoBundle.message("testo.report.open.browser"), AllIcons.Nodes.PpWeb) { panel ->
+            BrowserUtil.browse(panel.run.htmlReport.toUri())
+        },
+        TestoMutationReportAction(TestoBundle.message("testo.report.copy.path"), AllIcons.Actions.Copy) { panel ->
+            CopyPasteManager.getInstance().setContents(StringSelection(panel.run.htmlReport.toString()))
+        },
+    )
+) {
+    private val main = TestoMutationReportAction(null, AllIcons.General.Web) { panel ->
+        TestoMutationToolWindow.openReport(panel.project, panel.run)
+    }
+
     init {
         templatePresentation.icon = AllIcons.General.Web
     }
 
-    override fun isEnabled(panel: TestoMutationPanel) = !panel.run.isRunning && Files.isRegularFile(panel.run.htmlReport)
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
-    override fun perform(panel: TestoMutationPanel) = TestoMutationToolWindow.openReport(panel.project, panel.run)
+    override fun useDynamicSplitButton(): Boolean = false
+
+    override fun getMainAction(e: AnActionEvent): AnAction = main
+
+    override fun update(e: AnActionEvent) {
+        super.update(e)
+        e.presentation.isEnabled = e.getData(TestoMutationPanel.PANEL)?.let(::hasReport) == true
+    }
+}
+
+private fun hasReport(panel: TestoMutationPanel) = !panel.run.isRunning && Files.isRegularFile(panel.run.htmlReport)
+
+private class TestoMutationReportAction(
+    text: String?,
+    icon: Icon,
+    private val open: (TestoMutationPanel) -> Unit,
+) : TestoMutationAction() {
+    init {
+        text?.let { templatePresentation.text = it }
+        templatePresentation.icon = icon
+    }
+
+    override fun isEnabled(panel: TestoMutationPanel) = hasReport(panel)
+
+    override fun perform(panel: TestoMutationPanel) = open(panel)
 }
 
 class TestoMutationCopyIdAction : TestoMutationAction() {

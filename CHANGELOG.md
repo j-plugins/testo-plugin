@@ -10,7 +10,8 @@
 - Infection options — what to mutate, threads, flags, mutators — in the button's dropdown and in the run configuration's new *Mutation Testing* section.
 - *Run with Mutation*: a Coverage run with the coverage-xml and JUnit reports forced on that starts mutation testing as soon as its tests pass.
 - A *Mutations* tab can be pinned: it cannot be closed, and the next mutation run of the same tests opens a tab of its own.
-- *Rerun Mutant* (tree context menu) and *Rerun Escaped Mutants* (Mutations toolbar) run each mutant alone again and update it in its tab, showing the change (`Escaped → Killed`); the reruns are kept with the run. A file edited since its mutation run is marked with a warning in the tree: its mutants may no longer match the code.
+- *Rerun Mutant* (tree context menu) and *Rerun Escaped Mutants* (Mutations toolbar) run each mutant alone again and update it in its tab, showing the change (`Escaped → Killed`); the reruns are kept with the run. A file edited since its mutation run is marked "changed since the run" in the tree: its mutants may no longer match the code.
+- A mutant's diff numbers its lines as the file does; the mutation report opens from a split button (WebView, browser, copy path) and loses Infection's "Back" link, which led to the drive root.
 - Mutation runs are kept in the run history beside the run they mutate, the last five of each: the group's history button lists them and opens one in its tab, a replayed run shows its MSI, and an exported run carries them along.
 
 ### Changed

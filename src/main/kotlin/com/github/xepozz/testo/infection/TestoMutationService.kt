@@ -136,6 +136,7 @@ class TestoMutationService(private val project: Project) {
                         val stream = TestoMutationStream(run, recorder::line, onFile = run::fingerprint)
                         val exitCode = execute(clone, interpreter, run, launch, stream, recorder, indicator) { run.stopRequested }
                         launch.htmlTarget?.copyToLocal(project)
+                        TestoInfectionHtmlReport.clean(launch.htmlReport)
                         run.finish(exitCode)
                         recorder.summary(run)
                     }

@@ -97,7 +97,7 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
                 when (zoneAt(e.x)) {
                     Zone.BUTTON -> onButton()
                     Zone.ARROW -> showOptions()
-                    Zone.HISTORY -> showHistory()
+                    Zone.HISTORY -> if (hasHistory) showHistory()
                     Zone.PROGRESS -> run?.let { TestoMutationToolWindow.show(project, it) }
                     Zone.LABEL, null -> Unit
                 }
@@ -114,8 +114,17 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         if (zone == hovered) return
         hovered = zone
         toolTipText = tooltip(zone)
-        cursor = Cursor.getPredefinedCursor(if (zone == null || zone == Zone.LABEL) Cursor.DEFAULT_CURSOR else Cursor.HAND_CURSOR)
+        cursor = Cursor.getPredefinedCursor(if (isActive(zone)) Cursor.HAND_CURSOR else Cursor.DEFAULT_CURSOR)
         repaint()
+    }
+
+    // The latest mutation run is what the history lists first: none yet, nothing to list.
+    private val hasHistory: Boolean get() = run != null
+
+    private fun isActive(zone: Zone?): Boolean = when (zone) {
+        null, Zone.LABEL -> false
+        Zone.HISTORY -> hasHistory
+        else -> true
     }
 
     override fun removeNotify() {
@@ -176,7 +185,7 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
     private fun tooltip(zone: Zone?): String? = when (zone) {
         null, Zone.LABEL -> null
         Zone.ARROW -> TestoBundle.message("infection.cell.options")
-        Zone.HISTORY -> TestoBundle.message("infection.cell.history")
+        Zone.HISTORY -> TestoBundle.message(if (hasHistory) "infection.cell.history" else "infection.history.empty")
         Zone.PROGRESS -> TestoBundle.message(
             "infection.widget.tooltip",
             (run?.finishedCount() ?: 0).toString(),
@@ -280,7 +289,7 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
 
             val arc = JBUI.scale(6)
             val widths = segments().toMap()
-            hovered?.takeIf { it != Zone.LABEL }?.let { zone ->
+            hovered?.takeIf(::isActive)?.let { zone ->
                 g2.color = JBUI.CurrentTheme.ActionButton.hoverBackground()
                 g2.fillRoundRect(start(zone), 0, widths.getValue(zone), height, arc, arc)
             }
@@ -288,7 +297,8 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
             val metrics = g2.fontMetrics
             val baseline = (height - metrics.height) / 2 + metrics.ascent
 
-            g2.color = if (isReady) UIUtil.getLabelForeground() else UIUtil.getLabelDisabledForeground()
+            // Whether this run can be mutated at all; a mutation run going on does not change that.
+            g2.color = if (readiness is TestoMutationReadiness.Ready) UIUtil.getLabelForeground() else UIUtil.getLabelDisabledForeground()
             g2.drawString(LABEL, PADDING, baseline)
 
             var x = start(Zone.BUTTON) + PADDING
@@ -297,8 +307,8 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
             paintIcon(g2, ARROW, start(Zone.ARROW))
 
             x = start(Zone.HISTORY) + PADDING
-            paintIcon(g2, HISTORY, x)
-            paintIcon(g2, ARROW, x + HISTORY.iconWidth)
+            paintIcon(g2, if (hasHistory) HISTORY else HISTORY_DISABLED, x)
+            paintIcon(g2, if (hasHistory) ARROW else ARROW_DISABLED, x + HISTORY.iconWidth)
 
             if (progressLabel.isEmpty()) return
             x = start(Zone.PROGRESS) + PADDING
@@ -458,8 +468,10 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         private val LOGO: Icon = TestoIcons.MUTATION_RUN
         private val LOGO_DISABLED: Icon = IconLoader.getDisabledIcon(TestoIcons.MUTATION_RUN)
         private val HISTORY: Icon = AllIcons.Vcs.History
+        private val HISTORY_DISABLED: Icon = IconLoader.getDisabledIcon(HISTORY)
         private val ESCAPED: Icon = TestoIcons.Status.FAILED
         private val ARROW: Icon = AllIcons.General.LinkDropTriangle
+        private val ARROW_DISABLED: Icon = IconLoader.getDisabledIcon(ARROW)
 
         private val PADDING get() = JBUI.scale(5)
         private val GAP get() = JBUI.scale(4)

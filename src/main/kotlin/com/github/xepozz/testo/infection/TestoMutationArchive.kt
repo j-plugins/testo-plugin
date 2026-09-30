@@ -146,10 +146,10 @@ internal object TestoMutationArchive {
         val entries = runCatching { TestoMutationTextLog.parse(Files.readString(file)) }.getOrNull() ?: return
         run.mutants.forEach { mutant ->
             val entry = entries[mutant.hash] ?: return@forEach
-            if (mutant.original == null) {
-                mutant.original = entry.original
-                mutant.mutated = entry.mutated
-            }
+            // Over the stream's own snippet of an escaped mutant too: the line numbers are counted on this diff.
+            mutant.original = entry.original
+            mutant.mutated = entry.mutated
+            mutant.firstLine = entry.firstLine
             mutant.output = entry.output
         }
     }

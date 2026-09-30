@@ -111,6 +111,20 @@ class TestoInfectionTest {
     }
 
     @Test
+    fun `the report's Back link to the drive root is blanked out in place`() {
+        val body = "<html>\n    <body>\n        <a href=\"/\">Back</a>\n        <mutation-test-report-app></mutation-test-report-app>\n"
+        val report = temp.newFile("report.html").toPath()
+        Files.writeString(report, body + "x".repeat(10_000))
+
+        TestoInfectionHtmlReport.clean(report)
+
+        val cleaned = Files.readString(report)
+        assertEquals(body.length + 10_000, cleaned.length)
+        assertEquals(body.replace("<a href=\"/\">Back</a>", " ".repeat(20)), cleaned.take(body.length))
+        assertEquals(-1, TestoInfectionHtmlReport.backLinkOffset("<a href=\"/docs\">Back</a>".toByteArray()))
+    }
+
+    @Test
     fun `no filter when there are no sources or too many`() {
         assertNull(TestoInfectionArguments.filter(emptyList()))
         val many = List(1_000) { "src/Some/Long/Directory/Name/File$it.php" }

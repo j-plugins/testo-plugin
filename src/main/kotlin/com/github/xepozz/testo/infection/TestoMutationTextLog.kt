@@ -9,10 +9,16 @@ package com.github.xepozz.testo.infection
  * change follows within the gap sebastian/diff would still have merged into the same hunk.
  */
 internal object TestoMutationTextLog {
-    class Entry(val original: String, val mutated: String, val output: String)
+    class Entry(
+        val original: String,
+        val mutated: String,
+        val output: String,
+        /** The file's line, 1-based, that [original] and [mutated] start at: the header's line less the context above it. */
+        val firstLine: Int?,
+    )
 
     private const val CONTEXT = 3
-    private val HEADER = Regex("""^\d+\) .+:\d+\s+\[M] \S+ \[ID] (\S+)\s*$""")
+    private val HEADER = Regex("""^\d+\) .+:(\d+)\s+\[M] \S+ \[ID] (\S+)\s*$""")
     private val UNDERLINE = Regex("^=+$")
 
     fun parse(text: String): Map<String, Entry> {
@@ -20,13 +26,13 @@ internal object TestoMutationTextLog {
         val entries = LinkedHashMap<String, Entry>()
         var i = 0
         while (i < lines.size) {
-            val hash = HEADER.find(lines[i])?.groupValues?.get(1)
-            if (hash == null) {
+            val header = HEADER.find(lines[i])?.groupValues
+            if (header == null) {
                 i++
                 continue
             }
             val end = (i + 1 until lines.size).firstOrNull { isBoundary(lines, it) } ?: lines.size
-            parseEntry(lines.subList(i + 1, end))?.let { entries[hash] = it }
+            parseEntry(lines.subList(i + 1, end), header[1].toIntOrNull())?.let { entries[header[2]] = it }
             i = end
         }
         return entries
@@ -35,7 +41,7 @@ internal object TestoMutationTextLog {
     private fun isBoundary(lines: List<String>, index: Int): Boolean =
         HEADER.matches(lines[index]) || (UNDERLINE.matches(lines.getOrElse(index + 1) { "" }) && lines[index].endsWith(":"))
 
-    private fun parseEntry(body: List<String>): Entry? {
+    private fun parseEntry(body: List<String>, line: Int?): Entry? {
         val start = body.indexOfFirst { it.startsWith("@@") }
         if (start < 0) return null
         val diff = body.drop(start)
@@ -59,7 +65,9 @@ internal object TestoMutationTextLog {
             .dropWhile { it.isBlank() }
             .dropLastWhile { it.isBlank() }
             .joinToString("\n") { it.removePrefix("  ") }
-        return Entry(original.toString(), mutated.toString(), output)
+        // Infection's line is where the mutated code starts, which is the diff's first change.
+        val above = diff.subList(1, diffEnd).indexOfFirst(::isChange).coerceAtLeast(0)
+        return Entry(original.toString(), mutated.toString(), output, line?.minus(above)?.coerceAtLeast(1))
     }
 
     private fun diffEnd(diff: List<String>): Int {

@@ -4,7 +4,9 @@ import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
+import com.intellij.diff.contents.DocumentContent
 import com.intellij.diff.requests.SimpleDiffRequest
+import com.intellij.diff.util.DiffUserDataKeysEx
 import com.intellij.ide.CommonActionsManager
 import com.intellij.ide.DefaultTreeExpander
 import com.intellij.ide.projectView.PresentationData
@@ -12,7 +14,6 @@ import com.intellij.ide.util.treeView.AbstractTreeStructure
 import com.intellij.ide.util.treeView.NodeDescriptor
 import com.intellij.ide.util.treeView.NodeRenderer
 import com.intellij.ide.util.treeView.PresentableNodeDescriptor
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
@@ -21,7 +22,7 @@ import com.intellij.openapi.actionSystem.DataKey
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.UiDataProvider
-import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
@@ -30,6 +31,7 @@ import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.SimpleToolWindowPanel
+import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -39,7 +41,7 @@ import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.pom.Navigatable
 import com.intellij.util.EditSourceOnDoubleClickHandler
 import com.intellij.util.EditSourceOnEnterKeyHandler
-import com.intellij.ui.IconManager
+import com.intellij.ui.JBColor
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
@@ -59,6 +61,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.function.IntUnaryOperator
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.tree.TreePath
@@ -158,6 +161,9 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         }, this)
     }
 
+    /** Whether [file]'s code is no longer what Infection mutated, as last checked. */
+    internal fun isChanged(file: MutatedFile): Boolean = file.path in changed
+
     private fun localPaths(): Set<String> =
         run.files.mapNotNullTo(HashSet()) { file -> run.localPath(file.path)?.let(FileUtil::toSystemIndependentName) }
 
@@ -172,9 +178,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
             val expected = run.fingerprints[file.path] ?: return@filter false
             val local = run.localPath(file.path) ?: return@filter false
             val virtual = LocalFileSystem.getInstance().findFileByPath(local)
-            val unsaved = virtual != null && ReadAction.compute<Boolean, RuntimeException> {
-                FileDocumentManager.getInstance().isFileModified(virtual)
-            }
+            val unsaved = virtual != null && ApplicationManager.getApplication().runReadAction(Computable { FileDocumentManager.getInstance().isFileModified(virtual) })
             unsaved || fingerprintOf(Path.of(local)) != expected
         }.mapTo(HashSet()) { it.path }
         if (now == changed) return
@@ -257,7 +261,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         val original = mutant?.original
         val mutated = mutant?.mutated
         val key = when (element) {
-            is Mutant -> "m|${element.nodeId}|${element.file.path in changed}|${element.status}|${element.previousStatus}|${element.rerunning}|${original != null}|${element.output != null}"
+            is Mutant -> "m|${element.nodeId}|${element.file.path in changed}|${element.status}|${element.previousStatus}|${element.rerunning}|${original != null}|${element.firstLine}|${element.output != null}"
             is MutatedFile -> "f|${element.nodeId}|${element.path in changed}|${element.mutants.count { it.finished }}"
             else -> run.log()
         }
@@ -271,8 +275,8 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
             diff.setRequest(
                 SimpleDiffRequest(
                     "${mutant.mutator} · ${mutant.file.name}",
-                    factory.create(project, original, fileType),
-                    factory.create(project, mutated, fileType),
+                    numbered(factory.create(project, original, fileType), mutant.firstLine),
+                    numbered(factory.create(project, mutated, fileType), mutant.firstLine),
                     TestoBundle.message("infection.diff.original"),
                     TestoBundle.message("infection.diff.mutant"),
                 )
@@ -291,10 +295,18 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         cards.show(details, TEXT_CARD)
     }
 
+    // The snippet is a few lines of the file; its gutter counts them where the file has them.
+    private fun numbered(content: DocumentContent, firstLine: Int?): DocumentContent {
+        if (firstLine != null && firstLine > 1) {
+            content.putUserData(DiffUserDataKeysEx.LINE_NUMBER_CONVERTOR, IntUnaryOperator { it + firstLine - 1 })
+        }
+        return content
+    }
+
     private fun describe(mutant: Mutant): String = buildString {
         appendLine(mutant.mutatorClass)
         appendLine(mutant.status?.label ?: TestoBundle.message("infection.status.running"))
-        mutant.previousStatus?.let { appendLine(TestoBundle.message("infection.details.before", it.label)) }
+        mutant.previousStatus?.takeIf { it != mutant.status }?.let { appendLine(TestoBundle.message("infection.details.before", it.label)) }
         val position = position(mutant)
         appendLine(if (position != null) "${mutant.file.name}:${position.first + 1}" else mutant.file.name)
         appendLine(TestoBundle.message("infection.details.id", mutant.hash))
@@ -391,12 +403,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         override fun update(presentation: PresentationData) {
             when (value) {
                 is MutatedFile -> {
-                    val stale = value.path in changed
-                    presentation.setIcon(
-                        if (stale) IconManager.getInstance().createRowIcon(TestoIcons.PHP.FILE, AllIcons.General.Warning)
-                        else TestoIcons.PHP.FILE
-                    )
-                    if (stale) presentation.tooltip = TestoBundle.message("infection.file.changed")
+                    presentation.setIcon(TestoIcons.PHP.FILE)
                     presentation.addText(value.name, SimpleTextAttributes.REGULAR_ATTRIBUTES)
                     val statuses = value.mutants.mapNotNull { it.status }
                     val escaped = statuses.count { it == MutantStatus.ESCAPED }
@@ -407,6 +414,10 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
                         "  " + TestoBundle.message("infection.node.total", statuses.size.toString(), value.mutants.size.toString()),
                         SimpleTextAttributes.GRAYED_ATTRIBUTES,
                     )
+                    if (value.path in changed) {
+                        presentation.addText("  " + TestoBundle.message("infection.node.changed"), CHANGED)
+                        presentation.tooltip = TestoBundle.message("infection.file.changed")
+                    }
                 }
                 is Mutant -> {
                     val status = value.status
@@ -423,7 +434,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
                     }
                     val previous = value.previousStatus
                     val label = when {
-                        previous == null -> status?.label
+                        previous == null || previous == status -> status?.label
                         else -> TestoBundle.message(
                             "infection.node.change",
                             previous.label,
@@ -431,9 +442,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
                         )
                     }
                     label?.let { presentation.addText("  $it", SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES) }
-                    presentation.tooltip = if (value.file.path in changed) {
-                        "<html>${value.mutatorClass}<br>${TestoBundle.message("infection.file.changed")}</html>"
-                    } else value.mutatorClass
+                    presentation.tooltip = value.mutatorClass
                 }
             }
         }
@@ -470,5 +479,9 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         private const val CHECK_MS = 300
 
         private val ESCAPED = SimpleTextAttributes.ERROR_ATTRIBUTES
+        private val CHANGED = SimpleTextAttributes(
+            SimpleTextAttributes.STYLE_ITALIC,
+            JBColor.namedColor("Label.warningForeground", JBColor(0xA8631E, 0xD9A343)),
+        )
     }
 }
