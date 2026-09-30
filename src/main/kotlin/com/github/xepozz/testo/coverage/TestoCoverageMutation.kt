@@ -2,6 +2,7 @@ package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
+import com.github.xepozz.testo.infection.TestoInfectionArguments
 import com.github.xepozz.testo.infection.TestoInfectionReports
 import com.github.xepozz.testo.infection.TestoMutationReadiness
 import com.github.xepozz.testo.infection.TestoMutationRecipe
@@ -30,7 +31,7 @@ import java.util.WeakHashMap
 internal object TestoCoverageMutation {
     class Target(val recipe: TestoMutationRecipe, val filter: String, val name: String)
 
-    private class Prepared(val recipe: TestoMutationRecipe, val sources: List<String>)
+    private class Prepared(val recipe: TestoMutationRecipe, val sources: List<String>, val root: String?)
 
     // Once a bundle's run can be mutated it stays so; until its run.json says so, every update reads it again.
     private val prepared = Collections.synchronizedMap(WeakHashMap<CoverageSuitesBundle, Prepared>())
@@ -43,7 +44,8 @@ internal object TestoCoverageMutation {
     fun target(project: Project, bundle: CoverageSuitesBundle, file: VirtualFile): Target? {
         val ready = prepared[bundle] ?: prepare(project, bundle)?.also { prepared[bundle] = it } ?: return null
         val covered = bundle.coverageData?.classes?.keys.orEmpty()
-        val filter = mutationFilterFor(file.path, file.isDirectory, covered, ready.sources) ?: return null
+        val relative = mutationFilterFor(file.path, file.isDirectory, covered, ready.sources) ?: return null
+        val filter = relative.takeIf { it.isNotEmpty() }?.let { TestoInfectionArguments.pathFilter(ready.root, it) }.orEmpty()
         return Target(ready.recipe, filter, file.name)
     }
 
@@ -75,7 +77,8 @@ internal object TestoCoverageMutation {
             .findConfigurationByTypeAndName(TestoRunConfigurationType.INSTANCE, configuration.name)
             ?.configuration as? TestoRunConfiguration
         val sources = runCatching { TestoInfectionReports.coveredSourceFiles(ready.coverageXml) }.getOrDefault(emptyList())
-        return Prepared(TestoMutationRecipe(configuration, runDir, ready, saved ?: configuration), sources)
+        val root = runCatching { TestoInfectionReports.coverageRoot(ready.coverageXml) }.getOrNull()
+        return Prepared(TestoMutationRecipe(configuration, runDir, ready, saved ?: configuration), sources, root)
     }
 }
 

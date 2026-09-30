@@ -414,7 +414,7 @@ internal class TestoMutationRecipe(
     val ready: TestoMutationReadiness.Ready,
     /** Where the Infection options live: the saved configuration, which the tab's may only be a copy of. */
     val optionsFrom: TestoRunConfiguration,
-    /** The file or directory the run is narrowed to, as [mutationFilterFor] spells it for Infection. */
+    /** The file or directory the run is narrowed to, as [TestoInfectionArguments.pathFilter] spells it for Infection. */
     val filter: String? = null,
     /** What [filter] names, for the tab. */
     val scopeName: String? = null,
@@ -435,8 +435,8 @@ internal fun sourceOf(path: String, sources: List<String>): String? {
 }
 
 /**
- * Infection's `--filter` for a file or directory picked on the host: a file's source, a directory as the coverage
- * spells it with a trailing slash, found through a covered file under it. Empty when the directory holds the whole
+ * A file or directory picked on the host as the coverage spells it: a file's source, a directory with a trailing
+ * slash, found through a covered file under it. Empty when the directory holds the whole
  * coverage, null when nothing under it is covered.
  */
 internal fun mutationFilterFor(selected: String, directory: Boolean, coveredFiles: Collection<String>, sources: List<String>): String? {

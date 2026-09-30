@@ -18,7 +18,7 @@ internal data class TestoInfectionOptions(
     val mutantId: String? = null,
     /** The source file [mutantId] is in, as the coverage spells it: spares Infection generating every other file's mutants. */
     val mutantFile: String? = null,
-    /** A file or directory the run is narrowed to; Infection's `--filter` matches it anywhere in a source's real path. */
+    /** A file or directory the run is narrowed to, as the coverage spells it. */
     val filter: String? = null,
 ) {
     companion object {
@@ -86,6 +86,23 @@ internal object TestoInfectionArguments {
 
     fun filter(sourceFiles: List<String>): String? =
         sourceFiles.joinToString(",").takeIf { it.isNotEmpty() && it.length <= MAX_FILTER_LENGTH }
+
+    /**
+     * [relative], a source or a directory as the coverage spells it, as a `--filter` naming only that path. A plain
+     * filter is a substring of each real path, so `src/Sub/` takes `packages/a/src/Sub/` too: it goes in under the
+     * coverage's [root], and as a regex, since one led and ended by `/` is taken for a `/`-delimited one. Commas are
+     * escaped because Infection splits the filter on them.
+     */
+    fun pathFilter(root: String?, relative: String): String {
+        val path = root?.replace('\\', '/')?.trimEnd('/')?.let { "$it/$relative" } ?: "/$relative"
+        return path.map {
+            when {
+                it.isLetterOrDigit() || it == '/' || it == '_' -> "$it"
+                it == ',' -> "\\x2C"
+                else -> "\\$it"
+            }
+        }.joinToString("", prefix = "#", postfix = "#")
+    }
 }
 
 internal object TestoInfectionExecutable {

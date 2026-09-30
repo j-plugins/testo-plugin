@@ -58,6 +58,11 @@ internal object TestoInfectionReports {
             file.getAttribute("href").takeIf { executed > 0 && it.isNotEmpty() }?.removeSuffix(".xml")
         }
 
+    /** The project root those sources are relative to, as the interpreter saw it. */
+    fun coverageRoot(coverageXml: Path): String? =
+        readXmlRoot(coverageXml.resolve("index.xml")).childElements("project").firstOrNull()
+            ?.getAttribute("source")?.takeIf { it.isNotEmpty() }
+
     /** Infection finds `index.xml` and `*junit.xml` anywhere under `--coverage`, so it gets a directory with just those. */
     fun assemble(ready: TestoMutationReadiness.Ready, target: Path) {
         NioFiles.deleteRecursively(target)

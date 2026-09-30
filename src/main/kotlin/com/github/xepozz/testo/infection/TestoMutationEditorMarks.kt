@@ -100,9 +100,9 @@ class TestoMutationEditorMarks(private val project: Project) : Disposable {
         })
     }
 
+    // Throttled, not debounced: Infection reports mutants faster than the delay, so a debounce would wait out the run.
     fun refresh() {
-        alarm.cancelAllRequests()
-        alarm.addRequest(::compute, REFRESH_MS)
+        if (alarm.isEmpty) alarm.addRequest(::compute, REFRESH_MS)
     }
 
     private fun compute() {

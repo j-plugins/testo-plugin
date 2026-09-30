@@ -389,7 +389,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
 
     private fun StringBuilder.appendTests(title: String, tests: List<TestId>) {
         appendLine().appendLine(title)
-        tests.forEach { appendLine("  {it.fqcn}::{it.method}") }
+        tests.forEach { appendLine("  ${it.fqcn}::${it.method}") }
     }
 
     private fun describe(file: MutatedFile): String = buildString {

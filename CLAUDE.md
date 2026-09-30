@@ -544,7 +544,8 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **No `--filter` unless `--with-uncovered` or a narrowed run.** Infection skips a file its coverage has no test for
   before parsing it, and the positional replacement for the deprecated flag hands paths outside infection.json5's
   `source` to Testo as tests. `--filter` is matched as a substring of each source's real path, so a directory goes in
-  as its coverage-relative path with a trailing slash (`mutationFilterFor`), never as a file list.
+  as a regex of its path under coverage-xml's `project source` with a trailing slash (`pathFilter`), never as a file
+  list: a bare `/…/` is itself read as a regex.
 - **The Coverage view knows its Testo run only through `TestoCoverageSuite.runDir`**, set by whoever applies the bundle.
   Its MSI merges every mutation run of that Testo run per file, by when each file was last judged (`FileScore.at`,
   restamped by a rerun); its columns are fixed when it is built, so a finished mutation run re-applies the bundle.

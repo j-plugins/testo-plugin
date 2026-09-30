@@ -128,13 +128,20 @@ class TestoInfectionTest {
 
     @Test
     fun `a narrowed run filters by its file or directory whatever the scope`() {
-        val options = TestoInfectionOptions(scope = TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES, filter = "src/Sub/")
+        val options = TestoInfectionOptions(scope = TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES, filter = "#/app/src/Sub/#")
 
         assertEquals(
-            listOf("--filter=src/Sub/"),
+            listOf("--filter=#/app/src/Sub/#"),
             TestoInfectionArguments.build("/c", listOf("src/A.php"), null, null, options)
                 .filter { it.startsWith("--filter") || it.startsWith("--git-diff") },
         )
+    }
+
+    @Test
+    fun `a narrowed filter names its path under the coverage root and keeps its commas`() {
+        assertEquals("#/app/src/Sub/#", TestoInfectionArguments.pathFilter("/app/", "src/Sub/"))
+        assertEquals("#D\\:/p/src/Sub/C\\.php#", TestoInfectionArguments.pathFilter("D:\\p", "src/Sub/C.php"))
+        assertEquals("#/src/a\\x2Cb\\-c/\\#1/#", TestoInfectionArguments.pathFilter(null, "src/a,b-c/#1/"))
     }
 
     @Test
