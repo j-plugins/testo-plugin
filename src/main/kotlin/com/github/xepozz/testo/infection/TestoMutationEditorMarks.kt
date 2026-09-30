@@ -254,6 +254,13 @@ class TestoMutationEditorMarks(private val project: Project) : Disposable {
                         }
                     })
                 }
+                mutants.singleOrNull()?.takeIf { TestoMutationIgnore.canIgnore(project, run, it) }?.let { mutant ->
+                    group.add(object : DumbAwareAction(TestoBundle.message("infection.ignore.action")) {
+                        override fun actionPerformed(e: AnActionEvent) {
+                            TestoMutationIgnore.ignore(project, run, mutant)
+                        }
+                    })
+                }
                 val popup = JBPopupFactory.getInstance().createActionGroupPopup(
                     TestoBundle.message("infection.editor.line", (line + 1).toString()),
                     group,

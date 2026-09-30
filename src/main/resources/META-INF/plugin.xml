@@ -164,6 +164,7 @@
             <action id="Testo.Mutations.RerunSelected" class="com.github.xepozz.testo.infection.TestoMutationRerunSelectedAction"/>
             <group id="Testo.Mutations.Tests" class="com.github.xepozz.testo.infection.TestoMutationTestsGroup"/>
             <action id="Testo.Mutations.Apply" class="com.github.xepozz.testo.infection.TestoMutationApplyAction"/>
+            <action id="Testo.Mutations.Ignore" class="com.github.xepozz.testo.infection.TestoMutationIgnoreAction"/>
             <separator/>
             <action id="Testo.Mutations.CopyId" class="com.github.xepozz.testo.infection.TestoMutationCopyIdAction"/>
         </group>

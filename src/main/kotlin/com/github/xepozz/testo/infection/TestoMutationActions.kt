@@ -92,6 +92,17 @@ class TestoMutationApplyAction : TestoMutationAction() {
     }
 }
 
+class TestoMutationIgnoreAction : TestoMutationAction() {
+    override fun isEnabled(panel: TestoMutationPanel): Boolean {
+        val mutant = panel.selectedMutants().singleOrNull() ?: return false
+        return TestoMutationIgnore.canIgnore(panel.project, panel.run, mutant)
+    }
+
+    override fun perform(panel: TestoMutationPanel) {
+        panel.selectedMutants().singleOrNull()?.let { TestoMutationIgnore.ignore(panel.project, panel.run, it) }
+    }
+}
+
 /** Every escaped mutant alone, updated in place in this tab. */
 class TestoMutationRerunEscapedAction : TestoMutationAction() {
     init {
