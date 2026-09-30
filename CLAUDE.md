@@ -540,7 +540,8 @@ Non-obvious constraints already paid for in blood — read before touching the r
   replay reads it back through the same parsers. `mutation.json` also holds each file's fingerprint and per-file score.
 - **`--id` takes one ID** (repeated, the last wins; a comma list matches nothing), so rerunning N mutants is N
   processes, each archived under `reruns/` and replayed over the run in order; that stream updates mutants by ID and
-  adds none.
+  adds none. A whole file's mutants are one process over its `pathFilter` (`rerunUnits`), except under
+  `--git-diff-lines`, which replaces `--filter` with the changed files and would mutate every line of them.
 - **No `--filter` unless `--with-uncovered` or a narrowed run.** Infection skips a file its coverage has no test for
   before parsing it, and the positional replacement for the deprecated flag hands paths outside infection.json5's
   `source` to Testo as tests. `--filter` is matched as a substring of each source's real path, so a directory goes in

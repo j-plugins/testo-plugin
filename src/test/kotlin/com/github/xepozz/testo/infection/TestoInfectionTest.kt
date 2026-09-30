@@ -298,4 +298,27 @@ class TestoInfectionTest {
         assertNull(parseInfectionLocation("php_qn:///app/src/A.php"))
     }
 
+    @Test
+    fun `a rerun takes a whole file in one process and every other mutant in one of its own`() {
+        val whole = MutatedFile("f1", "A.php", "/app/src/A.php")
+        val partial = MutatedFile("f2", "B.php", "/app/src/B.php")
+        val single = MutatedFile("f3", "C.php", "/app/src/C.php")
+        fun MutatedFile.mutant(id: String) = Mutant(id, this, "Plus", id, null, null).also { mutants += it }
+        val a = listOf(whole.mutant("a1"), whole.mutant("a2"))
+        val b = listOf(partial.mutant("b1"), partial.mutant("b2"), partial.mutant("b3"))
+        val c = single.mutant("c1")
+        val targets = a + b.take(2) + c
+        val sources = mapOf(whole to "src/A.php", partial to "src/B.php", single to "src/C.php")
+
+        fun describe(units: List<RerunUnit>) = units.map {
+            when (it) {
+                is RerunUnit.One -> it.mutant.hash
+                is RerunUnit.File -> it.source
+            }
+        }
+
+        assertEquals(listOf("src/A.php", "b1", "b2", "c1"), describe(rerunUnits(targets, true, sources::get)))
+        assertEquals(listOf("a1", "a2", "b1", "b2", "c1"), describe(rerunUnits(targets, false, sources::get)))
+        assertEquals(listOf("a1", "a2", "b1", "b2", "c1"), describe(rerunUnits(targets, true) { null }))
+    }
 }

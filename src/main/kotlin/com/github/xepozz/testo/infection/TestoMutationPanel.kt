@@ -283,6 +283,16 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
 
     fun selectedMutants(): List<Mutant> = tree.selectionPaths.orEmpty().mapNotNull { elementOf(it) as? Mutant }
 
+    /** The selected mutants and the ones shown under each selected file or group. */
+    fun selectedForRerun(): List<Mutant> = tree.selectionPaths.orEmpty().flatMap { path ->
+        when (val element = elementOf(path)) {
+            is Mutant -> listOf(element)
+            is MutatedFile -> element.mutants.filter(::shown)
+            is MutantGroup -> mutantsOf(element)
+            else -> emptyList()
+        }
+    }.distinct()
+
     private fun elementOf(path: TreePath): Any? = TreeUtil.getLastUserObject(NodeDescriptor::class.java, path)?.element
 
     private fun showDetails() {

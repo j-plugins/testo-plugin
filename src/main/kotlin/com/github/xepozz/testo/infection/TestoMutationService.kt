@@ -6,6 +6,7 @@ import com.github.xepozz.testo.php.PhpToolLauncher
 import com.github.xepozz.testo.runs.TestoRunManifest
 import com.github.xepozz.testo.runs.TestoRunStore
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
+import com.github.xepozz.testo.tests.run.TestoRunnerSettings
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.process.ProcessEvent
 import com.intellij.execution.process.ProcessListener
@@ -206,8 +207,8 @@ class TestoMutationService(private val project: Project) {
     }
 
     /**
-     * Runs Infection again on each of [mutants] alone and updates them in place: a sub-run of [run], kept in its archive
-     * beside it. One process per mutant, since `--id` takes a single ID. Call on the EDT.
+     * Runs Infection again on [mutants] and updates them in place: a sub-run of [run], kept in its archive beside it,
+     * one process per [rerunUnits] entry. Call on the EDT.
      */
     fun rerun(run: TestoMutationRun, mutants: List<Mutant>) {
         val recipe = run.recipe ?: return
@@ -230,12 +231,25 @@ class TestoMutationService(private val project: Project) {
                 try {
                     if (interpreter == null) throw ExecutionException(TestoBundle.message("infection.error.noInterpreter"))
                     val sources = coveredSources(recipe)
+                    val root = runCatching { TestoInfectionReports.coverageRoot(recipe.ready.coverageXml) }.getOrNull()
+                    val options = recipe.options()
+                    val wholeFiles = options.filter != null || options.scope != TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES
+                    val units = rerunUnits(targets, wholeFiles) { sourceOf(it.path, sources) }
                     indicator.isIndeterminate = false
-                    for ((index, mutant) in targets.withIndex()) {
+                    for ((index, unit) in units.withIndex()) {
                         if (run.rerunStopRequested || indicator.isCanceled) break
-                        indicator.fraction = index.toDouble() / targets.size
-                        indicator.text2 = "${mutant.mutator} · ${mutant.file.name}"
-                        rerunOne(recipe, interpreter, run, mutant, sources, indicator)
+                        indicator.fraction = index.toDouble() / units.size
+                        val unitOptions = when (unit) {
+                            is RerunUnit.One -> {
+                                indicator.text2 = "${unit.mutant.mutator} · ${unit.mutant.file.name}"
+                                options.copy(mutantId = unit.mutant.hash, mutantFile = sourceOf(unit.mutant.file.path, sources))
+                            }
+                            is RerunUnit.File -> {
+                                indicator.text2 = unit.file.name
+                                options.copy(filter = TestoInfectionArguments.pathFilter(root, unit.source))
+                            }
+                        }
+                        rerunOne(recipe, interpreter, run, unitOptions, sources, indicator)
                     }
                 } catch (e: ProcessCanceledException) {
                     throw e
@@ -270,11 +284,10 @@ class TestoMutationService(private val project: Project) {
         recipe: TestoMutationRecipe,
         interpreter: PhpInterpreter,
         run: TestoMutationRun,
-        mutant: Mutant,
+        options: TestoInfectionOptions,
         sources: List<String>,
         indicator: ProgressIndicator,
     ) {
-        val options = recipe.options().copy(mutantId = mutant.hash, mutantFile = sourceOf(mutant.file.path, sources))
         val dir = TestoMutationArchive.newRerunDir(run.workDir, System.currentTimeMillis())
         val launch = TestoInfectionLaunch(recipe.ready, sources, dir, options, withHtml = false)
         try {
@@ -426,6 +439,25 @@ internal class TestoMutationRecipe(
 
     fun clone(launch: TestoInfectionLaunch): TestoRunConfiguration =
         (configuration.clone() as TestoRunConfiguration).also { it.infectionLaunch = launch }
+}
+
+internal sealed interface RerunUnit {
+    class One(val mutant: Mutant) : RerunUnit
+
+    class File(val file: MutatedFile, val source: String) : RerunUnit
+}
+
+/**
+ * The processes that rerun [targets]. `--id` takes a single ID, so each mutant is one of its own, unless it is one of
+ * several targets that make up a whole file: those are one process over the file. Not with [wholeFiles] off, for
+ * `--git-diff-lines` replaces the filter with the changed files and would mutate every line of them.
+ */
+internal fun rerunUnits(targets: List<Mutant>, wholeFiles: Boolean, sourceOf: (MutatedFile) -> String?): List<RerunUnit> {
+    val wanted = targets.toSet()
+    return targets.groupBy { it.file }.flatMap { (file, mutants) ->
+        val source = if (wholeFiles && mutants.size > 1 && file.mutants.all { it in wanted }) sourceOf(file) else null
+        if (source != null) listOf(RerunUnit.File(file, source)) else mutants.map(RerunUnit::One)
+    }
 }
 
 /** The coverage's spelling of [path], a mutated file as the interpreter sees it: the source it ends with. */

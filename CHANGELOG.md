@@ -9,7 +9,7 @@
 - Mutation testing with Infection over a finished run's own coverage-xml and JUnit reports, without running the tests again: a *Mutation* group after *Coverage* (run button, options, history, progress with MSI, report) and *Run with Mutation*, a Coverage run that goes on to mutate once its tests pass.
 - Infection options — scope, threads, flags, mutators, static analysis tool — in the button's dropdown and in the run configuration's *Mutation Testing* section.
 - A *Mutations* tool window, one tab per mutated run: mutants grouped by file, mutator or status, each with its diff, test output, killing and covering tests; *Apply Mutation* writes one into its file for a manual check and *Revert Mutation* takes it out, *Ignore* puts `@infection-ignore-all` above its statement; a file changed since the run is marked.
-- Rerunning single mutants or all escaped ones, updated in place (`Escaped → Killed`).
+- Rerunning single mutants, those of a file or group, or all escaped ones, updated in place (`Escaped → Killed`); a whole file reruns in one process.
 - Mutants in the editor: a gutter mark per line, worst status first, and escaped code underlined; the statuses shown are picked on the *Mutations* toolbar.
 - An MSI column in the Coverage view per file and directory, and *Mutate* for a single file or directory from the Coverage view, the editor or the project view.
 - Mutation runs are kept in the run history with the run they mutate: listed in the *Mutation* group, replayed and exported along.

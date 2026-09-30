@@ -59,17 +59,17 @@ class TestoMutationRerunAction : TestoMutationAction() {
     override fun perform(panel: TestoMutationPanel) = TestoMutationService.getInstance(panel.project).restart(panel.run)
 }
 
-/** Each selected mutant alone, updated in place in this tab. */
+/** The selected mutants, and those under a selected file or group, updated in place in this tab. */
 class TestoMutationRerunSelectedAction : TestoMutationAction() {
     init {
         templatePresentation.icon = AllIcons.Actions.Rerun
     }
 
     override fun isEnabled(panel: TestoMutationPanel) =
-        !panel.run.isBusy && panel.run.recipe != null && panel.selectedMutants().any { it.finished }
+        !panel.run.isBusy && panel.run.recipe != null && panel.selectedForRerun().any { it.finished }
 
     override fun perform(panel: TestoMutationPanel) =
-        TestoMutationService.getInstance(panel.project).rerun(panel.run, panel.selectedMutants())
+        TestoMutationService.getInstance(panel.project).rerun(panel.run, panel.selectedForRerun())
 }
 
 /** Writes the selected mutant into its file, or puts the original back where it is written: whichever the file reads. */
