@@ -119,6 +119,8 @@ internal object TestoMutationToolWindow {
 }
 
 /** Contents are added per run by [TestoMutationToolWindow]; the window stays off the stripe until the first one. */
+// Without it the compiler bridges the interface's defaults into the class, and on 252 three of them are internal API.
+@JvmDefaultWithoutCompatibility
 class TestoMutationToolWindowFactory : ToolWindowFactory, DumbAware {
     override fun shouldBeAvailable(project: Project): Boolean = false
 

@@ -501,6 +501,8 @@ Non-obvious constraints already paid for in blood — read before touching the r
   "show me the passed ones" with an empty tree), and releasing it recomposes them via `hiddenByToggles` — off Testo's
   statuses, not `isPassed`/`isIgnored`, where flaky and risky look like a plain pass. A listener on both
   `BooleanProperty`s re-asserts this after the platform's own, which would otherwise drop a live counter.
+- **A Kotlin class implementing a platform interface gets its default methods as bridges** (`-jvm-default=enable`),
+  so the verifier flags internal defaults it never touched. `@JvmDefaultWithoutCompatibility` on the class drops them.
 - **The results tree is re-skinned from outside, not subclassed.** `SMTRunnerTestTreeViewProvider` and
   `TestTreeRenderer` are both `@ApiStatus.Internal` and fail the verifier's default `failureLevel`, so
   `TestoTestTreeDecorator` wraps the renderer the console already installed (`JTree.getCellRenderer` /
