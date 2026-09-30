@@ -131,6 +131,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoMutationService.kt     # starts Infection as a background task, no Run tab; runs by source run dir
 │   ├── TestoMutationStream.kt      # `--teamcity` output → TestoMutationModel (files, mutants, statuses, MSI)
 │   ├── TestoMutationTextLog.kt     # `--logger-text` report: every mutant's diff and test output, read at the end
+│   ├── TestoMutantTests.kt         # a mutant's killing tests (Testo's JSON in its output) and covering ones (the run's coverage-xml)
 │   ├── TestoMutationArchive.kt     # `<run dir>/infection/<started at>/`: recorder, loader, pruning (5 per Testo run)
 │   ├── TestoMutationToolWindow.kt  # the *Mutations* tool window, registered on first use, one tab per Testo run
 │   ├── TestoMutationPanel.kt       # own tree (StructureTreeModel) + escaped-mutant diff; toolbar group ids

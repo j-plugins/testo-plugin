@@ -15,6 +15,7 @@
 - The *Mutations* tree groups by file, mutator or status (remembered across sessions) and filters by mutator; `--static-analysis-tool` joins the *Mutation Testing* options; the Coverage view gains an MSI column per file and directory for the Testo run whose coverage it shows, each file scored by whichever of its mutation runs or reruns judged it last; it appears and refreshes when a mutation run ends.
 - The editor marks each line a mutant sits on in the gutter, the worst status first (a click lists them, reveals one in the tree or reruns them), and underlines the code of escaped mutants; a file changed since the run gets no marks. Toggled from the *Mutations* toolbar, whose dropdown picks the statuses shown.
 - *Mutate Selected* in the Coverage view mutates the selected file or directory alone, from the reports of the run the view shows; it sits beside *Run Covering Tests*, split off from the view's toggles.
+- A mutant's details list the tests that killed it and the ones that ran over its code, and its context menu's *Tests* opens any of them or runs the covering ones — the tests to strengthen for an escaped mutant.
 - The *Mutations* window opens as soon as a mutation run starts; its right-edge menu hides the diff or the raw output under the tree.
 - Mutation runs are kept in the run history beside the run they mutate, the last five of each: the group's history button lists them and opens one in its tab, a replayed run shows its MSI, and an exported run carries them along.
 

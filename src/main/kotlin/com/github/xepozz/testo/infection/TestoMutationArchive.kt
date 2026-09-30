@@ -202,6 +202,7 @@ internal object TestoMutationArchive {
             mutant.original = entry.original
             mutant.mutated = entry.mutated
             mutant.firstLine = entry.firstLine
+            mutant.lines = entry.line?.let { it until it + entry.span }
             mutant.output = entry.output
         }
     }

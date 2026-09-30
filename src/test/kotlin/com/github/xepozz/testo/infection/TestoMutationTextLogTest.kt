@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.infection
 
+import com.github.xepozz.testo.coverage.format.TestId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,6 +25,44 @@ class TestoMutationTextLogTest {
 
         assertEquals(77, removal.firstLine)
         assertTrue(removal.original.startsWith("                goto run;\n"))
+    }
+
+    @Test
+    fun `a mutant knows the lines it replaced and the tests that failed on it`() {
+        val flaky = entries.getValue("8ce204542deccf0c3b1e29ad6792a3a0")
+
+        assertEquals(48, flaky.line)
+        assertEquals(1, flaky.span)
+        assertEquals(
+            TestId("Tests\\Retry\\Unit\\RetryPolicyRunInterceptorTest", "noRetryWhenFirstAttemptPasses"),
+            TestoMutantTests.killing(flaky.output).first(),
+        )
+        assertEquals(emptyList<TestId>(), TestoMutantTests.killing("PHP Fatal error: no JSON here"))
+    }
+
+    @Test
+    fun `the covering tests are the ones the run's coverage has on the mutated lines`() {
+        val dir = Files.createTempDirectory("coverage-xml")
+        Files.createDirectories(dir.resolve("src"))
+        Files.writeString(
+            dir.resolve("index.xml"),
+            """<phpunit><project source="/app"><directory name="/app"><file name="A.php" href="src/A.php.xml"><totals><lines total="3" executed="2"/></totals></file></directory></project></phpunit>""",
+        )
+        Files.writeString(
+            dir.resolve("src/A.php.xml"),
+            """<phpunit><file name="A.php" path="/src"><coverage>
+              <line nr="3"><covered by="Tests\ATest::one"/></line>
+              <line nr="4"><covered by="Tests\ATest::one"/><covered by="Tests\ATest::two"/></line>
+              <line nr="9"><covered by="Tests\ATest::three"/></line>
+            </coverage></file></phpunit>""",
+        )
+        val index = TestoCoveringTestIndex(dir)
+
+        assertEquals(
+            listOf(TestId("Tests\\ATest", "one"), TestId("Tests\\ATest", "two")),
+            index.covering("/app/src/A.php", 3..4),
+        )
+        assertEquals(emptyList<TestId>(), index.covering("/app/src/Other.php", 3..4))
     }
 
     @Test

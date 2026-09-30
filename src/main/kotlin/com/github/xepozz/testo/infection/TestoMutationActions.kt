@@ -2,6 +2,9 @@ package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
+import com.github.xepozz.testo.coverage.format.TestId
+import com.github.xepozz.testo.coverage.perTest.TestoCoveringTestsLauncher
+import com.github.xepozz.testo.coverage.perTest.navigateToTest
 import com.github.xepozz.testo.tests.console.TestoReportIcons
 import com.intellij.ide.BrowserUtil
 import com.intellij.icons.AllIcons
@@ -273,6 +276,72 @@ class TestoMutationMutatorFilterGroup : ActionGroup(), DumbAware {
         override fun actionPerformed(e: AnActionEvent) {
             e.getData(TestoMutationPanel.PANEL)?.hiddenMutators = emptySet()
         }
+    }
+}
+
+/**
+ * The selected mutant's tests: the ones that killed it and the ones that ran over its code, each opening the test,
+ * and a run of the covering ones — the tests an escaped mutant says to strengthen.
+ */
+class TestoMutationTestsGroup : ActionGroup(), DumbAware {
+    init {
+        templatePresentation.isPopupGroup = true
+    }
+
+    // Children read the run's coverage report, which the background thread may do.
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
+
+    override fun update(e: AnActionEvent) {
+        e.presentation.isEnabledAndVisible = mutant(e) != null
+    }
+
+    override fun getChildren(e: AnActionEvent?): Array<AnAction> {
+        val panel = e?.getData(TestoMutationPanel.PANEL) ?: return emptyArray()
+        val mutant = mutant(e) ?: return emptyArray()
+        val tests = TestoMutationService.getInstance(panel.project).testsOf(panel.run, mutant)
+        return buildList {
+            if (tests.killing.isNotEmpty()) {
+                add(Separator.create(TestoBundle.message("infection.tests.killedBy")))
+                tests.killing.forEach { add(GoToTest(it)) }
+            }
+            if (tests.covering.isNotEmpty()) {
+                add(Separator.create(TestoBundle.message("infection.tests.coveredBy")))
+                tests.covering.forEach { add(GoToTest(it)) }
+                add(Separator.getInstance())
+                add(RunCovering(tests.covering, mutant))
+            }
+            if (isEmpty()) add(Nothing())
+        }.toTypedArray()
+    }
+
+    private fun mutant(e: AnActionEvent): Mutant? = e.getData(TestoMutationPanel.SELECTED_MUTANTS)?.singleOrNull()
+
+    private class GoToTest(private val test: TestId) : DumbAwareAction("${test.fqcn}::${test.method}", null, AllIcons.Nodes.Method) {
+        override fun actionPerformed(e: AnActionEvent) {
+            e.project?.let { navigateToTest(it, test) }
+        }
+    }
+
+    private class RunCovering(private val tests: List<TestId>, private val mutant: Mutant) :
+        DumbAwareAction(TestoBundle.message("infection.tests.runCovering", tests.size), null, AllIcons.Actions.RunAll) {
+        override fun actionPerformed(e: AnActionEvent) {
+            val project = e.project ?: return
+            TestoCoveringTestsLauncher.run(
+                project,
+                tests.toSet(),
+                TestoCoveringTestsLauncher.runName("${mutant.mutator} · ${mutant.file.name}", tests.size),
+            )
+        }
+    }
+
+    private class Nothing : DumbAwareAction(TestoBundle.message("infection.tests.none")) {
+        override fun getActionUpdateThread() = ActionUpdateThread.BGT
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = false
+        }
+
+        override fun actionPerformed(e: AnActionEvent) = Unit
     }
 }
 

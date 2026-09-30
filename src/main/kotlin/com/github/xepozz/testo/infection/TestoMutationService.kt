@@ -4,6 +4,7 @@ import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.reapplyTestoCoverage
 import com.github.xepozz.testo.php.PhpToolLauncher
 import com.github.xepozz.testo.runs.TestoRunManifest
+import com.github.xepozz.testo.runs.TestoRunStore
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.process.ProcessEvent
@@ -42,6 +43,8 @@ class TestoMutationService(private val project: Project) {
     private val probed = ConcurrentHashMap.newKeySet<Path>()
 
     private val scoreCache = ConcurrentHashMap<Path, Map<String, MutationScore>>()
+
+    private val coveringIndexes = ConcurrentHashMap<Path, TestoCoveringTestIndex>()
 
     init {
         // Before mutation runs moved into the run archive they lived here; nothing reads that any more.
@@ -170,6 +173,21 @@ class TestoMutationService(private val project: Project) {
     private fun scored(sourceRunDir: Path) {
         scoreCache.remove(sourceRunDir)
         ApplicationManager.getApplication().invokeLater({ reapplyTestoCoverage(project, sourceRunDir) }, project.disposed)
+    }
+
+    /** The tests that ran over [mutant]'s code and the ones that failed on it. Reads the run's coverage: not on the EDT. */
+    internal fun testsOf(run: TestoMutationRun, mutant: Mutant): TestoMutantTests {
+        val covering = mutant.lines?.let { lines -> coveringIndex(run)?.covering(mutant.file.path, lines) }.orEmpty()
+        return TestoMutantTests(covering, TestoMutantTests.killing(mutant.output))
+    }
+
+    private fun coveringIndex(run: TestoMutationRun): TestoCoveringTestIndex? {
+        val coverage = run.recipe?.ready?.coverageXml
+            ?: (TestoInfectionReports.readiness(run.sourceRunDir, TestoRunStore.getInstance(project).readManifest(run.sourceRunDir))
+                as? TestoMutationReadiness.Ready)?.coverageXml
+            ?: return null
+        if (coveringIndexes.size >= MAX_RUNS) coveringIndexes.clear()
+        return coveringIndexes.getOrPut(coverage) { TestoCoveringTestIndex(coverage) }
     }
 
     /** Makes [run] the latest of its Testo run, the one [runFor] and [current] answer. */

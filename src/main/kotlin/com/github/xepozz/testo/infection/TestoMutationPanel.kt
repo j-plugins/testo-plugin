@@ -2,6 +2,7 @@ package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
+import com.github.xepozz.testo.coverage.format.TestId
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.contents.DocumentContent
@@ -306,8 +307,10 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
             output.caretPosition = 0
             diffShown = true
             layoutDetails()
+            loadTests(mutant, key)
             return
         }
+        if (mutant != null) loadTests(mutant, key)
         output.text = when (element) {
             is Mutant -> describe(element)
             is MutatedFile -> describe(element)
@@ -338,7 +341,21 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         return content
     }
 
-    private fun describe(mutant: Mutant): String = buildString {
+    // Off the EDT: the first mutant of a file reads that file's coverage report.
+    private fun loadTests(mutant: Mutant, key: Any) {
+        val service = TestoMutationService.getInstance(project)
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val tests = service.testsOf(run, mutant)
+            if (tests.covering.isEmpty() && tests.killing.isEmpty()) return@executeOnPooledThread
+            ApplicationManager.getApplication().invokeLater({
+                if (shown != key) return@invokeLater
+                output.text = describe(mutant, tests)
+                output.caretPosition = 0
+            }, project.disposed)
+        }
+    }
+
+    private fun describe(mutant: Mutant, tests: TestoMutantTests? = null): String = buildString {
         appendLine(mutant.mutatorClass)
         appendLine(mutant.status?.label ?: TestoBundle.message("infection.status.running"))
         mutant.previousStatus?.takeIf { it != mutant.status }?.let { appendLine(TestoBundle.message("infection.details.before", it.label)) }
@@ -347,11 +364,18 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         appendLine(TestoBundle.message("infection.details.id", mutant.hash))
         if (mutant.file.path in changed) appendLine(TestoBundle.message("infection.file.changed"))
         mutant.durationMs?.let { appendLine(TestoBundle.message("infection.details.duration", it.toString())) }
-        val tests = mutant.output
+        tests?.killing?.takeIf { it.isNotEmpty() }?.let { appendTests(TestoBundle.message("infection.details.killedBy", it.size), it) }
+        tests?.covering?.takeIf { it.isNotEmpty() }?.let { appendTests(TestoBundle.message("infection.details.coveredBy", it.size), it) }
+        val output = mutant.output
         when {
-            !tests.isNullOrBlank() -> appendLine().appendLine(tests)
-            tests == null && (run.isRunning || mutant.rerunning) -> appendLine().appendLine(TestoBundle.message("infection.details.outputPending"))
+            !output.isNullOrBlank() -> appendLine().appendLine(output)
+            output == null && (run.isRunning || mutant.rerunning) -> appendLine().appendLine(TestoBundle.message("infection.details.outputPending"))
         }
+    }
+
+    private fun StringBuilder.appendTests(title: String, tests: List<TestId>) {
+        appendLine().appendLine(title)
+        tests.forEach { appendLine("  {it.fqcn}::{it.method}") }
     }
 
     private fun describe(file: MutatedFile): String = buildString {
@@ -399,6 +423,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     override fun uiDataSnapshot(sink: DataSink) {
         super.uiDataSnapshot(sink)
         sink[PANEL] = this
+        sink[SELECTED_MUTANTS] = selectedMutants()
         val element = selected()
         sink.lazy(CommonDataKeys.NAVIGATABLE) { navigatable(element) }
     }
@@ -547,6 +572,10 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
 
         @JvmField
         val PANEL: DataKey<TestoMutationPanel> = DataKey.create("testo.mutations.panel")
+
+        /** The selection, taken on the EDT: for actions that update in the background. */
+        @JvmField
+        val SELECTED_MUTANTS: DataKey<List<Mutant>> = DataKey.create("testo.mutations.selected")
 
         private const val REFRESH_MS = 300
         private const val EXPAND_LIMIT = 500

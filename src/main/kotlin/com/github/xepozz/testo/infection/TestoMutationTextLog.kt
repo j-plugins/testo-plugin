@@ -15,6 +15,9 @@ internal object TestoMutationTextLog {
         val output: String,
         /** The file's line, 1-based, that [original] and [mutated] start at: the header's line less the context above it. */
         val firstLine: Int?,
+        /** The file's line the mutated code starts at, and how many of the original's lines the mutation replaced. */
+        val line: Int? = null,
+        val span: Int = 1,
     )
 
     private const val CONTEXT = 3
@@ -67,7 +70,8 @@ internal object TestoMutationTextLog {
             .joinToString("\n") { it.removePrefix("  ") }
         // Infection's line is where the mutated code starts, which is the diff's first change.
         val above = diff.subList(1, diffEnd).indexOfFirst(::isChange).coerceAtLeast(0)
-        return Entry(original.toString(), mutated.toString(), output, line?.minus(above)?.coerceAtLeast(1))
+        val removed = diff.subList(1, diffEnd).count { it.startsWith("-") }.coerceAtLeast(1)
+        return Entry(original.toString(), mutated.toString(), output, line?.minus(above)?.coerceAtLeast(1), line, removed)
     }
 
     private fun diffEnd(diff: List<String>): Int {

@@ -83,6 +83,10 @@ class Mutant(
     @Volatile
     var firstLine: Int? = null
 
+    /** The lines the mutation replaced, as the file read when the run's coverage was taken; known with [firstLine]. */
+    @Volatile
+    var lines: IntRange? = null
+
     @Volatile
     var durationMs: Long? = null
 

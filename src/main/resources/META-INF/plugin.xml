@@ -162,6 +162,7 @@
         <group id="Testo.Mutations.Popup">
             <reference ref="EditSource"/>
             <action id="Testo.Mutations.RerunSelected" class="com.github.xepozz.testo.infection.TestoMutationRerunSelectedAction"/>
+            <group id="Testo.Mutations.Tests" class="com.github.xepozz.testo.infection.TestoMutationTestsGroup"/>
             <separator/>
             <action id="Testo.Mutations.CopyId" class="com.github.xepozz.testo.infection.TestoMutationCopyIdAction"/>
         </group>
