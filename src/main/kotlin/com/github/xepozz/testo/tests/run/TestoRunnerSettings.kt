@@ -77,6 +77,9 @@ class TestoRunnerSettings(
     @Attribute("infection_mutators")
     var infectionMutators: String = "",
 
+    @Attribute("infection_static_analysis_tool")
+    var infectionStaticAnalysisTool: String = "",
+
     @Attribute("infection_options")
     var infectionOptions: String = "",
 ) : PhpTestRunnerSettings() {
@@ -135,6 +138,7 @@ class TestoRunnerSettings(
         infectionWithUncovered = other.infectionWithUncovered
         infectionTimeoutsAsEscaped = other.infectionTimeoutsAsEscaped
         infectionMutators = other.infectionMutators
+        infectionStaticAnalysisTool = other.infectionStaticAnalysisTool
         infectionOptions = other.infectionOptions
     }
 
@@ -154,6 +158,9 @@ class TestoRunnerSettings(
 
         /** Offered in the editor and the button's menu; empty is infection.json5's own `threads`. */
         val INFECTION_THREADS: List<String> = listOf("", "max", "1", "2", "4", "8")
+
+        /** The tools `--static-analysis-tool` takes; empty leaves it off. */
+        val INFECTION_STATIC_ANALYSIS_TOOLS: List<String> = listOf("", "phpstan")
 
         /** No `--coverage-level` flag at all: the level configured in testo.php stands. */
         const val COVERAGE_LEVEL_AUTO = "auto"

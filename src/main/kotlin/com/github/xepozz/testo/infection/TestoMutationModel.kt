@@ -2,6 +2,7 @@ package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.ui.AnimatedIcon
 import java.nio.file.Files
 import java.nio.file.Path
@@ -101,7 +102,7 @@ class Mutant(
 /** Infection's own metrics, over what the stream has reported so far. */
 data class MutationScore(val counts: Map<MutantStatus, Int>) {
     val defeated: Int get() = counts.filterKeys { it.isDefeated }.values.sum()
-    private val considered: Int get() = counts.filterKeys { !it.isExcluded }.values.sum()
+    val considered: Int get() = counts.filterKeys { !it.isExcluded }.values.sum()
     private val covered: Int get() = considered - (counts[MutantStatus.NOT_COVERED] ?: 0)
 
     val escaped: Int get() = counts[MutantStatus.ESCAPED] ?: 0
@@ -180,6 +181,20 @@ class TestoMutationRun(
     fun score(): MutationScore = MutationScore(mutants.mapNotNull { it.status }.groupingBy { it }.eachCount())
 
     fun finishedCount(): Int = mutants.count { it.finished }
+
+    /**
+     * The score of the mutated files at [localPath], a host path: the file itself, or everything beneath a directory.
+     * Null when none of this run's files is there.
+     */
+    fun scoreUnder(localPath: String, directory: Boolean): MutationScore? {
+        val target = FileUtil.toSystemIndependentName(localPath).trimEnd('/')
+        val under = files.filter { file ->
+            val local = localPath(file.path)?.let(FileUtil::toSystemIndependentName) ?: return@filter false
+            if (directory) local.startsWith("$target/") else local == target
+        }
+        if (under.isEmpty()) return null
+        return MutationScore(under.flatMap { it.mutants }.mapNotNull { it.status }.groupingBy { it }.eachCount())
+    }
 
     fun log(): String = log.toString()
 

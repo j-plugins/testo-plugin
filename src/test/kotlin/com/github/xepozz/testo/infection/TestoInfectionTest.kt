@@ -57,6 +57,7 @@ class TestoInfectionTest {
             withUncovered = true,
             timeoutsAsEscaped = true,
             mutators = "@default,-MethodCallRemoval",
+            staticAnalysisTool = "phpstan",
             extra = "--min-msi=80 --debug",
         )
 
@@ -75,6 +76,7 @@ class TestoInfectionTest {
                 "--with-uncovered",
                 "--with-timeouts",
                 "--mutators=@default,-MethodCallRemoval",
+                "--static-analysis-tool=phpstan",
                 "--min-msi=80",
                 "--debug",
             ),

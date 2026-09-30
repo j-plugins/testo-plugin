@@ -12,6 +12,7 @@
 - A *Mutations* tab can be pinned: it cannot be closed, and the next mutation run of the same tests opens a tab of its own.
 - *Rerun Mutant* (tree context menu) and *Rerun Escaped Mutants* (Mutations toolbar) run each mutant alone again and update it in its tab, showing the change (`Escaped → Killed`); the reruns are kept with the run. A file edited since its mutation run is marked "changed since the run" in the tree: its mutants may no longer match the code.
 - A mutant's diff numbers its lines as the file does; the mutation report opens from a split button (WebView, browser, copy path) and loses Infection's "Back" link, which led to the drive root.
+- The *Mutations* tree groups by file, mutator or status (remembered across sessions) and filters by mutator; `--static-analysis-tool` joins the *Mutation Testing* options; the Coverage view gains an MSI column per file and directory, from the selected *Mutations* tab or the latest mutation run.
 - Mutation runs are kept in the run history beside the run they mutate, the last five of each: the group's history button lists them and opens one in its tab, a replayed run shows its MSI, and an exported run carries them along.
 
 ### Changed

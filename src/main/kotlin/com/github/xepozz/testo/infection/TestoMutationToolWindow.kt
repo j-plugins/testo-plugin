@@ -87,6 +87,10 @@ internal object TestoMutationToolWindow {
     private fun contentOf(window: ToolWindow, workDir: Path): Content? =
         window.contentManager.contents.firstOrNull { it.getUserData(RUN_KEY)?.workDir == workDir }
 
+    /** The run on the selected tab, if the window has one. */
+    fun selectedRun(project: Project): TestoMutationRun? =
+        ToolWindowManager.getInstance(project).getToolWindow(ID)?.contentManager?.selectedContent?.getUserData(RUN_KEY)
+
     fun contentOf(project: Project, panel: TestoMutationPanel): Content? =
         ToolWindowManager.getInstance(project).getToolWindow(ID)?.contentManager?.contents?.firstOrNull { it.component === panel }
 

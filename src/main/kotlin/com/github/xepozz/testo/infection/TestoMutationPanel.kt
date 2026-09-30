@@ -9,11 +9,13 @@ import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.diff.util.DiffUserDataKeysEx
 import com.intellij.ide.CommonActionsManager
 import com.intellij.ide.DefaultTreeExpander
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.ide.projectView.PresentationData
 import com.intellij.ide.util.treeView.AbstractTreeStructure
 import com.intellij.ide.util.treeView.NodeDescriptor
 import com.intellij.ide.util.treeView.NodeRenderer
 import com.intellij.ide.util.treeView.PresentableNodeDescriptor
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
@@ -72,6 +74,22 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
 
     /** Show only the mutants the tests let through. */
     var escapedOnly = false
+        set(value) {
+            field = value
+            structureModel.invalidateAsync()
+        }
+
+    /** What the tree groups mutants under; kept for the next tab and the next session. */
+    var grouping: TestoMutationGrouping = TestoMutationGrouping.stored()
+        set(value) {
+            field = value
+            TestoMutationGrouping.store(value)
+            expanded = 0
+            structureModel.invalidateAsync().thenRun { UIUtil.invokeLaterIfNeeded(::expandWhileSmall) }
+        }
+
+    /** Mutators, by short name, whose mutants the tree leaves out. */
+    var hiddenMutators: Set<String> = emptySet()
         set(value) {
             field = value
             structureModel.invalidateAsync()
@@ -263,6 +281,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         val key = when (element) {
             is Mutant -> "m|${element.nodeId}|${element.file.path in changed}|${element.status}|${element.previousStatus}|${element.rerunning}|${original != null}|${element.firstLine}|${element.output != null}"
             is MutatedFile -> "f|${element.nodeId}|${element.path in changed}|${element.mutants.count { it.finished }}"
+            is MutantGroup -> "g|${element.grouping}|${element.key}|${mutantsOf(element).count { it.finished }}"
             else -> run.log()
         }
         if (key == shown) return
@@ -289,6 +308,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         text.text = when (element) {
             is Mutant -> describe(element)
             is MutatedFile -> describe(element)
+            is MutantGroup -> describe(element)
             else -> run.log()
         }
         text.caretPosition = 0
@@ -327,6 +347,18 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
             .forEach { (status, count) -> appendLine("${status.label}: $count") }
     }
 
+    private fun describe(group: MutantGroup): String = buildString {
+        val title = when (group.grouping) {
+            TestoMutationGrouping.STATUS -> MutantStatus.entries.firstOrNull { it.name == group.key }?.label
+                ?: TestoBundle.message("infection.status.running")
+            else -> group.key
+        }
+        appendLine(title)
+        mutantsOf(group).mapNotNull { it.status }.groupingBy { it }.eachCount().entries
+            .sortedBy { it.key.ordinal }
+            .forEach { (status, count) -> appendLine("${status.label}: $count") }
+    }
+
     private fun localFile(file: MutatedFile) = run.localPath(file.path)?.let(LocalFileSystem.getInstance()::findFileByPath)
 
     /** 0-based line and column of the mutated code; Infection's offsets count bytes, so they are resolved on bytes. */
@@ -360,28 +392,42 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
 
     private object Root
 
+    /** The mutants the toggles let through: escaped only, and not of a mutator filtered out. */
+    private fun shown(mutant: Mutant) = (!escapedOnly || escapedOrWas(mutant)) && mutant.mutator !in hiddenMutators
+
+    // A mutant rerun from this view stays in it, so its way from escaped to killed can be seen.
+    private fun escapedOrWas(mutant: Mutant) =
+        mutant.status == MutantStatus.ESCAPED || mutant.previousStatus == MutantStatus.ESCAPED || mutant.rerunning
+
+    private fun groupOf(mutant: Mutant): Any = when (grouping) {
+        TestoMutationGrouping.FILE -> mutant.file
+        TestoMutationGrouping.MUTATOR -> MutantGroup(grouping, mutant.mutator)
+        TestoMutationGrouping.STATUS -> MutantGroup(grouping, mutant.status?.name.orEmpty())
+    }
+
+    private fun mutantsOf(group: MutantGroup): List<Mutant> = run.mutants.filter { shown(it) && groupOf(it) == group }
+
     private inner class Structure : AbstractTreeStructure() {
         override fun getRootElement(): Any = Root
 
         override fun getChildElements(element: Any): Array<Any> = when (element) {
-            Root -> run.files
-                .filter { file -> !escapedOnly || file.mutants.any(::escapedOrWas) }
-                .sortedBy { it.name }
-                .toTypedArray()
-            is MutatedFile -> element.mutants
-                .filter { !escapedOnly || escapedOrWas(it) }
-                .sortedBy { it.start ?: Int.MAX_VALUE }
+            Root -> when (grouping) {
+                TestoMutationGrouping.FILE -> run.files.filter { file -> file.mutants.any(::shown) }.sortedBy { it.name }
+                TestoMutationGrouping.MUTATOR -> run.mutants.filter(::shown).map(::groupOf).distinct()
+                    .sortedBy { (it as MutantGroup).key }
+                TestoMutationGrouping.STATUS -> run.mutants.filter(::shown).map(::groupOf).distinct()
+                    .sortedBy { group -> MutantStatus.entries.indexOfFirst { it.name == (group as MutantGroup).key } }
+            }.toTypedArray()
+            is MutatedFile -> element.mutants.filter(::shown).sortedBy { it.start ?: Int.MAX_VALUE }.toTypedArray()
+            is MutantGroup -> mutantsOf(element)
+                .sortedWith(compareBy<Mutant> { it.file.name }.thenBy { it.start ?: Int.MAX_VALUE })
                 .toTypedArray()
             else -> emptyArray()
         }
 
-        // A mutant rerun from this view stays in it, so its way from escaped to killed can be seen.
-        private fun escapedOrWas(mutant: Mutant) =
-            mutant.status == MutantStatus.ESCAPED || mutant.previousStatus == MutantStatus.ESCAPED || mutant.rerunning
-
         override fun getParentElement(element: Any): Any? = when (element) {
-            is Mutant -> element.file
-            is MutatedFile -> Root
+            is Mutant -> groupOf(element)
+            is MutatedFile, is MutantGroup -> Root
             else -> null
         }
 
@@ -419,6 +465,28 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
                         presentation.tooltip = TestoBundle.message("infection.file.changed")
                     }
                 }
+                is MutantGroup -> {
+                    val status = MutantStatus.entries.firstOrNull { it.name == value.key }
+                    when (value.grouping) {
+                        TestoMutationGrouping.STATUS -> {
+                            presentation.setIcon(status?.icon ?: MutantStatus.RUNNING_ICON)
+                            presentation.addText(
+                                status?.label ?: TestoBundle.message("infection.status.running"),
+                                SimpleTextAttributes.REGULAR_ATTRIBUTES,
+                            )
+                        }
+                        else -> {
+                            presentation.setIcon(AllIcons.Nodes.Function)
+                            presentation.addText(value.key, SimpleTextAttributes.REGULAR_ATTRIBUTES)
+                        }
+                    }
+                    val mutants = mutantsOf(value)
+                    val escaped = mutants.count { it.status == MutantStatus.ESCAPED }
+                    if (escaped > 0 && value.grouping != TestoMutationGrouping.STATUS) {
+                        presentation.addText("  " + TestoBundle.message("infection.node.escaped", escaped.toString()), ESCAPED)
+                    }
+                    presentation.addText("  ${mutants.size}", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                }
                 is Mutant -> {
                     val status = value.status
                     presentation.setIcon(
@@ -428,7 +496,13 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
                             else -> MutantStatus.UNFINISHED_ICON
                         }
                     )
-                    presentation.addText(value.mutator, SimpleTextAttributes.REGULAR_ATTRIBUTES)
+                    // Under a file the mutator names the row; under a mutator or a status the file has to.
+                    val title = when (grouping) {
+                        TestoMutationGrouping.FILE -> value.mutator
+                        TestoMutationGrouping.MUTATOR -> value.file.name
+                        TestoMutationGrouping.STATUS -> "${value.mutator} · ${value.file.name}"
+                    }
+                    presentation.addText(title, SimpleTextAttributes.REGULAR_ATTRIBUTES)
                     position(value)?.let {
                         presentation.addText("  " + TestoBundle.message("infection.node.line", (it.first + 1).toString()), SimpleTextAttributes.GRAYED_ATTRIBUTES)
                     }
@@ -442,6 +516,9 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
                         )
                     }
                     label?.let { presentation.addText("  $it", SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES) }
+                    if (grouping != TestoMutationGrouping.FILE && value.file.path in changed) {
+                        presentation.addText("  " + TestoBundle.message("infection.node.changed"), CHANGED)
+                    }
                     presentation.tooltip = value.mutatorClass
                 }
             }
@@ -485,3 +562,24 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         )
     }
 }
+
+/** What the *Mutations* tree groups mutants under. */
+enum class TestoMutationGrouping(private val labelKey: String) {
+    FILE("infection.grouping.file"),
+    MUTATOR("infection.grouping.mutator"),
+    STATUS("infection.grouping.status");
+
+    val label: String get() = TestoBundle.message(labelKey)
+
+    companion object {
+        private const val KEY = "testo.mutations.grouping"
+
+        fun stored(): TestoMutationGrouping =
+            PropertiesComponent.getInstance().getValue(KEY)?.let { name -> entries.firstOrNull { it.name == name } } ?: FILE
+
+        fun store(grouping: TestoMutationGrouping) = PropertiesComponent.getInstance().setValue(KEY, grouping.name, FILE.name)
+    }
+}
+
+/** The mutants of one mutator, or of one status (its name; empty while still running), under the tree's root. */
+internal data class MutantGroup(val grouping: TestoMutationGrouping, val key: String)

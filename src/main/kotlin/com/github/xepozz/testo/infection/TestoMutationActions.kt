@@ -4,12 +4,16 @@ import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
 import com.intellij.ide.BrowserUtil
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.KeepPopupOnPerform
+import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.SplitButtonAction
 import com.intellij.openapi.ide.CopyPasteManager
+import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.DumbAwareToggleAction
 import java.awt.datatransfer.StringSelection
@@ -183,5 +187,88 @@ class TestoMutationPinAction : DumbAwareToggleAction() {
     override fun update(e: AnActionEvent) {
         super.update(e)
         e.presentation.isEnabled = content(e) != null
+    }
+}
+
+/** Group By: under their file, their mutator or their status. */
+class TestoMutationGroupByGroup : ActionGroup(), DumbAware {
+    init {
+        templatePresentation.icon = AllIcons.Actions.GroupBy
+        templatePresentation.isPopupGroup = true
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+    override fun update(e: AnActionEvent) {
+        e.presentation.isEnabled = e.getData(TestoMutationPanel.PANEL) != null
+    }
+
+    override fun getChildren(e: AnActionEvent?): Array<AnAction> =
+        TestoMutationGrouping.entries.map { grouping -> GroupingToggle(grouping) }.toTypedArray()
+
+    private class GroupingToggle(private val grouping: TestoMutationGrouping) : DumbAwareToggleAction(grouping.label) {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun isSelected(e: AnActionEvent): Boolean = e.getData(TestoMutationPanel.PANEL)?.grouping == grouping
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            if (state) e.getData(TestoMutationPanel.PANEL)?.grouping = grouping
+        }
+    }
+}
+
+/** Which mutators' mutants the tree shows: one toggle per mutator the run has, the popup staying open between them. */
+class TestoMutationMutatorFilterGroup : ActionGroup(), DumbAware {
+    init {
+        templatePresentation.icon = AllIcons.General.Filter
+        templatePresentation.isPopupGroup = true
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+    override fun update(e: AnActionEvent) {
+        e.presentation.isEnabled = e.getData(TestoMutationPanel.PANEL)?.run?.mutants?.isNotEmpty() == true
+    }
+
+    override fun getChildren(e: AnActionEvent?): Array<AnAction> {
+        val panel = e?.getData(TestoMutationPanel.PANEL) ?: return emptyArray()
+        val mutators = panel.run.mutants.map { it.mutator }.distinct().sorted()
+        return buildList {
+            add(ShowAll())
+            add(Separator.getInstance())
+            mutators.forEach { add(MutatorToggle(it)) }
+        }.toTypedArray()
+    }
+
+    private class MutatorToggle(private val mutator: String) : DumbAwareToggleAction(mutator) {
+        init {
+            templatePresentation.keepPopupOnPerform = KeepPopupOnPerform.Always
+        }
+
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun isSelected(e: AnActionEvent): Boolean =
+            e.getData(TestoMutationPanel.PANEL)?.hiddenMutators?.contains(mutator) == false
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            val panel = e.getData(TestoMutationPanel.PANEL) ?: return
+            panel.hiddenMutators = if (state) panel.hiddenMutators - mutator else panel.hiddenMutators + mutator
+        }
+    }
+
+    private class ShowAll : DumbAwareAction(TestoBundle.message("infection.filter.all")) {
+        init {
+            templatePresentation.keepPopupOnPerform = KeepPopupOnPerform.Always
+        }
+
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = e.getData(TestoMutationPanel.PANEL)?.hiddenMutators?.isNotEmpty() == true
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            e.getData(TestoMutationPanel.PANEL)?.hiddenMutators = emptySet()
+        }
     }
 }

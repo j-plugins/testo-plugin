@@ -84,6 +84,9 @@ class TestoTestRunConfigurationEditor(
     private val infectionWithUncoveredBox = JBCheckBox("--with-uncovered")
     private val infectionTimeoutsBox = JBCheckBox("--with-timeouts")
     private val infectionMutatorsField = JBTextField()
+    private val infectionStaticAnalysisField = ComboBox(TestoRunnerSettings.INFECTION_STATIC_ANALYSIS_TOOLS.toTypedArray()).apply {
+        isEditable = true
+    }
     private val infectionOptionsField = JBTextField()
 
     private val parallelInjected = injectParallelRow()
@@ -227,6 +230,14 @@ class TestoTestRunConfigurationEditor(
                 .rowComment("--mutators, e.g. @default,-MethodCallRemoval; empty leaves it to infection.json5")
 
             row {
+                label("Static analysis")
+                    .gap(RightGap.COLUMNS)
+                cell(infectionStaticAnalysisField)
+            }
+                .layout(RowLayout.PARENT_GRID)
+                .rowComment("--static-analysis-tool: a mutant the tool rejects counts as killed; empty leaves it off")
+
+            row {
                 label("Additional options")
                     .gap(RightGap.COLUMNS)
                 cell(infectionOptionsField)
@@ -249,6 +260,7 @@ class TestoTestRunConfigurationEditor(
         coverageOptionsField.document.addDocumentListener(documentAdapter)
         infectionGitDiffBaseField.document.addDocumentListener(documentAdapter)
         infectionMutatorsField.document.addDocumentListener(documentAdapter)
+        infectionStaticAnalysisField.addActionListener { listener() }
         infectionOptionsField.document.addDocumentListener(documentAdapter)
         infectionScopeField.addActionListener { listener() }
         infectionThreadsField.addActionListener { listener() }
@@ -288,6 +300,7 @@ class TestoTestRunConfigurationEditor(
                 || infectionWithUncoveredBox.isSelected != runner.infectionWithUncovered
                 || infectionTimeoutsBox.isSelected != runner.infectionTimeoutsAsEscaped
                 || infectionMutatorsField.text != runner.infectionMutators
+                || infectionStaticAnalysis() != runner.infectionStaticAnalysisTool
                 || infectionOptionsField.text != runner.infectionOptions
                 || parentEditor.isSpecificallyModified
     }
@@ -313,6 +326,7 @@ class TestoTestRunConfigurationEditor(
         infectionWithUncoveredBox.isSelected = runnerSettings.infectionWithUncovered
         infectionTimeoutsBox.isSelected = runnerSettings.infectionTimeoutsAsEscaped
         infectionMutatorsField.text = runnerSettings.infectionMutators
+        infectionStaticAnalysisField.selectedItem = runnerSettings.infectionStaticAnalysisTool
         infectionOptionsField.text = runnerSettings.infectionOptions
 
         parentEditor.javaClass.declaredMethods.find { it.name == "resetEditorFrom" && it.parameterCount == 1 }?.let {
@@ -355,11 +369,15 @@ class TestoTestRunConfigurationEditor(
         runnerSettings.infectionWithUncovered = infectionWithUncoveredBox.isSelected
         runnerSettings.infectionTimeoutsAsEscaped = infectionTimeoutsBox.isSelected
         runnerSettings.infectionMutators = infectionMutatorsField.text
+        runnerSettings.infectionStaticAnalysisTool = infectionStaticAnalysis()
         runnerSettings.infectionOptions = infectionOptionsField.text
     }
 
     // Editable: any count Infection takes, not only the offered ones.
     private fun infectionThreads(): String = (infectionThreadsField.editor.item ?: infectionThreadsField.selectedItem)?.toString()?.trim().orEmpty()
+
+    private fun infectionStaticAnalysis(): String =
+        (infectionStaticAnalysisField.editor.item ?: infectionStaticAnalysisField.selectedItem)?.toString()?.trim().orEmpty()
 
     /**
      * Puts Parallel into the PHP editor's own *Test Runner options* row, where the rest of the runner's flags are.

@@ -60,6 +60,7 @@ class TestoRunnerSettingsSerializationTest : TestCase() {
             infectionThreads = "4",
             infectionWithUncovered = true,
             infectionOptions = "--debug",
+            infectionStaticAnalysisTool = "phpstan",
         )
         val restored = deserialize(serialize(settings))
 
@@ -67,6 +68,8 @@ class TestoRunnerSettingsSerializationTest : TestCase() {
         assertEquals("4", restored.infectionThreads)
         assertTrue(restored.infectionWithUncovered)
         assertEquals("--debug", restored.infectionOptions)
+        assertEquals("phpstan", restored.infectionStaticAnalysisTool)
+        assertEquals("phpstan", TestoRunnerSettings.fromPhpTestRunnerSettings(settings).infectionStaticAnalysisTool)
         assertEquals("4", TestoRunnerSettings.fromPhpTestRunnerSettings(settings).infectionThreads)
     }
 

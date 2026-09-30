@@ -12,6 +12,7 @@ internal data class TestoInfectionOptions(
     val withUncovered: Boolean = false,
     val timeoutsAsEscaped: Boolean = false,
     val mutators: String = "",
+    val staticAnalysisTool: String = "",
     val extra: String = "",
     /** Infection's `--id`: this one mutant alone. It takes a single ID, so a rerun of several is one process each. */
     val mutantId: String? = null,
@@ -27,6 +28,7 @@ internal data class TestoInfectionOptions(
             withUncovered = settings.infectionWithUncovered,
             timeoutsAsEscaped = settings.infectionTimeoutsAsEscaped,
             mutators = settings.infectionMutators,
+            staticAnalysisTool = settings.infectionStaticAnalysisTool,
             extra = settings.infectionOptions,
         )
     }
@@ -69,6 +71,7 @@ internal object TestoInfectionArguments {
         if (options.withUncovered) add("--with-uncovered")
         if (options.timeoutsAsEscaped) add("--with-timeouts")
         options.mutators.trim().takeIf { it.isNotEmpty() }?.let { add("--mutators=$it") }
+        options.staticAnalysisTool.trim().takeIf { it.isNotEmpty() }?.let { add("--static-analysis-tool=$it") }
         htmlReport?.let { add("--logger-html=$it") }
         textLog?.let {
             add("--logger-text=$it")

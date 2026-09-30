@@ -100,6 +100,19 @@ class TestoMutationArchiveTest {
     }
 
     @Test
+    fun `a file and the directories above it are scored by their mutants`() {
+        val testoRun = temp.newFolder("run").toPath()
+        val run = TestoMutationArchive.load(testoRun, record(testoRun, 1000))!!
+        val local = "D:/local${run.files.single().path}"
+
+        assertEquals(run.score().msi, run.scoreUnder(local, directory = false)?.msi)
+        assertEquals(run.score().msi, run.scoreUnder(local.substringBeforeLast('/'), directory = true)?.msi)
+        assertEquals(19, run.scoreUnder("D:/local", directory = true)?.counts?.values?.sum())
+        assertEquals(null, run.scoreUnder("D:/elsewhere", directory = true))
+        assertEquals(null, run.scoreUnder(local.dropLast(1), directory = false))
+    }
+
+    @Test
     fun `the history lists a run off its summary alone`() {
         val testoRun = temp.newFolder("run").toPath()
         val dir = record(testoRun, 1000)
