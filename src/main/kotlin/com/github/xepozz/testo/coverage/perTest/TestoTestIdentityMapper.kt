@@ -2,7 +2,11 @@ package com.github.xepozz.testo.coverage.perTest
 
 import com.github.xepozz.testo.coverage.format.TestId
 import com.github.xepozz.testo.tests.TestoTestRunLineMarkerProvider
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.project.Project
+import com.intellij.pom.Navigatable
+import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.psi.PsiElement
 import com.jetbrains.php.PhpIndex
 import com.jetbrains.php.lang.psi.elements.Method
@@ -24,6 +28,17 @@ interface TestoTestIdentityMapper {
     companion object {
         fun getInstance(): TestoTestIdentityMapper = DefaultTestIdentityMapper
     }
+}
+
+/** Opens [id]'s method. The class is looked up in the index, which the EDT may not read: off it, then back to navigate. */
+fun navigateToTest(project: Project, id: TestId) {
+    ReadAction.nonBlocking<Navigatable?> {
+        (TestoTestIdentityMapper.getInstance().resolve(id, project) as? Navigatable)?.takeIf { it.canNavigate() }
+    }
+        .inSmartMode(project)
+        .expireWith(project)
+        .finishOnUiThread(ModalityState.defaultModalityState()) { it?.navigate(true) }
+        .submit(AppExecutorUtil.getAppExecutorService())
 }
 
 internal object DefaultTestIdentityMapper : TestoTestIdentityMapper {
