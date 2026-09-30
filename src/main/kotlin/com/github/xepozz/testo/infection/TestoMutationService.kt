@@ -2,6 +2,7 @@ package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.php.PhpToolLauncher
+import com.github.xepozz.testo.runs.TestoRunManifest
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.process.ProcessEvent
@@ -24,6 +25,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.NioFiles
+import com.intellij.util.text.DateFormatUtil
 import com.jetbrains.php.run.PhpRunConfiguration
 import java.nio.file.Files
 import java.nio.file.Path
@@ -60,6 +62,45 @@ class TestoMutationService(private val project: Project) {
             }
         }
         return null
+    }
+
+    /** The mutation runs of the Testo run archived at [sourceRunDir], newest first. Reads the archive: not on the EDT. */
+    internal fun history(sourceRunDir: Path): List<TestoMutationHistoryEntry> {
+        val live = runs[sourceRunDir]
+        val archived = TestoMutationArchive.runs(sourceRunDir)
+            .filter { it != live?.workDir }
+            .mapNotNull { dir -> TestoMutationArchive.summary(dir)?.let { TestoMutationHistoryEntry.of(dir, it) } }
+        return (archived + listOfNotNull(live?.let(TestoMutationHistoryEntry::of))).sortedByDescending { it.startedAt }
+    }
+
+    /** Brings up the mutation run archived in [dir]: its tab when one is open, else a new tab read from the archive. */
+    internal fun open(sourceRunDir: Path, dir: Path, restart: (() -> Unit)?) {
+        if (TestoMutationToolWindow.select(project, dir)) return
+        runs[sourceRunDir]?.takeIf { it.workDir == dir }?.let { return TestoMutationToolWindow.show(project, it) }
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val run = TestoMutationArchive.load(sourceRunDir, dir) ?: return@executeOnPooledThread
+            run.restart = restart
+            ApplicationManager.getApplication().invokeLater({
+                TestoMutationToolWindow.show(project, run, "${run.title} · ${DateFormatUtil.formatTimeWithSeconds(run.startedAt)}")
+            }, project.disposed)
+        }
+    }
+
+    /** Mutates the run just archived at [runDir] when its tests passed, else says why it does not. */
+    internal fun startAfterRun(
+        configuration: TestoRunConfiguration,
+        runDir: Path,
+        manifest: TestoRunManifest,
+        optionsFrom: TestoRunConfiguration,
+    ) {
+        when (val readiness = TestoInfectionReports.readiness(runDir, manifest)) {
+            is TestoMutationReadiness.Ready -> ApplicationManager.getApplication().invokeLater({
+                start(configuration, runDir, readiness, optionsFrom)
+            }, project.disposed)
+            is TestoMutationReadiness.Missing -> if (!manifest.cancelled) {
+                notify(TestoBundle.message("infection.finished", configuration.name), readiness.hint, NotificationType.INFORMATION)
+            }
+        }
     }
 
     /** Runs Infection over [ready], the reports of [configuration]'s run archived at [runDir]. Call on the EDT. */
@@ -187,6 +228,12 @@ class TestoMutationService(private val project: Project) {
     }
 
     private fun notifyFailed(run: TestoMutationRun, message: String) = notify(run, message, NotificationType.ERROR)
+
+    private fun notify(title: String, content: String, type: NotificationType) {
+        ApplicationManager.getApplication().invokeLater({
+            NotificationGroupManager.getInstance().getNotificationGroup("Testo").createNotification(title, content, type).notify(project)
+        }, project.disposed)
+    }
 
     private fun notify(run: TestoMutationRun, content: String, type: NotificationType) {
         ApplicationManager.getApplication().invokeLater {

@@ -33,6 +33,9 @@ internal object TestoMutationArchive {
         val expected: Int = 0,
         /** Interpreter path → host path of every mutated file, as the interpreter's mappings resolved it then. */
         val localPaths: Map<String, String> = emptyMap(),
+        val msi: Int? = null,
+        val escaped: Int = 0,
+        val mutants: Int = 0,
     )
 
     fun newRunDir(testoRunDir: Path, startedAt: Long): Path = testoRunDir.resolve(DIR).resolve(startedAt.toString())
@@ -68,6 +71,7 @@ internal object TestoMutationArchive {
         }
 
         fun summary(run: TestoMutationRun) {
+            val score = run.score()
             val summary = Summary(
                 title = run.title,
                 startedAt = run.startedAt,
@@ -76,6 +80,9 @@ internal object TestoMutationArchive {
                 stopped = run.stopRequested,
                 expected = run.expected,
                 localPaths = run.files.mapNotNull { file -> run.localPath(file.path)?.let { file.path to it } }.toMap(),
+                msi = score.msi,
+                escaped = score.escaped,
+                mutants = run.mutants.size,
             )
             Files.writeString(dir.resolve(SUMMARY_FILE), gson.toJson(summary), StandardCharsets.UTF_8)
         }
@@ -84,11 +91,13 @@ internal object TestoMutationArchive {
         override fun close() = writer.close()
     }
 
+    fun summary(dir: Path): Summary? = runCatching {
+        gson.fromJson(Files.readString(dir.resolve(SUMMARY_FILE)), Summary::class.java)
+    }.getOrNull()
+
     /** A finished run back from [dir], or null when it is not one. */
     fun load(testoRunDir: Path, dir: Path): TestoMutationRun? {
-        val summary = runCatching {
-            gson.fromJson(Files.readString(dir.resolve(SUMMARY_FILE)), Summary::class.java)
-        }.getOrNull() ?: return null
+        val summary = summary(dir) ?: return null
         val run = TestoMutationRun(summary.title, testoRunDir, dir) { path ->
             summary.localPaths[path] ?: path.takeIf { Files.exists(Path.of(it)) }
         }

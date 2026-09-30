@@ -13,6 +13,7 @@ import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
 import java.nio.file.Files
+import java.nio.file.Path
 
 /**
  * The *Mutations* tool window, one tab per mutated Testo run. Made available on first use, so a project that never
@@ -27,11 +28,11 @@ internal object TestoMutationToolWindow {
      * Shows [run] without focusing. A rerun of the same Testo run takes over the tab its last run had, unless that tab
      * is pinned: a pinned tab keeps its run and cannot be closed until unpinned.
      */
-    fun add(project: Project, run: TestoMutationRun): Content {
+    fun add(project: Project, run: TestoMutationRun, title: String? = null): Content {
         val window = window(project)
         val manager = window.contentManager
         val panel = TestoMutationPanel(project, run)
-        val content = ContentFactory.getInstance().createContent(panel, title(manager.contents, run), false).apply {
+        val content = ContentFactory.getInstance().createContent(panel, title ?: title(manager.contents, run), false).apply {
             putUserData(RUN_KEY, run)
             isCloseable = true
             isPinnable = true
@@ -45,7 +46,11 @@ internal object TestoMutationToolWindow {
             }
             preferredFocusableComponent = panel.preferredFocus
         }
-        val previous = manager.contents.firstOrNull { !it.isPinned && it.getUserData(RUN_KEY)?.sourceRunDir == run.sourceRunDir }
+        // Never one still running: closing its tab would stop it.
+        val previous = manager.contents.firstOrNull { content ->
+            val shown = content.getUserData(RUN_KEY)
+            !content.isPinned && shown?.sourceRunDir == run.sourceRunDir && !shown.isRunning
+        }
         if (previous != null) {
             val index = manager.getIndexOfContent(previous)
             manager.addContent(content, index)
@@ -63,12 +68,24 @@ internal object TestoMutationToolWindow {
         return if (pinned == 0) run.title else "${run.title} (${pinned + 1})"
     }
 
-    fun show(project: Project, run: TestoMutationRun) {
+    fun show(project: Project, run: TestoMutationRun, title: String? = null) {
         val window = window(project)
-        val content = window.contentManager.contents.firstOrNull { it.getUserData(RUN_KEY) === run } ?: add(project, run)
+        val content = contentOf(window, run.workDir) ?: add(project, run, title)
         window.contentManager.setSelectedContent(content, true)
         window.activate(null)
     }
+
+    /** Brings up the tab of the mutation run archived in [workDir], if one is open. */
+    fun select(project: Project, workDir: Path): Boolean {
+        val window = ToolWindowManager.getInstance(project).getToolWindow(ID) ?: return false
+        val content = contentOf(window, workDir) ?: return false
+        window.contentManager.setSelectedContent(content, true)
+        window.activate(null)
+        return true
+    }
+
+    private fun contentOf(window: ToolWindow, workDir: Path): Content? =
+        window.contentManager.contents.firstOrNull { it.getUserData(RUN_KEY)?.workDir == workDir }
 
     fun contentOf(project: Project, panel: TestoMutationPanel): Content? =
         ToolWindowManager.getInstance(project).getToolWindow(ID)?.contentManager?.contents?.firstOrNull { it.component === panel }

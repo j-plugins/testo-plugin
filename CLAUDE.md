@@ -123,10 +123,11 @@ src/main/kotlin/com/github/xepozz/testo/
 │   └── TestoDataProviderUtils.kt   # isDataProvider / findDataProviderUsages / usage index
 │
 ├── infection/                      # mutation testing: Infection over an archived run's coverage-xml + JUnit
-│   ├── TestoMutationCell.kt        # the reports row's last cell: button + options dropdown + progress (TestoReportsRowCell)
+│   ├── TestoMutationCell.kt        # the reports row's last cell: label, button, options, history, progress (TestoReportsRowCell)
 │   ├── TestoInfectionCommand.kt    # the launch (TestoRunConfiguration.infectionLaunch) and its command
 │   ├── TestoInfectionReports.kt    # readiness off run.json, covered sources, the --coverage directory
 │   ├── TestoInfectionArguments.kt  # CLI flags; where the infection binary is looked for
+│   ├── TestoMutationExecutor.kt    # Run with Mutation: the executor + a Coverage runner that mutates once the run is archived
 │   ├── TestoMutationService.kt     # starts Infection as a background task, no Run tab; runs by source run dir
 │   ├── TestoMutationStream.kt      # `--teamcity` output → TestoMutationModel (files, mutants, statuses, MSI)
 │   ├── TestoMutationTextLog.kt     # `--logger-text` report: every mutant's diff and test output, read at the end
@@ -258,7 +259,8 @@ src/test/testData/mixin, rename # PHP fixtures for PSI-backed tests
 (`TestoComposerConfig`).
 
 `META-INF/coverage.xml` (optional, `com.intellij.modules.coverage`) adds `coverageEngine`, `coverageRunner`, the
-coverage `programRunner`, the annotator service and the *Run covering tests* `codeInsight.lineMarkerProvider`.
+coverage `programRunner`, the *Run with Mutation* `executor` and its runner, the annotator service and the *Run covering
+tests* `codeInsight.lineMarkerProvider`.
 
 `projectListeners`: `TestoConsoleAugmenter` on `ExecutionListener` — the only hook where the PHP-built test console
 can be reached to install the channel tabs.

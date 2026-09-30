@@ -55,6 +55,20 @@ class TestoMutationArchiveTest {
     }
 
     @Test
+    fun `the history lists a run off its summary alone`() {
+        val testoRun = temp.newFolder("run").toPath()
+        val dir = record(testoRun, 1000)
+
+        val entry = TestoMutationHistoryEntry.of(dir, TestoMutationArchive.summary(dir)!!)
+
+        assertEquals(1000, entry.startedAt)
+        assertEquals(19, entry.mutants)
+        assertEquals(1, entry.escaped)
+        assertEquals(TestoMutationArchive.load(testoRun, dir)!!.score().msi, entry.msi)
+        assertFalse(entry.running)
+    }
+
+    @Test
     fun `pruning keeps the newest runs and a directory without a summary is not a run`() {
         val testoRun = temp.newFolder("run").toPath()
         listOf(1L, 2L, 3L).forEach { record(testoRun, it) }

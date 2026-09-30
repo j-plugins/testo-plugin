@@ -6,10 +6,11 @@
 
 ### Added
 
-- Mutation testing: an *Infection* button after *Coverage* runs Infection over the run's own coverage-xml and JUnit reports, without re-running the tests. Its progress shows beside it; the mutants go to a *Mutations* tool window, each with its diff and the test output it caused.
+- Mutation testing: a *Mutation* group after *Coverage* — an Infection button that runs Infection over the run's own coverage-xml and JUnit reports without re-running the tests, then the latest mutation run's progress and elapsed time. The mutants go to a *Mutations* tool window, each with its diff and the test output it caused.
 - Infection options — what to mutate, threads, flags, mutators — in the button's dropdown and in the run configuration's new *Mutation Testing* section.
+- *Run with Mutation*: a Coverage run with the coverage-xml and JUnit reports forced on that starts mutation testing as soon as its tests pass.
 - A *Mutations* tab can be pinned: it cannot be closed, and the next mutation run of the same tests opens a tab of its own.
-- Mutation runs are kept in the run history beside the run they mutate, the last five of each: a replayed run shows its MSI and opens its mutants again, and an exported run carries them along.
+- Mutation runs are kept in the run history beside the run they mutate, the last five of each: the group's history button lists them and opens one in its tab, a replayed run shows its MSI, and an exported run carries them along.
 
 ### Changed
 

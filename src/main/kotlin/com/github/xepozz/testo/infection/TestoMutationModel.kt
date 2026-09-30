@@ -211,3 +211,42 @@ internal fun parseInfectionLocation(hint: String): InfectionLocation? {
         else -> null
     }
 }
+
+/** A mutation run as the history lists it: live off the run, or off an archived run's summary. */
+internal data class TestoMutationHistoryEntry(
+    val dir: Path,
+    val startedAt: Long,
+    val elapsedMs: Long,
+    val msi: Int?,
+    val escaped: Int,
+    val mutants: Int,
+    val finished: Int,
+    val running: Boolean,
+    val stopped: Boolean,
+    val exitCode: Int?,
+) {
+    val verdict: Icon? get() = mutationVerdict(running, stopped, escaped, exitCode, mutants)
+
+    companion object {
+        fun of(run: TestoMutationRun): TestoMutationHistoryEntry {
+            val score = run.score()
+            return TestoMutationHistoryEntry(
+                run.workDir, run.startedAt, run.elapsedMs(), score.msi, score.escaped, maxOf(run.expected, run.mutants.size),
+                run.finishedCount(), run.isRunning, run.stopRequested, run.exitCode,
+            )
+        }
+
+        fun of(dir: Path, summary: TestoMutationArchive.Summary) = TestoMutationHistoryEntry(
+            dir, summary.startedAt, summary.finishedAt - summary.startedAt, summary.msi, summary.escaped, summary.mutants,
+            summary.mutants, false, summary.stopped, summary.exitCode,
+        )
+    }
+}
+
+/** The icon a run is judged by, or null while it runs. */
+internal fun mutationVerdict(running: Boolean, stopped: Boolean, escaped: Int, exitCode: Int?, mutants: Int): Icon? = when {
+    running -> null
+    stopped -> TestoIcons.Status.FAILURE_CANCELLED
+    escaped > 0 || (exitCode != 0 && mutants == 0) -> TestoIcons.Status.FAILURE
+    else -> TestoIcons.Status.SUCCESS
+}

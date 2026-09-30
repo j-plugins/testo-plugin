@@ -94,6 +94,10 @@ class TestoConsoleProperties(
     @Volatile
     internal var reportTargets: List<TestoReportTarget> = emptyList()
 
+    /** Called on a pooled thread once this run's archive is complete; the Mutation executor mutates from there. */
+    @Volatile
+    internal var afterArchive: ((runDir: java.nio.file.Path, manifest: com.github.xepozz.testo.runs.TestoRunManifest) -> Unit)? = null
+
     /** An announced report path as a local one; the PHP plugin's mapper may throw over a path it does not know. */
     fun reportLocalPath(path: String): String? =
         TestoReportTarget.localPathOf(path, reportTargets) ?: pathMapper.getLocalPath(path)

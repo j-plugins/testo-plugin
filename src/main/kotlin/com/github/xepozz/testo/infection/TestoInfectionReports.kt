@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.infection
 
+import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.coverage.format.childElements
 import com.github.xepozz.testo.coverage.format.descendants
@@ -61,3 +62,11 @@ internal object TestoInfectionReports {
         Files.copy(ready.junit, target.resolve("junit.xml"))
     }
 }
+
+/** What the user has to do to get a run mutation testing can start from. */
+internal val TestoMutationReadiness.Missing.hint: String
+    get() = when (this) {
+        TestoMutationReadiness.Missing.NOT_FINISHED -> TestoBundle.message("infection.missing.notFinished")
+        TestoMutationReadiness.Missing.NOT_PASSED -> TestoBundle.message("infection.missing.notPassed")
+        TestoMutationReadiness.Missing.NO_COVERAGE_XML, TestoMutationReadiness.Missing.NO_JUNIT -> TestoBundle.message("infection.missing.reports")
+    }

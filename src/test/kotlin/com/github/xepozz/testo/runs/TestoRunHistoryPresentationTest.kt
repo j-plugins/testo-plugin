@@ -12,6 +12,7 @@ class TestoRunHistoryPresentationTest {
     @Test
     fun executorIdDecidesTheRunKind() {
         assertEquals(TestoRunKind.COVERAGE, runKindOf("Coverage"))
+        assertEquals(TestoRunKind.MUTATION, runKindOf("TestoMutation"))
         assertEquals(TestoRunKind.DEBUG, runKindOf("Debug"))
         assertEquals(TestoRunKind.RUN, runKindOf("Run"))
     }

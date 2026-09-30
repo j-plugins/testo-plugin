@@ -1,6 +1,8 @@
 package com.github.xepozz.testo.tests.actions
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.TestoIcons
+import com.github.xepozz.testo.infection.TestoMutationExecutor
 import com.github.xepozz.testo.runs.TestoRunReplayProfile
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.ExecutionManager
@@ -238,6 +240,12 @@ class TestoRerunSplitButtonAction : SplitButtonAction(buildExecutorGroup()) {
                 TestoBundle.message("action.testo.rerunWithCoverage.text"),
                 AllIcons.General.RunWithCoverage,
                 "Coverage",
+            ),
+            // Hidden by its own update where the executor is not registered: it comes with the coverage module.
+            TestoRerunWithExecutorAction(
+                TestoBundle.message("action.testo.rerunWithMutation.text"),
+                TestoIcons.INFECTION,
+                TestoMutationExecutor.ID,
             ),
         )
     }

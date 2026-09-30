@@ -55,7 +55,7 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
 
     override fun doExecute(state: RunProfileState, env: ExecutionEnvironment): RunContentDescriptor? {
         FileDocumentManager.getInstance().saveAllDocuments()
-        val runConfiguration = env.runProfile as? TestoRunConfiguration
+        val runConfiguration = (env.runProfile as? TestoRunConfiguration)?.let(::prepare)
             ?: throw ExecutionException(TestoBundle.message("testo.coverage.run.unsupported.profile"))
         val interpreter = runConfiguration.interpreter
             ?: throw ExecutionException(PhpCommandSettingsBuilder.getInterpreterNotFoundError())
@@ -93,6 +93,7 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
         // Handed over rather than kept here: the run archive dedupes the same way, and it only sees the properties.
         props?.coverageFlagPaths = flagDataFiles
         props?.let { it.reportTargets += targets }
+        props?.let { started(env, it) }
         executionResult.processHandler.addProcessListener(object : ProcessAdapter() {
             override fun processTerminated(event: ProcessEvent) {
                 ApplicationManager.getApplication().executeOnPooledThread {
@@ -104,6 +105,11 @@ open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
         })
         return RunContentBuilder(executionResult, env).showRunContent(env.contentToReuse)
     }
+
+    /** The configuration this run executes: [configuration] itself, or a copy with what the executor needs. */
+    protected open fun prepare(configuration: TestoRunConfiguration): TestoRunConfiguration = configuration
+
+    protected open fun started(env: ExecutionEnvironment, properties: TestoConsoleProperties) = Unit
 
     /** The enabled formats with the local file/directory each one writes, derived from the IDE-managed base path. */
     fun coverageFlagLocalPaths(settings: TestoRunnerSettings, localCoverage: String?): List<Pair<CoverageFormat, String>> {

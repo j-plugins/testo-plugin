@@ -76,33 +76,33 @@ internal object TestoRunArchiver {
                 recording.writeLocations()
                 val finishedAt = System.currentTimeMillis()
                 val interpreter = (props.configuration as? TestoRunConfiguration)?.interpreter
-                recording.writeManifest(
-                    TestoRunManifest(
-                        configurationName = recording.configurationName,
-                        executorId = recording.executorId,
-                        commandLine = props.commandLine.orEmpty(),
-                        configuration = serializeConfiguration(props),
-                        startedAt = recording.startedAt,
-                        finishedAt = finishedAt,
-                        workingDirectory = props.workingDirectory.orEmpty(),
-                        timings = runMarks(props, recording, finishedAt),
-                        retention = recording.retention,
-                        statuses = props.statusStore.counts().entries.associate { it.key.wireName to it.value },
-                        reports = reports,
-                        metadataArtifacts = metadataArtifacts,
-                        exitCode = exitCode,
-                        cancelled = stoppedFromIde || props.unfinishedNodes.isNotEmpty(),
-                        interpreterName = interpreter?.name.orEmpty(),
-                        interpreterType = interpreterType(interpreter),
-                        pluginVersion = pluginVersion(),
-                        testoVersion = props.testoVersion.orEmpty(),
-                    )
+                val manifest = TestoRunManifest(
+                    configurationName = recording.configurationName,
+                    executorId = recording.executorId,
+                    commandLine = props.commandLine.orEmpty(),
+                    configuration = serializeConfiguration(props),
+                    startedAt = recording.startedAt,
+                    finishedAt = finishedAt,
+                    workingDirectory = props.workingDirectory.orEmpty(),
+                    timings = runMarks(props, recording, finishedAt),
+                    retention = recording.retention,
+                    statuses = props.statusStore.counts().entries.associate { it.key.wireName to it.value },
+                    reports = reports,
+                    metadataArtifacts = metadataArtifacts,
+                    exitCode = exitCode,
+                    cancelled = stoppedFromIde || props.unfinishedNodes.isNotEmpty(),
+                    interpreterName = interpreter?.name.orEmpty(),
+                    interpreterType = interpreterType(interpreter),
+                    pluginVersion = pluginVersion(),
+                    testoVersion = props.testoVersion.orEmpty(),
                 )
+                recording.writeManifest(manifest)
                 TestoRunStore.getInstance(project).prune()
                 // The archive is the lens's whole source of truth, and it only just became complete — so the lens is
                 // told here rather than on a timer after the process ends.
                 TestoHistoryIndex.invalidate()
                 TestoHistoryIndex.refreshLens(project)
+                props.afterArchive?.invoke(recording.dir, manifest)
             } catch (e: Exception) {
                 LOG.warn("Failed to archive Testo run ${recording.dir}", e)
             }
