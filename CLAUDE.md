@@ -528,6 +528,9 @@ Non-obvious constraints already paid for in blood — read before touching the r
   Every mutation run lives in its Testo run's archive, `<run dir>/infection/<started at>/` (`TestoMutationArchive`):
   its line stream, text log, HTML report and `mutation.json`, so it is exported, locked and pruned with that run and a
   replay reads it back through the same parsers. A pinned tab keeps its directory while the next run writes its own.
+  Rerunning single mutants is a sub-run of that run: `--id` takes one ID (a repeated one: the last wins), so one process
+  per mutant, each archived under `reruns/` and replayed over the run in order; that stream updates the run's own
+  mutants by ID and adds none.
   No `--filter` unless `--with-uncovered`: Infection skips a file its coverage has no test for before parsing it, and
   the positional replacement for the deprecated flag hands paths outside infection.json5's `source` to Testo as tests.
 - **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to

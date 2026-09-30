@@ -2,6 +2,7 @@ package com.github.xepozz.testo.infection
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -52,6 +53,50 @@ class TestoMutationArchiveTest {
         assertTrue("every mutant gets its code", restored.mutants.all { it.original != null && it.mutated != null })
         val file = restored.files.single()
         assertEquals("D:/local${file.path}", restored.localPath(file.path))
+    }
+
+    @Test
+    fun `a rerun of one mutant updates it in place when read back`() {
+        val testoRun = temp.newFolder("run").toPath()
+        val dir = record(testoRun, 1000)
+        val name = "Infection\\Mutator\\Removal\\ReturnRemoval (7fef23dae843ecb8be780d94655a9f77)"
+        TestoMutationArchive.Recorder(TestoMutationArchive.newRerunDir(dir, 2000)).use { recorder ->
+            recorder.line("$ php vendor/bin/infection --id=7fef23dae843ecb8be780d94655a9f77")
+            recorder.line("##teamcity[testCount count='12']")
+            recorder.line("##teamcity[testStarted name='$name' nodeId='a1' parentNodeId='f1']")
+            recorder.line("##teamcity[testFinished name='$name' nodeId='a1' duration='12']")
+        }
+
+        val restored = TestoMutationArchive.load(testoRun, dir)!!
+        val rerun = restored.mutants.single { it.hash == "7fef23dae843ecb8be780d94655a9f77" }
+
+        assertEquals(MutantStatus.KILLED, rerun.status)
+        assertEquals(MutantStatus.ESCAPED, rerun.previousStatus)
+        assertEquals(19, restored.mutants.size)
+        assertEquals(0, restored.score().escaped)
+        assertTrue(restored.mutants.all { it.finished })
+    }
+
+    @Test
+    fun `a file's fingerprint is kept with the run and tells an edit`() {
+        val testoRun = temp.newFolder("run").toPath()
+        val source = temp.newFile("A.php").toPath()
+        Files.writeString(source, "<?php return 1;")
+        val dir = TestoMutationArchive.newRunDir(testoRun, 1000)
+        val run = TestoMutationRun("a", testoRun, dir) { source.toString() }
+        TestoMutationArchive.Recorder(dir).use { recorder ->
+            val stream = TestoMutationStream(run, recorder::line, onFile = run::fingerprint)
+            stream.feed("##teamcity[testSuiteStarted name='A.php' nodeId='f1' parentNodeId='0' locationHint='file:///app/A.php']\n", stdout = true)
+            run.finish(0)
+            recorder.summary(run)
+        }
+
+        val restored = TestoMutationArchive.load(testoRun, dir)!!
+        val fingerprint = restored.fingerprints.getValue("/app/A.php")
+
+        assertEquals(fingerprintOf(source), fingerprint)
+        Files.writeString(source, "<?php return 2;")
+        assertNotEquals(fingerprintOf(source), fingerprint)
     }
 
     @Test

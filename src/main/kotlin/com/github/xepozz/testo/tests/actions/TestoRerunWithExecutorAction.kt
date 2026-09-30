@@ -244,7 +244,7 @@ class TestoRerunSplitButtonAction : SplitButtonAction(buildExecutorGroup()) {
             // Hidden by its own update where the executor is not registered: it comes with the coverage module.
             TestoRerunWithExecutorAction(
                 TestoBundle.message("action.testo.rerunWithMutation.text"),
-                TestoIcons.INFECTION,
+                TestoIcons.MUTATION_RUN,
                 TestoMutationExecutor.ID,
             ),
         )

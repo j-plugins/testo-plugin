@@ -15,6 +15,8 @@ internal class TestoInfectionLaunch(
     val sourceFiles: List<String>,
     val workDir: Path,
     val options: TestoInfectionOptions = TestoInfectionOptions(),
+    /** A rerun writes no HTML report: the run's own one covers every mutant, this one would cover a single one. */
+    val withHtml: Boolean = true,
 ) {
     val coverageDir: Path get() = workDir.resolve("coverage")
     val htmlReport: Path get() = workDir.resolve(HTML_REPORT)
@@ -51,8 +53,10 @@ internal object TestoInfectionCommand {
         launch.shared = shared
 
         Files.createDirectories(launch.workDir)
-        Files.deleteIfExists(launch.htmlReport)
-        val html = launcher.output(launch.htmlReport.toString()).takeIf { it.isReachable }
+        val html = if (!launch.withHtml) null else {
+            Files.deleteIfExists(launch.htmlReport)
+            launcher.output(launch.htmlReport.toString()).takeIf { it.isReachable }
+        }
         launch.htmlTarget = html
         Files.deleteIfExists(launch.textLog)
         val text = launcher.output(launch.textLog.toString()).takeIf { it.isReachable }

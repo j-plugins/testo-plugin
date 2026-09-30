@@ -35,11 +35,37 @@ class TestoMutationRerunAction : TestoMutationAction() {
         templatePresentation.icon = AllIcons.Actions.Restart
     }
 
-    override fun isEnabled(panel: TestoMutationPanel) = !panel.run.isRunning && panel.run.restart != null
+    override fun isEnabled(panel: TestoMutationPanel) = !panel.run.isBusy && panel.run.recipe != null
 
-    override fun perform(panel: TestoMutationPanel) {
-        panel.run.restart?.invoke()
+    override fun perform(panel: TestoMutationPanel) = TestoMutationService.getInstance(panel.project).restart(panel.run)
+}
+
+/** Each selected mutant alone, updated in place in this tab. */
+class TestoMutationRerunSelectedAction : TestoMutationAction() {
+    init {
+        templatePresentation.icon = AllIcons.Actions.Rerun
     }
+
+    override fun isEnabled(panel: TestoMutationPanel) =
+        !panel.run.isBusy && panel.run.recipe != null && panel.selectedMutants().any { it.finished }
+
+    override fun perform(panel: TestoMutationPanel) =
+        TestoMutationService.getInstance(panel.project).rerun(panel.run, panel.selectedMutants())
+}
+
+/** Every escaped mutant alone, updated in place in this tab. */
+class TestoMutationRerunEscapedAction : TestoMutationAction() {
+    init {
+        templatePresentation.icon = AllIcons.RunConfigurations.RerunFailedTests
+    }
+
+    private fun escaped(panel: TestoMutationPanel) = panel.run.mutants.filter { it.status == MutantStatus.ESCAPED }
+
+    override fun isEnabled(panel: TestoMutationPanel) =
+        !panel.run.isBusy && panel.run.recipe != null && escaped(panel).isNotEmpty()
+
+    override fun perform(panel: TestoMutationPanel) =
+        TestoMutationService.getInstance(panel.project).rerun(panel.run, escaped(panel))
 }
 
 class TestoMutationStopAction : TestoMutationAction() {
@@ -47,7 +73,7 @@ class TestoMutationStopAction : TestoMutationAction() {
         templatePresentation.icon = AllIcons.Actions.Suspend
     }
 
-    override fun isEnabled(panel: TestoMutationPanel) = panel.run.isRunning
+    override fun isEnabled(panel: TestoMutationPanel) = panel.run.isBusy
 
     override fun perform(panel: TestoMutationPanel) = panel.run.stop()
 }

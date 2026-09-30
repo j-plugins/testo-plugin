@@ -140,7 +140,7 @@ internal fun runKindOf(executorId: String?): TestoRunKind = when (executorId) {
 // sit on them.
 internal fun runKindIcon(kind: TestoRunKind): Icon = when (kind) {
     TestoRunKind.COVERAGE -> AllIcons.Toolwindows.ToolWindowCoverage
-    TestoRunKind.MUTATION -> TestoIcons.MUTATE
+    TestoRunKind.MUTATION -> TestoIcons.MUTATION
     TestoRunKind.DEBUG -> AllIcons.Toolwindows.ToolWindowDebugger
     TestoRunKind.RUN -> AllIcons.Toolwindows.ToolWindowRun
 }

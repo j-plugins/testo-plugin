@@ -19,6 +19,9 @@ internal object TestoMutationArchive {
     const val SUMMARY_FILE = "mutation.json"
     const val TEXT_LOG = "mutations.log"
 
+    /** A run's reruns of single mutants, `<run>/reruns/<started at>/`: a stream and a text log each, replayed in order. */
+    const val RERUNS_DIR = "reruns"
+
     /** How many mutation runs of one Testo run are kept; the oldest go when a new one starts. */
     const val KEEP = 5
 
@@ -36,9 +39,25 @@ internal object TestoMutationArchive {
         val msi: Int? = null,
         val escaped: Int = 0,
         val mutants: Int = 0,
+        /** SHA-256 of each mutated file when it was mutated, by interpreter path. */
+        val fingerprints: Map<String, String> = emptyMap(),
     )
 
     fun newRunDir(testoRunDir: Path, startedAt: Long): Path = testoRunDir.resolve(DIR).resolve(startedAt.toString())
+
+    // Two reruns can start within one millisecond when the first fails at once; the name is their order, so it stays unique.
+    fun newRerunDir(workDir: Path, startedAt: Long): Path {
+        val root = workDir.resolve(RERUNS_DIR)
+        var at = startedAt
+        while (Files.exists(root.resolve(at.toString()))) at++
+        return root.resolve(at.toString())
+    }
+
+    private fun reruns(workDir: Path): List<Path> {
+        val root = workDir.resolve(RERUNS_DIR)
+        if (!Files.isDirectory(root)) return emptyList()
+        return Files.list(root).use { it.toList() }.sortedBy { it.fileName.toString().toLongOrNull() ?: 0 }
+    }
 
     /** The mutation runs of [testoRunDir], oldest first. */
     fun runs(testoRunDir: Path): List<Path> {
@@ -70,25 +89,28 @@ internal object TestoMutationArchive {
             writer.write("\n")
         }
 
-        fun summary(run: TestoMutationRun) {
-            val score = run.score()
-            val summary = Summary(
-                title = run.title,
-                startedAt = run.startedAt,
-                finishedAt = run.finishedAt ?: System.currentTimeMillis(),
-                exitCode = run.exitCode,
-                stopped = run.stopRequested,
-                expected = run.expected,
-                localPaths = run.files.mapNotNull { file -> run.localPath(file.path)?.let { file.path to it } }.toMap(),
-                msi = score.msi,
-                escaped = score.escaped,
-                mutants = run.mutants.size,
-            )
-            Files.writeString(dir.resolve(SUMMARY_FILE), gson.toJson(summary), StandardCharsets.UTF_8)
-        }
+        fun summary(run: TestoMutationRun) = writeSummary(dir, run)
 
         @Synchronized
         override fun close() = writer.close()
+    }
+
+    fun writeSummary(dir: Path, run: TestoMutationRun) {
+        val score = run.score()
+        val summary = Summary(
+            title = run.title,
+            startedAt = run.startedAt,
+            finishedAt = run.finishedAt ?: System.currentTimeMillis(),
+            exitCode = run.exitCode,
+            stopped = run.stopRequested,
+            expected = run.expected,
+            localPaths = run.files.mapNotNull { file -> run.localPath(file.path)?.let { file.path to it } }.toMap(),
+            msi = score.msi,
+            escaped = score.escaped,
+            mutants = run.mutants.size,
+            fingerprints = HashMap(run.fingerprints),
+        )
+        Files.writeString(dir.resolve(SUMMARY_FILE), gson.toJson(summary), StandardCharsets.UTF_8)
     }
 
     fun summary(dir: Path): Summary? = runCatching {
@@ -101,7 +123,14 @@ internal object TestoMutationArchive {
         val run = TestoMutationRun(summary.title, testoRunDir, dir) { path ->
             summary.localPaths[path] ?: path.takeIf { Files.exists(Path.of(it)) }
         }
-        val stream = TestoMutationStream(run)
+        replay(dir, TestoMutationStream(run), run)
+        reruns(dir).forEach { replay(it, TestoMutationStream(run, rerun = true), run) }
+        run.fingerprints.putAll(summary.fingerprints)
+        run.restore(summary.startedAt, summary.finishedAt, summary.exitCode, summary.stopped, summary.expected)
+        return run
+    }
+
+    private fun replay(dir: Path, stream: TestoMutationStream, run: TestoMutationRun) {
         runCatching {
             Files.newBufferedReader(dir.resolve(STREAM_FILE), StandardCharsets.UTF_8).useLines { lines ->
                 lines.forEach { stream.feed("$it\n", stdout = true) }
@@ -109,8 +138,6 @@ internal object TestoMutationArchive {
         }
         stream.flush()
         applyTextLog(dir.resolve(TEXT_LOG), run)
-        run.restore(summary.startedAt, summary.finishedAt, summary.exitCode, summary.stopped, summary.expected)
-        return run
     }
 
     /** Gives every mutant the code and test output Infection's text log holds for it. */

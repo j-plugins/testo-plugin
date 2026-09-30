@@ -87,6 +87,30 @@ class TestoInfectionTest {
     }
 
     @Test
+    fun `a rerun of one mutant names it and its file, whatever the scope`() {
+        val options = TestoInfectionOptions(
+            scope = TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES,
+            mutantId = "7fef23da",
+            mutantFile = "src/A.php",
+        )
+
+        assertEquals(
+            listOf("--filter=src/A.php", "--id=7fef23da"),
+            TestoInfectionArguments.build("/c", listOf("src/A.php", "src/B.php"), null, null, options)
+                .filter { it.startsWith("--filter") || it.startsWith("--id") || it.startsWith("--git-diff") },
+        )
+    }
+
+    @Test
+    fun `a mutated file is matched to the coverage's own spelling of it`() {
+        val sources = listOf("src/A.php", "lib/src/A.php", "src/B.php")
+
+        assertEquals("lib/src/A.php", sourceOf("/app/lib/src/A.php", sources))
+        assertEquals("src/A.php", sourceOf("D:\\p\\src\\A.php", sources))
+        assertNull(sourceOf("/app/src/C.php", sources))
+    }
+
+    @Test
     fun `no filter when there are no sources or too many`() {
         assertNull(TestoInfectionArguments.filter(emptyList()))
         val many = List(1_000) { "src/Some/Long/Directory/Name/File$it.php" }

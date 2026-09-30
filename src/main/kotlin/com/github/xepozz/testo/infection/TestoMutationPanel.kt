@@ -12,6 +12,7 @@ import com.intellij.ide.util.treeView.AbstractTreeStructure
 import com.intellij.ide.util.treeView.NodeDescriptor
 import com.intellij.ide.util.treeView.NodeRenderer
 import com.intellij.ide.util.treeView.PresentableNodeDescriptor
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
@@ -20,15 +21,25 @@ import com.intellij.openapi.actionSystem.DataKey
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.UiDataProvider
+import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.editor.event.DocumentEvent
+import com.intellij.openapi.editor.event.DocumentListener
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.pom.Navigatable
 import com.intellij.util.EditSourceOnDoubleClickHandler
 import com.intellij.util.EditSourceOnEnterKeyHandler
+import com.intellij.ui.IconManager
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
@@ -96,6 +107,11 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         schedule()
     }
 
+    // Files whose code is no longer what Infection mutated, by the interpreter's path: their mutants may not match it.
+    private val changed = ConcurrentHashMap.newKeySet<String>()
+    private val checkAlarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
+    private var checkedFinished = false
+
     init {
         details.add(ScrollPaneFactory.createScrollPane(text, true), TEXT_CARD)
         details.add(
@@ -123,7 +139,49 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
 
         run.addListener(listener)
         Disposer.register(this) { run.removeListener(listener) }
+        watchChanges()
         refresh()
+    }
+
+    private fun watchChanges() {
+        project.messageBus.connect(this).subscribe(VirtualFileManager.VFS_CHANGES, object : BulkFileListener {
+            override fun after(events: List<VFileEvent>) {
+                val paths = localPaths()
+                if (events.any { it.path in paths }) requestCheck()
+            }
+        })
+        EditorFactory.getInstance().eventMulticaster.addDocumentListener(object : DocumentListener {
+            override fun documentChanged(event: DocumentEvent) {
+                val file = FileDocumentManager.getInstance().getFile(event.document) ?: return
+                if (file.path in localPaths()) requestCheck()
+            }
+        }, this)
+    }
+
+    private fun localPaths(): Set<String> =
+        run.files.mapNotNullTo(HashSet()) { file -> run.localPath(file.path)?.let(FileUtil::toSystemIndependentName) }
+
+    private fun requestCheck() {
+        checkAlarm.cancelAllRequests()
+        checkAlarm.addRequest(::checkChanges, CHECK_MS)
+    }
+
+    // An unsaved edit counts: the code under the caret is what the user reads the mutants against.
+    private fun checkChanges() {
+        val now = run.files.filter { file ->
+            val expected = run.fingerprints[file.path] ?: return@filter false
+            val local = run.localPath(file.path) ?: return@filter false
+            val virtual = LocalFileSystem.getInstance().findFileByPath(local)
+            val unsaved = virtual != null && ReadAction.compute<Boolean, RuntimeException> {
+                FileDocumentManager.getInstance().isFileModified(virtual)
+            }
+            unsaved || fingerprintOf(Path.of(local)) != expected
+        }.mapTo(HashSet()) { it.path }
+        if (now == changed) return
+        changed.retainAll(now)
+        changed.addAll(now)
+        lines.clear()
+        listener()
     }
 
     private fun createToolbar(): JComponent {
@@ -145,10 +203,14 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     private fun refresh() {
         scheduled.set(false)
         if (dirty.getAndSet(false)) structureModel.invalidateAsync().thenRun { UIUtil.invokeLaterIfNeeded(::expandWhileSmall) }
-        summary.icon = if (run.isRunning) MutantStatus.RUNNING_ICON else verdictIcon()
+        summary.icon = if (run.isBusy) MutantStatus.RUNNING_ICON else verdictIcon()
         summary.text = summaryText()
         showDetails()
-        if (run.isRunning) schedule()
+        if (run.isBusy) schedule()
+        else if (!checkedFinished) {
+            checkedFinished = true
+            requestCheck()
+        }
     }
 
     // Expanded for the first file and again once the run is over, unless the tree has grown too big to read that way.
@@ -195,8 +257,8 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         val original = mutant?.original
         val mutated = mutant?.mutated
         val key = when (element) {
-            is Mutant -> "m|${element.nodeId}|${element.status}|${original != null}|${element.output != null}"
-            is MutatedFile -> "f|${element.nodeId}|${element.mutants.count { it.finished }}"
+            is Mutant -> "m|${element.nodeId}|${element.file.path in changed}|${element.status}|${element.previousStatus}|${element.rerunning}|${original != null}|${element.output != null}"
+            is MutatedFile -> "f|${element.nodeId}|${element.path in changed}|${element.mutants.count { it.finished }}"
             else -> run.log()
         }
         if (key == shown) return
@@ -232,19 +294,22 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     private fun describe(mutant: Mutant): String = buildString {
         appendLine(mutant.mutatorClass)
         appendLine(mutant.status?.label ?: TestoBundle.message("infection.status.running"))
+        mutant.previousStatus?.let { appendLine(TestoBundle.message("infection.details.before", it.label)) }
         val position = position(mutant)
         appendLine(if (position != null) "${mutant.file.name}:${position.first + 1}" else mutant.file.name)
         appendLine(TestoBundle.message("infection.details.id", mutant.hash))
+        if (mutant.file.path in changed) appendLine(TestoBundle.message("infection.file.changed"))
         mutant.durationMs?.let { appendLine(TestoBundle.message("infection.details.duration", it.toString())) }
         val tests = mutant.output
         when {
             !tests.isNullOrBlank() -> appendLine().appendLine(tests)
-            tests == null && run.isRunning -> appendLine().appendLine(TestoBundle.message("infection.details.outputPending"))
+            tests == null && (run.isRunning || mutant.rerunning) -> appendLine().appendLine(TestoBundle.message("infection.details.outputPending"))
         }
     }
 
     private fun describe(file: MutatedFile): String = buildString {
         appendLine(file.name)
+        if (file.path in changed) appendLine(TestoBundle.message("infection.file.changed"))
         file.mutants.mapNotNull { it.status }.groupingBy { it }.eachCount().entries
             .sortedBy { it.key.ordinal }
             .forEach { (status, count) -> appendLine("${status.label}: $count") }
@@ -288,15 +353,19 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
 
         override fun getChildElements(element: Any): Array<Any> = when (element) {
             Root -> run.files
-                .filter { file -> !escapedOnly || file.mutants.any { it.status == MutantStatus.ESCAPED } }
+                .filter { file -> !escapedOnly || file.mutants.any(::escapedOrWas) }
                 .sortedBy { it.name }
                 .toTypedArray()
             is MutatedFile -> element.mutants
-                .filter { !escapedOnly || it.status == MutantStatus.ESCAPED }
+                .filter { !escapedOnly || escapedOrWas(it) }
                 .sortedBy { it.start ?: Int.MAX_VALUE }
                 .toTypedArray()
             else -> emptyArray()
         }
+
+        // A mutant rerun from this view stays in it, so its way from escaped to killed can be seen.
+        private fun escapedOrWas(mutant: Mutant) =
+            mutant.status == MutantStatus.ESCAPED || mutant.previousStatus == MutantStatus.ESCAPED || mutant.rerunning
 
         override fun getParentElement(element: Any): Any? = when (element) {
             is Mutant -> element.file
@@ -322,7 +391,12 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         override fun update(presentation: PresentationData) {
             when (value) {
                 is MutatedFile -> {
-                    presentation.setIcon(TestoIcons.PHP.FILE)
+                    val stale = value.path in changed
+                    presentation.setIcon(
+                        if (stale) IconManager.getInstance().createRowIcon(TestoIcons.PHP.FILE, AllIcons.General.Warning)
+                        else TestoIcons.PHP.FILE
+                    )
+                    if (stale) presentation.tooltip = TestoBundle.message("infection.file.changed")
                     presentation.addText(value.name, SimpleTextAttributes.REGULAR_ATTRIBUTES)
                     val statuses = value.mutants.mapNotNull { it.status }
                     val escaped = statuses.count { it == MutantStatus.ESCAPED }
@@ -339,7 +413,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
                     presentation.setIcon(
                         when {
                             status != null -> status.icon
-                            run.isRunning -> MutantStatus.RUNNING_ICON
+                            run.isRunning || value.rerunning -> MutantStatus.RUNNING_ICON
                             else -> MutantStatus.UNFINISHED_ICON
                         }
                     )
@@ -347,8 +421,19 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
                     position(value)?.let {
                         presentation.addText("  " + TestoBundle.message("infection.node.line", (it.first + 1).toString()), SimpleTextAttributes.GRAYED_ATTRIBUTES)
                     }
-                    status?.let { presentation.addText("  ${it.label}", SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES) }
-                    presentation.tooltip = value.mutatorClass
+                    val previous = value.previousStatus
+                    val label = when {
+                        previous == null -> status?.label
+                        else -> TestoBundle.message(
+                            "infection.node.change",
+                            previous.label,
+                            status?.label ?: TestoBundle.message("infection.status.running"),
+                        )
+                    }
+                    label?.let { presentation.addText("  $it", SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES) }
+                    presentation.tooltip = if (value.file.path in changed) {
+                        "<html>${value.mutatorClass}<br>${TestoBundle.message("infection.file.changed")}</html>"
+                    } else value.mutatorClass
                 }
             }
         }
@@ -382,6 +467,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         private const val DIFF_CARD = "diff"
         private const val REFRESH_MS = 300
         private const val EXPAND_LIMIT = 500
+        private const val CHECK_MS = 300
 
         private val ESCAPED = SimpleTextAttributes.ERROR_ATTRIBUTES
     }

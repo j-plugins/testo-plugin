@@ -3,7 +3,10 @@ package com.github.xepozz.testo.infection
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
 import com.intellij.ui.AnimatedIcon
+import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import javax.swing.Icon
 
@@ -81,6 +84,14 @@ class Mutant(
     /** What the test run against this mutant printed; read off the text log once Infection is done. */
     @Volatile
     var output: String? = null
+
+    /** The status it had before its latest rerun; null when it was never rerun. */
+    @Volatile
+    var previousStatus: MutantStatus? = null
+
+    /** Waiting for, or in, a rerun of its own. */
+    @Volatile
+    var rerunning = false
 }
 
 /** Infection's own metrics, over what the stream has reported so far. */
@@ -132,14 +143,31 @@ class TestoMutationRun(
     @Volatile
     var finishedAt: Long? = null
 
-    /** Starts this run over again, on the same reports. */
+    /** How to run Infection again over the same reports: known to the tab that started it, or to the Testo tab of a restored run. */
     @Volatile
-    var restart: (() -> Unit)? = null
+    internal var recipe: TestoMutationRecipe? = null
+
+    /** Some of its mutants are being run again, one Infection process each. */
+    @Volatile
+    var rerunning = false
+
+    @Volatile
+    internal var rerunStopRequested = false
 
     @Volatile
     internal var stopper: (() -> Unit)? = null
 
     val isRunning: Boolean get() = finishedAt == null
+
+    val isBusy: Boolean get() = isRunning || rerunning
+
+    /** SHA-256 of each mutated file as it was when Infection read it, by the interpreter's path: how a change is told. */
+    internal val fingerprints = ConcurrentHashMap<String, String>()
+
+    /** Remembers what [file] holds now; called as Infection announces it, never on a replay. */
+    internal fun fingerprint(file: MutatedFile) {
+        localPath(file.path)?.let { fingerprintOf(Path.of(it)) }?.let { fingerprints[file.path] = it }
+    }
 
     val mutants: List<Mutant> get() = files.flatMap { it.mutants }
 
@@ -156,7 +184,8 @@ class TestoMutationRun(
     }
 
     fun stop() {
-        stopRequested = true
+        if (isRunning) stopRequested = true
+        if (rerunning) rerunStopRequested = true
         stopper?.invoke()
     }
 
@@ -250,3 +279,8 @@ internal fun mutationVerdict(running: Boolean, stopped: Boolean, escaped: Int, e
     escaped > 0 || (exitCode != 0 && mutants == 0) -> TestoIcons.Status.FAILURE
     else -> TestoIcons.Status.SUCCESS
 }
+
+/** SHA-256 of [file]'s bytes, or null when it cannot be read. */
+internal fun fingerprintOf(file: Path): String? = runCatching {
+    MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file)).joinToString("") { "%02x".format(it) }
+}.getOrNull()

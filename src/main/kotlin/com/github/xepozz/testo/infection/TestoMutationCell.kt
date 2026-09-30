@@ -130,16 +130,16 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         val mutation = TestoMutationService.getInstance(project).runFor(current.runDir)
         run = mutation
         // A run read back from the archive has no recipe of its own; this tab knows how to run its Testo run's reports again.
-        if (mutation != null && mutation.restart == null) mutation.restart = restartOf(current)
+        if (mutation != null && mutation.recipe == null) mutation.recipe = recipeOf(current)
         updateProgress(mutation)
-        if (mutation?.isRunning == true) spinner.start() else spinner.stop()
+        if (mutation?.isBusy == true) spinner.start() else spinner.stop()
         toolTipText = tooltip(hovered)
         repaint()
         return true
     }
 
-    private fun restartOf(current: Context): (() -> Unit)? = (readiness as? TestoMutationReadiness.Ready)?.let { ready ->
-        { TestoMutationService.getInstance(project).start(current.configuration, current.runDir, ready, current.options) }
+    private fun recipeOf(current: Context): TestoMutationRecipe? = (readiness as? TestoMutationReadiness.Ready)?.let { ready ->
+        TestoMutationRecipe(current.configuration, current.runDir, ready, current.options)
     }
 
     private fun resolveContext(): Context? {
@@ -163,14 +163,13 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         return TestoInfectionReports.readiness(runDir, TestoRunStore.getInstance(project).readManifest(runDir))
     }
 
-    private val isReady: Boolean get() = readiness is TestoMutationReadiness.Ready && run?.isRunning != true
+    private val isReady: Boolean get() = readiness is TestoMutationReadiness.Ready && run?.isBusy != true
 
     private fun onButton() {
         val current = context ?: return
         val mutation = run
-        if (mutation?.isRunning == true) return TestoMutationToolWindow.show(project, mutation)
-        val ready = readiness as? TestoMutationReadiness.Ready ?: return
-        TestoMutationService.getInstance(project).start(current.configuration, current.runDir, ready, current.options)
+        if (mutation?.isBusy == true) return TestoMutationToolWindow.show(project, mutation)
+        TestoMutationService.getInstance(project).start(recipeOf(current) ?: return)
         refresh()
     }
 
@@ -188,7 +187,7 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         Zone.BUTTON -> {
             val current = readiness
             when {
-                run?.isRunning == true -> TestoBundle.message("infection.running")
+                run?.isBusy == true -> TestoBundle.message("infection.running")
                 current is TestoMutationReadiness.Ready -> TestoBundle.message("action.testo.mutate.description")
                 current == TestoMutationReadiness.Missing.NOT_FINISHED && properties.afterArchive != null ->
                     TestoBundle.message("infection.missing.pending")
@@ -206,7 +205,7 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         val score = mutation.score()
         val done = mutation.finishedCount()
         val total = maxOf(mutation.expected, mutation.mutants.size)
-        val running = mutation.isRunning
+        val running = mutation.isBusy
         indeterminate = total <= 0
         fraction = if (total > 0) (done.toDouble() / total).coerceIn(0.0, 1.0) else 0.0
         escaped = score.escaped
@@ -293,7 +292,7 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
             g2.drawString(LABEL, PADDING, baseline)
 
             var x = start(Zone.BUTTON) + PADDING
-            val logo = if (isReady || run?.isRunning == true) LOGO else LOGO_DISABLED
+            val logo = if (isReady || run?.isBusy == true) LOGO else LOGO_DISABLED
             paintIcon(g2, logo, x)
             paintIcon(g2, ARROW, start(Zone.ARROW))
 
@@ -362,10 +361,10 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
             val entries = service.history(current.runDir)
             ApplicationManager.getApplication().invokeLater({
                 if (!isShowing) return@invokeLater
-                val restart = restartOf(current)
+                val recipe = recipeOf(current)
                 val group = DefaultActionGroup(entries.map { entry ->
                     object : DumbAwareAction(historyText(entry), null, entry.verdict ?: AllIcons.Process.Step_1) {
-                        override fun actionPerformed(e: AnActionEvent) = service.open(current.runDir, entry.dir, restart)
+                        override fun actionPerformed(e: AnActionEvent) = service.open(current.runDir, entry.dir, recipe)
                     }
                 })
                 if (entries.isEmpty()) group.add(object : DumbAwareAction(TestoBundle.message("infection.history.empty")) {
@@ -456,8 +455,8 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         private const val SPIN_ARC = 90.0
 
         private val LABEL get() = TestoBundle.message("infection.cell.label")
-        private val LOGO: Icon = TestoIcons.INFECTION
-        private val LOGO_DISABLED: Icon = IconLoader.getDisabledIcon(TestoIcons.INFECTION)
+        private val LOGO: Icon = TestoIcons.MUTATION_RUN
+        private val LOGO_DISABLED: Icon = IconLoader.getDisabledIcon(TestoIcons.MUTATION_RUN)
         private val HISTORY: Icon = AllIcons.Vcs.History
         private val ESCAPED: Icon = TestoIcons.Status.FAILED
         private val ARROW: Icon = AllIcons.General.LinkDropTriangle

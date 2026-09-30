@@ -42,14 +42,14 @@ internal object TestoMutationToolWindow {
             // The files stay: they belong to the Testo run's archive. A run still going stops with its tab.
             setDisposer {
                 Disposer.dispose(panel)
-                if (run.isRunning) run.stop()
+                if (run.isBusy) run.stop()
             }
             preferredFocusableComponent = panel.preferredFocus
         }
         // Never one still running: closing its tab would stop it.
         val previous = manager.contents.firstOrNull { content ->
             val shown = content.getUserData(RUN_KEY)
-            !content.isPinned && shown?.sourceRunDir == run.sourceRunDir && !shown.isRunning
+            !content.isPinned && shown?.sourceRunDir == run.sourceRunDir && !shown.isBusy
         }
         if (previous != null) {
             val index = manager.getIndexOfContent(previous)

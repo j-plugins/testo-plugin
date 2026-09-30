@@ -16,9 +16,9 @@ import javax.swing.Icon
 class TestoMutationExecutor : Executor() {
     override fun getId(): String = ID
     override fun getToolWindowId(): String = ToolWindowId.RUN
-    override fun getToolWindowIcon(): Icon = TestoIcons.INFECTION
-    override fun getIcon(): Icon = TestoIcons.INFECTION
-    override fun getDisabledIcon(): Icon = IconLoader.getDisabledIcon(TestoIcons.INFECTION)
+    override fun getToolWindowIcon(): Icon = TestoIcons.MUTATION
+    override fun getIcon(): Icon = TestoIcons.MUTATION_RUN
+    override fun getDisabledIcon(): Icon = IconLoader.getDisabledIcon(TestoIcons.MUTATION_RUN)
     override fun getDescription(): String = TestoBundle.message("infection.executor.description")
     override fun getActionName(): String = TestoBundle.message("infection.executor.action")
     override fun getStartActionText(): String = TestoBundle.message("infection.executor.start")

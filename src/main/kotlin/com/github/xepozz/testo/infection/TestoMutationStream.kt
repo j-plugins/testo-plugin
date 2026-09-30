@@ -7,11 +7,16 @@ import jetbrains.buildServer.messages.serviceMessages.ServiceMessage
  * into lines here, per stream.
  *
  * A mutant's `testStdOut` carries a name but no `nodeId`, so mutants are looked up by name as well.
+ *
+ * With [rerun], the stream is one of a rerun: it adds nothing and updates the run's own mutants, found by their ID.
  */
 internal class TestoMutationStream(
     private val run: TestoMutationRun,
     /** Every complete line, as it was read: what [TestoMutationArchive] keeps. */
     private val onLine: ((String) -> Unit)? = null,
+    private val rerun: Boolean = false,
+    /** Each file as it is first announced: a live run fingerprints it there. */
+    private val onFile: ((MutatedFile) -> Unit)? = null,
 ) {
     private val files = HashMap<String, MutatedFile>()
     private val byId = HashMap<String, Mutant>()
@@ -53,9 +58,9 @@ internal class TestoMutationStream(
         val attributes = message.attributes
         val name = attributes["name"].orEmpty()
         when (message.messageName) {
-            "testCount" -> run.expected = attributes["count"]?.toIntOrNull() ?: return false
-            "testSuiteStarted" -> file(attributes["nodeId"] ?: return false, name, attributes["locationHint"])
-            "testStarted" -> started(attributes, name)
+            "testCount" -> if (rerun) return false else run.expected = attributes["count"]?.toIntOrNull() ?: return false
+            "testSuiteStarted" -> if (rerun) return false else file(attributes["nodeId"] ?: return false, name, attributes["locationHint"])
+            "testStarted" -> if (rerun) restarted(attributes, name) else started(attributes, name)
             "testStdOut" -> {
                 val mutant = mutant(attributes, name) ?: return false
                 MutantStatus.fromMessage(attributes["out"].orEmpty())?.let { mutant.status = it }
@@ -86,7 +91,10 @@ internal class TestoMutationStream(
 
     private fun file(nodeId: String, name: String, hint: String?): MutatedFile = files.getOrPut(nodeId) {
         val path = hint?.let(::parseInfectionLocation)?.file ?: name
-        MutatedFile(nodeId, name.ifEmpty { path }, path).also { run.files += it }
+        MutatedFile(nodeId, name.ifEmpty { path }, path).also {
+            run.files += it
+            onFile?.invoke(it)
+        }
     }
 
     private fun started(attributes: Map<String, String>, name: String) {
@@ -98,13 +106,26 @@ internal class TestoMutationStream(
             nodeId = nodeId,
             file = file,
             mutatorClass = name.substringBefore(" (").trim(),
-            hash = name.substringAfter(" (", "").removeSuffix(")"),
+            hash = hashOf(name),
             start = location?.start,
             end = location?.end,
         )
         byId[nodeId] = mutant
         byName[name] = mutant
         file.mutants += mutant
+    }
+
+    // Reset here only when read back from the archive: a live rerun reset its mutants before starting.
+    private fun restarted(attributes: Map<String, String>, name: String) {
+        val hash = hashOf(name)
+        val mutant = run.mutants.firstOrNull { it.hash == hash } ?: return
+        if (mutant.finished) {
+            mutant.previousStatus = mutant.status
+            mutant.status = null
+            mutant.finished = false
+        }
+        attributes["nodeId"]?.let { byId[it] = mutant }
+        byName[name] = mutant
     }
 
     private fun mutant(attributes: Map<String, String>, name: String): Mutant? =
@@ -114,4 +135,6 @@ internal class TestoMutationStream(
         mutant.durationMs = attributes["duration"]?.toLongOrNull()
         mutant.finished = true
     }
+
+    private fun hashOf(name: String) = name.substringAfter(" (", "").removeSuffix(")")
 }

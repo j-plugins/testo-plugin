@@ -13,6 +13,10 @@ internal data class TestoInfectionOptions(
     val timeoutsAsEscaped: Boolean = false,
     val mutators: String = "",
     val extra: String = "",
+    /** Infection's `--id`: this one mutant alone. It takes a single ID, so a rerun of several is one process each. */
+    val mutantId: String? = null,
+    /** The source file [mutantId] is in, as the coverage spells it: spares Infection generating every other file's mutants. */
+    val mutantFile: String? = null,
 ) {
     companion object {
         fun of(settings: TestoRunnerSettings) = TestoInfectionOptions(
@@ -46,15 +50,19 @@ internal object TestoInfectionArguments {
         add("--teamcity")
         add("--no-progress")
         add("--no-interaction")
-        when (options.scope) {
-            TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES -> {
+        when {
+            options.mutantId != null -> {
+                options.mutantFile?.let { add("--filter=$it") }
+                add("--id=${options.mutantId}")
+            }
+            options.scope == TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES -> {
                 add("--git-diff-lines")
                 options.gitDiffBase.trim().takeIf { it.isNotEmpty() }?.let { add("--git-diff-base=$it") }
             }
-            TestoRunnerSettings.INFECTION_SCOPE_ALL -> Unit
+            options.scope == TestoRunnerSettings.INFECTION_SCOPE_ALL -> Unit
             // Without --with-uncovered, Infection skips every file this run's coverage has no test for before parsing it, so
             // the deprecated --filter would change nothing. With it, the filter is what keeps the other files out.
-            else -> if (options.withUncovered) filter(sourceFiles)?.let { add("--filter=$it") }
+            options.withUncovered -> filter(sourceFiles)?.let { add("--filter=$it") }
         }
         options.threads.trim().takeIf { it.isNotEmpty() }?.let { add("--threads=$it") }
         if (options.onlyCoveringTestCases) add("--only-covering-test-cases")
