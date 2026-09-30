@@ -58,7 +58,6 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import com.intellij.util.ui.tree.TreeUtil
 import java.awt.BorderLayout
-import java.awt.CardLayout
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
@@ -105,19 +104,12 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     val preferredFocus: JComponent get() = tree
 
     private val summary = JBLabel().apply { border = JBUI.Borders.empty(4, 8) }
-    private val details = JPanel(CardLayout())
-    private val text = JBTextArea().apply {
-        isEditable = false
-        lineWrap = false
-        border = JBUI.Borders.empty(6, 8)
-    }
     internal val diff = DiffManager.getInstance().createRequestPanel(project, this, null)
     private val output = JBTextArea().apply {
         isEditable = false
         lineWrap = false
         border = JBUI.Borders.empty(6, 8)
     }
-    private val textPane = ScrollPaneFactory.createScrollPane(text, true)
     internal val outputPane = ScrollPaneFactory.createScrollPane(output, true)
     private val diffSplitter = OnePixelSplitter(true, 0.6f)
     private val mainSplitter = OnePixelSplitter(true, 0.55f)
@@ -140,11 +132,10 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     private var checkedFinished = false
 
     init {
+        // One text area under the diff for every selection: a second one stacked on it for the log showed through the diff.
         diffSplitter.firstComponent = diff.component
         diffSplitter.secondComponent = outputPane
-        details.add(textPane, TEXT_CARD)
-        details.add(diffSplitter, DIFF_CARD)
-        mainSplitter.secondComponent = details
+        mainSplitter.secondComponent = diffSplitter
 
         mainSplitter.firstComponent = JPanel(BorderLayout()).apply {
             add(summary, BorderLayout.NORTH)
@@ -299,7 +290,6 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         if (key == shown) return
         shown = key
 
-        val cards = details.layout as CardLayout
         if (mutant != null && original != null && mutated != null) {
             val fileType = FileTypeManager.getInstance().getFileTypeByFileName(mutant.file.path)
             val factory = DiffContentFactory.getInstance()
@@ -314,19 +304,17 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
             )
             output.text = describe(mutant)
             output.caretPosition = 0
-            cards.show(details, DIFF_CARD)
             diffShown = true
             layoutDetails()
             return
         }
-        text.text = when (element) {
+        output.text = when (element) {
             is Mutant -> describe(element)
             is MutatedFile -> describe(element)
             is MutantGroup -> describe(element)
             else -> run.log()
         }
-        text.caretPosition = 0
-        cards.show(details, TEXT_CARD)
+        output.caretPosition = 0
         diffShown = false
         layoutDetails()
     }
@@ -335,9 +323,9 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     private fun layoutDetails() {
         val showDiff = TestoMutationDetails.showDiff
         val showOutput = TestoMutationDetails.showOutput
-        diff.component.isVisible = showDiff
+        diff.component.isVisible = showDiff && diffShown
         outputPane.isVisible = showOutput
-        details.isVisible = showOutput || diffShown && showDiff
+        diffSplitter.isVisible = showOutput || diffShown && showDiff
         diffSplitter.revalidate()
         mainSplitter.revalidate()
     }
@@ -560,8 +548,6 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         @JvmField
         val PANEL: DataKey<TestoMutationPanel> = DataKey.create("testo.mutations.panel")
 
-        private const val TEXT_CARD = "text"
-        private const val DIFF_CARD = "diff"
         private const val REFRESH_MS = 300
         private const val EXPAND_LIMIT = 500
         private const val CHECK_MS = 300

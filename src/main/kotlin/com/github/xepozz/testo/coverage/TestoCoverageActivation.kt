@@ -54,6 +54,17 @@ fun applyTestoCoverage(project: Project, reports: List<TestoCoverageReport>, run
     return true
 }
 
+/**
+ * Applies the shown Testo bundle again when it is [runDir]'s coverage, so the Coverage view is built anew: its columns
+ * are fixed when it is built, and its cells read their numbers only as they repaint.
+ */
+fun reapplyTestoCoverage(project: Project, runDir: Path) {
+    val bundle = CoverageDataManager.getInstance(project).activeSuites().firstOrNull { it.coverageEngine is TestoCoverageEngine } ?: return
+    val suites = bundle.suites.filterIsInstance<TestoCoverageSuite>()
+    if (suites.none { it.runDir == runDir }) return
+    applyTestoCoverage(project, suites.map { TestoCoverageReport(it.presentableName, it.format, Path.of(it.coverageDataFileName)) }, runDir)
+}
+
 /** Closes the active Testo bundle, if any — the "no reports checked" state. */
 fun closeTestoCoverage(project: Project) {
     val manager = CoverageDataManager.getInstance(project)

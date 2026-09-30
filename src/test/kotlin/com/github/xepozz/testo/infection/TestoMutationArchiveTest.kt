@@ -113,6 +113,42 @@ class TestoMutationArchiveTest {
     }
 
     @Test
+    fun `each file is scored by the run that judged it last`() {
+        fun score(escaped: Int, killed: Int, at: Long) =
+            TestoMutationArchive.FileScore(mapOf("ESCAPED" to escaped, "KILLED" to killed), at)
+        val full = TestoMutationArchive.Summary(
+            localPaths = mapOf("/app/src/A.php" to "D:\\p\\src\\A.php", "/app/src/Sub/B.php" to "D:\\p\\src\\Sub\\B.php"),
+            scores = mapOf("/app/src/A.php" to score(1, 1, 100), "/app/src/Sub/B.php" to score(2, 2, 100)),
+        )
+        val narrowed = TestoMutationArchive.Summary(
+            localPaths = mapOf("/app/src/A.php" to "D:\\p\\src\\A.php"),
+            scores = mapOf("/app/src/A.php" to score(0, 2, 200)),
+        )
+
+        val merged = mergeScores(listOf(narrowed, full))
+
+        assertEquals(100, merged.getValue("D:/p/src/A.php").msi)
+        assertEquals(50, merged.getValue("D:/p/src/Sub/B.php").msi)
+        assertEquals(66, scoreUnder(merged, "D:\\p\\src", directory = true)?.msi)
+        assertEquals(50, scoreUnder(merged, "D:/p/src/Sub/", directory = true)?.msi)
+        assertEquals(null, scoreUnder(merged, "D:/p/src/C.php", directory = false))
+    }
+
+    @Test
+    fun `a rerun restamps only the files it judged again`() {
+        val testoRun = temp.newFolder("run").toPath()
+        val dir = record(testoRun, 1000)
+        val file = TestoMutationArchive.summary(dir)!!.scores.keys.single()
+        assertEquals(1000, TestoMutationArchive.summary(dir)!!.scores.getValue(file).at)
+
+        val run = TestoMutationArchive.load(testoRun, dir)!!
+        TestoMutationArchive.writeSummary(dir, run, rescored = setOf(file))
+
+        assertTrue(TestoMutationArchive.summary(dir)!!.scores.getValue(file).at > 1000)
+        assertEquals(run.score().msi, TestoMutationArchive.scores(testoRun).values.single().msi)
+    }
+
+    @Test
     fun `the history lists a run off its summary alone`() {
         val testoRun = temp.newFolder("run").toPath()
         val dir = record(testoRun, 1000)

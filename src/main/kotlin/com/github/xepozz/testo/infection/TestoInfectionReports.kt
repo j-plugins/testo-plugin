@@ -8,8 +8,12 @@ import com.github.xepozz.testo.coverage.format.readXmlRoot
 import com.github.xepozz.testo.runs.TestoRunManifest
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.NioFiles
+import org.w3c.dom.Element
 import java.nio.file.Files
 import java.nio.file.Path
+import javax.xml.transform.TransformerFactory
+import javax.xml.transform.dom.DOMSource
+import javax.xml.transform.stream.StreamResult
 
 /** Whether an archived run carries what Infection needs to skip its own initial test run. */
 internal sealed interface TestoMutationReadiness {
@@ -47,7 +51,7 @@ internal object TestoInfectionReports {
      * them — the same on the host and inside a container.
      */
     fun coveredSourceFiles(coverageXml: Path): List<String> =
-        readXmlRoot(coverageXml.resolve("index.xml")).descendants("file").mapNotNull { file ->
+        readXmlRoot(coverageXml.resolve("index.xml")).descendants("file").filter { !isEvaluated(it) }.mapNotNull { file ->
             val executed = file.childElements("totals").firstOrNull()
                 ?.childElements("lines")?.firstOrNull()
                 ?.getAttribute("executed")?.toIntOrNull() ?: 0
@@ -59,8 +63,32 @@ internal object TestoInfectionReports {
         NioFiles.deleteRecursively(target)
         Files.createDirectories(target)
         FileUtil.copyDir(ready.coverageXml.toFile(), target.resolve("coverage-xml").toFile())
+        dropUnreadable(target.resolve("coverage-xml"))
         Files.copy(ready.junit, target.resolve("junit.xml"))
     }
+
+    /**
+     * Takes out of `index.xml` every file Infection could not read: it stops at the first. Code run through eval() is
+     * one — PHP reports it as a file of its own, `Foo.php(64) : eval()'d code`, which is no source and, on Windows, no
+     * path either — as is any file whose report is not beside the index.
+     */
+    fun dropUnreadable(coverageXml: Path) {
+        val index = coverageXml.resolve("index.xml")
+        val root = readXmlRoot(index)
+        val dropped = root.descendants("file").filter { file ->
+            val href = file.getAttribute("href")
+            isEvaluated(file) || href.isEmpty() || runCatching { !Files.isRegularFile(coverageXml.resolve(href)) }.getOrDefault(true)
+        }
+        if (dropped.isEmpty()) return
+        dropped.forEach { it.parentNode.removeChild(it) }
+        Files.newOutputStream(index).use { out ->
+            TransformerFactory.newInstance().newTransformer().transform(DOMSource(root.ownerDocument), StreamResult(out))
+        }
+    }
+
+    private val EVALUATED = Regex("""\(\d+\) : eval\(\)'d code$""")
+
+    private fun isEvaluated(file: Element): Boolean = EVALUATED.containsMatchIn(file.getAttribute("name"))
 }
 
 /** What the user has to do to get a run mutation testing can start from. */

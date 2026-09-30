@@ -540,6 +540,8 @@ Non-obvious constraints already paid for in blood — read before touching the r
   A run narrowed from the Coverage view does pass `--filter`: it is matched as a substring of each source's real path,
   so a directory goes in as its coverage-relative path with a trailing slash (`mutationFilterFor`), never as a file list.
   The Coverage view knows its Testo run only through `TestoCoverageSuite.runDir`, set by whoever applies the bundle.
+  Its MSI merges every mutation run of that Testo run per file, by the time each file was last judged (`FileScore.at`,
+  restamped by a rerun), and its columns are fixed at build time, so a finished run re-applies the bundle.
 - **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to
   `SMTRunnerEventsListener`: a short run finishes replaying before the augmenter hands us the console, so the
   events are already fired and missed.

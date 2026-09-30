@@ -96,6 +96,53 @@ class TestoMutationPanelPsiTest : BasePlatformTestCase() {
         }
     }
 
+    fun testTheLogStaysHiddenAfterBothPartsWereOffWhileMutantsWereSelected() {
+        val dir = Files.createTempDirectory("testo-mutation")
+        val run = TestoMutationRun("t", dir, dir) { it }
+        run.appendLog("$ php vendor/bin/infection")
+        val file = MutatedFile("f1", "E.php", dir.resolve("E.php").toString())
+        val mutants = (1..2).map { index ->
+            Mutant("m$index", file, "Infection\\Mutator\\Number\\DecrementInteger", "h$index", 0, 1).apply {
+                status = MutantStatus.ESCAPED
+                finished = true
+                original = "<?php return $index;"
+                mutated = "<?php return 0;"
+            }
+        }
+        file.mutants += mutants
+        run.files += file
+        run.finish(0)
+        TestoMutationDetails.showOutput = true
+        TestoMutationDetails.showDiff = true
+        try {
+            val panel = TestoMutationPanel(project, run)
+            Disposer.register(testRootDisposable, panel)
+            panel.setSize(400, 600)
+            waitFor { false }
+            assertTrue("the log first", outputText(panel).startsWith("$ php vendor/bin/infection"))
+
+            TestoMutationDetails.showOutput = false
+            TestoMutationDetails.showDiff = false
+            mutants.forEach { mutant ->
+                panel.select(mutant)
+                waitFor { false }
+            }
+            TestoMutationDetails.showOutput = true
+            TestoMutationDetails.showDiff = true
+            waitFor { false }
+
+            assertTrue(panel.diff.component.isVisible)
+            assertTrue(panel.outputPane.isVisible)
+            assertTrue("the selected mutant's details under its diff", outputText(panel).contains("h2"))
+        } finally {
+            TestoMutationDetails.showOutput = false
+            TestoMutationDetails.showDiff = true
+        }
+    }
+
+    private fun outputText(panel: TestoMutationPanel): String =
+        (panel.outputPane.viewport.view as javax.swing.text.JTextComponent).text
+
     // Headless: nothing lays the panel out on its own.
     private fun layOut(component: java.awt.Component) {
         if (component is java.awt.Container) {

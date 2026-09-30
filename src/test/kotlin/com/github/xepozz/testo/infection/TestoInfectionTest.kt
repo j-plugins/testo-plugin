@@ -5,6 +5,7 @@ import com.github.xepozz.testo.runs.TestoRunManifest
 import com.github.xepozz.testo.tests.run.TestoRunnerSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -223,6 +224,38 @@ class TestoInfectionTest {
         )
 
         assertEquals(listOf("src/A.php", "src/Sub/C.php"), TestoInfectionReports.coveredSourceFiles(dir))
+    }
+
+    @Test
+    fun `code run through eval and files without a report are left out of the index Infection reads`() {
+        val source = temp.newFolder("eval").toPath()
+        Files.createDirectories(source.resolve("coverage-xml/src"))
+        Files.writeString(
+            source.resolve("coverage-xml/index.xml"),
+            """
+            <phpunit xmlns="https://schema.phpunit.de/coverage/1.0">
+              <project source="/app">
+                <directory name="/app">
+                  <file name="A.php" href="src/A.php.xml"><totals><lines total="4" executed="2"/></totals></file>
+                  <file name="A.php(64) : eval()'d code" href="src/A.php(64) : eval()'d code.xml"><totals><lines total="1" executed="1"/></totals></file>
+                  <file name="Gone.php" href="src/Gone.php.xml"><totals><lines total="1" executed="1"/></totals></file>
+                </directory>
+              </project>
+            </phpunit>
+            """.trimIndent(),
+        )
+        Files.writeString(source.resolve("coverage-xml/src/A.php.xml"), "<phpunit/>")
+        Files.writeString(source.resolve("junit.xml"), "<testsuites/>")
+        val target = temp.root.toPath().resolve("assembled-eval")
+
+        assertEquals(listOf("src/A.php", "src/Gone.php"), TestoInfectionReports.coveredSourceFiles(source.resolve("coverage-xml")))
+        TestoInfectionReports.assemble(
+            TestoMutationReadiness.Ready(source.resolve("coverage-xml"), source.resolve("junit.xml")),
+            target,
+        )
+
+        assertEquals(listOf("src/A.php"), TestoInfectionReports.coveredSourceFiles(target.resolve("coverage-xml")))
+        assertTrue(Files.readString(target.resolve("coverage-xml/index.xml")).contains("xmlns=\"https://schema.phpunit.de/coverage/1.0\""))
     }
 
     @Test

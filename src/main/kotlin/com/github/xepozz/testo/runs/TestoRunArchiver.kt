@@ -207,6 +207,8 @@ internal object TestoRunArchiver {
         return candidate
     }
 
+    // A file that cannot be read is left behind rather than the whole report: PHP reports code run through eval() as
+    // `Foo.php(64) : eval()'d code.xml`, which NTFS stores as an alternate stream of a name no copy can open.
     private fun copyDirectory(source: Path, target: Path) {
         Files.walk(source).use { paths ->
             paths.forEach { path ->
@@ -214,7 +216,8 @@ internal object TestoRunArchiver {
                 if (Files.isDirectory(path)) Files.createDirectories(destination)
                 else {
                     Files.createDirectories(destination.parent)
-                    Files.copy(path, destination, StandardCopyOption.REPLACE_EXISTING)
+                    runCatching { Files.copy(path, destination, StandardCopyOption.REPLACE_EXISTING) }
+                        .onFailure { LOG.info("Left $path out of the captured report: ${it.message}") }
                 }
             }
         }

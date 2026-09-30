@@ -15,6 +15,7 @@ import com.intellij.execution.RunManager
 import com.intellij.execution.RunnerAndConfigurationSettings
 import com.intellij.execution.impl.RunDialog
 import com.intellij.icons.AllIcons
+import com.intellij.ide.BrowserUtil
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.ActionPlaces
@@ -25,6 +26,7 @@ import com.intellij.openapi.actionSystem.ExecutionDataKeys
 import com.intellij.openapi.actionSystem.KeepPopupOnPerform
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.DumbAwareToggleAction
 import com.intellij.openapi.ui.popup.JBPopupFactory
@@ -44,6 +46,7 @@ import java.awt.Graphics2D
 import java.awt.Point
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.awt.datatransfer.StringSelection
 import java.awt.geom.Arc2D
 import java.nio.file.Files
 import java.nio.file.Path
@@ -76,8 +79,9 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
     private var verdict: Icon? = null
     private var escaped = 0
     private var spinAngle = 0
+    private var hasReport = false
 
-    private enum class Zone { LABEL, BUTTON, ARROW, HISTORY, PROGRESS }
+    private enum class Zone { LABEL, BUTTON, ARROW, HISTORY, PROGRESS, REPORT, REPORT_ARROW }
 
     private class Context(val configuration: TestoRunConfiguration, val runDir: Path, val saved: RunnerAndConfigurationSettings?) {
         /** Where the options are read and written: the saved configuration, else the tab's own copy. */
@@ -99,6 +103,8 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
                     Zone.ARROW -> showOptions()
                     Zone.HISTORY -> if (hasHistory) showHistory()
                     Zone.PROGRESS -> run?.let { TestoMutationToolWindow.show(project, it) }
+                    Zone.REPORT -> if (hasReport) run?.let { TestoMutationToolWindow.openReport(project, it) }
+                    Zone.REPORT_ARROW -> if (hasReport) showReportMenu()
                     Zone.LABEL, null -> Unit
                 }
             }
@@ -124,6 +130,7 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
     private fun isActive(zone: Zone?): Boolean = when (zone) {
         null, Zone.LABEL -> false
         Zone.HISTORY -> hasHistory
+        Zone.REPORT, Zone.REPORT_ARROW -> hasReport
         else -> true
     }
 
@@ -141,6 +148,7 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         // A run read back from the archive has no recipe of its own; this tab knows how to run its Testo run's reports again.
         if (mutation != null && mutation.recipe == null) mutation.recipe = recipeOf(current)
         updateProgress(mutation)
+        hasReport = mutation != null && !mutation.isRunning && Files.isRegularFile(mutation.htmlReport)
         if (mutation?.isBusy == true) spinner.start() else spinner.stop()
         toolTipText = tooltip(hovered)
         repaint()
@@ -185,6 +193,8 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
     private fun tooltip(zone: Zone?): String? = when (zone) {
         null, Zone.LABEL -> null
         Zone.ARROW -> TestoBundle.message("infection.cell.options")
+        Zone.REPORT -> TestoBundle.message(if (hasReport) "infection.cell.report" else "infection.cell.report.none")
+        Zone.REPORT_ARROW -> TestoBundle.message(if (hasReport) "infection.cell.report.more" else "infection.cell.report.none")
         Zone.HISTORY -> TestoBundle.message(if (hasHistory) "infection.cell.history" else "infection.history.empty")
         Zone.PROGRESS -> TestoBundle.message(
             "infection.widget.tooltip",
@@ -232,13 +242,17 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         repaint()
     }
 
-    // Layout: Mutation [logo][▾] [history ▾] then, with a run, [ring label ✗ n  elapsed].
+    // Layout: Mutation [logo][▾] [history ▾] then, with a run, [ring label ✗ n  elapsed] [report][▾].
     private fun segments(): List<Pair<Zone, Int>> = buildList {
         add(Zone.LABEL to PADDING + textWidth(LABEL) + GAP)
         add(Zone.BUTTON to PADDING + LOGO.iconWidth + GAP)
         add(Zone.ARROW to ARROW.iconWidth + PADDING)
         add(Zone.HISTORY to PADDING + HISTORY.iconWidth + ARROW.iconWidth + PADDING)
-        if (progressLabel.isNotEmpty()) add(Zone.PROGRESS to progressWidth())
+        if (progressLabel.isNotEmpty()) {
+            add(Zone.PROGRESS to progressWidth())
+            add(Zone.REPORT to PADDING + REPORT.iconWidth + GAP)
+            add(Zone.REPORT_ARROW to ARROW.iconWidth + PADDING)
+        }
     }
 
     private fun progressWidth(): Int {
@@ -330,6 +344,9 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
                 g2.color = UIUtil.getContextHelpForeground()
                 g2.drawString(elapsed, x, baseline)
             }
+
+            paintIcon(g2, if (hasReport) REPORT else REPORT_DISABLED, start(Zone.REPORT) + PADDING)
+            paintIcon(g2, if (hasReport) ARROW else ARROW_DISABLED, start(Zone.REPORT_ARROW))
         } finally {
             g2.dispose()
         }
@@ -362,6 +379,23 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
                 ActionPlaces.TOOLBAR,
             )
             .show(RelativePoint(this, Point(LEAD + start(under), height)))
+    }
+
+    private fun showReportMenu() {
+        val mutation = run ?: return
+        val report = mutation.htmlReport
+        val group = DefaultActionGroup(
+            object : DumbAwareAction(TestoBundle.message("testo.report.open.webview"), null, AllIcons.Actions.Preview) {
+                override fun actionPerformed(e: AnActionEvent) = TestoMutationToolWindow.openReport(project, mutation)
+            },
+            object : DumbAwareAction(TestoBundle.message("testo.report.open.browser"), null, AllIcons.Nodes.PpWeb) {
+                override fun actionPerformed(e: AnActionEvent) = BrowserUtil.browse(report.toUri())
+            },
+            object : DumbAwareAction(TestoBundle.message("testo.report.copy.path"), null, AllIcons.Actions.Copy) {
+                override fun actionPerformed(e: AnActionEvent) = CopyPasteManager.getInstance().setContents(StringSelection(report.toString()))
+            },
+        )
+        showPopup(null, group, Zone.REPORT)
     }
 
     private fun showHistory() {
@@ -472,6 +506,8 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         private val ESCAPED: Icon = TestoIcons.Status.FAILED
         private val ARROW: Icon = AllIcons.General.LinkDropTriangle
         private val ARROW_DISABLED: Icon = IconLoader.getDisabledIcon(ARROW)
+        private val REPORT: Icon = AllIcons.General.Web
+        private val REPORT_DISABLED: Icon = IconLoader.getDisabledIcon(REPORT)
 
         private val PADDING get() = JBUI.scale(5)
         private val GAP get() = JBUI.scale(4)

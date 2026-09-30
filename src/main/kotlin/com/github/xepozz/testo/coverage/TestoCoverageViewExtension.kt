@@ -5,8 +5,8 @@ import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
 import com.github.xepozz.testo.coverage.perTest.testsUnder
 import com.github.xepozz.testo.infection.MutationScore
-import com.github.xepozz.testo.infection.TestoMutationArchive
 import com.github.xepozz.testo.infection.TestoMutationService
+import com.github.xepozz.testo.infection.scoreUnder
 import com.intellij.coverage.CoverageSuitesBundle
 import com.intellij.coverage.view.DirectoryCoverageViewExtension
 import com.intellij.coverage.view.ElementColumnInfo
@@ -86,18 +86,14 @@ class TestoCoverageViewExtension(
     /** The Testo run the shown coverage came from: its mutation runs are the only ones that score this code. */
     private val runDir: Path? = mySuitesBundle.suites.filterIsInstance<TestoCoverageSuite>().firstNotNullOfOrNull { it.runDir }
 
-    // Decided once, with the columns: the view does not add one later, and its width is asked for on every repaint.
-    private val showsMsi: Boolean by lazy {
-        runDir != null &&
-            (TestoMutationService.getInstance(project).runFor(runDir) != null || TestoMutationArchive.runs(runDir).isNotEmpty())
-    }
+    // Only once this run has been mutated; a mutation run after the view is built rebuilds it (reapplyTestoCoverage).
+    private fun showsMsi(): Boolean = runDir != null && TestoMutationService.getInstance(project).scores(runDir).isNotEmpty()
 
-    private fun showsMsi(): Boolean = showsMsi
-
-    /** The score of a node by the latest mutation run of this coverage's Testo run: its file, or everything beneath a directory. */
+    /** A node's score, each file by the mutation run of this Testo run that judged it last; a directory sums its files. */
     private fun msiFor(node: NodeDescriptor<*>): MutationScore? {
         val file = (node as? AbstractTreeNode<*>)?.let { extractFile(it) } ?: return null
-        return TestoMutationService.getInstance(project).runFor(runDir)?.scoreUnder(file.path, file.isDirectory)
+        val dir = runDir ?: return null
+        return scoreUnder(TestoMutationService.getInstance(project).scores(dir), file.path, file.isDirectory)
     }
 
     private fun msiText(score: MutationScore): String? =

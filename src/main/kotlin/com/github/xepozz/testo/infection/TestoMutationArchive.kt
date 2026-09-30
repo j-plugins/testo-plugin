@@ -1,11 +1,33 @@
 package com.github.xepozz.testo.infection
 
 import com.google.gson.Gson
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.NioFiles
 import java.io.Writer
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+
+/** Each file's score from the summary that judged it last, keyed by host path. */
+internal fun mergeScores(summaries: List<TestoMutationArchive.Summary>): Map<String, MutationScore> {
+    val latest = HashMap<String, TestoMutationArchive.FileScore>()
+    for (summary in summaries) {
+        for ((path, score) in summary.scores) {
+            val local = FileUtil.toSystemIndependentName(summary.localPaths[path] ?: path)
+            if ((latest[local]?.at ?: Long.MIN_VALUE) <= score.at) latest[local] = score
+        }
+    }
+    return latest.mapValues { it.value.score() }
+}
+
+/** The score of [localPath], a host path: the file itself, or every scored file beneath a directory; null when none is there. */
+internal fun scoreUnder(scores: Map<String, MutationScore>, localPath: String, directory: Boolean): MutationScore? {
+    val target = FileUtil.toSystemIndependentName(localPath).trimEnd('/')
+    if (!directory) return scores[target]
+    val under = scores.filterKeys { it.startsWith("$target/") }.values
+    if (under.isEmpty()) return null
+    return MutationScore(under.flatMap { it.counts.entries }.groupingBy { it.key }.fold(0) { sum, entry -> sum + entry.value })
+}
 
 /**
  * Mutation runs kept beside the Testo run they mutate, in `<run dir>/infection/<started at>/`: they are exported,
@@ -41,7 +63,14 @@ internal object TestoMutationArchive {
         val mutants: Int = 0,
         /** SHA-256 of each mutated file when it was mutated, by interpreter path. */
         val fingerprints: Map<String, String> = emptyMap(),
+        /** Each file whose mutants all finished, by interpreter path: what the Coverage view scores it by. */
+        val scores: Map<String, FileScore> = emptyMap(),
     )
+
+    /** A file's mutants by status name, and when they were last judged: the run's start, or its latest rerun of them. */
+    class FileScore(val counts: Map<String, Int> = emptyMap(), val at: Long = 0) {
+        fun score() = MutationScore(counts.mapNotNull { (name, count) -> MutantStatus.entries.firstOrNull { it.name == name }?.to(count) }.toMap())
+    }
 
     fun newRunDir(testoRunDir: Path, startedAt: Long): Path = testoRunDir.resolve(DIR).resolve(startedAt.toString())
 
@@ -95,8 +124,17 @@ internal object TestoMutationArchive {
         override fun close() = writer.close()
     }
 
-    fun writeSummary(dir: Path, run: TestoMutationRun) {
+    /** Writes [run]'s summary; the files in [rescored] were just judged again, the rest keep when they last were. */
+    fun writeSummary(dir: Path, run: TestoMutationRun, rescored: Set<String> = emptySet()) {
         val score = run.score()
+        val previous = summary(dir)?.scores.orEmpty()
+        val now = System.currentTimeMillis()
+        val scores = run.files
+            .filter { file -> file.mutants.isNotEmpty() && file.mutants.all { it.finished && it.status != null } }
+            .associate { file ->
+                val at = if (file.path in rescored) now else previous[file.path]?.at ?: run.startedAt
+                file.path to FileScore(file.mutants.groupingBy { it.status!!.name }.eachCount(), at)
+            }
         val summary = Summary(
             title = run.title,
             startedAt = run.startedAt,
@@ -109,6 +147,7 @@ internal object TestoMutationArchive {
             escaped = score.escaped,
             mutants = run.mutants.size,
             fingerprints = HashMap(run.fingerprints),
+            scores = scores,
         )
         Files.writeString(dir.resolve(SUMMARY_FILE), gson.toJson(summary), StandardCharsets.UTF_8)
     }
@@ -129,6 +168,19 @@ internal object TestoMutationArchive {
         run.restore(summary.startedAt, summary.finishedAt, summary.exitCode, summary.stopped, summary.expected)
         return run
     }
+
+    /**
+     * The score of every file the mutation runs of [testoRunDir] judged, by host path: each file by whichever run judged
+     * it last, so a run narrowed to one file or a rerun of one mutant updates that file and leaves the others as they were.
+     */
+    fun scores(testoRunDir: Path): Map<String, MutationScore> = mergeScores(runs(testoRunDir).mapNotNull { dir ->
+        val summary = summary(dir) ?: return@mapNotNull null
+        // Written before the per-file scores were: read the run back and store them, once.
+        if (summary.scores.isEmpty() && summary.mutants > 0) {
+            load(testoRunDir, dir)?.let { run -> runCatching { writeSummary(dir, run) } }
+            summary(dir) ?: summary
+        } else summary
+    })
 
     private fun replay(dir: Path, stream: TestoMutationStream, run: TestoMutationRun) {
         runCatching {

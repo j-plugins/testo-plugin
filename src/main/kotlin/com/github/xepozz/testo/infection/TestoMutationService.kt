@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.coverage.reapplyTestoCoverage
 import com.github.xepozz.testo.php.PhpToolLauncher
 import com.github.xepozz.testo.runs.TestoRunManifest
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
@@ -39,6 +40,8 @@ class TestoMutationService(private val project: Project) {
 
     // Testo runs whose archive has been looked into for a mutation run, so a replay reads its files once.
     private val probed = ConcurrentHashMap.newKeySet<Path>()
+
+    private val scoreCache = ConcurrentHashMap<Path, Map<String, MutationScore>>()
 
     init {
         // Before mutation runs moved into the run archive they lived here; nothing reads that any more.
@@ -150,9 +153,23 @@ class TestoMutationService(private val project: Project) {
                 } finally {
                     release(launch)
                 }
+                scored(runDir)
                 if (run.exitCode != null) notifyFinished(run)
             }
         }.queue()
+    }
+
+    /**
+     * Every file the mutation runs of the Testo run at [sourceRunDir] have judged, by host path, each by the run that did
+     * so last. Read from their summaries once, then again after each mutation run or rerun of it.
+     */
+    fun scores(sourceRunDir: Path): Map<String, MutationScore> =
+        scoreCache.getOrPut(sourceRunDir) { runCatching { TestoMutationArchive.scores(sourceRunDir) }.getOrDefault(emptyMap()) }
+
+    // The Coverage view builds its columns once: a view on this run is built again for the MSI column to appear.
+    private fun scored(sourceRunDir: Path) {
+        scoreCache.remove(sourceRunDir)
+        ApplicationManager.getApplication().invokeLater({ reapplyTestoCoverage(project, sourceRunDir) }, project.disposed)
     }
 
     /** Makes [run] the latest of its Testo run, the one [runFor] and [current] answer. */
@@ -221,9 +238,11 @@ class TestoMutationService(private val project: Project) {
                     targets.forEach { it.rerunning = false }
                     run.rerunning = false
                     run.stopper = null
-                    runCatching { TestoMutationArchive.writeSummary(run.workDir, run) }
+                    val rescored = (targets - missing.toSet()).mapTo(HashSet()) { it.file.path }
+                    runCatching { TestoMutationArchive.writeSummary(run.workDir, run, rescored) }
                         .onFailure { thisLogger().warn("Could not update the summary of ${run.workDir}", it) }
                     run.changed()
+                    scored(run.sourceRunDir)
                     notifyRerun(run, targets - missing.toSet(), missing.size)
                 }
             }
