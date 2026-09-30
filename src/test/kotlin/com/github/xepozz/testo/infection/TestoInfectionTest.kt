@@ -113,6 +113,30 @@ class TestoInfectionTest {
     }
 
     @Test
+    fun `a file or directory picked on the host becomes the filter the coverage spells`() {
+        val sources = listOf("src/A.php", "src/Sub/C.php", "lib/B.php")
+        val covered = listOf("D:/p/src/A.php", "D:/p/src/Sub/C.php", "D:/p/lib/B.php")
+
+        assertEquals("src/Sub/C.php", mutationFilterFor("D:\\p\\src\\Sub\\C.php", false, covered, sources))
+        assertEquals("src/Sub/", mutationFilterFor("D:/p/src/Sub", true, covered, sources))
+        assertEquals("src/", mutationFilterFor("D:/p/src/", true, covered, sources))
+        assertEquals("", mutationFilterFor("D:/p", true, covered, sources))
+        assertNull(mutationFilterFor("D:/p/tests", true, covered, sources))
+        assertNull(mutationFilterFor("D:/p/src/D.php", false, covered, sources))
+    }
+
+    @Test
+    fun `a narrowed run filters by its file or directory whatever the scope`() {
+        val options = TestoInfectionOptions(scope = TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES, filter = "src/Sub/")
+
+        assertEquals(
+            listOf("--filter=src/Sub/"),
+            TestoInfectionArguments.build("/c", listOf("src/A.php"), null, null, options)
+                .filter { it.startsWith("--filter") || it.startsWith("--git-diff") },
+        )
+    }
+
+    @Test
     fun `the report's Back link to the drive root is blanked out in place`() {
         val body = "<html>\n    <body>\n        <a href=\"/\">Back</a>\n        <mutation-test-report-app></mutation-test-report-app>\n"
         val report = temp.newFile("report.html").toPath()

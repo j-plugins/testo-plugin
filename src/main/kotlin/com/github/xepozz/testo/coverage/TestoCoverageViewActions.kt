@@ -1,6 +1,17 @@
 package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.TestoIcons
+import com.github.xepozz.testo.infection.TestoInfectionReports
+import com.github.xepozz.testo.infection.TestoMutationReadiness
+import com.github.xepozz.testo.infection.TestoMutationRecipe
+import com.github.xepozz.testo.infection.TestoMutationService
+import com.github.xepozz.testo.infection.mutationFilterFor
+import com.github.xepozz.testo.runs.TestoRunStore
+import com.github.xepozz.testo.runs.restoreTestoConfiguration
+import com.github.xepozz.testo.tests.run.TestoRunConfiguration
+import com.github.xepozz.testo.tests.run.TestoRunConfigurationType
+import com.intellij.execution.RunManager
 import com.github.xepozz.testo.coverage.editor.TestoCoverageEditorHighlighter
 import com.github.xepozz.testo.coverage.editor.TestoCoveringTestsGutter
 import com.github.xepozz.testo.coverage.format.TestId
@@ -136,6 +147,72 @@ internal class TestoRunCoveringTestsAction(private val project: Project) : AnAct
 
     private fun selectedItem(e: AnActionEvent): PsiFileSystemItem? =
         ((e.getData(CommonDataKeys.NAVIGATABLE) as? AbstractTreeNode<*>)?.value) as? PsiFileSystemItem
+}
+
+/**
+ * Mutates the selected row alone — a file, or a directory's whole subtree — over the reports of the Testo run the view
+ * shows. Read off the selection like [TestoRunCoveringTestsAction], for the same reason.
+ */
+internal class TestoMutateSelectionAction(
+    private val project: Project,
+    private val bundle: CoverageSuitesBundle,
+) : AnAction(TestoBundle.message("testo.coverage.view.mutate"), null, TestoIcons.MUTATION_RUN), DumbAware {
+    // Kept once the run can be mutated; until its run.json says so, every update reads it again.
+    @Volatile
+    private var recipe: TestoMutationRecipe? = null
+
+    @Volatile
+    private var sources: List<String> = emptyList()
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+
+    override fun update(e: AnActionEvent) {
+        val target = target(e)
+        val busy = target != null && TestoMutationService.getInstance(project).runFor(target.recipe.runDir)?.isBusy == true
+        e.presentation.isEnabled = target != null && !busy
+        e.presentation.text = target?.let { TestoBundle.message("testo.coverage.view.mutate.named", it.name) }
+            ?: TestoBundle.message("testo.coverage.view.mutate")
+    }
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val target = target(e) ?: return
+        val recipe = target.recipe
+        val scoped = target.filter.isNotEmpty()
+        TestoMutationService.getInstance(project).start(
+            TestoMutationRecipe(
+                recipe.configuration,
+                recipe.runDir,
+                recipe.ready,
+                recipe.optionsFrom,
+                filter = target.filter.takeIf { scoped },
+                scopeName = target.name.takeIf { scoped },
+            )
+        )
+    }
+
+    private class Target(val recipe: TestoMutationRecipe, val filter: String, val name: String)
+
+    private fun target(e: AnActionEvent): Target? {
+        val recipe = recipe() ?: return null
+        val item = ((e.getData(CommonDataKeys.NAVIGATABLE) as? AbstractTreeNode<*>)?.value) as? PsiFileSystemItem ?: return null
+        val file = item.virtualFile ?: return null
+        val covered = bundle.coverageData?.classes?.keys.orEmpty()
+        val filter = mutationFilterFor(file.path, file.isDirectory, covered, sources) ?: return null
+        return Target(recipe, filter, item.name)
+    }
+
+    private fun recipe(): TestoMutationRecipe? {
+        recipe?.let { return it }
+        val runDir = bundle.suites.filterIsInstance<TestoCoverageSuite>().firstNotNullOfOrNull { it.runDir } ?: return null
+        val manifest = TestoRunStore.getInstance(project).readManifest(runDir) ?: return null
+        val ready = TestoInfectionReports.readiness(runDir, manifest) as? TestoMutationReadiness.Ready ?: return null
+        val configuration = restoreTestoConfiguration(project, runDir, manifest)
+        val saved = RunManager.getInstance(project)
+            .findConfigurationByTypeAndName(TestoRunConfigurationType.INSTANCE, configuration.name)
+            ?.configuration as? TestoRunConfiguration
+        sources = runCatching { TestoInfectionReports.coveredSourceFiles(ready.coverageXml) }.getOrDefault(emptyList())
+        return TestoMutationRecipe(configuration, runDir, ready, saved ?: configuration).also { recipe = it }
+    }
 }
 
 /** Non-clickable chips naming the report formats merged into the shown bundle — one per distinct format. */

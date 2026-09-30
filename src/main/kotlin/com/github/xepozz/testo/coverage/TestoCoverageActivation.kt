@@ -31,7 +31,7 @@ data class TestoCoverageReport(val name: String?, val format: CoverageFormat?, v
  * Returns false when the coverage module is absent (the runner is registered only by `coverage.xml`) or no report was
  * given; the format falls back to sniffing when unknown. Call on the EDT — `chooseSuitesBundle` opens UI.
  */
-fun applyTestoCoverage(project: Project, reports: List<TestoCoverageReport>): Boolean {
+fun applyTestoCoverage(project: Project, reports: List<TestoCoverageReport>, runDir: Path? = null): Boolean {
     if (reports.isEmpty()) return false
     val runner = CoverageRunner.getInstance(TestoCoverageRunner::class.java) ?: return false
     val suites = reports.mapNotNull { report ->
@@ -42,6 +42,7 @@ fun applyTestoCoverage(project: Project, reports: List<TestoCoverageReport>): Bo
             .createCoverageSuite(report.name ?: "Testo coverage", project, runner, provider, timestamp) as? TestoCoverageSuite
             ?: return@mapNotNull null
         suite.format = report.format ?: detectCoverageFormat(report.dataFile) ?: CoverageFormat.CLOVER
+        suite.runDir = runDir
         suite
     }
     if (suites.isEmpty()) return false

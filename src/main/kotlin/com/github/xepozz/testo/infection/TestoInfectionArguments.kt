@@ -18,6 +18,8 @@ internal data class TestoInfectionOptions(
     val mutantId: String? = null,
     /** The source file [mutantId] is in, as the coverage spells it: spares Infection generating every other file's mutants. */
     val mutantFile: String? = null,
+    /** A file or directory the run is narrowed to; Infection's `--filter` matches it anywhere in a source's real path. */
+    val filter: String? = null,
 ) {
     companion object {
         fun of(settings: TestoRunnerSettings) = TestoInfectionOptions(
@@ -57,6 +59,7 @@ internal object TestoInfectionArguments {
                 options.mutantFile?.let { add("--filter=$it") }
                 add("--id=${options.mutantId}")
             }
+            options.filter != null -> add("--filter=${options.filter}")
             options.scope == TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES -> {
                 add("--git-diff-lines")
                 options.gitDiffBase.trim().takeIf { it.isNotEmpty() }?.let { add("--git-diff-base=$it") }

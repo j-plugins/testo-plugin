@@ -44,7 +44,8 @@ internal fun autoApplyCoverage(project: Project, props: TestoConsoleProperties, 
         val chosen = dedupeCoverageByFormat(checked, flagKeys)
             .map { (ref, path) -> TestoCoverageReport(ref.name, ref.coverageFormat, path) }
         if (chosen.isEmpty()) return@executeOnPooledThread
-        ApplicationManager.getApplication().invokeLater({ applyTestoCoverage(project, chosen) }, project.disposed)
+        val runDir = props.currentRunDir()
+        ApplicationManager.getApplication().invokeLater({ applyTestoCoverage(project, chosen, runDir) }, project.disposed)
     }
 }
 

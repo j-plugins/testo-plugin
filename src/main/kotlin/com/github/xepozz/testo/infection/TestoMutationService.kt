@@ -121,7 +121,7 @@ class TestoMutationService(private val project: Project) {
         val interpreter = clone.interpreter
         val launcher = interpreter?.let { PhpToolLauncher(project, it) }
 
-        val run = TestoMutationRun(recipe.configuration.name, runDir, launch.workDir) { launcher?.toLocal(it) }
+        val run = TestoMutationRun(recipe.title, runDir, launch.workDir) { launcher?.toLocal(it) }
         run.recipe = recipe
         track(run)
         TestoMutationToolWindow.add(project, run)
@@ -378,9 +378,15 @@ internal class TestoMutationRecipe(
     val ready: TestoMutationReadiness.Ready,
     /** Where the Infection options live: the saved configuration, which the tab's may only be a copy of. */
     val optionsFrom: TestoRunConfiguration,
+    /** The file or directory the run is narrowed to, as [mutationFilterFor] spells it for Infection. */
+    val filter: String? = null,
+    /** What [filter] names, for the tab. */
+    val scopeName: String? = null,
 ) {
+    val title: String get() = scopeName?.let { "${configuration.name} · $it" } ?: configuration.name
+
     /** Read at each start, so an option changed since the first run applies to the next. */
-    fun options(): TestoInfectionOptions = TestoInfectionOptions.of(optionsFrom.testoSettings.runnerSettings)
+    fun options(): TestoInfectionOptions = TestoInfectionOptions.of(optionsFrom.testoSettings.runnerSettings).copy(filter = filter)
 
     fun clone(launch: TestoInfectionLaunch): TestoRunConfiguration =
         (configuration.clone() as TestoRunConfiguration).also { it.infectionLaunch = launch }
@@ -390,4 +396,23 @@ internal class TestoMutationRecipe(
 internal fun sourceOf(path: String, sources: List<String>): String? {
     val normalized = path.replace('\\', '/')
     return sources.filter { normalized == it || normalized.endsWith("/$it") }.maxByOrNull { it.length }
+}
+
+/**
+ * Infection's `--filter` for a file or directory picked on the host: a file's source, a directory as the coverage
+ * spells it with a trailing slash, found through a covered file under it. Empty when the directory holds the whole
+ * coverage, null when nothing under it is covered.
+ */
+internal fun mutationFilterFor(selected: String, directory: Boolean, coveredFiles: Collection<String>, sources: List<String>): String? {
+    val path = selected.replace('\\', '/').trimEnd('/')
+    if (!directory) return sourceOf(path, sources)
+    val prefix = "$path/"
+    for (covered in coveredFiles) {
+        val file = covered.replace('\\', '/')
+        if (!file.startsWith(prefix)) continue
+        val source = sourceOf(file, sources) ?: continue
+        val root = file.removeSuffix(source)
+        return if (prefix.length > root.length) prefix.removePrefix(root) else ""
+    }
+    return null
 }

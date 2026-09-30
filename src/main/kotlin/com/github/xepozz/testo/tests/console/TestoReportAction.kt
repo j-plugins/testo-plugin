@@ -59,6 +59,8 @@ class TestoReportsAction(
     private val project: Project,
     private val baseDirectory: () -> String?,
     private val mapToLocal: (String) -> String?,
+    /** The archive this run is recorded into or replayed from: whose coverage the Coverage view then shows. */
+    private val runDir: () -> Path? = { null },
     private val trailing: (() -> TestoReportsRowCell)? = null,
 ) : AnAction(), CustomComponentAction, RightAlignedToolbarAction, DumbAware {
 
@@ -440,13 +442,13 @@ class TestoReportsAction(
 
         private fun applyChecked() {
             val checked = checkedReports()
-            if (checked.isNotEmpty()) applyTestoCoverage(project, checked)
+            if (checked.isNotEmpty()) applyTestoCoverage(project, checked, runDir())
         }
 
         private fun onToggled() {
             if (!isTestoCoverageActive(project)) return
             val checked = checkedReports()
-            if (checked.isEmpty()) closeTestoCoverage(project) else applyTestoCoverage(project, checked)
+            if (checked.isEmpty()) closeTestoCoverage(project) else applyTestoCoverage(project, checked, runDir())
         }
 
         private fun showMenu() {

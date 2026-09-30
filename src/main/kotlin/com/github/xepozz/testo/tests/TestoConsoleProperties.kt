@@ -120,6 +120,7 @@ class TestoConsoleProperties(
             project,
             { workingDirectory ?: project.basePath },
             { path -> reportLocalPath(path) },
+            { currentRunDir() },
         ) { com.github.xepozz.testo.infection.TestoMutationCell(this) }
 
     // Guards the channel-tab install: set once whoever wires the tabs first (the run-path ExecutionListener or the

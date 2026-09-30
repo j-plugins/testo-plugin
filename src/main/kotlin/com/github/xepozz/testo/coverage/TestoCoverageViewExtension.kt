@@ -5,6 +5,7 @@ import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
 import com.github.xepozz.testo.coverage.perTest.testsUnder
 import com.github.xepozz.testo.infection.MutationScore
+import com.github.xepozz.testo.infection.TestoMutationArchive
 import com.github.xepozz.testo.infection.TestoMutationService
 import com.intellij.coverage.CoverageSuitesBundle
 import com.intellij.coverage.view.DirectoryCoverageViewExtension
@@ -13,8 +14,10 @@ import com.intellij.coverage.view.PercentageCoverageColumnInfo
 import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.ide.util.treeView.NodeDescriptor
 import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.project.Project
 import com.intellij.util.ui.ColumnInfo
+import java.nio.file.Path
 
 data class CoverageTally(val covered: Int, val total: Int)
 
@@ -80,13 +83,21 @@ class TestoCoverageViewExtension(
     /** Where the MSI column sits, after Tests when that is shown, or -1. */
     private fun msiColumn(): Int = if (showsMsi()) metrics().size + 1 + (if (showsTests()) 1 else 0) else -1
 
-    // Only once mutation testing has run here: the column would be empty in every project that never mutates.
-    private fun showsMsi(): Boolean = TestoMutationService.getInstance(project).current() != null
+    /** The Testo run the shown coverage came from: its mutation runs are the only ones that score this code. */
+    private val runDir: Path? = mySuitesBundle.suites.filterIsInstance<TestoCoverageSuite>().firstNotNullOfOrNull { it.runDir }
 
-    /** The latest mutation run's score of a node: its file, or everything mutated beneath a directory. */
+    // Decided once, with the columns: the view does not add one later, and its width is asked for on every repaint.
+    private val showsMsi: Boolean by lazy {
+        runDir != null &&
+            (TestoMutationService.getInstance(project).runFor(runDir) != null || TestoMutationArchive.runs(runDir).isNotEmpty())
+    }
+
+    private fun showsMsi(): Boolean = showsMsi
+
+    /** The score of a node by the latest mutation run of this coverage's Testo run: its file, or everything beneath a directory. */
     private fun msiFor(node: NodeDescriptor<*>): MutationScore? {
         val file = (node as? AbstractTreeNode<*>)?.let { extractFile(it) } ?: return null
-        return TestoMutationService.getInstance(project).current()?.scoreUnder(file.path, file.isDirectory)
+        return TestoMutationService.getInstance(project).runFor(runDir)?.scoreUnder(file.path, file.isDirectory)
     }
 
     private fun msiText(score: MutationScore): String? =
@@ -110,7 +121,9 @@ class TestoCoverageViewExtension(
         TestoSelectOpenedFileAction(project),
         TestoCoverageHighlightToggleAction(project),
         TestoCoveringTestsGutterToggleAction(project),
+        Separator.getInstance(),
         TestoRunCoveringTestsAction(project),
+        TestoMutateSelectionAction(project, mySuitesBundle),
         TestoCoverageFormatBadgesAction(mySuitesBundle),
     )
 

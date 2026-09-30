@@ -537,6 +537,9 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `file://`: it is blanked with spaces in place once the report is written, not cut out.
   No `--filter` unless `--with-uncovered`: Infection skips a file its coverage has no test for before parsing it, and
   the positional replacement for the deprecated flag hands paths outside infection.json5's `source` to Testo as tests.
+  A run narrowed from the Coverage view does pass `--filter`: it is matched as a substring of each source's real path,
+  so a directory goes in as its coverage-relative path with a trailing slash (`mutationFilterFor`), never as a file list.
+  The Coverage view knows its Testo run only through `TestoCoverageSuite.runDir`, set by whoever applies the bundle.
 - **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to
   `SMTRunnerEventsListener`: a short run finishes replaying before the augmenter hands us the console, so the
   events are already fired and missed.
