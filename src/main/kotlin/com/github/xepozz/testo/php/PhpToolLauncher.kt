@@ -69,21 +69,10 @@ internal class PhpToolLauncher(private val project: Project, val interpreter: Ph
         mappings?.convertToRemote(localDir.toString())?.takeIf { it != localDir.toString() }
             ?.let { return SharedDirectory(it, null) }
 
-        val roots = listOfNotNull(
-            project.basePath?.let { Path.of(it, ".idea", "testo", STAGING_DIR) },
-            workingDirectory?.let { Path.of(it, ".testo-$STAGING_DIR") },
-        )
-        for (root in roots) {
-            val staging = root.resolve(FileUtil.sanitizeFileName(stagingName))
-            val path = toMapped(staging.toString(), command) ?: continue
-            NioFiles.deleteRecursively(staging)
-            FileUtil.copyDir(localDir.toFile(), staging.toFile())
-            Files.writeString(root.resolve(".gitignore"), "*\n")
-            return SharedDirectory(path, staging)
-        }
-        throw ExecutionException(
-            "The interpreter '${interpreter.name}' cannot see $localDir, nor the project's .idea or the working directory"
-        )
+        return stage(localDir, stagingName, stagingRoots(project.basePath, workingDirectory)) { toMapped(it, command) }
+            ?: throw ExecutionException(
+                "The interpreter '${interpreter.name}' cannot see $localDir, nor the project's .idea or the working directory"
+            )
     }
 
     private fun toMapped(path: String, command: PhpCommandLinePathProcessor? = null): String? {
@@ -144,5 +133,27 @@ internal class PhpToolLauncher(private val project: Project, val interpreter: Ph
 
     companion object {
         private const val STAGING_DIR = "staging"
+
+        /** Where a copy may go, in order: the project's `.idea`, then the working directory. */
+        fun stagingRoots(basePath: String?, workingDirectory: String?): List<Path> = listOfNotNull(
+            basePath?.let { Path.of(it, ".idea", "testo", STAGING_DIR) },
+            workingDirectory?.let { Path.of(it, ".testo-$STAGING_DIR") },
+        )
+
+        /**
+         * [localDir] copied under the first of [roots] that [toRemote] translates, or null when none is: the
+         * translation is asked before anything is written.
+         */
+        fun stage(localDir: Path, stagingName: String, roots: List<Path>, toRemote: (String) -> String?): SharedDirectory? {
+            for (root in roots) {
+                val staging = root.resolve(FileUtil.sanitizeFileName(stagingName))
+                val path = toRemote(staging.toString()) ?: continue
+                NioFiles.deleteRecursively(staging)
+                FileUtil.copyDir(localDir.toFile(), staging.toFile())
+                Files.writeString(root.resolve(".gitignore"), "*\n")
+                return SharedDirectory(path, staging)
+            }
+            return null
+        }
     }
 }
