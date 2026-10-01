@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [2026.15.262] - 2026-10-01
+
 ### Added
 
 - Mutation testing with Infection over a finished run's own coverage-xml and JUnit reports, without running the tests again: a *Mutation* group after *Coverage* (run button, options, history, progress with MSI, report) and *Run with Mutation*, a Coverage run that goes on to mutate once its tests pass.
@@ -243,7 +245,8 @@
 - Concurrent tests no longer nest inside one another in the test tree: the tree is built from the `nodeId`/`parentNodeId`
   Testo reports rather than from the order messages arrive in.
 
-[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.14.262...HEAD
+[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.15.262...HEAD
+[2026.15.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.14.262...v2026.15.262
 [2026.14.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.13.262...v2026.14.262
 [2026.13.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.12.262...v2026.13.262
 [2026.12.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.11.262...v2026.12.262
