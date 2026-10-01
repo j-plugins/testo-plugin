@@ -5,7 +5,7 @@ import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.coverage.format.TestId
 import com.github.xepozz.testo.coverage.perTest.TEST_ID_ORDER
 import com.github.xepozz.testo.coverage.perTest.TestoCoveringTestsLauncher
-import com.github.xepozz.testo.coverage.perTest.TestoTestIdentityMapper
+import com.github.xepozz.testo.coverage.perTest.navigateToTest
 import com.github.xepozz.testo.coverage.perTest.shortTestLabel
 import com.github.xepozz.testo.coverage.perTest.testsCoveringElement
 import com.intellij.codeInsight.codeVision.CodeVisionAnchorKind
@@ -18,7 +18,6 @@ import com.intellij.codeInsight.hints.codeVision.CodeVisionProviderBase
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
-import com.intellij.pom.Navigatable
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.SmartPointerManager
@@ -69,7 +68,6 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
         val tests = testsCoveringElement(function).sortedWith(TEST_ID_ORDER)
         if (tests.isEmpty()) return
 
-        val mapper = TestoTestIdentityMapper.getInstance()
         // A run-all action first (like the *Run covering tests* gutter), then one navigable row per test.
         val rows = buildList {
             add(Row(null, TestoBundle.message("testo.coverage.editor.popup.run.all", tests.size), AllIcons.Actions.RunAll))
@@ -90,7 +88,7 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
                 if (test == null) {
                     TestoCoveringTestsLauncher.run(project, tests, TestoCoveringTestsLauncher.runName(function.name, tests.size))
                 } else {
-                    (mapper.resolve(test, project) as? Navigatable)?.takeIf { it.canNavigate() }?.navigate(true)
+                    navigateToTest(project, test)
                 }
             }
             .createPopup()

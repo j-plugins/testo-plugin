@@ -49,6 +49,12 @@ import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.Timer
 
+/** The report buttons' document-with-a-magnifier, shared with the mutation report's: grey, and blue once on disk. */
+internal object TestoReportIcons {
+    val REPORT: Icon = AllIcons.General.IndentDetected
+    val READY: Icon = IconUtil.colorize(REPORT, JBColor(0x3574F0, 0x548AF7))
+}
+
 /**
  * The report buttons at the far right of the test toolbar — one per report Testo announced. Hand-drawn like the run
  * summary beside it: an expanded `ActionGroup` loses [RightAlignedToolbarAction] on its children. A click before the
@@ -59,6 +65,9 @@ class TestoReportsAction(
     private val project: Project,
     private val baseDirectory: () -> String?,
     private val mapToLocal: (String) -> String?,
+    /** The archive this run is recorded into or replayed from: whose coverage the Coverage view then shows. */
+    private val runDir: () -> Path? = { null },
+    private val trailing: (() -> TestoReportsRowCell)? = null,
 ) : AnAction(), CustomComponentAction, RightAlignedToolbarAction, DumbAware {
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
@@ -76,6 +85,7 @@ class TestoReportsAction(
         private val cells = LinkedHashMap<String, ReportCell>()
         private var coverageCell: CoverageGroupCell? = null
         private val timer = Timer(REFRESH_MS) { tick() }
+        private val trailingCell = trailing?.invoke()?.also { add(it.component) }
 
         init {
             isOpaque = false
@@ -121,7 +131,13 @@ class TestoReportsAction(
 
         override fun doLayout() {
             var x = insets.left
-            for (child in components) {
+            // The trailing cell was added first but always ends the row, after cells that appear with later reports.
+            val trailingComponent = trailingCell?.component
+            for (child in components.filter { it !== trailingComponent } + listOfNotNull(trailingComponent)) {
+                if (!child.isVisible) {
+                    child.setBounds(x, 0, 0, 0)
+                    continue
+                }
                 val size = child.preferredSize
                 child.setBounds(x, (height - size.height) / 2, size.width, size.height)
                 x += size.width
@@ -146,7 +162,10 @@ class TestoReportsAction(
             }
             cell?.refresh(coverage)
 
-            isVisible = cells.isNotEmpty() || coverageCell != null
+            val trailingVisible = trailingCell?.refresh() == true
+            trailingCell?.component?.isVisible = trailingVisible
+
+            isVisible = cells.isNotEmpty() || coverageCell != null || trailingVisible
 
             // Re-laid out only when the row changed shape — this runs twice a second.
             val width = preferredSize.width
@@ -429,13 +448,13 @@ class TestoReportsAction(
 
         private fun applyChecked() {
             val checked = checkedReports()
-            if (checked.isNotEmpty()) applyTestoCoverage(project, checked)
+            if (checked.isNotEmpty()) applyTestoCoverage(project, checked, runDir())
         }
 
         private fun onToggled() {
             if (!isTestoCoverageActive(project)) return
             val checked = checkedReports()
-            if (checked.isEmpty()) closeTestoCoverage(project) else applyTestoCoverage(project, checked)
+            if (checked.isEmpty()) closeTestoCoverage(project) else applyTestoCoverage(project, checked, runDir())
         }
 
         private fun showMenu() {
@@ -506,11 +525,11 @@ class TestoReportsAction(
     private companion object {
         private const val REFRESH_MS = 500
 
-        private val ICON: Icon = AllIcons.General.IndentDetected
+        private val ICON: Icon = TestoReportIcons.REPORT
         private val ARROW: Icon = AllIcons.General.LinkDropTriangle
 
         /** The icon's three colours: grey (nothing to open), blue (this run's report is on disk), green (scheduled). */
-        private val READY_ICON: Icon = IconUtil.colorize(ICON, JBColor(0x3574F0, 0x548AF7))
+        private val READY_ICON: Icon = TestoReportIcons.READY
         private val SCHEDULED_ICON: Icon = IconUtil.colorize(ICON, JBColor(0x59A869, 0x499C54))
 
         // Coverage cell: the normal coverage icon once the report is on disk, greyed while it is still pending.
@@ -691,4 +710,11 @@ private fun <T> resolveReportOffEdt(
             ModalityState.any(),
         ) { project.isDisposed }
     }
+}
+
+/** A cell another feature ends the reports row with; [refresh] runs on the row's tick and answers whether to show it. */
+interface TestoReportsRowCell {
+    val component: JComponent
+
+    fun refresh(): Boolean
 }

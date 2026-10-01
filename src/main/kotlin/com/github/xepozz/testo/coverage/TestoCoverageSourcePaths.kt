@@ -1,12 +1,12 @@
 package com.github.xepozz.testo.coverage
 
+import com.github.xepozz.testo.php.PhpToolLauncher
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.github.xepozz.testo.tests.run.TestoRunConfigurationType
 import com.intellij.execution.RunManager
 import com.intellij.openapi.project.Project
 import com.jetbrains.php.config.PhpProjectConfigurationFacade
 import com.jetbrains.php.config.interpreters.PhpInterpreter
-import com.jetbrains.php.run.remote.PhpRemoteInterpreterManager
 
 /**
  * [path] as it exists on this machine: as is, else through the first of [toLocal] that lands on an existing file.
@@ -24,7 +24,6 @@ fun resolveCoverageSourcePath(path: String, toLocal: List<(String) -> String?>, 
  * a manual import or after a restart, with no run around it.
  */
 fun coverageSourcePathMappers(project: Project): List<(String) -> String?> {
-    val manager = PhpRemoteInterpreterManager.getInstance() ?: return emptyList()
     val configured = RunManager.getInstance(project)
         .getConfigurationsList(TestoRunConfigurationType.INSTANCE)
         .mapNotNull { (it as? TestoRunConfiguration)?.interpreter }
@@ -32,8 +31,5 @@ fun coverageSourcePathMappers(project: Project): List<(String) -> String?> {
     return (configured + listOfNotNull(default))
         .filter(PhpInterpreter::isRemote)
         .distinctBy { it.name }
-        .mapNotNull { interpreter ->
-            runCatching { manager.createPathMappings(project, interpreter.phpSdkAdditionalData) }.getOrNull()
-        }
-        .map { mappings -> { path: String -> mappings.convertToLocal(path) } }
+        .map { interpreter -> PhpToolLauncher(project, interpreter)::toLocal }
 }

@@ -112,6 +112,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoCoverageAnnotator.kt   # per-file/dir percentages behind the Coverage view's columns
 │   ├── TestoCoverageViewExtension.kt  # the view's columns (Branches, Tests) and its extra toolbar
 │   ├── TestoCoverageViewActions.kt    # those toolbar actions: highlight, gutters, run covering, badges
+│   ├── TestoCoverageMutation.kt    # a mutation run narrowed to a file or directory, off the shown coverage's run
 │   ├── TestoCoverageSelectOpenedFile.kt  # our own "select the opened file" (the platform's cannot work here)
 │   ├── editor/                     # the editor side: stripes, the line popup, the covering-tests gutter
 │   ├── format/                     # clover / cobertura / coverage-xml parsers → one model
@@ -121,6 +122,27 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoDataProvidersIndex.kt  # FileBasedIndex: provider name → {class, method, providerFqn}
 │   ├── TestoGroupsIndex.kt         # FileBasedIndex: every name a #[Filter\Group] in the project spells
 │   └── TestoDataProviderUtils.kt   # isDataProvider / findDataProviderUsages / usage index
+│
+├── infection/                      # mutation testing: Infection over an archived run's coverage-xml + JUnit
+│   ├── TestoMutationCell.kt        # the reports row's last cell: label, button, options, history, progress, report
+│   ├── TestoInfectionCommand.kt    # the launch (TestoRunConfiguration.infectionLaunch) and its command
+│   ├── TestoInfectionReports.kt    # readiness off run.json, covered sources, the --coverage directory
+│   ├── TestoInfectionArguments.kt  # CLI flags; where the infection binary is looked for
+│   ├── TestoMutationExecutor.kt    # Run with Mutation: the executor + a Coverage runner that mutates once the run is archived
+│   ├── TestoMutationService.kt     # starts Infection as a background task, no Run tab; runs by source run dir
+│   ├── TestoMutationStream.kt      # `--teamcity` output → TestoMutationModel (files, mutants, statuses, MSI)
+│   ├── TestoMutationTextLog.kt     # `--logger-text` report: every mutant's diff and test output, read at the end
+│   ├── TestoMutationApply.kt       # Apply / Revert Mutation: a mutant written into its file, off the file's own text
+│   ├── TestoMutationIgnore.kt      # `// @infection-ignore-all` above a mutant's statement or class member
+│   ├── TestoMutantTests.kt         # a mutant's killing tests (Testo's JSON output) and covering ones (the run's coverage-xml)
+│   ├── TestoMutationArchive.kt     # `<run dir>/infection/<started at>/`: recorder, loader, pruning (5 per Testo run)
+│   ├── TestoMutationToolWindow.kt  # the *Mutations* tool window, registered on first use, one tab per Testo run
+│   ├── TestoMutationPanel.kt       # own tree (StructureTreeModel), the selected mutant's diff and the text under it
+│   ├── TestoMutationEditorMarks.kt # gutter marks + escaped-code underlines in the editor, for TestoMutationService.current()
+│   └── TestoMutationActions.kt     # that toolbar and popup (Testo.Mutations.Toolbar / .Popup in plugin.xml)
+│
+├── php/
+│   └── PhpToolLauncher.kt          # any vendor/bin script on any interpreter: paths both ways, the command
 │
 ├── references/
 │   └── TestFunctionImplicitUsageProvider.kt  # tests/classes are never "unused"
@@ -235,20 +257,22 @@ src/test/testData/mixin, rename # PHP fixtures for PSI-backed tests
 `runLineMarkerContributor` (order="first"), `configurationType`, `runConfigurationProducer`,
 `runAnything.executionProvider`, `programRunner` (debug), `implicitUsageProvider`, `iconProvider`,
 `codeInsight.daemonBoundCodeVisionProvider`, `notificationGroup` (id `Testo`), `internalFileTemplate`,
-`defaultLiveTemplates` + `liveTemplateContext`, two `console.folding`s, `fileBasedIndex`,
+`toolWindow` (*Mutations*), `defaultLiveTemplates` + `liveTemplateContext`, two `console.folding`s, `fileBasedIndex`,
 `spellchecker.bundledDictionaryProvider`, `lang.inspectionSuppressor`, `localInspection` (`TestoGroupNameInspection`).
 
 `com.jetbrains.php` namespace: `testFrameworkType` (`TestoFrameworkType`), `composerConfigClient`
 (`TestoComposerConfig`).
 
 `META-INF/coverage.xml` (optional, `com.intellij.modules.coverage`) adds `coverageEngine`, `coverageRunner`, the
-coverage `programRunner`, the annotator service and the *Run covering tests* `codeInsight.lineMarkerProvider`.
+coverage `programRunner`, the *Run with Mutation* `executor` and its runner, the annotator service, the *Run covering
+tests* `codeInsight.lineMarkerProvider` and the editor / project-view *Mutate* action.
 
 `projectListeners`: `TestoConsoleAugmenter` on `ExecutionListener` — the only hook where the PHP-built test console
 can be reached to install the channel tabs.
 
 Actions: the Generate-menu entry, the rerun trio + split button on `RunTab.TopToolbar`, an `overrides="true"`
-replacement for the platform `Rerun`, and a `Tools | Testo` menu (channel-icon preview + rerun-style toggles).
+replacement for the platform `Rerun`, a `Tools | Testo` menu (channel-icon preview + rerun-style toggles), and the
+*Mutations* window's toolbar and tree popup (`Testo.Mutations.Toolbar` / `.Popup`).
 
 ### Dependencies
 
@@ -272,7 +296,7 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
   **lists** (`@XCollection`), one `--group` flag each — Testo ORs repeated `--group`s and reads a `!name` prefix as an
   exclusion, which is the only exclusion form its CLI has. A name is opaque: whatever `#[Group]` spells reaches the
   CLI untouched.
-- `--log-html`/`--log-junit` at an IDE-managed path (`TestoReportFlags`, `logHtml` on / `logJunit` off by default),
+- `--log-html`/`--log-junit` at an IDE-managed path (`TestoReportFlags`, both on by default),
   emitted from `createCommand` so every executor gets them, and the archive copies the reports into history the same
   way it does coverage. Not in `prepareArguments`: that has no project/interpreter.
 - Every IDE-managed report path (`--log-*`, `--coverage-*`) goes to the interpreter through `TestoReportTarget`, i.e.
@@ -477,6 +501,8 @@ Non-obvious constraints already paid for in blood — read before touching the r
   "show me the passed ones" with an empty tree), and releasing it recomposes them via `hiddenByToggles` — off Testo's
   statuses, not `isPassed`/`isIgnored`, where flaky and risky look like a plain pass. A listener on both
   `BooleanProperty`s re-asserts this after the platform's own, which would otherwise drop a live counter.
+- **A Kotlin class implementing a platform interface gets its default methods as bridges** (`-jvm-default=enable`),
+  so the verifier flags internal defaults it never touched. `@JvmDefaultWithoutCompatibility` on the class drops them.
 - **The results tree is re-skinned from outside, not subclassed.** `SMTRunnerTestTreeViewProvider` and
   `TestTreeRenderer` are both `@ApiStatus.Internal` and fail the verifier's default `failureLevel`, so
   `TestoTestTreeDecorator` wraps the renderer the console already installed (`JTree.getCellRenderer` /
@@ -499,6 +525,44 @@ Non-obvious constraints already paid for in blood — read before touching the r
   converter, so none of our stores fill — an imported tab is a PHPUnit-looking tree. `TestoRunReplayProfile` feeds
   the archived teamcity stream through the *live* properties instead. Three switches keep a replay from acting like
   a run: `replayMode`, `getConfiguration()` answering the replay profile, `reportStore.startedAtOverride`.
+- **A mutation run never gets a Run tab.** Its command comes from a `TestoRunConfiguration` clone with `infectionLaunch`
+  set (so it inherits the interpreter and working directory), but `TestoMutationService` starts it through
+  `PhpRunConfiguration.createProcessHandler` itself — which still handles Docker/WSL/SSH. Run through the executor,
+  it took over the tab and the Run button of the Testo run it mutates.
+- **`createPathMappings` misses what the interpreter's command line mounts**: a Docker interpreter's project volume is
+  known only to `createPathMapper` (the console's translation), so every host ↔ interpreter path goes through
+  `PhpToolLauncher`, which falls back to it. The IDE system dir is in neither, so a directory Infection reads from
+  there is staged under the project's `.idea`.
+- **Infection's stream is not the SM runner's.** `TestoMutationStream` reads it: a mutant's `testStdOut` has no
+  `nodeId`, and its offsets count bytes (the end one is the node's last byte). The stream carries a mutant's code only
+  when it escaped; everything else comes from the `--logger-text` report at `--log-verbosity=all`, whose diff has no
+  end marker — `TestoMutationTextLog` closes a hunk after sebastian/diff's three context lines. Its `file:line` header
+  is where the change starts: less the context above, it numbers the snippet
+  (`DiffUserDataKeysEx.LINE_NUMBER_CONVERTOR`), so a mutant always takes its snippet from that log. The HTML report's `replacement` is only the `+` lines.
+- **A mutation run lives in its Testo run's archive**, `<run dir>/infection/<started at>/` (`TestoMutationArchive`): the
+  line stream, text log, HTML report and `mutation.json`, so it is exported, locked and pruned with that run and a
+  replay reads it back through the same parsers. `mutation.json` also holds each file's fingerprint and per-file score.
+- **`--id` takes one ID** (repeated, the last wins; a comma list matches nothing), so rerunning N mutants is N
+  processes, each archived under `reruns/` and replayed over the run in order; that stream updates mutants by ID and
+  adds none. A whole file's mutants are one process over its `pathFilter` (`rerunUnits`), except under
+  `--git-diff-lines`, which replaces `--filter` with the changed files and would mutate every line of them.
+- **No `--filter` unless `--with-uncovered` or a narrowed run.** Infection skips a file its coverage has no test for
+  before parsing it, and the positional replacement for the deprecated flag hands paths outside infection.json5's
+  `source` to Testo as tests. `--filter` is matched as a substring of each source's real path, so a directory goes in
+  as a regex of its path under coverage-xml's `project source` with a trailing slash (`pathFilter`), never as a file
+  list: a bare `/…/` is itself read as a regex.
+- **The Coverage view knows its Testo run only through `TestoCoverageSuite.runDir`**, set by whoever applies the bundle.
+  Its MSI merges every mutation run of that Testo run per file, by when each file was last judged (`FileScore.at`,
+  restamped by a rerun); its columns are fixed when it is built, so a finished mutation run re-applies the bundle.
+- **Code run through `eval()` is a file of its own in PHP coverage**, `Foo.php(64) : eval()'d code`. On Windows the
+  `:` makes it an NTFS alternate stream of an unopenable name, so the archiver skips unreadable files instead of losing
+  the report, and `TestoInfectionReports.dropUnreadable` takes such entries out of the `index.xml` Infection reads —
+  it stops at the first one on any OS.
+- **Infection's report template links "Back" to `/`**, the drive root over `file://`: it is blanked with spaces in place
+  once written (`TestoInfectionHtmlReport`), not cut out of a file megabytes long.
+- **The diff's view mode (Side-by-side / Unified) is not public API**: it lives in `DiffSettingsHolder` (`impl`), so
+  titles cannot be hidden in Unified only. Actions for the diff's own toolbar go through
+  `DiffUserDataKeys.CONTEXT_ACTIONS`.
 - **Whoever waits for a replayed tree polls for a stable node count** instead of subscribing to
   `SMTRunnerEventsListener`: a short run finishes replaying before the augmenter hands us the console, so the
   events are already fired and missed.
@@ -529,6 +593,9 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **`CoverageViewExtension` is instantiated three times per view** (`CoverageView`, `CoverageTableModel`,
   `CoverageViewTreeStructure`), so no instance sees another's fields — anything `getPercentage` needs must be derived
   from the bundle, not remembered from `createColumnInfos`.
+- **`applyTestoCoverage` reads the reports on a pooled thread before `chooseSuitesBundle`**: the platform loads each
+  suite's data inside that call on the EDT, and the runner resolves every source through the VFS (a slow-operation
+  error). A suite keeps its loaded data behind a soft reference, so it is held until the bundle is handed over.
 - **The editor highlighter is installed from `applyTestoCoverage`, not from the annotator**: `onSuiteChosen` fires
   only on reload/close, never on the session's first `chooseSuitesBundle` — which left the first coverage run of an
   IDE session unpainted.
@@ -587,10 +654,12 @@ JUnit 4, two flavours — prefer the first when the logic allows it:
 - **Plain unit tests** (no IDE fixture): pure string/logic helpers — `testoDisplayName`, location-URL → filter,
   attribute ordering, display names, folding placeholders, bundle keys, runner settings, coverage arguments,
   channel icons, channel store.
-- **`BasePlatformTestCase`** (7 classes: `MixinPsiTest`, `TestoLineMarkerPsiTest`,
-  `TestoRunConfigurationProducerPsiTest`, `TestoTestLocatorTest`, `ExitStatementsVisitorTest`,
-  `PhpBacktraceFileFilterTest`, `MyPluginTest`) — anything that needs PSI or the PHP plugin.
-  Fixtures live in `src/test/testData/`.
+- **`BasePlatformTestCase`** (`*PsiTest`, plus `TestoTestLocatorTest`, `ExitStatementsVisitorTest`,
+  `PhpBacktraceFileFilterTest`, `MyPluginTest`) — anything that needs PSI, the PHP plugin or Swing.
+  Fixtures live in `src/test/testData/`. Headless, nothing lays a panel out (call `doLayout` down the tree),
+  icons paint nothing, tool windows are not registered (go through the service, not `ToolWindowManager`), and a
+  temp directory outside the project needs `VfsRootAccess.allowRootAccess`. A diff panel loads asynchronously: wait
+  for its editor before asserting on it.
 
 When adding behaviour, pull the pure logic into a top-level function (as `testoDisplayName` was) so it can be
 tested without the platform fixture.

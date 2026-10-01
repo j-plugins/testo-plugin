@@ -5,7 +5,7 @@ import com.github.xepozz.testo.coverage.format.TestId
 import com.github.xepozz.testo.coverage.perTest.TEST_ID_ORDER
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
 import com.github.xepozz.testo.coverage.perTest.TestoCoveringTestsLauncher
-import com.github.xepozz.testo.coverage.perTest.TestoTestIdentityMapper
+import com.github.xepozz.testo.coverage.perTest.navigateToTest
 import com.github.xepozz.testo.coverage.perTest.shortTestLabel
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.editor.Editor
@@ -16,7 +16,6 @@ import com.intellij.openapi.editor.markup.LineMarkerRendererEx
 import com.intellij.openapi.editor.markup.ActiveGutterRenderer
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.pom.Navigatable
 import com.intellij.rt.coverage.data.LineData
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.awt.RelativePoint
@@ -124,12 +123,11 @@ internal class TestoCoverageGutterRenderer(
             .setRequestFocus(true)
             .createPopup()
 
-        val mapper = TestoTestIdentityMapper.getInstance()
         val navigateSelected = {
             val id = list.selectedValue
             if (id != null) {
                 popup.cancel()
-                (mapper.resolve(id, project) as? Navigatable)?.takeIf { it.canNavigate() }?.navigate(true)
+                navigateToTest(project, id)
             }
         }
         list.addMouseListener(object : MouseAdapter() {

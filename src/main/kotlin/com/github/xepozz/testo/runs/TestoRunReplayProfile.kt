@@ -58,20 +58,8 @@ internal class TestoRunReplayProfile(
     /** The executor the archived run used — what the tab's rerun button offers, whatever executor opened the replay. */
     val executorId: String get() = manifest.executorId
 
-    /**
-     * The archived run's own configuration, restored from the manifest — what the rerun buttons on a replayed tab
-     * run. Falls back to a bare template for an archive that predates the recording (nothing to rerun there, but the
-     * console still needs a configuration to be built from).
-     */
-    val testoConfiguration: TestoRunConfiguration by lazy {
-        val configuration = TestoRunConfigurationType.INSTANCE.createTemplateConfiguration(project)
-        manifest.configuration.takeIf { it.isNotBlank() }?.let { xml ->
-            runCatching { configuration.readExternal(JDOMUtil.load(xml)) }
-                .onFailure { LOG.warn("Failed to restore the run configuration of $runDir", it) }
-        }
-        configuration.name = manifest.configurationName.ifEmpty { runDir.fileName.toString() }
-        configuration
-    }
+    /** The archived run's own configuration — what the rerun buttons on a replayed tab run. */
+    val testoConfiguration: TestoRunConfiguration by lazy { restoreTestoConfiguration(project, runDir, manifest) }
 
     override fun getState(executor: Executor, environment: ExecutionEnvironment): RunProfileState =
         RunProfileState { _, _ ->
@@ -181,7 +169,7 @@ internal class TestoRunReplayProfile(
             .values.toList()
         ApplicationManager.getApplication().invokeLater(
             {
-                if (reports.isEmpty()) closeTestoCoverage(project) else applyTestoCoverage(project, reports)
+                if (reports.isEmpty()) closeTestoCoverage(project) else applyTestoCoverage(project, reports, runDir)
             },
             project.disposed,
         )
@@ -213,4 +201,18 @@ internal class TestoRunReplayProfile(
             }
         }
     }
+}
+
+/**
+ * The configuration an archived run was started with, restored from its manifest. An archive that predates the
+ * recording gets a bare template: nothing useful to rerun, but a console or a command can still be built from it.
+ */
+internal fun restoreTestoConfiguration(project: Project, runDir: Path, manifest: TestoRunManifest): TestoRunConfiguration {
+    val configuration = TestoRunConfigurationType.INSTANCE.createTemplateConfiguration(project)
+    manifest.configuration.takeIf { it.isNotBlank() }?.let { xml ->
+        runCatching { configuration.readExternal(JDOMUtil.load(xml)) }
+            .onFailure { Logger.getInstance(TestoRunReplayProfile::class.java).warn("Failed to restore the run configuration of $runDir", it) }
+    }
+    configuration.name = manifest.configurationName.ifEmpty { runDir.fileName.toString() }
+    return configuration
 }

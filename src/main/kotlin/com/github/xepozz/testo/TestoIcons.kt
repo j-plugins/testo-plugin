@@ -11,6 +11,14 @@ object TestoIcons {
     @JvmField
     val TESTO = IconLoader.getIcon("/icons/testo/icon.svg", this::class.java)
 
+    /** Mutation testing wherever it is shown: the Mutations tool window, the run history. */
+    @JvmField
+    val MUTATION = IconLoader.getIcon("/icons/testo/mutation.svg", this::class.java)
+
+    /** Starting mutation testing: the Infection button, *Run with Mutation*. */
+    @JvmField
+    val MUTATION_RUN = IconLoader.getIcon("/icons/testo/mutationRun.svg", this::class.java)
+
     // One icon per Testo\Core\Value\Status case, plus the pair the run is judged by. Five shapes cover the eight:
     // check, exclamation and crossed-out circle each serve two and are told apart by colour, baked into the SVGs
     // rather than tinted at runtime.

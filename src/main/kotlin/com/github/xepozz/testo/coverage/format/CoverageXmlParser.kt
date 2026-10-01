@@ -26,7 +26,8 @@ object CoverageXmlParser : TestoCoverageParser {
 
         for (entry in indexRoot.descendants("file")) {
             val href = entry.getAttribute("href").ifBlank { continue }
-            val perFilePath = indexDir.resolve(href)
+            // Code run through eval() is reported as `Foo.php(64) : eval()'d code`, which is no path on Windows.
+            val perFilePath = runCatching { indexDir.resolve(href) }.getOrNull() ?: continue
             if (!Files.exists(perFilePath)) continue
             val relative = href.removeSuffix(".xml")
             val path = if (source.isEmpty()) relative else "$source/$relative"

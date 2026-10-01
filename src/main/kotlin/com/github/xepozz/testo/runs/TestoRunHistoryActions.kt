@@ -1,7 +1,9 @@
 package com.github.xepozz.testo.runs
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.coverage.TestoCoverageProgramRunner
+import com.github.xepozz.testo.infection.TestoMutationExecutor
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoTestStatus
 import com.github.xepozz.testo.tests.run.TestoRunConfiguration
@@ -124,10 +126,11 @@ class TestoRunRetentionGroup : DefaultActionGroup(TestoBundle.message("testo.run
 }
 
 /** What a run was started as — all the history list needs to know to draw it. */
-internal enum class TestoRunKind { RUN, DEBUG, COVERAGE }
+internal enum class TestoRunKind { RUN, DEBUG, COVERAGE, MUTATION }
 
 internal fun runKindOf(executorId: String?): TestoRunKind = when (executorId) {
     TestoCoverageProgramRunner.EXECUTOR_ID -> TestoRunKind.COVERAGE
+    TestoMutationExecutor.ID -> TestoRunKind.MUTATION
     DefaultDebugExecutor.EXECUTOR_ID -> TestoRunKind.DEBUG
     // Also a v1 archive, which recorded no executor: a plain run is the honest guess.
     else -> TestoRunKind.RUN
@@ -137,6 +140,7 @@ internal fun runKindOf(executorId: String?): TestoRunKind = when (executorId) {
 // sit on them.
 internal fun runKindIcon(kind: TestoRunKind): Icon = when (kind) {
     TestoRunKind.COVERAGE -> AllIcons.Toolwindows.ToolWindowCoverage
+    TestoRunKind.MUTATION -> TestoIcons.MUTATION
     TestoRunKind.DEBUG -> AllIcons.Toolwindows.ToolWindowDebugger
     TestoRunKind.RUN -> AllIcons.Toolwindows.ToolWindowRun
 }

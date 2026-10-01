@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.coverage.editor.TestoCoverageEditorHighlighter
 import com.github.xepozz.testo.coverage.editor.TestoCoveringTestsGutter
 import com.github.xepozz.testo.coverage.format.TestId
@@ -136,6 +137,33 @@ internal class TestoRunCoveringTestsAction(private val project: Project) : AnAct
 
     private fun selectedItem(e: AnActionEvent): PsiFileSystemItem? =
         ((e.getData(CommonDataKeys.NAVIGATABLE) as? AbstractTreeNode<*>)?.value) as? PsiFileSystemItem
+}
+
+/**
+ * Mutates the selected row alone — a file, or a directory's whole subtree — over the reports of the Testo run the view
+ * shows. Read off the selection like [TestoRunCoveringTestsAction], for the same reason.
+ */
+internal class TestoMutateSelectionAction(
+    private val project: Project,
+    private val bundle: CoverageSuitesBundle,
+) : AnAction(TestoBundle.message("testo.coverage.view.mutate"), null, TestoIcons.MUTATION_RUN), DumbAware {
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
+
+    override fun update(e: AnActionEvent) {
+        val target = target(e)
+        e.presentation.isEnabled = target != null && !TestoCoverageMutation.isBusy(project, target)
+        e.presentation.text = target?.let { TestoBundle.message("testo.coverage.view.mutate.named", it.name) }
+            ?: TestoBundle.message("testo.coverage.view.mutate")
+    }
+
+    override fun actionPerformed(e: AnActionEvent) {
+        target(e)?.let { TestoCoverageMutation.start(project, it) }
+    }
+
+    private fun target(e: AnActionEvent): TestoCoverageMutation.Target? {
+        val item = ((e.getData(CommonDataKeys.NAVIGATABLE) as? AbstractTreeNode<*>)?.value) as? PsiFileSystemItem ?: return null
+        return TestoCoverageMutation.target(project, bundle, item.virtualFile ?: return null)
+    }
 }
 
 /** Non-clickable chips naming the report formats merged into the shown bundle — one per distinct format. */

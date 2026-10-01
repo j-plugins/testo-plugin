@@ -4,6 +4,9 @@ import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageByTestIndex
 import com.github.xepozz.testo.coverage.perTest.testsUnder
+import com.github.xepozz.testo.infection.MutationScore
+import com.github.xepozz.testo.infection.TestoMutationService
+import com.github.xepozz.testo.infection.scoreUnder
 import com.intellij.coverage.CoverageSuitesBundle
 import com.intellij.coverage.view.DirectoryCoverageViewExtension
 import com.intellij.coverage.view.ElementColumnInfo
@@ -11,8 +14,10 @@ import com.intellij.coverage.view.PercentageCoverageColumnInfo
 import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.ide.util.treeView.NodeDescriptor
 import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.project.Project
 import com.intellij.util.ui.ColumnInfo
+import java.nio.file.Path
 
 data class CoverageTally(val covered: Int, val total: Int)
 
@@ -58,6 +63,7 @@ class TestoCoverageViewExtension(
             columns.add(PercentageCoverageColumnInfo(i + 1, TestoBundle.message(metric.titleKey), mySuitesBundle))
         }
         if (showsTests()) columns.add(TestsColumnInfo())
+        if (showsMsi()) columns.add(MsiColumnInfo())
         return columns.toTypedArray()
     }
 
@@ -65,6 +71,7 @@ class TestoCoverageViewExtension(
         // Also what the view sizes a column by, off the root node — so the Tests column must answer with a count and
         // not a percentage string, which would size it for "100% (1234/1234)".
         if (columnIdx == testsColumn()) return countFor(node)?.takeIf { it > 0 }?.toString()
+        if (columnIdx == msiColumn()) return msiFor(node)?.let(::msiText)
         val metric = metrics().getOrNull(columnIdx - 1) ?: return null
         val file = extractFile(node) ?: return null
         return annotator.coverageOf(file, mySuitesBundle)?.let(metric.of)?.cellText()
@@ -72,6 +79,25 @@ class TestoCoverageViewExtension(
 
     /** Where the Tests column sits, or -1 when it is not shown. */
     private fun testsColumn(): Int = if (showsTests()) metrics().size + 1 else -1
+
+    /** Where the MSI column sits, after Tests when that is shown, or -1. */
+    private fun msiColumn(): Int = if (showsMsi()) metrics().size + 1 + (if (showsTests()) 1 else 0) else -1
+
+    /** The Testo run the shown coverage came from: its mutation runs are the only ones that score this code. */
+    private val runDir: Path? = mySuitesBundle.suites.filterIsInstance<TestoCoverageSuite>().firstNotNullOfOrNull { it.runDir }
+
+    // Only once this run has been mutated; a mutation run after the view is built rebuilds it (reapplyTestoCoverage).
+    private fun showsMsi(): Boolean = runDir != null && TestoMutationService.getInstance(project).scores(runDir).isNotEmpty()
+
+    /** A node's score, each file by the mutation run of this Testo run that judged it last; a directory sums its files. */
+    private fun msiFor(node: NodeDescriptor<*>): MutationScore? {
+        val file = (node as? AbstractTreeNode<*>)?.let { extractFile(it) } ?: return null
+        val dir = runDir ?: return null
+        return scoreUnder(TestoMutationService.getInstance(project).scores(dir), file.path, file.isDirectory)
+    }
+
+    private fun msiText(score: MutationScore): String? =
+        score.msi?.let { "$it% (${score.defeated}/${score.considered})" }
 
     private fun showsTests(): Boolean =
         hasPerTestData() && TestoCoverageByTestIndex.getInstance(project).data().testsByFile().isNotEmpty()
@@ -91,7 +117,9 @@ class TestoCoverageViewExtension(
         TestoSelectOpenedFileAction(project),
         TestoCoverageHighlightToggleAction(project),
         TestoCoveringTestsGutterToggleAction(project),
+        Separator.getInstance(),
         TestoRunCoveringTestsAction(project),
+        TestoMutateSelectionAction(project, mySuitesBundle),
         TestoCoverageFormatBadgesAction(mySuitesBundle),
     )
 
@@ -99,6 +127,13 @@ class TestoCoverageViewExtension(
     // resurface the previous run's per-test counts — the column needs a coverage-xml suite in *this* bundle.
     private fun hasPerTestData(): Boolean =
         mySuitesBundle.suites.filterIsInstance<TestoCoverageSuite>().any { it.format == CoverageFormat.COVERAGE_XML }
+
+    private inner class MsiColumnInfo :
+        ColumnInfo<NodeDescriptor<*>, String>(TestoBundle.message("testo.coverage.view.column.msi")) {
+        override fun valueOf(node: NodeDescriptor<*>): String? = msiFor(node)?.let(::msiText)
+
+        override fun getComparator(): Comparator<NodeDescriptor<*>> = compareBy { msiFor(it)?.msi ?: -1 }
+    }
 
     private inner class TestsColumnInfo :
         ColumnInfo<NodeDescriptor<*>, String>(TestoBundle.message("testo.coverage.view.column.tests")) {

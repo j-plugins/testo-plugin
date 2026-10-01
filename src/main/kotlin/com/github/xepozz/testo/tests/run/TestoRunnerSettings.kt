@@ -47,12 +47,41 @@ class TestoRunnerSettings(
     var coverageOptions: String = DEFAULT_COVERAGE_OPTIONS,
 
     // Reports written into an IDE-managed folder on every run (`--log-html` / `--log-junit`) and copied into history.
-    // HTML is on by default (it opens in a tab); JUnit is off — it exists for external tooling (mutation testing).
+    // JUnit is on by default: with coverage-xml it is what lets mutation testing skip Infection's own initial test run.
     @Attribute("log_html")
     var logHtml: Boolean = true,
 
     @Attribute("log_junit")
-    var logJunit: Boolean = false,
+    var logJunit: Boolean = true,
+
+    // Mutation testing, over this configuration's own reports. Each maps onto one Infection flag; empty leaves it to
+    // infection.json5.
+    @Attribute("infection_scope")
+    var infectionScope: String = INFECTION_SCOPE_COVERED,
+
+    @Attribute("infection_git_diff_base")
+    var infectionGitDiffBase: String = "",
+
+    @Attribute("infection_threads")
+    var infectionThreads: String = "",
+
+    @Attribute("infection_only_covering_test_cases")
+    var infectionOnlyCoveringTestCases: Boolean = false,
+
+    @Attribute("infection_with_uncovered")
+    var infectionWithUncovered: Boolean = false,
+
+    @Attribute("infection_timeouts_as_escaped")
+    var infectionTimeoutsAsEscaped: Boolean = false,
+
+    @Attribute("infection_mutators")
+    var infectionMutators: String = "",
+
+    @Attribute("infection_static_analysis_tool")
+    var infectionStaticAnalysisTool: String = "",
+
+    @Attribute("infection_options")
+    var infectionOptions: String = "",
 ) : PhpTestRunnerSettings() {
     /** Suite names to run, one `--suite` flag each (Testo ORs them). A name is opaque — spaces and all. */
     @get:XCollection(propertyElementName = "suites", style = XCollection.Style.v2)
@@ -101,8 +130,37 @@ class TestoRunnerSettings(
         }
     }
 
+    fun copyInfectionFrom(other: TestoRunnerSettings) {
+        infectionScope = other.infectionScope
+        infectionGitDiffBase = other.infectionGitDiffBase
+        infectionThreads = other.infectionThreads
+        infectionOnlyCoveringTestCases = other.infectionOnlyCoveringTestCases
+        infectionWithUncovered = other.infectionWithUncovered
+        infectionTimeoutsAsEscaped = other.infectionTimeoutsAsEscaped
+        infectionMutators = other.infectionMutators
+        infectionStaticAnalysisTool = other.infectionStaticAnalysisTool
+        infectionOptions = other.infectionOptions
+    }
+
     companion object Companion {
         const val DEFAULT_COVERAGE_OPTIONS = "--type=!bench"
+
+        /** What the run's coverage covers: Infection skips the rest itself, or is given `--filter` with `--with-uncovered`. */
+        const val INFECTION_SCOPE_COVERED = "covered"
+
+        /** `--git-diff-lines`: only lines changed against the git base. Infection refuses it together with `--filter`. */
+        const val INFECTION_SCOPE_GIT_LINES = "git-lines"
+
+        /** No filter: whatever infection.json5's `source` names and the coverage covers. */
+        const val INFECTION_SCOPE_ALL = "all"
+
+        val INFECTION_SCOPES: List<String> = listOf(INFECTION_SCOPE_COVERED, INFECTION_SCOPE_GIT_LINES, INFECTION_SCOPE_ALL)
+
+        /** Offered in the editor and the button's menu; empty is infection.json5's own `threads`. */
+        val INFECTION_THREADS: List<String> = listOf("", "max", "1", "2", "4", "8")
+
+        /** The tools `--static-analysis-tool` takes; empty leaves it off. */
+        val INFECTION_STATIC_ANALYSIS_TOOLS: List<String> = listOf("", "phpstan")
 
         /** No `--coverage-level` flag at all: the level configured in testo.php stands. */
         const val COVERAGE_LEVEL_AUTO = "auto"
@@ -158,6 +216,7 @@ class TestoRunnerSettings(
                 runnerSettings.coverageOptions = settings.coverageOptions
                 runnerSettings.logHtml = settings.logHtml
                 runnerSettings.logJunit = settings.logJunit
+                runnerSettings.copyInfectionFrom(settings)
                 runnerSettings.migrateLegacyNames()
             }
 

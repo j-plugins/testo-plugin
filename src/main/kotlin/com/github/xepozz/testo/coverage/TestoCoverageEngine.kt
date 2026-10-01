@@ -16,6 +16,7 @@ import com.intellij.execution.configurations.coverage.CoverageEnabledConfigurati
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
 import com.jetbrains.php.lang.psi.PhpFile
+import java.nio.file.Path
 
 /**
  * Testo coverage on 100% public platform API — no `com.intellij.php.coverage.*` (internal, closed to third-party
@@ -45,6 +46,9 @@ class TestoCoverageSuite : BaseCoverageSuite {
         private set
 
     private var branchCoverage: Boolean = false
+
+    /** The archived Testo run the report came from, when known: what the Coverage view mutates from. */
+    var runDir: Path? = null
 
     constructor() : super()
 
