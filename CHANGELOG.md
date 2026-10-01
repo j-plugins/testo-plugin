@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [2026.16.262] - 2026-10-01
+
 ### Fixed
 
 - Mutation testing starts on a Docker interpreter that mounts only part of the project ("cannot see … coverage").
@@ -249,7 +251,8 @@
 - Concurrent tests no longer nest inside one another in the test tree: the tree is built from the `nodeId`/`parentNodeId`
   Testo reports rather than from the order messages arrive in.
 
-[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.15.262...HEAD
+[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.16.262...HEAD
+[2026.16.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.15.262...v2026.16.262
 [2026.15.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.14.262...v2026.15.262
 [2026.14.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.13.262...v2026.14.262
 [2026.13.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.12.262...v2026.13.262
