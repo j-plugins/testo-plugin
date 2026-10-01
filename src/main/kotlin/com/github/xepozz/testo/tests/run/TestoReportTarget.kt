@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.tests.run
 
+import com.github.xepozz.testo.php.PhpToolLauncher
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.remote.RemoteSdkAdditionalData
@@ -60,8 +61,7 @@ internal class TestoReportTarget(
             runCatching { remoteManager.getCoverageResultManager(data) }.getOrNull()?.let { manager ->
                 return TestoReportTarget(local, manager.processCoverageFile(local), manager, true)
             }
-            val mapped = runCatching { remoteManager.createPathMappings(project, data).convertToRemote(local) }.getOrNull()
-                ?: local
+            val mapped = PhpToolLauncher(project, interpreter).toInterpreterIfMapped(local)
             return TestoReportTarget(local, mapped, null, mapped != local)
         }
     }

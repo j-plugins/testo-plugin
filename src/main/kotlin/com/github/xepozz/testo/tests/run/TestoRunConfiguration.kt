@@ -20,7 +20,6 @@ import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.util.PathMappingSettings
 import com.intellij.util.PathUtil
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
@@ -173,8 +172,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     private fun executableProjectRoot(config: PhpTestFrameworkConfiguration?): String? {
         val executable = config?.executablePath?.takeIf { it.isNotEmpty() } ?: return null
         val basePath = project.basePath ?: return null
-        val local = interpreter?.takeIf { it.isRemote }?.let { pathMappings(it)?.convertToLocal(executable) }
-            ?: executable
+        val local = interpreter?.takeIf { it.isRemote }?.let { PhpToolLauncher(project, it).toLocal(executable) } ?: executable
 
         return TestoRunPaths.projectRootOfExecutable(local, basePath) {
             LocalFileSystem.getInstance().findFileByPath(it) != null
@@ -189,13 +187,9 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         if (settings.runnerSettings.isUseAlternativeConfigurationFile) return path
 
         val remote = interpreter?.takeIf { it.isRemote } ?: return path
-        val mappings = pathMappings(remote) ?: return path
-        // convertToLocal returns the input unchanged when no mapping matches; a container path is no working directory.
-        return mappings.convertToLocal(path).takeIf { it != path }
+        // A container path is no working directory: an unmapped one is no answer.
+        return PhpToolLauncher(project, remote).toLocal(path)
     }
-
-    private fun pathMappings(interpreter: PhpInterpreter): PathMappingSettings? =
-        PhpToolLauncher(project, interpreter).mappings
 
     override fun createCommand(
         interpreter: PhpInterpreter,
@@ -236,7 +230,6 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
             withDebugger,
             listOf(testoSettings.runnerSettings.command),
         )
-        val mappings = launcher.mappings
 
         fillTestRunnerArguments(
             project,
@@ -246,7 +239,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
             command,
             frameworkConfig,
             myHandler,
-            mappings,
+            launcher::toInterpreterIfMapped,
         )
 
         return command
@@ -295,11 +288,6 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     companion object Companion {
         const val ID = "TestoConsoleCommandRunConfiguration"
 
-        // convertToRemote returns the input unchanged when no mapping matches, which is what an already-remote
-        // framework path needs; a host path (a per-interpreter configuration fabricated from the local one) is mapped.
-        private fun toRemoteIfMapped(path: String, mappings: PathMappingSettings?) =
-            mappings?.convertToRemote(path) ?: path
-
         private fun fillTestRunnerArguments(
             project: Project,
             workingDirectory: String,
@@ -308,7 +296,9 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
             command: PhpCommandSettings,
             configuration: PhpTestFrameworkConfiguration?,
             handler: PhpTestRunConfigurationHandler,
-            mappings: PathMappingSettings?,
+            // An already-remote framework path comes back unchanged; a host one (a per-interpreter configuration
+            // fabricated from the local one) is mapped.
+            toRemote: (String) -> String,
         ) {
             val testRunnerOptions = testRunnerSettings.testRunnerOptions
             if (StringUtil.isNotEmpty(testRunnerOptions)) {
@@ -325,7 +315,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
                 if (testRunnerSettings.isUseAlternativeConfigurationFile) {
                     command.addPathArgument(configurationFilePath)
                 } else {
-                    command.addArgument(toRemoteIfMapped(configurationFilePath, mappings))
+                    command.addArgument(toRemote(configurationFilePath))
                 }
             }
 

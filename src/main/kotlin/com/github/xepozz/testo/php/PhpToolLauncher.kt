@@ -6,11 +6,13 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.util.PathMappingSettings
 import com.intellij.openapi.util.io.NioFiles
+import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
 import com.jetbrains.php.config.commandLine.PhpCommandSettingsBuilder
 import com.jetbrains.php.config.interpreters.PhpInterpreter
 import com.jetbrains.php.run.PhpCommandLineSettings
 import com.jetbrains.php.run.remote.PhpRemoteInterpreterManager
+import com.jetbrains.php.util.pathmapper.PhpPathMapper
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -28,13 +30,25 @@ internal class PhpToolLauncher(private val project: Project, val interpreter: Ph
         }.getOrNull()
     }
 
-    /** A path as the interpreter sees it. convertToRemote hands back an already-remote path unchanged. */
-    fun toInterpreterIfMapped(path: String): String = mappings?.convertToRemote(path) ?: path
+    // createPathMappings can miss what the interpreter's command line mounts (a Docker interpreter's project volume);
+    // createPathMapper, the console's translation, has it.
+    private val interpreterPaths: PhpCommandLinePathProcessor? by lazy {
+        if (!isRemote) return@lazy null
+        runCatching {
+            PhpRemoteInterpreterManager.getInstance()?.createPathMapper(project, interpreter.phpSdkAdditionalData)
+        }.getOrNull()
+    }
+
+    private val interpreterMapper: PhpPathMapper? by lazy { interpreterPaths?.let { runCatching { it.createPathMapper(project) }.getOrNull() } }
+
+    /** A path as the interpreter sees it. An already-remote path comes back unchanged. */
+    fun toInterpreterIfMapped(path: String): String = toMapped(path) ?: path
 
     /** The host view of an interpreter path, or null when no mapping covers it. */
     fun toLocal(path: String): String? {
         if (!isRemote) return path
-        return mappings?.convertToLocal(path)?.takeIf { it != path }
+        mappings?.convertToLocal(path)?.takeIf { it != path }?.let { return it }
+        return runCatching { interpreterMapper?.getLocalPath(path) }.getOrNull()?.takeIf { it.isNotEmpty() && it != path }
     }
 
     /** A file the script writes and the IDE reads back afterwards. */
@@ -46,22 +60,26 @@ internal class PhpToolLauncher(private val project: Project, val interpreter: Ph
      */
     fun share(localDir: Path, stagingName: String): SharedDirectory {
         if (!isRemote) return SharedDirectory(localDir.toString(), null)
-        toMappedPath(localDir)?.let { return SharedDirectory(it, null) }
+        mappings?.convertToRemote(localDir.toString())?.takeIf { it != localDir.toString() }
+            ?.let { return SharedDirectory(it, null) }
 
         val base = project.basePath ?: throw unreachable(localDir)
         val staging = Path.of(base, ".idea", "testo", STAGING_DIR, FileUtil.sanitizeFileName(stagingName))
         NioFiles.deleteRecursively(staging)
         FileUtil.copyDir(localDir.toFile(), staging.toFile())
         Files.writeString(staging.parent.resolve(".gitignore"), "*\n")
-        val path = toMappedPath(staging) ?: run {
+        val path = toMapped(staging.toString()) ?: run {
             NioFiles.deleteRecursively(staging)
             throw unreachable(localDir)
         }
         return SharedDirectory(path, staging)
     }
 
-    private fun toMappedPath(local: Path): String? =
-        mappings?.convertToRemote(local.toString())?.takeIf { it != local.toString() }
+    private fun toMapped(path: String): String? {
+        mappings?.convertToRemote(path)?.takeIf { it != path }?.let { return it }
+        val processor = interpreterPaths ?: return null
+        return runCatching { processor.takeIf { it.canProcess(path) }?.process(path) }.getOrNull()?.takeIf { it != path }
+    }
 
     private fun unreachable(localDir: Path) = ExecutionException(
         "The interpreter '${interpreter.name}' cannot see $localDir, and the project directory is not mapped for it either"
