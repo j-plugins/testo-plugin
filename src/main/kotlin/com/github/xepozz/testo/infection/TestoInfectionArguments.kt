@@ -88,21 +88,21 @@ internal object TestoInfectionArguments {
         sourceFiles.joinToString(",").takeIf { it.isNotEmpty() && it.length <= MAX_FILTER_LENGTH }
 
     /**
-     * [relative], a source or a directory as the coverage spells it, as a `--filter` naming only that path. A plain
-     * filter is a substring of each real path, so `src/Sub/` takes `packages/a/src/Sub/` too: it goes in under the
-     * coverage's [root], and as a regex, since one led and ended by `/` is taken for a `/`-delimited one. Commas are
-     * escaped because Infection splits the filter on them.
+     * [path], a file or a directory as the interpreter spells it, as a `--filter` naming only that path. A plain filter
+     * is a substring of each real path, so `src/Sub/` takes `packages/a/src/Sub/` too, and one led and ended by `/` is
+     * taken for a `/`-delimited regex: it goes in whole, as a regex. Commas are escaped because Infection splits on them.
      */
-    fun pathFilter(root: String?, relative: String): String {
-        val path = root?.replace('\\', '/')?.trimEnd('/')?.let { "$it/$relative" } ?: "/$relative"
-        return path.map {
-            when {
-                it.isLetterOrDigit() || it == '/' || it == '_' -> "$it"
-                it == ',' -> "\\x2C"
-                else -> "\\$it"
-            }
-        }.joinToString("", prefix = "#", postfix = "#")
-    }
+    fun pathFilter(path: String): String = path.replace('\\', '/').map {
+        when {
+            it.isLetterOrDigit() || it == '/' || it == '_' -> "$it"
+            it == ',' -> "\\x2C"
+            else -> "\\$it"
+        }
+    }.joinToString("", prefix = "#", postfix = "#")
+
+    /** [pathFilter] for [relative], a source or a directory as the coverage spells it, under the coverage's [root]. */
+    fun pathFilter(root: String?, relative: String): String =
+        pathFilter(root?.replace('\\', '/')?.trimEnd('/')?.let { "$it/$relative" } ?: "/$relative")
 }
 
 internal object TestoInfectionExecutable {

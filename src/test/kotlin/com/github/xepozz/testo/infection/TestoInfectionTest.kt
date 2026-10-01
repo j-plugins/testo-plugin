@@ -142,6 +142,7 @@ class TestoInfectionTest {
         assertEquals("#/app/src/Sub/#", TestoInfectionArguments.pathFilter("/app/", "src/Sub/"))
         assertEquals("#D\\:/p/src/Sub/C\\.php#", TestoInfectionArguments.pathFilter("D:\\p", "src/Sub/C.php"))
         assertEquals("#/src/a\\x2Cb\\-c/\\#1/#", TestoInfectionArguments.pathFilter(null, "src/a,b-c/#1/"))
+        assertEquals("#C\\:/p/src/A\\.php#", TestoInfectionArguments.pathFilter("C:\\p\\src\\A.php"))
     }
 
     @Test
@@ -308,17 +309,15 @@ class TestoInfectionTest {
         val b = listOf(partial.mutant("b1"), partial.mutant("b2"), partial.mutant("b3"))
         val c = single.mutant("c1")
         val targets = a + b.take(2) + c
-        val sources = mapOf(whole to "src/A.php", partial to "src/B.php", single to "src/C.php")
 
         fun describe(units: List<RerunUnit>) = units.map {
             when (it) {
                 is RerunUnit.One -> it.mutant.hash
-                is RerunUnit.File -> it.source
+                is RerunUnit.File -> it.file.path
             }
         }
 
-        assertEquals(listOf("src/A.php", "b1", "b2", "c1"), describe(rerunUnits(targets, true, sources::get)))
-        assertEquals(listOf("a1", "a2", "b1", "b2", "c1"), describe(rerunUnits(targets, false, sources::get)))
-        assertEquals(listOf("a1", "a2", "b1", "b2", "c1"), describe(rerunUnits(targets, true) { null }))
+        assertEquals(listOf("/app/src/A.php", "b1", "b2", "c1"), describe(rerunUnits(targets, true)))
+        assertEquals(listOf("a1", "a2", "b1", "b2", "c1"), describe(rerunUnits(targets, false)))
     }
 }

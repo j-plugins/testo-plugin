@@ -231,10 +231,9 @@ class TestoMutationService(private val project: Project) {
                 try {
                     if (interpreter == null) throw ExecutionException(TestoBundle.message("infection.error.noInterpreter"))
                     val sources = coveredSources(recipe)
-                    val root = runCatching { TestoInfectionReports.coverageRoot(recipe.ready.coverageXml) }.getOrNull()
                     val options = recipe.options()
                     val wholeFiles = options.filter != null || options.scope != TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES
-                    val units = rerunUnits(targets, wholeFiles) { sourceOf(it.path, sources) }
+                    val units = rerunUnits(targets, wholeFiles)
                     indicator.isIndeterminate = false
                     for ((index, unit) in units.withIndex()) {
                         if (run.rerunStopRequested || indicator.isCanceled) break
@@ -246,7 +245,7 @@ class TestoMutationService(private val project: Project) {
                             }
                             is RerunUnit.File -> {
                                 indicator.text2 = unit.file.name
-                                options.copy(filter = TestoInfectionArguments.pathFilter(root, unit.source))
+                                options.copy(filter = TestoInfectionArguments.pathFilter(unit.file.path))
                             }
                         }
                         rerunOne(recipe, interpreter, run, unitOptions, sources, indicator)
@@ -444,7 +443,7 @@ internal class TestoMutationRecipe(
 internal sealed interface RerunUnit {
     class One(val mutant: Mutant) : RerunUnit
 
-    class File(val file: MutatedFile, val source: String) : RerunUnit
+    class File(val file: MutatedFile) : RerunUnit
 }
 
 /**
@@ -452,11 +451,11 @@ internal sealed interface RerunUnit {
  * several targets that make up a whole file: those are one process over the file. Not with [wholeFiles] off, for
  * `--git-diff-lines` replaces the filter with the changed files and would mutate every line of them.
  */
-internal fun rerunUnits(targets: List<Mutant>, wholeFiles: Boolean, sourceOf: (MutatedFile) -> String?): List<RerunUnit> {
+internal fun rerunUnits(targets: List<Mutant>, wholeFiles: Boolean): List<RerunUnit> {
     val wanted = targets.toSet()
     return targets.groupBy { it.file }.flatMap { (file, mutants) ->
-        val source = if (wholeFiles && mutants.size > 1 && file.mutants.all { it in wanted }) sourceOf(file) else null
-        if (source != null) listOf(RerunUnit.File(file, source)) else mutants.map(RerunUnit::One)
+        if (wholeFiles && mutants.size > 1 && file.mutants.all { it in wanted }) listOf(RerunUnit.File(file))
+        else mutants.map(RerunUnit::One)
     }
 }
 
