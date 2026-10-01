@@ -72,9 +72,12 @@ class TestoMutationService(private val project: Project) {
         return null
     }
 
+    /** The *Mutations* window's selected tab, kept here because only the EDT may read the window. */
+    @Volatile
+    internal var selected: TestoMutationRun? = null
+
     /** The run the editor marks show: the *Mutations* window's selected tab, else the latest started. */
-    fun current(): TestoMutationRun? =
-        TestoMutationToolWindow.selectedRun(project) ?: runs.values.maxByOrNull { it.startedAt }
+    fun current(): TestoMutationRun? = selected ?: runs.values.maxByOrNull { it.startedAt }
 
     /** The mutation runs of the Testo run archived at [sourceRunDir], newest first. Reads the archive: not on the EDT. */
     internal fun history(sourceRunDir: Path): List<TestoMutationHistoryEntry> {

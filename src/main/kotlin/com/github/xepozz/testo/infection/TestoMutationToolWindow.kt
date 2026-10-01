@@ -97,8 +97,11 @@ internal object TestoMutationToolWindow {
         (contentOf(window, run.workDir)?.component as? TestoMutationPanel)?.select(mutant)
     }
 
-    fun selectedRun(project: Project): TestoMutationRun? =
-        ToolWindowManager.getInstance(project).getToolWindow(ID)?.contentManager?.selectedContent?.getUserData(RUN_KEY)
+    /** Call on the EDT. A tab being closed is no longer the selected one, though the manager may still answer it. */
+    fun selectedRun(window: ToolWindow, event: ContentManagerEvent): TestoMutationRun? =
+        window.contentManager.selectedContent
+            ?.takeUnless { event.operation == ContentManagerEvent.ContentOperation.remove && it === event.content }
+            ?.getUserData(RUN_KEY)
 
     fun contentOf(project: Project, panel: TestoMutationPanel): Content? =
         ToolWindowManager.getInstance(project).getToolWindow(ID)?.contentManager?.contents?.firstOrNull { it.component === panel }
@@ -128,7 +131,10 @@ class TestoMutationToolWindowFactory : ToolWindowFactory, DumbAware {
         toolWindow.setToHideOnEmptyContent(true)
         // The editor marks follow the selected tab.
         toolWindow.addContentManagerListener(object : ContentManagerListener {
-            override fun selectionChanged(event: ContentManagerEvent) = TestoMutationEditorMarks.getInstance(toolWindow.project).refresh()
+            override fun selectionChanged(event: ContentManagerEvent) {
+                TestoMutationService.getInstance(toolWindow.project).selected = TestoMutationToolWindow.selectedRun(toolWindow, event)
+                TestoMutationEditorMarks.getInstance(toolWindow.project).refresh()
+            }
         })
     }
 
