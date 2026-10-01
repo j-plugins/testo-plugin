@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Mutation testing starts on a Docker interpreter that mounts only part of the project ("cannot see … coverage").
+
 ## [2026.15.262] - 2026-10-01
 
 ### Added

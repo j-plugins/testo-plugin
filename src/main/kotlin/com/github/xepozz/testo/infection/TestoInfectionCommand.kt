@@ -49,9 +49,6 @@ internal object TestoInfectionCommand {
         val infection = findInfection(launcher, testoExecutable, workingDirectory)
 
         TestoInfectionReports.assemble(launch.ready, launch.coverageDir)
-        val shared = launcher.share(launch.coverageDir, launch.workDir.fileName.toString())
-        launch.shared = shared
-
         Files.createDirectories(launch.workDir)
         val html = if (!launch.withHtml) null else {
             Files.deleteIfExists(launch.htmlReport)
@@ -62,14 +59,11 @@ internal object TestoInfectionCommand {
         val text = launcher.output(launch.textLog.toString()).takeIf { it.isReachable }
         launch.textTarget = text
 
-        return launcher.command(
-            infection,
-            workingDirectory,
-            settings.commandLineSettings,
-            env,
-            withDebugger,
-            TestoInfectionArguments.build(shared.path, launch.sourceFiles, html?.path, text?.path, launch.options),
-        )
+        return launcher.command(infection, workingDirectory, settings.commandLineSettings, env, withDebugger) { paths ->
+            val shared = launcher.share(launch.coverageDir, launch.workDir.fileName.toString(), workingDirectory, paths)
+            launch.shared = shared
+            TestoInfectionArguments.build(shared.path, launch.sourceFiles, html?.path, text?.path, launch.options)
+        }
     }
 
     private fun findInfection(launcher: PhpToolLauncher, testoExecutable: String, workingDirectory: String): String {
