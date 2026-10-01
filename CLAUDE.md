@@ -531,8 +531,9 @@ Non-obvious constraints already paid for in blood — read before touching the r
   it took over the tab and the Run button of the Testo run it mutates.
 - **`createPathMappings` misses what the interpreter's command line mounts**: a Docker interpreter's project volume is
   known only to `createPathMapper` (the console's translation), so every host ↔ interpreter path goes through
-  `PhpToolLauncher`, which falls back to it. The IDE system dir is in neither, so a directory Infection reads from
-  there is staged under the project's `.idea`.
+  `PhpToolLauncher`, which falls back to it and to the command's own `getPathProcessor`. The IDE system dir is in none,
+  so a directory Infection reads from there is staged under the project's `.idea`, else under the working directory:
+  a container may mount only part of the project.
 - **Infection's stream is not the SM runner's.** `TestoMutationStream` reads it: a mutant's `testStdOut` has no
   `nodeId`, and its offsets count bytes (the end one is the node's last byte). The stream carries a mutant's code only
   when it escaped; everything else comes from the `--logger-text` report at `--log-verbosity=all`, whose diff has no

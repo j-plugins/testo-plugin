@@ -56,34 +56,42 @@ internal class PhpToolLauncher(private val project: Project, val interpreter: Ph
 
     /**
      * The interpreter's view of a host directory the script only reads. One the interpreter cannot see (the IDE system
-     * dir sits under no mapping) is copied into the project's `.idea`, which every mapped interpreter mounts.
+     * dir sits under no mapping) is copied where it can: the project's `.idea`, else [workingDirectory] — a container
+     * may mount only part of the project, but never leaves out the directory the script runs in.
      */
-    fun share(localDir: Path, stagingName: String): SharedDirectory {
+    fun share(
+        localDir: Path,
+        stagingName: String,
+        workingDirectory: String? = null,
+        command: PhpCommandLinePathProcessor? = null,
+    ): SharedDirectory {
         if (!isRemote) return SharedDirectory(localDir.toString(), null)
         mappings?.convertToRemote(localDir.toString())?.takeIf { it != localDir.toString() }
             ?.let { return SharedDirectory(it, null) }
 
-        val base = project.basePath ?: throw unreachable(localDir)
-        val staging = Path.of(base, ".idea", "testo", STAGING_DIR, FileUtil.sanitizeFileName(stagingName))
-        NioFiles.deleteRecursively(staging)
-        FileUtil.copyDir(localDir.toFile(), staging.toFile())
-        Files.writeString(staging.parent.resolve(".gitignore"), "*\n")
-        val path = toMapped(staging.toString()) ?: run {
+        val roots = listOfNotNull(
+            project.basePath?.let { Path.of(it, ".idea", "testo", STAGING_DIR) },
+            workingDirectory?.let { Path.of(it, ".testo-$STAGING_DIR") },
+        )
+        for (root in roots) {
+            val staging = root.resolve(FileUtil.sanitizeFileName(stagingName))
+            val path = toMapped(staging.toString(), command) ?: continue
             NioFiles.deleteRecursively(staging)
-            throw unreachable(localDir)
+            FileUtil.copyDir(localDir.toFile(), staging.toFile())
+            Files.writeString(root.resolve(".gitignore"), "*\n")
+            return SharedDirectory(path, staging)
         }
-        return SharedDirectory(path, staging)
+        throw ExecutionException(
+            "The interpreter '${interpreter.name}' cannot see $localDir, nor the project's .idea or the working directory"
+        )
     }
 
-    private fun toMapped(path: String): String? {
+    private fun toMapped(path: String, command: PhpCommandLinePathProcessor? = null): String? {
         mappings?.convertToRemote(path)?.takeIf { it != path }?.let { return it }
-        val processor = interpreterPaths ?: return null
-        return runCatching { processor.takeIf { it.canProcess(path) }?.process(path) }.getOrNull()?.takeIf { it != path }
+        return listOfNotNull(command, interpreterPaths).firstNotNullOfOrNull { processor ->
+            runCatching { processor.takeIf { it.canProcess(path) }?.process(path) }.getOrNull()?.takeIf { it != path }
+        }
     }
-
-    private fun unreachable(localDir: Path) = ExecutionException(
-        "The interpreter '${interpreter.name}' cannot see $localDir, and the project directory is not mapped for it either"
-    )
 
     /**
      * A command running [script] (host or interpreter path) in [workingDirectory] (a host path), followed by
@@ -96,13 +104,24 @@ internal class PhpToolLauncher(private val project: Project, val interpreter: Ph
         env: Map<String?, String?>,
         withDebugger: Boolean,
         scriptArguments: List<String> = emptyList(),
+    ): PhpCommandSettings = command(script, workingDirectory, commandLineSettings, env, withDebugger) { scriptArguments }
+
+    /** As above, with arguments that need the command's own path translation (what it mounts) to be spelled. */
+    fun command(
+        script: String,
+        workingDirectory: String,
+        commandLineSettings: PhpCommandLineSettings?,
+        env: Map<String?, String?>,
+        withDebugger: Boolean,
+        scriptArguments: (PhpCommandLinePathProcessor?) -> List<String>,
     ): PhpCommandSettings {
         val command = PhpCommandSettingsBuilder(project, interpreter)
             .loadAndStartDebug(withDebugger)
             .build()
+        val paths = if (command.isRemote) command.pathProcessor else null
         command.setWorkingDir(workingDirectory)
-        command.setScript(toInterpreterIfMapped(script), !command.isRemote)
-        command.addArguments(scriptArguments)
+        command.setScript(toMapped(script, paths) ?: script, !command.isRemote)
+        command.addArguments(scriptArguments(paths))
         commandLineSettings?.let { command.importCommandLineSettings(it, workingDirectory) }
         command.addEnvs(env)
         return command
@@ -111,7 +130,15 @@ internal class PhpToolLauncher(private val project: Project, val interpreter: Ph
     /** [path] is what the interpreter reads; [staging] is the project-local copy to delete afterwards, if one was made. */
     class SharedDirectory(val path: String, val staging: Path?) {
         fun release() {
-            staging?.let(NioFiles::deleteRecursively)
+            val staging = staging ?: return
+            NioFiles.deleteRecursively(staging)
+            // The working directory's staging root is ours alone: nothing left in it but its .gitignore.
+            val root = staging.parent
+            runCatching {
+                if (Files.list(root).use { entries -> entries.allMatch { it.fileName.toString() == ".gitignore" } }) {
+                    NioFiles.deleteRecursively(root)
+                }
+            }
         }
     }
 
