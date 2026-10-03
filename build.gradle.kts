@@ -140,6 +140,9 @@ tasks {
         autoReload = false
     }
     test {
+        // VFS resolves macOS /var symlinks; fixtures and file lookups must use the same temporary path.
+        systemProperty("java.io.tmpdir", file(System.getProperty("java.io.tmpdir")).canonicalPath)
+
         // The bundled Kotlin plugin's KotlinScriptDefinitionCodeVisionProvider cannot be instantiated in the 2026.2
         // test fixture (its message bundle is missing the provider's name key), and the error is logged from a
         // project startup activity — outside any window a test could guard — failing whichever test the project
