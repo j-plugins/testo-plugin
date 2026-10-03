@@ -123,7 +123,7 @@ class TestoMutationStopAction : TestoMutationAction() {
         templatePresentation.icon = AllIcons.Actions.Suspend
     }
 
-    override fun isEnabled(panel: TestoMutationPanel) = panel.run.isBusy
+    override fun isEnabled(panel: TestoMutationPanel) = panel.run.isRunning || panel.run.rerunning || panel.run.stopper != null
 
     override fun perform(panel: TestoMutationPanel) = panel.run.stop()
 }

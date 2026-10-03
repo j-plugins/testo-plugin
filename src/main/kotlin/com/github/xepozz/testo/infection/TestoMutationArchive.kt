@@ -7,6 +7,10 @@ import java.io.Writer
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.StandardCopyOption.ATOMIC_MOVE
+import java.nio.file.StandardCopyOption.REPLACE_EXISTING
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Each file's score from the summary that judged it last, keyed by host path. */
 internal fun mergeScores(summaries: List<TestoMutationArchive.Summary>): Map<String, MutationScore> {
@@ -48,6 +52,49 @@ internal object TestoMutationArchive {
     const val KEEP = 5
 
     private val gson = Gson()
+    private val inputUsers = HashMap<Path, Int>()
+
+    /** Protects inputs before preparation, including the interval before an uncertain result is saved. */
+    @Synchronized
+    fun protectInputs(dir: Path): AutoCloseable {
+        val path = dir.toAbsolutePath().normalize()
+        inputUsers[path] = inputUsers.getOrDefault(path, 0) + 1
+        val released = AtomicBoolean()
+        return AutoCloseable {
+            synchronized(this) {
+                if (released.compareAndSet(false, true)) {
+                    val remaining = inputUsers.getValue(path) - 1
+                    if (remaining == 0) inputUsers.remove(path) else inputUsers[path] = remaining
+                }
+            }
+        }
+    }
+
+    private fun hasInputUsers(dir: Path): Boolean {
+        val path = dir.toAbsolutePath().normalize()
+        return inputUsers.keys.any { it.startsWith(path) }
+    }
+
+    private fun mustKeep(dir: Path): Boolean {
+        if (hasInputUsers(dir)) return true
+        val state = summary(dir) ?: return true
+        return state.finishedAt <= 0 || state.unconfirmedReason != null
+    }
+
+    /** Check and deletion share the same lock as acquisition and summary publication. Fail closed on bad metadata. */
+    @Synchronized
+    fun deleteRunIfSafe(sourceRunDir: Path): Boolean {
+        if (hasInputUsers(sourceRunDir)) return false
+        val root = sourceRunDir.resolve(DIR)
+        if (!Files.notExists(root)) {
+            val protected = runCatching {
+                Files.list(root).use { entries -> entries.anyMatch { Files.isDirectory(it) && mustKeep(it) } }
+            }.getOrDefault(true)
+            if (protected) return false
+        }
+        NioFiles.deleteRecursively(sourceRunDir)
+        return true
+    }
 
     class Summary(
         val title: String = "",
@@ -55,6 +102,9 @@ internal object TestoMutationArchive {
         val finishedAt: Long = 0,
         val exitCode: Int? = null,
         val stopped: Boolean = false,
+        val rerunStopped: Boolean = false,
+        val failureReason: String? = null,
+        val unconfirmedReason: String? = null,
         val expected: Int = 0,
         /** Interpreter path → host path of every mutated file, as the interpreter's mappings resolved it then. */
         val localPaths: Map<String, String> = emptyMap(),
@@ -97,12 +147,17 @@ internal object TestoMutationArchive {
         }.sortedBy { it.fileName.toString().toLongOrNull() ?: 0 }
     }
 
+    @Synchronized
     fun prune(testoRunDir: Path, keep: Int = KEEP) {
         val root = testoRunDir.resolve(DIR)
         if (!Files.isDirectory(root)) return
         val all = Files.list(root).use { it.toList() }.sortedBy { it.fileName.toString().toLongOrNull() ?: 0 }
-        all.dropLast(keep).forEach { runCatching { NioFiles.deleteRecursively(it) } }
+        all.dropLast(keep).filter { !mustKeep(it) }
+            .forEach { runCatching { NioFiles.deleteRecursively(it) } }
     }
+
+    @Synchronized
+    fun unconfirmedRun(testoRunDir: Path): Path? = runs(testoRunDir).firstOrNull { summary(it)?.unconfirmedReason != null }
 
     class Recorder(private val dir: Path) : AutoCloseable {
         private val writer: Writer
@@ -125,6 +180,7 @@ internal object TestoMutationArchive {
     }
 
     /** Writes [run]'s summary; the files in [rescored] were just judged again, the rest keep when they last were. */
+    @Synchronized
     fun writeSummary(dir: Path, run: TestoMutationRun, rescored: Set<String> = emptySet()) {
         val score = run.score()
         val previous = summary(dir)?.scores.orEmpty()
@@ -141,6 +197,9 @@ internal object TestoMutationArchive {
             finishedAt = run.finishedAt ?: System.currentTimeMillis(),
             exitCode = run.exitCode,
             stopped = run.stopRequested,
+            rerunStopped = run.rerunStopRequested,
+            failureReason = run.failureReason,
+            unconfirmedReason = run.unconfirmedReason,
             expected = run.expected,
             localPaths = run.files.mapNotNull { file -> run.localPath(file.path)?.let { file.path to it } }.toMap(),
             msi = score.msi,
@@ -149,9 +208,21 @@ internal object TestoMutationArchive {
             fingerprints = HashMap(run.fingerprints),
             scores = scores,
         )
-        Files.writeString(dir.resolve(SUMMARY_FILE), gson.toJson(summary), StandardCharsets.UTF_8)
+        val temporary = Files.createTempFile(dir, ".mutation-", ".tmp")
+        try {
+            Files.writeString(temporary, gson.toJson(summary), StandardCharsets.UTF_8)
+            try {
+                Files.move(temporary, dir.resolve(SUMMARY_FILE), ATOMIC_MOVE, REPLACE_EXISTING)
+            } catch (_: AtomicMoveNotSupportedException) {
+                // Readers and deletion are still serialized on providers without atomic rename.
+                Files.move(temporary, dir.resolve(SUMMARY_FILE), REPLACE_EXISTING)
+            }
+        } finally {
+            Files.deleteIfExists(temporary)
+        }
     }
 
+    @Synchronized
     fun summary(dir: Path): Summary? = runCatching {
         gson.fromJson(Files.readString(dir.resolve(SUMMARY_FILE)), Summary::class.java)
     }.getOrNull()
@@ -165,7 +236,8 @@ internal object TestoMutationArchive {
         replay(dir, TestoMutationStream(run), run)
         reruns(dir).forEach { replay(it, TestoMutationStream(run, rerun = true), run) }
         run.fingerprints.putAll(summary.fingerprints)
-        run.restore(summary.startedAt, summary.finishedAt, summary.exitCode, summary.stopped, summary.expected)
+        run.restore(summary.startedAt, summary.finishedAt, summary.exitCode, summary.stopped, summary.expected,
+            summary.rerunStopped, summary.failureReason, summary.unconfirmedReason)
         return run
     }
 

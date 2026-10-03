@@ -1,10 +1,10 @@
 package com.github.xepozz.testo.util
 
 import com.github.xepozz.testo.TestoClasses
+import com.github.xepozz.testo.php.PhpAttributeView
+import com.github.xepozz.testo.php.PhpDeclarationView
+import com.github.xepozz.testo.php.TestoPhp
 import com.intellij.psi.PsiElement
-import com.jetbrains.php.lang.psi.elements.Function
-import com.jetbrains.php.lang.psi.elements.PhpAttribute
-import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
 
 object PsiUtil {
     val MEANINGFUL_ATTRIBUTES = arrayOf(
@@ -23,14 +23,18 @@ object PsiUtil {
     fun getAttributeGroup(fqn: String?): Array<String>? =
         ATTRIBUTE_GROUPS.firstOrNull { fqn in it }
 
-    fun getAttributeOrder(attribute: PhpAttribute, owner: PhpAttributesOwner): Int {
-        val group = getAttributeGroup(attribute.fqn) ?: return -1
-        return owner.attributes
+    /** The position of [attribute] among the attributes of its own group on [owner], or -1 for an unnumbered one. */
+    fun getAttributeOrder(attribute: PsiElement, owner: PsiElement): Int {
+        val php = TestoPhp.getInstance()
+        val view = php.view(attribute) as? PhpAttributeView ?: return -1
+        val group = getAttributeGroup(view.fqn) ?: return -1
+        val declaration = php.view(owner) as? PhpDeclarationView ?: return -1
+        return declaration.attributes
             .filter { it.fqn in group }
-            .indexOf(attribute)
+            .indexOf(view)
     }
 
-    fun getExitStatementOrder(element: PsiElement, function: Function): Int = ExitStatementsVisitor(element)
+    fun getExitStatementOrder(element: PsiElement, function: PsiElement): Int = ExitStatementsVisitor(element)
         .apply { function.accept(this) }
         .index
 }

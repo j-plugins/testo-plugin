@@ -2,56 +2,67 @@ package com.github.xepozz.testo.index
 
 import com.github.xepozz.testo.isTestoDataProviderLike
 import com.github.xepozz.testo.isTestoFunction
+import com.github.xepozz.testo.php.PhpFunctionView
+import com.github.xepozz.testo.php.TestoPhp
+import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.psi.PsiElement
 import com.intellij.psi.search.GlobalSearchScopesCore
 import com.intellij.util.indexing.FileBasedIndex
-import com.jetbrains.php.PhpIndex
-import com.jetbrains.php.lang.psi.elements.Function
-import com.jetbrains.php.lang.psi.elements.Method
-import com.intellij.openapi.diagnostic.thisLogger
 
 object TestoDataProviderUtils {
-    fun isDataProvider(function: Function): Boolean {
+    private val php: TestoPhp get() = TestoPhp.getInstance()
+
+    fun isDataProvider(function: PsiElement): Boolean {
         if (!function.isTestoDataProviderLike()) return false
+        val name = (php.view(function) as? PhpFunctionView)?.name ?: return false
 
         return FileBasedIndex.getInstance()
             .getValues(
                 TestoDataProvidersIndex.KEY,
-                function.name,
+                name,
                 GlobalSearchScopesCore.projectTestScope(function.project)
             )
             .isNotEmpty()
     }
 
-    fun findDataProviderUsages(function: Function): List<Method> {
+    /** The test methods that name [function] as their data provider, ordered by file and source position. */
+    fun findDataProviderUsages(function: PsiElement): List<PsiElement> {
         if (!function.isTestoDataProviderLike()) return emptyList()
-        val phpIndex = PhpIndex.getInstance(function.project)
+        val name = (php.view(function) as? PhpFunctionView)?.name ?: return emptyList()
+        val project = function.project
 
         return FileBasedIndex.getInstance()
             .getValues(
                 TestoDataProvidersIndex.KEY,
-                function.name,
-                GlobalSearchScopesCore.projectTestScope(function.project)
+                name,
+                GlobalSearchScopesCore.projectTestScope(project)
             )
             .flatMap { it }
             .flatMap { usage ->
-                phpIndex
-                    .getClassesByFQN(usage.classFqn)
-                    .mapNotNull { it.findOwnMethodByName(usage.methodName) }
+                php.classesByFqn(project, usage.classFqn)
+                    .mapNotNull { it.findOwnMethod(usage.methodName)?.psi }
             }
+            .let(::inSourceOrder)
     }
 
-    fun findDataProviderUsagesIndex(test: Function, dataProvider: Function): Int {
+    // Index iteration order is not a stable default for a run or for the shared-provider chooser.
+    internal fun inSourceOrder(usages: List<PsiElement>): List<PsiElement> =
+        usages.sortedWith(compareBy({ it.containingFile.virtualFile.path }, { it.textOffset }))
+
+    fun findDataProviderUsagesIndex(test: PsiElement, dataProvider: PsiElement): Int {
         if (!test.isTestoFunction()) return -1
+        val provider = php.view(dataProvider) as? PhpFunctionView ?: return -1
 
         val mapping = TestoDataProvidersIndex.getDataProvidersFromAttributes(test)
 
-        val indexByFqn = mapping.indexOfFirst { it.first == dataProvider.fqn }
+        val indexByFqn = mapping.indexOfFirst { it.first == provider.fqn }
         if (indexByFqn != -1) return indexByFqn
 
-        val indexByName = mapping.indexOfFirst { it.second == dataProvider.name }
+        val indexByName = mapping.indexOfFirst { it.second == provider.name }
         if (indexByName != -1) return indexByName
 
-        thisLogger().debug("Could not find data provider usage for ${dataProvider.name} (${dataProvider.fqn}) in ${test.name} (${test.fqn})")
+        val testView = php.view(test) as? PhpFunctionView
+        thisLogger().debug("Could not find data provider usage for ${provider.name} (${provider.fqn}) in ${testView?.name} (${testView?.fqn})")
         return -1
     }
 }

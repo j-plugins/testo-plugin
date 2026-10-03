@@ -174,7 +174,9 @@ class TestoRunStore(private val project: Project) {
             ?: runCatching { Files.getLastModifiedTime(dir).toMillis() }.getOrDefault(0L)
 
     private fun delete(dir: Path) {
-        runCatching { FileUtil.delete(dir) }.onFailure { LOG.warn("Failed to delete archived Testo run $dir", it) }
+        // A disconnected interpreter may still be reading the mutation run's coverage copy.
+        runCatching { com.github.xepozz.testo.infection.TestoMutationArchive.deleteRunIfSafe(dir) }
+            .onFailure { LOG.warn("Failed to delete archived Testo run $dir", it) }
     }
 
     companion object {

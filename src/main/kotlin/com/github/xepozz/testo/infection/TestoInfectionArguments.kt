@@ -1,11 +1,11 @@
 package com.github.xepozz.testo.infection
 
-import com.github.xepozz.testo.tests.run.TestoRunnerSettings
+import com.github.xepozz.testo.launch.TestoRunSelection
 import com.intellij.execution.configurations.ParametersList
 
 /** The Infection flags a run configuration asks for, beyond the ones every mutation run needs. */
 internal data class TestoInfectionOptions(
-    val scope: String = TestoRunnerSettings.INFECTION_SCOPE_COVERED,
+    val scope: String = TestoRunSelection.INFECTION_SCOPE_COVERED,
     val gitDiffBase: String = "",
     val threads: String = "",
     val onlyCoveringTestCases: Boolean = false,
@@ -22,7 +22,7 @@ internal data class TestoInfectionOptions(
     val filter: String? = null,
 ) {
     companion object {
-        fun of(settings: TestoRunnerSettings) = TestoInfectionOptions(
+        fun of(settings: TestoRunSelection) = TestoInfectionOptions(
             scope = settings.infectionScope,
             gitDiffBase = settings.infectionGitDiffBase,
             threads = settings.infectionThreads,
@@ -60,11 +60,11 @@ internal object TestoInfectionArguments {
                 add("--id=${options.mutantId}")
             }
             options.filter != null -> add("--filter=${options.filter}")
-            options.scope == TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES -> {
+            options.scope == TestoRunSelection.INFECTION_SCOPE_GIT_LINES -> {
                 add("--git-diff-lines")
                 options.gitDiffBase.trim().takeIf { it.isNotEmpty() }?.let { add("--git-diff-base=$it") }
             }
-            options.scope == TestoRunnerSettings.INFECTION_SCOPE_ALL -> Unit
+            options.scope == TestoRunSelection.INFECTION_SCOPE_ALL -> Unit
             // Without --with-uncovered, Infection skips every file this run's coverage has no test for before parsing it, so
             // the deprecated --filter would change nothing. With it, the filter is what keeps the other files out.
             options.withUncovered -> filter(sourceFiles)?.let { add("--filter=$it") }

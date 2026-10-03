@@ -2,16 +2,13 @@ package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.reapplyTestoCoverage
-import com.github.xepozz.testo.php.PhpToolLauncher
+import com.github.xepozz.testo.php.TestoPhp
+import com.github.xepozz.testo.php.TestoToolEnvironment
+import com.github.xepozz.testo.launch.TestoConfiguration
+import com.github.xepozz.testo.launch.TestoRunSelection
 import com.github.xepozz.testo.runs.TestoRunManifest
 import com.github.xepozz.testo.runs.TestoRunStore
-import com.github.xepozz.testo.tests.run.TestoRunConfiguration
-import com.github.xepozz.testo.tests.run.TestoRunnerSettings
 import com.intellij.execution.ExecutionException
-import com.intellij.execution.process.ProcessEvent
-import com.intellij.execution.process.ProcessListener
-import com.intellij.execution.process.ProcessOutputType
-import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -25,11 +22,8 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.io.NioFiles
 import com.intellij.util.text.DateFormatUtil
-import com.jetbrains.php.config.interpreters.PhpInterpreter
-import com.jetbrains.php.run.PhpRunConfiguration
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
@@ -103,14 +97,15 @@ class TestoMutationService(private val project: Project) {
 
     /** Mutates the run just archived at [runDir] when its tests passed, else says why it does not. */
     internal fun startAfterRun(
-        configuration: TestoRunConfiguration,
+        configuration: TestoConfiguration,
         runDir: Path,
         manifest: TestoRunManifest,
-        optionsFrom: TestoRunConfiguration,
+        optionsFrom: TestoConfiguration,
+        environment: TestoToolEnvironment?,
     ) {
         when (val readiness = TestoInfectionReports.readiness(runDir, manifest)) {
             is TestoMutationReadiness.Ready -> ApplicationManager.getApplication().invokeLater({
-                start(TestoMutationRecipe(configuration, runDir, readiness, optionsFrom))
+                start(TestoMutationRecipe(configuration, runDir, readiness, optionsFrom, capturedEnvironment = environment))
             }, project.disposed)
             is TestoMutationReadiness.Missing -> if (!manifest.cancelled) {
                 notify(TestoBundle.message("infection.finished", configuration.name), readiness.hint, NotificationType.INFORMATION)
@@ -122,15 +117,19 @@ class TestoMutationService(private val project: Project) {
     internal fun start(recipe: TestoMutationRecipe) {
         val runDir = recipe.runDir
         runs[runDir]?.takeIf { it.isBusy }?.let { return TestoMutationToolWindow.show(project, it) }
+        TestoMutationArchive.unconfirmedRun(runDir)?.let { dir ->
+            TestoMutationArchive.load(runDir, dir)?.let { restored ->
+                restored.recipe = recipe
+                track(restored)
+                TestoMutationToolWindow.show(project, restored)
+            }
+            return
+        }
 
         val sources = coveredSources(recipe)
         TestoMutationArchive.prune(runDir, TestoMutationArchive.KEEP - 1)
         val launch = TestoInfectionLaunch(recipe.ready, sources, TestoMutationArchive.newRunDir(runDir, System.currentTimeMillis()), recipe.options())
-        val clone = recipe.clone(launch)
-        val interpreter = clone.interpreter
-        val launcher = interpreter?.let { PhpToolLauncher(project, it) }
-
-        val run = TestoMutationRun(recipe.title, runDir, launch.workDir) { launcher?.toLocal(it) }
+        val run = TestoMutationRun(recipe.title, runDir, launch.workDir) { recipe.environment.toLocal(it) }
         run.recipe = recipe
         track(run)
         TestoMutationToolWindow.add(project, run)
@@ -138,17 +137,16 @@ class TestoMutationService(private val project: Project) {
         object : Task.Backgroundable(project, TestoBundle.message("infection.task.title", recipe.configuration.name), true) {
             override fun run(indicator: ProgressIndicator) {
                 try {
-                    if (interpreter == null) throw ExecutionException(TestoBundle.message("infection.error.noInterpreter"))
                     TestoMutationArchive.Recorder(launch.workDir).use { recorder ->
                         run.startedAt = System.currentTimeMillis()
                         val stream = TestoMutationStream(run, recorder::line, onFile = run::fingerprint)
-                        val exitCode = execute(clone, interpreter, run, launch, stream, recorder, indicator) { run.stopRequested }
-                        launch.htmlTarget?.copyToLocal(project)
+                        val exitCode = execute(recipe.environment, run, launch, stream, recorder, indicator) { run.stopRequested }
                         TestoInfectionHtmlReport.clean(launch.htmlReport)
                         run.finish(exitCode)
                         recorder.summary(run)
                     }
                 } catch (e: ProcessCanceledException) {
+                    run.stop()
                     if (run.isRunning) run.finish(null)
                     throw e
                 } catch (e: Exception) {
@@ -157,6 +155,8 @@ class TestoMutationService(private val project: Project) {
                     if (run.isRunning) run.finish(null)
                     notifyFailed(run, e.message ?: e.javaClass.simpleName)
                 } finally {
+                    runCatching { TestoMutationArchive.writeSummary(launch.workDir, run) }
+                        .onFailure { thisLogger().warn("Could not save mutation run", it) }
                     release(launch)
                 }
                 scored(runDir)
@@ -228,18 +228,17 @@ class TestoMutationService(private val project: Project) {
         run.rerunning = true
         run.changed()
 
-        val interpreter = recipe.configuration.interpreter
         object : Task.Backgroundable(project, TestoBundle.message("infection.rerun.task", targets.size.toString(), run.title), true) {
             override fun run(indicator: ProgressIndicator) {
                 try {
-                    if (interpreter == null) throw ExecutionException(TestoBundle.message("infection.error.noInterpreter"))
                     val sources = coveredSources(recipe)
                     val options = recipe.options()
-                    val wholeFiles = options.filter != null || options.scope != TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES
+                    val wholeFiles = options.filter != null || options.scope != TestoRunSelection.INFECTION_SCOPE_GIT_LINES
                     val units = rerunUnits(targets, wholeFiles)
                     indicator.isIndeterminate = false
                     for ((index, unit) in units.withIndex()) {
-                        if (run.rerunStopRequested || indicator.isCanceled) break
+                        if (indicator.isCanceled) run.stop()
+                        if (run.rerunStopRequested) break
                         indicator.fraction = index.toDouble() / units.size
                         val unitOptions = when (unit) {
                             is RerunUnit.One -> {
@@ -251,9 +250,10 @@ class TestoMutationService(private val project: Project) {
                                 options.copy(filter = TestoInfectionArguments.pathFilter(unit.file.path))
                             }
                         }
-                        rerunOne(recipe, interpreter, run, unitOptions, sources, indicator)
+                        rerunOne(recipe, run, unitOptions, sources, indicator)
                     }
                 } catch (e: ProcessCanceledException) {
+                    run.stop()
                     throw e
                 } catch (e: Exception) {
                     if (e !is ExecutionException) thisLogger().warn("Mutant rerun failed to start", e)
@@ -270,7 +270,7 @@ class TestoMutationService(private val project: Project) {
                     }
                     targets.forEach { it.rerunning = false }
                     run.rerunning = false
-                    run.stopper = null
+                    if (run.pendingTool == null) run.stopper = null
                     val rescored = (targets - missing.toSet()).mapTo(HashSet()) { it.file.path }
                     runCatching { TestoMutationArchive.writeSummary(run.workDir, run, rescored) }
                         .onFailure { thisLogger().warn("Could not update the summary of ${run.workDir}", it) }
@@ -284,7 +284,6 @@ class TestoMutationService(private val project: Project) {
 
     private fun rerunOne(
         recipe: TestoMutationRecipe,
-        interpreter: PhpInterpreter,
         run: TestoMutationRun,
         options: TestoInfectionOptions,
         sources: List<String>,
@@ -295,7 +294,7 @@ class TestoMutationService(private val project: Project) {
         try {
             TestoMutationArchive.Recorder(dir).use { recorder ->
                 val stream = TestoMutationStream(run, recorder::line, rerun = true)
-                execute(recipe.clone(launch), interpreter, run, launch, stream, recorder, indicator) { run.rerunStopRequested }
+                execute(recipe.environment, run, launch, stream, recorder, indicator) { run.rerunStopRequested }
             }
         } finally {
             release(launch)
@@ -308,15 +307,27 @@ class TestoMutationService(private val project: Project) {
             .getOrDefault(emptyList())
 
     private fun release(launch: TestoInfectionLaunch) {
-        launch.shared?.release()
         // A copy of the Testo run's own reports, which the archive already has.
-        runCatching { NioFiles.deleteRecursively(launch.coverageDir) }
+        val cleanup: () -> Unit = {
+            try {
+                runCatching { NioFiles.deleteRecursively(launch.coverageDir) }
+                    .onFailure { thisLogger().warn("Could not release mutation inputs", it) }
+            } finally {
+                launch.inputProtection?.close()
+                launch.inputProtection = null
+            }
+        }
+        val prepared = launch.prepared
+        if (prepared == null) cleanup()
+        else {
+            prepared.afterRelease(cleanup)
+            prepared.close()
+        }
     }
 
     /** Runs one Infection process to its end, feeding [stream]. Returns its exit code. */
     private fun execute(
-        clone: TestoRunConfiguration,
-        interpreter: PhpInterpreter,
+        environment: TestoToolEnvironment,
         run: TestoMutationRun,
         launch: TestoInfectionLaunch,
         stream: TestoMutationStream,
@@ -324,36 +335,11 @@ class TestoMutationService(private val project: Project) {
         indicator: ProgressIndicator,
         stopped: () -> Boolean,
     ): Int {
-        val command = clone.createCommand(interpreter, mutableMapOf(), mutableListOf(), false)
-        val commandLine = command.createGeneralCommandLine(false)
-        val handler = PhpRunConfiguration.createProcessHandler(project, command, false, false, commandLine)
-        val header = "$ ${commandLine.commandLineString}"
-        recorder.line(header)
-        run.appendLog(header)
-        handler.addProcessListener(object : ProcessListener {
-            override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
-                if (outputType == ProcessOutputTypes.SYSTEM) return
-                stream.feed(event.text, ProcessOutputType.isStdout(outputType))
-            }
-        })
-        run.stopper = { handler.destroyProcess() }
-        handler.startNotify()
-        if (stopped()) handler.destroyProcess()
-
-        while (!handler.waitFor(POLL_MS)) {
-            if (indicator.isCanceled && !stopped()) run.stop()
-            if (run.isRunning) {
-                val done = run.finishedCount()
-                val total = run.expected
-                indicator.isIndeterminate = total <= 0
-                if (total > 0) indicator.fraction = done.toDouble() / total
-                indicator.text2 = TestoBundle.message("infection.task.progress", done.toString(), total.toString())
-            }
-        }
-        stream.flush()
-        launch.textTarget?.copyToLocal(project)
+        launch.inputProtection = TestoMutationArchive.protectInputs(launch.workDir)
+        val prepared = TestoInfectionCommand.create(environment, launch)
+        val exitCode = executeToolProcess(prepared, run, stream, indicator, stopped, recorder::line)
         TestoMutationArchive.applyTextLog(launch.textLog, run)
-        return handler.exitCode ?: -1
+        return exitCode
     }
 
     private fun notifyRerun(run: TestoMutationRun, rerun: List<Mutant>, missing: Int) {
@@ -414,7 +400,6 @@ class TestoMutationService(private val project: Project) {
     }
 
     companion object {
-        private const val POLL_MS = 200L
         private const val MAX_RUNS = 10
 
         fun getInstance(project: Project): TestoMutationService = project.service()
@@ -423,24 +408,25 @@ class TestoMutationService(private val project: Project) {
 
 /** What a mutation run is started from, so it can be started again or have its mutants rerun. */
 internal class TestoMutationRecipe(
-    val configuration: TestoRunConfiguration,
+    val configuration: TestoConfiguration,
     /** The archived Testo run whose reports are mutated. */
     val runDir: Path,
     val ready: TestoMutationReadiness.Ready,
     /** Where the Infection options live: the saved configuration, which the tab's may only be a copy of. */
-    val optionsFrom: TestoRunConfiguration,
+    val optionsFrom: TestoConfiguration,
     /** The file or directory the run is narrowed to, as [TestoInfectionArguments.pathFilter] spells it for Infection. */
     val filter: String? = null,
     /** What [filter] names, for the tab. */
     val scopeName: String? = null,
+    capturedEnvironment: TestoToolEnvironment? = null,
 ) {
+    val environment: TestoToolEnvironment by lazy {
+        capturedEnvironment ?: TestoPhp.getInstance().toolEnvironment(configuration)
+    }
     val title: String get() = scopeName?.let { "${configuration.name} · $it" } ?: configuration.name
 
     /** Read at each start, so an option changed since the first run applies to the next. */
-    fun options(): TestoInfectionOptions = TestoInfectionOptions.of(optionsFrom.testoSettings.runnerSettings).copy(filter = filter)
-
-    fun clone(launch: TestoInfectionLaunch): TestoRunConfiguration =
-        (configuration.clone() as TestoRunConfiguration).also { it.infectionLaunch = launch }
+    fun options(): TestoInfectionOptions = TestoInfectionOptions.of(optionsFrom.selection).copy(filter = filter)
 }
 
 internal sealed interface RerunUnit {

@@ -1,0 +1,7 @@
+<!-- Coverage on PhpStorm's PHP plugin. Included by coverage.xml, so it loads only where the coverage module does. -->
+<idea-plugin>
+    <extensions defaultExtensionNs="com.intellij">
+        <programRunner implementation="com.github.xepozz.testo.phpstorm.coverage.TestoMutationProgramRunner"/>
+        <programRunner implementation="com.github.xepozz.testo.phpstorm.coverage.TestoCoverageProgramRunner"/>
+    </extensions>
+</idea-plugin>

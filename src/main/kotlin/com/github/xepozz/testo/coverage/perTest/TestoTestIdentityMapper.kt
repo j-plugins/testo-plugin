@@ -1,6 +1,8 @@
 package com.github.xepozz.testo.coverage.perTest
 
 import com.github.xepozz.testo.coverage.format.TestId
+import com.github.xepozz.testo.php.PhpFunctionView
+import com.github.xepozz.testo.php.TestoPhp
 import com.github.xepozz.testo.tests.TestoTestRunLineMarkerProvider
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
@@ -8,13 +10,11 @@ import com.intellij.openapi.project.Project
 import com.intellij.pom.Navigatable
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.psi.PsiElement
-import com.jetbrains.php.PhpIndex
-import com.jetbrains.php.lang.psi.elements.Method
 
 /**
  * The one place that maps a coverage [TestId] (a `\`-qualified class + method, as coverage-xml spells covering tests)
  * onto Testo's own identities — so its consumers cannot diverge. A `--filter` selector is a pure string (available
- * with no PSI); the `php_qn://` hint and PSI need the class resolved through [PhpIndex].
+ * with no PSI); the `php_qn://` hint and PSI need the class resolved through the class index.
  */
 interface TestoTestIdentityMapper {
     /** `\Ns\FooTest::method` — the selector Testo's `--filter` accepts (matches TestoRunTarget.filterOf output). */
@@ -44,12 +44,14 @@ fun navigateToTest(project: Project, id: TestId) {
 internal object DefaultTestIdentityMapper : TestoTestIdentityMapper {
     override fun toFilterSelector(id: TestId): String = "\\" + id.fqcn.trimStart('\\') + "::" + id.method
 
-    override fun toLocationHint(id: TestId, project: Project): String? =
-        (resolve(id, project) as? Method)?.let { TestoTestRunLineMarkerProvider.getLocationHint(it) }
+    override fun toLocationHint(id: TestId, project: Project): String? {
+        val method = TestoPhp.getInstance().view(resolve(id, project)) as? PhpFunctionView ?: return null
+        return if (method.isMethod) TestoTestRunLineMarkerProvider.getLocationHint(method) else null
+    }
 
     override fun resolve(id: TestId, project: Project): PsiElement? {
         val fqn = "\\" + id.fqcn.trimStart('\\')
-        return PhpIndex.getInstance(project).getClassesByFQN(fqn)
-            .firstNotNullOfOrNull { it.findMethodByName(id.method) }
+        return TestoPhp.getInstance().classesByFqn(project, fqn)
+            .firstNotNullOfOrNull { it.findMethod(id.method)?.psi }
     }
 }

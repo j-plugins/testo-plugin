@@ -2,7 +2,6 @@ package com.github.xepozz.testo
 
 import com.github.xepozz.testo.index.TestoGroupsIndex
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jetbrains.php.lang.PhpFileType
 
 /**
  * What the group index reads out of one file. `#[Group]` is variadic and may sit on a class, a method or a standalone
@@ -12,7 +11,7 @@ class TestoGroupsIndexPsiTest : BasePlatformTestCase() {
 
     fun testNamesAreCollectedFromEveryDeclarationAndDeduplicated() {
         val file = myFixture.configureByText(
-            PhpFileType.INSTANCE,
+            PHP_TEST_FILE,
             """<?php
             #[\Testo\Filter\Group('db')]
             class OrderTest {
@@ -29,7 +28,7 @@ class TestoGroupsIndexPsiTest : BasePlatformTestCase() {
 
     fun testNonLiteralAndBlankNamesAreSkipped() {
         val file = myFixture.configureByText(
-            PhpFileType.INSTANCE,
+            PHP_TEST_FILE,
             """<?php
             class OrderTest {
                 #[\Testo\Filter\Group('', SOME_CONST, 'db')]
@@ -42,7 +41,7 @@ class TestoGroupsIndexPsiTest : BasePlatformTestCase() {
 
     fun testAnotherAttributeContributesNothing() {
         val file = myFixture.configureByText(
-            PhpFileType.INSTANCE,
+            PHP_TEST_FILE,
             """<?php
             class OrderTest {
                 #[\Testo\Test]

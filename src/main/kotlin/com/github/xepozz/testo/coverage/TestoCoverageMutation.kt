@@ -10,8 +10,8 @@ import com.github.xepozz.testo.infection.TestoMutationService
 import com.github.xepozz.testo.infection.mutationFilterFor
 import com.github.xepozz.testo.runs.TestoRunStore
 import com.github.xepozz.testo.runs.restoreTestoConfiguration
-import com.github.xepozz.testo.tests.run.TestoRunConfiguration
-import com.github.xepozz.testo.tests.run.TestoRunConfigurationType
+import com.github.xepozz.testo.launch.TestoConfiguration
+import com.github.xepozz.testo.php.TestoPhp
 import com.intellij.coverage.CoverageDataManager
 import com.intellij.coverage.CoverageSuitesBundle
 import com.intellij.execution.RunManager
@@ -64,6 +64,7 @@ internal object TestoCoverageMutation {
                 recipe.optionsFrom,
                 filter = target.filter.takeIf { scoped },
                 scopeName = target.name.takeIf { scoped },
+                capturedEnvironment = recipe.environment,
             )
         )
     }
@@ -74,8 +75,8 @@ internal object TestoCoverageMutation {
         val ready = TestoInfectionReports.readiness(runDir, manifest) as? TestoMutationReadiness.Ready ?: return null
         val configuration = restoreTestoConfiguration(project, runDir, manifest)
         val saved = RunManager.getInstance(project)
-            .findConfigurationByTypeAndName(TestoRunConfigurationType.INSTANCE, configuration.name)
-            ?.configuration as? TestoRunConfiguration
+            .findConfigurationByTypeAndName(TestoPhp.getInstance().configurationFactory().type, configuration.name)
+            ?.configuration as? TestoConfiguration
         val sources = runCatching { TestoInfectionReports.coveredSourceFiles(ready.coverageXml) }.getOrDefault(emptyList())
         val root = runCatching { TestoInfectionReports.coverageRoot(ready.coverageXml) }.getOrNull()
         return Prepared(TestoMutationRecipe(configuration, runDir, ready, saved ?: configuration), sources, root)

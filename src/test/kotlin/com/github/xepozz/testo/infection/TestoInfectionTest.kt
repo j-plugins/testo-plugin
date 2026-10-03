@@ -2,7 +2,7 @@ package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.runs.StoredReport
 import com.github.xepozz.testo.runs.TestoRunManifest
-import com.github.xepozz.testo.tests.run.TestoRunnerSettings
+import com.github.xepozz.testo.launch.TestoRunSelection
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -51,7 +51,7 @@ class TestoInfectionTest {
     @Test
     fun `options map onto their flags, the extra ones last`() {
         val options = TestoInfectionOptions(
-            scope = TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES,
+            scope = TestoRunSelection.INFECTION_SCOPE_GIT_LINES,
             gitDiffBase = "origin/main",
             threads = "max",
             onlyCoveringTestCases = true,
@@ -85,14 +85,14 @@ class TestoInfectionTest {
         )
         assertEquals(
             listOf("--coverage=/c", "--skip-initial-tests", "--test-framework=testo", "--teamcity", "--no-progress", "--no-interaction"),
-            TestoInfectionArguments.build("/c", listOf("src/A.php"), null, null, TestoInfectionOptions(scope = TestoRunnerSettings.INFECTION_SCOPE_ALL)),
+            TestoInfectionArguments.build("/c", listOf("src/A.php"), null, null, TestoInfectionOptions(scope = TestoRunSelection.INFECTION_SCOPE_ALL)),
         )
     }
 
     @Test
     fun `a rerun of one mutant names it and its file, whatever the scope`() {
         val options = TestoInfectionOptions(
-            scope = TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES,
+            scope = TestoRunSelection.INFECTION_SCOPE_GIT_LINES,
             mutantId = "7fef23da",
             mutantFile = "src/A.php",
         )
@@ -128,7 +128,7 @@ class TestoInfectionTest {
 
     @Test
     fun `a narrowed run filters by its file or directory whatever the scope`() {
-        val options = TestoInfectionOptions(scope = TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES, filter = "#/app/src/Sub/#")
+        val options = TestoInfectionOptions(scope = TestoRunSelection.INFECTION_SCOPE_GIT_LINES, filter = "#/app/src/Sub/#")
 
         assertEquals(
             listOf("--filter=#/app/src/Sub/#"),

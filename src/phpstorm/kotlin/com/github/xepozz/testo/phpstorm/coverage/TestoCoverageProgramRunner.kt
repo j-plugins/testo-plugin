@@ -1,0 +1,165 @@
+package com.github.xepozz.testo.phpstorm.coverage
+
+import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.coverage.TestoCoverageRunner
+import com.github.xepozz.testo.coverage.autoApplyCoverage
+import com.github.xepozz.testo.coverage.flagLocalDataFiles
+import com.github.xepozz.testo.coverage.format.CoverageFormat
+import com.github.xepozz.testo.launch.TestoConfiguration
+import com.github.xepozz.testo.launch.TestoCoverageArguments
+import com.github.xepozz.testo.phpstorm.tests.run.TestoReportTarget
+import com.github.xepozz.testo.phpstorm.tests.run.TestoRunConfiguration
+import com.github.xepozz.testo.phpstorm.tests.run.TestoRunnerSettings
+import com.github.xepozz.testo.phpstorm.toSelection
+import com.github.xepozz.testo.tests.TestoConsoleProperties
+import com.intellij.coverage.CoverageRunnerData
+import com.intellij.execution.ExecutionException
+import com.intellij.execution.configurations.ConfigurationInfoProvider
+import com.intellij.execution.configurations.RunProfile
+import com.intellij.execution.configurations.RunProfileState
+import com.intellij.execution.configurations.RunnerSettings
+import com.intellij.execution.configurations.RuntimeConfigurationError
+import com.intellij.execution.configurations.coverage.CoverageEnabledConfiguration
+import com.intellij.execution.process.ProcessAdapter
+import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.runners.ExecutionEnvironment
+import com.intellij.execution.runners.GenericProgramRunner
+import com.intellij.execution.runners.RunContentBuilder
+import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
+import com.intellij.execution.ui.RunContentDescriptor
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.util.PathMappingSettings
+import com.intellij.util.PathUtil
+import com.jetbrains.php.config.commandLine.PhpCommandSettings
+import com.jetbrains.php.config.commandLine.PhpCommandSettingsBuilder
+import com.jetbrains.php.config.interpreters.PhpInterpreter
+import com.jetbrains.php.debug.xdebug.options.XdebugConfigurationOptionsManager
+import com.jetbrains.php.phpunit.coverage.PhpUnitCoverageEngine.CoverageEngine
+import com.jetbrains.php.run.PhpConfigurationOption
+
+/**
+ * Runs a Testo configuration under the Coverage executor. Extends the public [GenericProgramRunner] instead of the
+ * internal `com.intellij.php.coverage.PhpCoverageRunner`: [doExecute] reproduces that base's Xdebug flow (resolve the
+ * IDE-managed report path, build the command, attach the platform to the process so it loads coverage on termination
+ * via [TestoCoverageRunner]) on public PHP execution API alone.
+ */
+open class TestoCoverageProgramRunner : GenericProgramRunner<RunnerSettings>() {
+    companion object {
+        const val EXECUTOR_ID: String = TestoConfiguration.COVERAGE_EXECUTOR_ID
+        const val RUNNER_ID: String = "TestoCoverageRunner"
+    }
+
+    override fun getRunnerId(): String = RUNNER_ID
+
+    override fun canRun(executorId: String, profile: RunProfile): Boolean =
+        executorId == EXECUTOR_ID && profile is TestoRunConfiguration
+
+    // The Coverage executor needs CoverageRunnerData so the platform threads RunnerSettings through to attachToProcess.
+    override fun createConfigurationData(settingsProvider: ConfigurationInfoProvider): RunnerSettings = CoverageRunnerData()
+
+    override fun doExecute(state: RunProfileState, env: ExecutionEnvironment): RunContentDescriptor? {
+        FileDocumentManager.getInstance().saveAllDocuments()
+        val runConfiguration = (env.runProfile as? TestoRunConfiguration)?.let(::prepare)
+            ?: throw ExecutionException(TestoBundle.message("testo.coverage.run.unsupported.profile"))
+        val interpreter = runConfiguration.interpreter
+            ?: throw ExecutionException(PhpCommandSettingsBuilder.getInterpreterNotFoundError())
+
+        // Kept for its IDE-managed base path alone — loading no longer goes through CoverageHelper.
+        val coverageConfiguration = CoverageEnabledConfiguration.getOrCreate(runConfiguration)
+        val localCoverage = coverageConfiguration.coverageFilePath
+        val settings = runConfiguration.testoSettings.getTestoRunnerSettings()
+        val flags = coverageFlagLocalPaths(settings, localCoverage)
+        val targets = flags.map { (_, local) -> TestoReportTarget.resolve(runConfiguration.project, interpreter, local) }
+        val reportArguments = TestoCoverageArguments.reportArguments(flags, targets.map { it.path })
+        val coverageArguments = reportArguments + extraCoverageArguments(settings)
+
+        val command = createTestoCoverageCommand(
+            runConfiguration,
+            interpreter,
+            coverageArguments,
+            localCoverage,
+            localCoverage?.takeIf { it.isNotEmpty() }?.let { TestoReportTarget.resolve(runConfiguration.project, interpreter, it).path },
+        )
+        runConfiguration.checkConfiguration()
+
+        val profileState = runConfiguration.getState(env, command, null) ?: return null
+        val executionResult = profileState.execute(env.executor, this) ?: return null
+
+        // The platform's CoverageHelper loads exactly one file; a Testo run can produce several reports (flags plus
+        // testo.php writers), so termination triggers our own merged apply instead.
+        val flagDataFiles = flagLocalDataFiles(flags)
+        val props = (executionResult.executionConsole as? SMTRunnerConsoleView)?.properties as? TestoConsoleProperties
+        // Handed over rather than kept here: the run archive dedupes the same way, and it only sees the properties.
+        props?.coverageFlagPaths = flagDataFiles
+        props?.let { it.reportTargets += targets }
+        props?.let { started(env, it) }
+        executionResult.processHandler.addProcessListener(object : ProcessAdapter() {
+            override fun processTerminated(event: ProcessEvent) {
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    val properties = props ?: return@executeOnPooledThread
+                    properties.copyReportsToLocal()
+                    autoApplyCoverage(runConfiguration.project, properties, flagDataFiles)
+                }
+            }
+        })
+        return RunContentBuilder(executionResult, env).showRunContent(env.contentToReuse)
+    }
+
+    /** The configuration this run executes: [configuration] itself, or a copy with what the executor needs. */
+    protected open fun prepare(configuration: TestoRunConfiguration): TestoRunConfiguration = configuration
+
+    protected open fun started(env: ExecutionEnvironment, properties: TestoConsoleProperties) = Unit
+
+    /** See [TestoCoverageArguments.flagLocalPaths]. */
+    fun coverageFlagLocalPaths(settings: TestoRunnerSettings, localCoverage: String?): List<Pair<CoverageFormat, String>> =
+        TestoCoverageArguments.flagLocalPaths(settings.toSelection(), localCoverage)
+
+    /** See [TestoCoverageArguments.extraArguments]. */
+    fun extraCoverageArguments(settings: TestoRunnerSettings): List<String> =
+        TestoCoverageArguments.extraArguments(settings.toSelection())
+
+    /** See [TestoCoverageArguments.level]. */
+    fun resolveCoverageLevel(settings: TestoRunnerSettings): String? = TestoCoverageArguments.level(settings.toSelection())
+
+    fun coverageFlagFor(format: CoverageFormat, targetCoverage: String): String =
+        TestoCoverageArguments.flagFor(format, targetCoverage)
+
+    fun createTestoCoverageCommand(
+        runConfiguration: TestoRunConfiguration,
+        interpreter: PhpInterpreter,
+        coverageArguments: List<String>,
+        localCoverage: String?,
+        targetCoverage: String?,
+    ): PhpCommandSettings {
+        val command = runConfiguration.createCommand(
+            interpreter,
+            mutableMapOf(),
+            coverageArguments.toMutableList(),
+            true,
+        )
+
+        val coverageEngine = runConfiguration.testoSettings.getTestoRunnerSettings().coverageEngine
+        val options = when (coverageEngine) {
+            CoverageEngine.XDEBUG -> XdebugConfigurationOptionsManager
+                .getConfigurationOptionsProvider(runConfiguration.project, interpreter)
+                .enableCoverage()
+                .createXdebugConfigurations()
+
+            CoverageEngine.PCOV -> listOf(PhpConfigurationOption("pcov.enabled", 1))
+            else -> throw RuntimeConfigurationError("Unsupported Testo coverage engine: $coverageEngine.")
+        }
+        command.addConfigurationOptions(options)
+        setAdditionalMapping(localCoverage, targetCoverage, command)
+
+        return command
+    }
+
+    private fun setAdditionalMapping(localCoverage: String?, targetCoverage: String?, command: PhpCommandSettings) {
+        if (!localCoverage.isNullOrEmpty() && !targetCoverage.isNullOrEmpty()) {
+            command.setAdditionalMapping(
+                PathMappingSettings.PathMapping(PathUtil.getParentPath(localCoverage), PathUtil.getParentPath(targetCoverage)),
+            )
+        }
+    }
+}

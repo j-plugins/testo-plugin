@@ -1,11 +1,12 @@
-<idea-plugin>
+<idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude">
+    <!-- Coverage registrations that need the PHP plugin's classes; loaded under the same coverage condition. -->
+    <xi:include href="/META-INF/testo-php-coverage.xml"/>
+
     <extensions defaultExtensionNs="com.intellij">
         <coverageEngine implementation="com.github.xepozz.testo.coverage.TestoCoverageEngine"/>
         <coverageRunner implementation="com.github.xepozz.testo.coverage.TestoCoverageRunner"/>
-        <programRunner implementation="com.github.xepozz.testo.coverage.TestoCoverageProgramRunner"/>
-        <!-- Run with Mutation: Coverage, then Infection over the run once its tests pass. -->
+        <!-- Run with Mutation shares the UI; the PHP-specific descriptor supplies its runner. -->
         <executor implementation="com.github.xepozz.testo.infection.TestoMutationExecutor"/>
-        <programRunner implementation="com.github.xepozz.testo.infection.TestoMutationProgramRunner"/>
         <projectService serviceImplementation="com.github.xepozz.testo.coverage.TestoCoverageAnnotator"/>
         <!-- "Run covering tests (N)" on methods, functions and classes; silent until a coverage-xml report is loaded. -->
         <codeInsight.lineMarkerProvider language="PHP"

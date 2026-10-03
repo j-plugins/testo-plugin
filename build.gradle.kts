@@ -32,6 +32,17 @@ kotlin {
     jvmToolchain(21)
 }
 
+// PHP-specific implementations and registrations are compiled alongside the shared core.
+sourceSets {
+    main {
+        kotlin.srcDir("src/phpstorm/kotlin")
+        resources.srcDir("src/phpstorm/resources")
+    }
+    test {
+        kotlin.srcDir("src/phpstormTest/kotlin")
+    }
+}
+
 // Configure project's dependencies
 repositories {
     mavenCentral()

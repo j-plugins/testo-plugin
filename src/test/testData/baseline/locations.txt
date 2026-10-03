@@ -1,0 +1,20 @@
+== parsing
+  path/to/file.php -> class=null method=null file=null
+  path/to/file.php::\Ns\CalcTest -> class=\Ns\CalcTest method=null file=null
+  path/to/file.php::\Ns\CalcTest::median -> class=\Ns\CalcTest method=median file=null
+  path/to/file.php::\Ns\CalcTest::med:3:0 -> class=\Ns\CalcTest method=med file=null
+  path/to/file.php::\Ns\CalcTest::med#2 -> class=\Ns\CalcTest method=med file=null
+  path/to/file.php::\Ns\CalcTest::med with data set #1 -> class=\Ns\CalcTest method=med file=null
+  path/to/file.php::\Ns\medianOf -> class=\Ns\medianOf method=null file=null
+  path/to/file.php::\Ns\medianOf:0:1 -> class=\Ns\medianOf method=null file=null
+  D:/p/Calculator.php::\Ns\Calculator::med:3:0 -> class=\Ns\Calculator method=med file=null
+  a::b::c::d -> null
+   -> null
+== navigation
+  CalcTest.php::\App\CalcTest::median -> primaryNavigationElement=MethodImpl(#[Test]) testDetectionElement=<none>
+  CalcTest.php::\App\CalcTest::med:3:0 -> primaryNavigationElement=PhpClassImpl(final class CalcTest) testDetectionElement=<none>
+  CalcTest.php::\App\CalcTest::null -> primaryNavigationElement=PhpClassImpl(final class CalcTest) testDetectionElement=<none>
+  CalcTest.php::\App\Missing::null -> primaryNavigationElement=PhpClassImpl(final class CalcTest) testDetectionElement=<none>
+  CalcTest.php::null::null -> primaryNavigationElement=PhpFileImpl(CalcTest.php) testDetectionElement=<none>
+  functions.php::\App\medianOf::null -> primaryNavigationElement=FunctionImpl(#[\Testo\Test]) testDetectionElement=FunctionImpl(#[\Testo\Test])
+  functions.php::\App\medianOf:0:1::null -> primaryNavigationElement=FunctionImpl(#[\Testo\Test]) testDetectionElement=FunctionImpl(#[\Testo\Test])

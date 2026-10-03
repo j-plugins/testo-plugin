@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Separate PHP-specific integrations from the shared plugin logic while retaining the PhpStorm builds and saved
+  configuration formats.
+
+### Fixed
+
+- List tests sharing a data provider in source order for a consistent default selection.
+- Keep temporary rerun filters out of saved run configurations.
+- Preserve stopped mutation reruns in run history after restarting the IDE, and protect active mutation archives
+  during cleanup.
+
 ## [2026.16.262] - 2026-10-01
 
 ### Fixed

@@ -1,0 +1,9 @@
+id=Testo presentable=Testo
+base=PHP
+InBodyTest.php: <caret> -> true
+BeforeBraceTest.php: final class BeforeBraceTest <caret> -> false
+InMethodTest.php: public function testA(): void { <caret> } -> false
+InCommentTest.php: // <caret> -> true
+InStringTest.php: public const A = '<caret>'; -> false
+Service.php: <caret> -> false
+html.php: <div><caret></div> -> false

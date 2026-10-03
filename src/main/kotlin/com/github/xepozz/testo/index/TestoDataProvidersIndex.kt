@@ -2,9 +2,11 @@ package com.github.xepozz.testo.index
 
 import com.github.xepozz.testo.TestoClasses
 import com.github.xepozz.testo.isTestoClass
+import com.github.xepozz.testo.php.PhpFunctionView
+import com.github.xepozz.testo.php.TestoPhp
+import com.intellij.psi.PsiElement
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.util.asSafely
 import com.intellij.util.indexing.DataIndexer
 import com.intellij.util.indexing.FileBasedIndex
 import com.intellij.util.indexing.FileBasedIndexExtension
@@ -12,13 +14,6 @@ import com.intellij.util.indexing.FileContent
 import com.intellij.util.indexing.ID
 import com.intellij.util.io.DataExternalizer
 import com.intellij.util.io.EnumeratorStringDescriptor
-import com.jetbrains.php.lang.PhpFileType
-import com.jetbrains.php.lang.psi.PhpPsiUtil
-import com.jetbrains.php.lang.psi.elements.Function
-import com.jetbrains.php.lang.psi.elements.Method
-import com.jetbrains.php.lang.psi.elements.PhpAttribute
-import com.jetbrains.php.lang.psi.stubs.indexes.expectedArguments.PhpExpectedFunctionArgument
-import com.jetbrains.php.lang.psi.stubs.indexes.expectedArguments.PhpExpectedFunctionScalarArgument
 import com.intellij.openapi.diagnostic.thisLogger
 import java.io.DataInput
 import java.io.DataOutput
@@ -32,11 +27,11 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
     override fun getIndexer() = DataIndexer<String, TestoDataProvidersIndexType, FileContent?> { inputData ->
         val map = mutableMapOf<String, TestoDataProvidersIndexType>()
 
-        for (testClass in PhpPsiUtil.findAllClasses(inputData.psiFile)) {
-            // An indexer must not query the global PhpIndex: it loads other files' stubs mid-indexing.
-            if (!testClass.isTestoClass(resolveHierarchy = false)) continue
+        for (testClass in TestoPhp.getInstance().allClasses(inputData.psiFile)) {
+            // An indexer must not query the global class index: it loads other files' stubs mid-indexing.
+            if (!testClass.psi.isTestoClass(resolveHierarchy = false)) continue
             for (method in testClass.ownMethods) {
-                val dataProviders = getDataProvidersFromAttributes(method)
+                val dataProviders = getDataProvidersFromAttributes(method.psi)
 
                 for (dataProvider in dataProviders) {
                     map.computeIfAbsent(dataProvider.second) { mutableSetOf() }
@@ -57,7 +52,7 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
     // 3 stopped resolving subclasses.
     override fun getVersion() = 3
 
-    override fun getInputFilter() = FileBasedIndex.InputFilter { it.fileType is PhpFileType }
+    override fun getInputFilter() = PHP_INPUT_FILTER
 
     override fun dependsOnFileContent() = true
 
@@ -111,15 +106,15 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
         // The real Testo data-provider attribute; the previous "\Testo\Sample\DataProvider" matched nothing.
         private const val DATA_PROVIDER_ATTRIBUTE = TestoClasses.DATA_PROVIDER
 
-        fun getDataProvidersFromAttributes(function: Function): MutableSet<Pair<String, String>> {
+        fun getDataProvidersFromAttributes(function: PsiElement): MutableSet<Pair<String, String>> {
             val result = mutableSetOf<Pair<String, String>>()
+            val view = TestoPhp.getInstance().view(function) as? PhpFunctionView ?: return result
 
-            val targetFQN = function.asSafely<Method>()?.containingClass?.fqn ?: function.fqn
+            val targetFQN = view.containingClass?.fqn ?: view.fqn
 
-            for (dataProvider in function.getAttributes(DATA_PROVIDER_ATTRIBUTE)) {
-                val argument = getAttributeArgument(dataProvider, "provider", 0) ?: continue
-                val methodNameArg = argument as? PhpExpectedFunctionScalarArgument ?: continue
-                val attributeValue = methodNameArg.value
+            for (dataProvider in view.attributes(DATA_PROVIDER_ATTRIBUTE)) {
+                val methodNameArg = dataProvider.argument("provider", 0) ?: continue
+                val attributeValue = methodNameArg.text
 
                 when {
                     methodNameArg.isStringLiteral -> result.add(
@@ -154,17 +149,6 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
             }
 
             return result
-        }
-
-        private fun getAttributeArgument(
-            attribute: PhpAttribute,
-            name: String,
-            index: Int
-        ): PhpExpectedFunctionArgument? {
-            val arguments = attribute.arguments
-            val argument = arguments.firstOrNull { it.name == name } ?: arguments.getOrNull(index)
-
-            return argument?.argument
         }
     }
 }

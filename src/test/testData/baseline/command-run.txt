@@ -1,0 +1,201 @@
+== defaults: file scope
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml --path tests/CalcTest.php
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  arg=--path
+  arg=tests/CalcTest.php
+== directory scope
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml --path tests
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  arg=--path
+  arg=tests
+== directory scope = working directory
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+== method: data set selector
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml --path tests/CalcTest.php --filter med:3:0
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  arg=--path
+  arg=tests/CalcTest.php
+  arg=--filter
+  arg=med:3:0
+== method: selector with # data provider
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml --path tests/CalcTest.php --filter testSum --data-provider provider
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  arg=--path
+  arg=tests/CalcTest.php
+  arg=--filter
+  arg=testSum
+  arg=--data-provider
+  arg=provider
+== method: qualified selector
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml --path tests/CalcTest.php --filter \App\CalcTest::med:3:0
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  arg=--path
+  arg=tests/CalcTest.php
+  arg=--filter
+  arg=\App\CalcTest::med:3:0
+== groups and excluded groups
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --group db --group "a b" --group !slow --group !flaky --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--group
+  arg=db
+  arg=--group
+  arg=a b
+  arg=--group
+  arg=!slow
+  arg=--group
+  arg=!flaky
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+== suites and type
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --type bench --suite Unit --suite "My Suite" --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--type
+  arg=bench
+  arg=--suite
+  arg=Unit
+  arg=--suite
+  arg=My Suite
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+== rerun filters
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --filter \App\CalcTest::adds --filter \App\medianOf --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--filter
+  arg=\App\CalcTest::adds
+  arg=--filter
+  arg=\App\medianOf
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+== explicit configuration file
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml --config <wd>/config/testo.php
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  arg=--config
+  arg=<wd>/config/testo.php
+== explicit testo.php, no custom working directory
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml --config <wd>/nested/testo.php
+  cwd=<wd>/nested
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  arg=--config
+  arg=<wd>/nested/testo.php
+== configuration file from framework settings
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml --config <wd>/testo.php --path tests/CalcTest.php
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  arg=--config
+  arg=<wd>/testo.php
+  arg=--path
+  arg=tests/CalcTest.php
+== type scope
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml --suite Unit
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  arg=--suite
+  arg=Unit
+== runner options, command, reports
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo list --stop-on-failure --no-ansi --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml --path tests/CalcTest.php
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=list
+  arg=--stop-on-failure
+  arg=--no-ansi
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  arg=--path
+  arg=tests/CalcTest.php
+== reports off
+  commandLine=<php-dir>/php <wd>/vendor/bin/testo run -q -n --teamcity --path tests/CalcTest.php
+  cwd=<wd>
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--path
+  arg=tests/CalcTest.php
+== file outside the working directory
+  error: ExecutionException: Testo cannot run '/elsewhere/tests/CalcTest.php': it is outside the working directory '<wd>'
+== no executable
+  error: ExecutionException: Path to Testo for local machine is not configured. You can fix it at "PHP|Testo"
