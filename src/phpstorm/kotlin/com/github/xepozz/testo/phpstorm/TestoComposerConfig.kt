@@ -1,0 +1,45 @@
+package com.github.xepozz.testo.phpstorm
+
+import com.github.xepozz.testo.phpstorm.tests.TestoFrameworkType
+import com.github.xepozz.testo.phpstorm.tests.run.TestoRunConfigurationType
+import com.github.xepozz.testo.tests.run.TestoRunPaths
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
+import com.jetbrains.php.testFramework.PhpTestFrameworkComposerConfig
+import com.jetbrains.php.testFramework.PhpTestFrameworkConfigurationIml
+import com.jetbrains.php.testFramework.PhpTestFrameworkSettingsManager
+import kotlin.io.path.Path
+
+class TestoComposerConfig : PhpTestFrameworkComposerConfig(TestoFrameworkType.INSTANCE, PACKAGE, RELATIVE_PATH) {
+    override fun getDefaultConfigName() = DEFAULT_CONFIG_NAME
+
+    override fun getConfigurationType() = TestoRunConfigurationType.INSTANCE
+
+    override fun updateConfigurations(project: Project, configFile: VirtualFile?, composerConfig: VirtualFile?) {
+        val testFrameworkSettingsManager = PhpTestFrameworkSettingsManager.getInstance(project)
+        if (testFrameworkSettingsManager.getConfigurations(TestoFrameworkType.INSTANCE).isNotEmpty()) {
+            return
+        }
+
+        val runnableBinary = findFromComposerVendor(project, composerConfig)
+            ?.let { Path(it) }
+            ?.let { VfsUtil.findFile(it, false) }
+
+        val configuration = PhpTestFrameworkConfigurationIml(TestoFrameworkType.INSTANCE)
+        configuration.executablePath = runnableBinary?.path
+
+        testFrameworkSettingsManager.addSettingsIfAbsent(
+            TestoFrameworkType.INSTANCE,
+            configuration,
+            null,
+            runnableBinary,
+        )
+    }
+
+    companion object Companion {
+        const val DEFAULT_CONFIG_NAME = TestoRunPaths.DEFAULT_CONFIG_NAME
+        private const val PACKAGE = "testo/testo"
+        private const val RELATIVE_PATH = "bin/testo"
+    }
+}

@@ -1,0 +1,66 @@
+== src/Calculator.php
+== stubs/TestCase.php
+== testo.php
+  7:12 ApplicationConfig -> php_qn:///src/testo.php actions=7
+  9:13 SuiteConfig -> php_qn:///src/testo.php actions=7
+  10:13 SuiteConfig -> php_qn:///src/testo.php actions=7
+== tests/Base/AbstractBaseTest.php
+  4:16 AbstractBaseTest -> php_qn:///src/tests/Base/AbstractBaseTest.php::\App\Base\AbstractBaseTest actions=7
+  6:14 Test -> php_qn:///src/tests/Base/AbstractBaseTest.php::\App\Base\AbstractBaseTest::inherited actions=7
+  7:21 inherited -> php_qn:///src/tests/Base/AbstractBaseTest.php::\App\Base\AbstractBaseTest::inherited actions=7
+== tests/Base/ConcreteTest.php
+  4:13 ConcreteTest -> php_qn:///src/tests/Base/ConcreteTest.php::\App\Base\ConcreteTest actions=7
+== tests/CalcTest.php
+  10:13 CalcTest -> php_qn:///src/tests/CalcTest.php::\App\CalcTest actions=7
+  12:7 Test -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::adds actions=7
+  13:21 adds -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::adds actions=7
+  15:7 Test -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::median actions=7
+  16:7 DataProvider -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::median#0 actions=7
+  17:7 DataProvider -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::median#1 actions=7
+  18:21 median -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::median actions=7
+  20:7 DataProvider -> null#0 actions=7
+  23:28 cases -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::cases actions=7
+  25:9 yield -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::cases#1 actions=7
+  26:9 yield -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::cases#1 actions=7
+  27:9 return -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::cases#1 actions=7
+  30:28 moreCases -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::moreCases actions=7
+  32:9 yield -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::moreCases#1 actions=7
+  40:7 Bench -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::sumBench#0 actions=7
+  41:21 sumBench -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::sumBench actions=7
+  43:7 TestInline -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::inlineSum#0 actions=7
+  44:7 TestInline -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::inlineSum#1 actions=7
+  45:28 inlineSum -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::inlineSum actions=7
+  47:7 Group -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::testGrouped actions=7
+  48:21 testGrouped -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::testGrouped actions=7
+  51:21 testUngrouped -> php_qn:///src/tests/CalcTest.php::\App\CalcTest::testUngrouped actions=7
+== tests/CaseTest.php
+  4:10 Test -> php_qn:///src/tests/CaseTest.php::\App\CaseTest actions=7
+  5:13 CaseTest -> php_qn:///src/tests/CaseTest.php::\App\CaseTest actions=7
+  7:21 itWorks -> php_qn:///src/tests/CaseTest.php::\App\CaseTest::itWorks actions=7
+  9:14 Bench -> php_qn:///src/tests/CaseTest.php::\App\CaseTest::benchIt#0 actions=7
+  10:21 benchIt -> php_qn:///src/tests/CaseTest.php::\App\CaseTest::benchIt actions=7
+== tests/PhpUnitStyleTest.php
+  2:13 PhpUnitStyleTest -> php_qn:///src/tests/PhpUnitStyleTest.php::\PhpUnitStyleTest actions=7
+  4:21 testSomething -> php_qn:///src/tests/PhpUnitStyleTest.php::\PhpUnitStyleTest::testSomething actions=7
+== tests/Rector/SomeRector.php
+  4:32 TestRectorFixtures -> php_qn:///src/tests/Rector/SomeRector.php::\App\Rector\SomeRector actions=7
+  5:13 SomeRector -> php_qn:///src/tests/Rector/SomeRector.php::\App\Rector\SomeRector actions=7
+== tests/SharedProviderTest.php
+  6:13 SharedProviderTest -> php_qn:///src/tests/SharedProviderTest.php::\App\SharedProviderTest actions=7
+  8:14 Test -> php_qn:///src/tests/SharedProviderTest.php::\App\SharedProviderTest::first actions=7
+  9:7 DataProvider -> php_qn:///src/tests/SharedProviderTest.php::\App\SharedProviderTest::first#0 actions=7
+  10:21 first -> php_qn:///src/tests/SharedProviderTest.php::\App\SharedProviderTest::first actions=7
+  12:14 Test -> php_qn:///src/tests/SharedProviderTest.php::\App\SharedProviderTest::second actions=7
+  13:7 DataProvider -> php_qn:///src/tests/SharedProviderTest.php::\App\SharedProviderTest::second#0 actions=7
+  14:21 second -> php_qn:///src/tests/SharedProviderTest.php::\App\SharedProviderTest::second actions=7
+  16:28 shared -> php_qn:///src/tests/SharedProviderTest.php::\App\SharedProviderTest::shared actions=7
+  18:9 yield -> php_qn:///src/tests/SharedProviderTest.php::\App\SharedProviderTest::shared#1 actions=7
+== tests/UserTest.php
+  2:7 UserTest -> php_qn:///src/tests/UserTest.php::\UserTest actions=7
+  4:21 testSomething -> php_qn:///src/tests/UserTest.php::\UserTest::testSomething actions=7
+== tests/functions.php
+  4:10 Test -> php_qn:///src/tests/functions.php::\App\medianOf actions=7
+  5:10 medianOf -> php_qn:///src/tests/functions.php::\App\medianOf actions=7
+  7:17 Group -> php_qn:///src/tests/functions.php::\App\groupedFunction actions=7
+  8:10 Test -> php_qn:///src/tests/functions.php::\App\groupedFunction actions=7
+  9:10 groupedFunction -> php_qn:///src/tests/functions.php::\App\groupedFunction actions=7

@@ -2,12 +2,11 @@ package com.github.xepozz.testo.runs
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
-import com.github.xepozz.testo.coverage.TestoCoverageProgramRunner
 import com.github.xepozz.testo.infection.TestoMutationExecutor
+import com.github.xepozz.testo.launch.TestoConfiguration
+import com.github.xepozz.testo.php.TestoPhp
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoTestStatus
-import com.github.xepozz.testo.tests.run.TestoRunConfiguration
-import com.github.xepozz.testo.tests.run.TestoRunConfigurationType
 import com.intellij.execution.ExecutionManager
 import com.intellij.execution.ExecutorRegistry
 import com.intellij.execution.RunManager
@@ -129,7 +128,7 @@ class TestoRunRetentionGroup : DefaultActionGroup(TestoBundle.message("testo.run
 internal enum class TestoRunKind { RUN, DEBUG, COVERAGE, MUTATION }
 
 internal fun runKindOf(executorId: String?): TestoRunKind = when (executorId) {
-    TestoCoverageProgramRunner.EXECUTOR_ID -> TestoRunKind.COVERAGE
+    TestoConfiguration.COVERAGE_EXECUTOR_ID -> TestoRunKind.COVERAGE
     TestoMutationExecutor.ID -> TestoRunKind.MUTATION
     DefaultDebugExecutor.EXECUTOR_ID -> TestoRunKind.DEBUG
     // Also a v1 archive, which recorded no executor: a plain run is the honest guess.
@@ -275,8 +274,9 @@ private fun repeatArchivedRun(project: Project, runDir: Path, manifest: TestoRun
     val executor = ExecutorRegistry.getInstance().getExecutorById(manifest.executorId)
         ?: DefaultRunExecutor.getRunExecutorInstance()
     val name = manifest.configurationName.ifEmpty { runDir.fileName.toString() }
-    val settings = RunManager.getInstance(project).createConfiguration(name, TestoRunConfigurationType.INSTANCE)
-    val configuration = settings.configuration as? TestoRunConfiguration ?: return
+    val factory = TestoPhp.getInstance().configurationFactory()
+    val settings = RunManager.getInstance(project).createConfiguration(name, factory)
+    val configuration = settings.configuration as? TestoConfiguration ?: return
     manifest.configuration.takeIf { it.isNotBlank() }?.let { xml ->
         runCatching { configuration.readExternal(JDOMUtil.load(xml)) }
             .onFailure { LOG.warn("Failed to restore the run configuration of $runDir", it) }

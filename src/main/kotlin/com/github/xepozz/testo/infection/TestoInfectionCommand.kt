@@ -1,11 +1,10 @@
 package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
-import com.github.xepozz.testo.php.PhpToolLauncher
-import com.github.xepozz.testo.tests.run.TestoReportTarget
+import com.github.xepozz.testo.php.TestoPreparedTool
+import com.github.xepozz.testo.php.TestoToolEnvironment
+import com.github.xepozz.testo.php.TestoToolRequest
 import com.intellij.execution.ExecutionException
-import com.jetbrains.php.config.commandLine.PhpCommandSettings
-import com.jetbrains.php.testFramework.run.PhpTestRunConfigurationSettings
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -15,7 +14,7 @@ internal class TestoInfectionLaunch(
     val sourceFiles: List<String>,
     val workDir: Path,
     val options: TestoInfectionOptions = TestoInfectionOptions(),
-    /** A rerun writes no HTML report: the run's own one covers every mutant, this one would cover a single one. */
+    /** A rerun writes no HTML report: the run's own one covers every mutant. */
     val withHtml: Boolean = true,
 ) {
     val coverageDir: Path get() = workDir.resolve("coverage")
@@ -23,13 +22,9 @@ internal class TestoInfectionLaunch(
     val textLog: Path get() = workDir.resolve("mutations.log")
 
     @Volatile
-    internal var shared: PhpToolLauncher.SharedDirectory? = null
+    internal var prepared: TestoPreparedTool? = null
 
-    @Volatile
-    internal var htmlTarget: TestoReportTarget? = null
-
-    @Volatile
-    internal var textTarget: TestoReportTarget? = null
+    internal var inputProtection: AutoCloseable? = null
 
     companion object {
         const val HTML_REPORT = "report.html"
@@ -37,39 +32,22 @@ internal class TestoInfectionLaunch(
 }
 
 internal object TestoInfectionCommand {
-    fun create(
-        launcher: PhpToolLauncher,
-        launch: TestoInfectionLaunch,
-        testoExecutable: String,
-        workingDirectory: String,
-        settings: PhpTestRunConfigurationSettings,
-        env: Map<String?, String?>,
-        withDebugger: Boolean,
-    ): PhpCommandSettings {
-        val infection = findInfection(launcher, testoExecutable, workingDirectory)
-
+    fun create(environment: TestoToolEnvironment, launch: TestoInfectionLaunch): TestoPreparedTool {
+        val infection = findInfection(environment)
         TestoInfectionReports.assemble(launch.ready, launch.coverageDir)
         Files.createDirectories(launch.workDir)
-        val html = if (!launch.withHtml) null else {
-            Files.deleteIfExists(launch.htmlReport)
-            launcher.output(launch.htmlReport.toString()).takeIf { it.isReachable }
-        }
-        launch.htmlTarget = html
-        Files.deleteIfExists(launch.textLog)
-        val text = launcher.output(launch.textLog.toString()).takeIf { it.isReachable }
-        launch.textTarget = text
-
-        return launcher.command(infection, workingDirectory, settings.commandLineSettings, env, withDebugger) { paths ->
-            val shared = launcher.share(launch.coverageDir, launch.workDir.fileName.toString(), workingDirectory, paths)
-            launch.shared = shared
-            TestoInfectionArguments.build(shared.path, launch.sourceFiles, html?.path, text?.path, launch.options)
-        }
+        val outputs = listOfNotNull(launch.htmlReport.takeIf { launch.withHtml }, launch.textLog)
+        outputs.forEach { Files.deleteIfExists(it) }
+        return environment.prepare(TestoToolRequest(infection, launch.coverageDir, outputs) { input, paths ->
+            TestoInfectionArguments.build(input, launch.sourceFiles, paths[launch.htmlReport], paths[launch.textLog], launch.options)
+        }).also { launch.prepared = it }
     }
 
-    private fun findInfection(launcher: PhpToolLauncher, testoExecutable: String, workingDirectory: String): String {
-        val local = launcher.toLocal(testoExecutable)
-        val candidates = TestoInfectionExecutable.candidates(local ?: testoExecutable, workingDirectory)
-        // An unmapped remote Testo binary cannot be looked around from the host: its sibling is the one guess left.
+    private fun findInfection(environment: TestoToolEnvironment): String {
+        val executable = environment.testoExecutable
+        val local = environment.toLocal(executable)
+        val candidates = TestoInfectionExecutable.candidates(local ?: executable, environment.workingDirectory)
+        // An unmapped interpreter binary cannot be inspected from the host; preserve its sibling path.
         val found = if (local == null) candidates.firstOrNull()
         else candidates.firstOrNull { Files.isRegularFile(Path.of(it)) }
         return found ?: throw ExecutionException(

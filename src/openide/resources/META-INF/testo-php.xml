@@ -1,0 +1,49 @@
+<!-- Testo on the PHP for OpenIDE plugin: the dependency on it and every registration that needs its classes. Included by
+     plugin.xml; the coverage counterpart is testo-php-coverage.xml, included by coverage.xml. -->
+<idea-plugin>
+    <depends>ru.openide.openphp</depends>
+    <depends>intellij.testRunner.plugin</depends>
+    <dependencies>
+        <module name="intellij.platform.smRunner"/>
+        <module name="intellij.platform.testRunner"/>
+    </dependencies>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService
+                serviceInterface="com.github.xepozz.testo.php.TestoPhp"
+                serviceImplementation="com.github.xepozz.testo.openide.OpenIdeTestoPhp"/>
+        <configurationType
+                implementation="com.github.xepozz.testo.openide.tests.run.TestoRunConfigurationType"/>
+        <runConfigurationProducer
+                implementation="com.github.xepozz.testo.openide.tests.run.TestoRunConfigurationProducer"/>
+        <programRunner
+                implementation="com.github.xepozz.testo.openide.tests.run.TestoProgramRunner"/>
+        <programRunner
+                implementation="com.github.xepozz.testo.openide.tests.run.TestoDebugRunner"/>
+        <localInspection
+                language="PHP"
+                shortName="TestoGroupNameInspection"
+                bundle="messages.TestoBundle"
+                key="inspection.group.display.name"
+                groupBundle="messages.TestoBundle"
+                groupKey="inspection.group"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="com.github.xepozz.testo.openide.tests.inspections.TestoGroupNameInspection"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="ru.openide.openphp">
+        <testFrameworkType
+                implementation="com.github.xepozz.testo.openide.tests.TestoFrameworkType"/>
+    </extensions>
+
+    <actions>
+        <group id="TestoGenerateGroup">
+            <action
+                    id="TestoGenerateTestMethod"
+                    class="com.github.xepozz.testo.openide.actions.TestoGenerateTestMethodAction"/>
+            <separator/>
+            <add-to-group group-id="GenerateGroup" anchor="first"/>
+        </group>
+    </actions>
+</idea-plugin>

@@ -1,16 +1,15 @@
 package com.github.xepozz.testo.coverage.perTest
 
 import com.github.xepozz.testo.TestoBundle
-import com.github.xepozz.testo.coverage.TestoCoverageProgramRunner
 import com.github.xepozz.testo.coverage.format.TestId
-import com.github.xepozz.testo.tests.run.TestoRunConfiguration
-import com.github.xepozz.testo.tests.run.TestoRunConfigurationType
+import com.github.xepozz.testo.launch.TestoConfiguration
+import com.github.xepozz.testo.launch.TestoScope
+import com.github.xepozz.testo.php.TestoPhp
 import com.intellij.execution.ExecutionManager
 import com.intellij.execution.ExecutorRegistry
 import com.intellij.execution.RunManager
 import com.intellij.execution.runners.ExecutionEnvironmentBuilder
 import com.intellij.openapi.project.Project
-import com.jetbrains.php.testFramework.run.PhpTestRunnerSettings
 
 /**
  * Runs a set of tests read off the per-test coverage — the covering tests of a line, a declaration, a file or a whole
@@ -27,18 +26,19 @@ internal object TestoCoveringTestsLauncher {
         project: Project,
         tests: Collection<TestId>,
         name: String,
-        executorId: String = TestoCoverageProgramRunner.EXECUTOR_ID,
+        executorId: String = TestoConfiguration.COVERAGE_EXECUTOR_ID,
     ) {
         val mapper = TestoTestIdentityMapper.getInstance()
         val filters = tests.map { mapper.toFilterSelector(it) }.distinct().sorted()
         if (filters.isEmpty()) return
         val executor = ExecutorRegistry.getInstance().getExecutorById(executorId) ?: return
 
-        val settings = RunManager.getInstance(project).createConfiguration(name, TestoRunConfigurationType.INSTANCE)
-        val configuration = settings.configuration as? TestoRunConfiguration ?: return
-        configuration.testoSettings.getTestoRunnerSettings().apply {
+        val factory = TestoPhp.getInstance().configurationFactory()
+        val settings = RunManager.getInstance(project).createConfiguration(name, factory)
+        val configuration = settings.configuration as? TestoConfiguration ?: return
+        configuration.selection = configuration.selection.apply {
             rerunFilters = filters
-            scope = PhpTestRunnerSettings.Scope.ConfigurationFile
+            scope = TestoScope.CONFIGURATION_FILE
         }
         val environment = ExecutionEnvironmentBuilder.createOrNull(executor, settings)?.build() ?: return
         ExecutionManager.getInstance(project).restartRunProfile(environment)

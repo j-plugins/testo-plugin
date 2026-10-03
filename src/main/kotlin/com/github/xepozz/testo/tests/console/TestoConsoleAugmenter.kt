@@ -63,7 +63,7 @@ class TestoConsoleAugmenter(private val project: Project) : ExecutionListener {
                 console, props.channelStore, props.metadataStore, props.levelFilter, project, console,
                 // A replay resolves a metadata artifact to its archived copy first; a live run finds nothing here and
                 // falls through to the deployment mapper (identity locally).
-                resolveLocalPath = { path -> props.metadataArtifactPaths[path] ?: props.pathMapper.getLocalPath(path) },
+                resolveLocalPath = { path -> props.metadataArtifactPaths[path] ?: props.paths.toLocalPath(path) },
             )
             // The verdict is a supplier, not a value: the progress action is wired below and only reaches one at the
             // end of the run.

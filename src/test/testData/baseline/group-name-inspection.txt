@@ -1,0 +1,13 @@
+shortName=TestoGroupNameInspection
+displayName=Group name is unusable from the command line
+groupPath=Testo
+language=PHP
+defaultLevel=WARNING(300)
+enabledByDefault=true
+toolGroupDisplayName=PHP
+toolGroupPath=PHP
+toolDefaultLevel=WARNING(300)
+problem WARNING(300) '' padded '': Group name has leading or trailing whitespace
+problem WARNING(300) '\Testo\Filter\Group': #[Group] without names selects nothing
+suppressedByNoinspection=true
+suppressActions=[Suppress all for file, Suppress for PhpDoc comment, Suppress for field, Suppress for file, Suppress for statement, Suppress for tag, Suppress inspection]
