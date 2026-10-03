@@ -18,3 +18,19 @@ Run the checks for both supported platform variants:
 ./gradlew check buildPlugin verifyPlugin -PphpApi=252
 ./gradlew check buildPlugin verifyPlugin -PphpApi=262
 ```
+
+## OpenIDE implementation
+
+`-PphpApi=openide` selects `src/openide` and `src/openideTest` instead of the PhpStorm implementation.
+It compiles against OpenIDE and PHP for OpenIDE, using Java 25. The shared contract and run-context tests execute
+against both implementations, and the isolation checks also prevent dependencies between the two adapters.
+
+```shell
+./gradlew check buildPlugin verifyPlugin -PphpApi=openide
+```
+
+The OpenIDE build has its own output directory (`build/openide`) and ZIP name. It is excluded from the normal
+`phpApis` publishing list and uses `OPENIDE_PUBLISH_TOKEN` when explicitly published to the OpenIDE plugin store.
+
+The OpenIDE verification task supplies the resolved PHP plugin through a local dependency repository, so it checks
+against the same artifact used for compilation. The dependency itself is resolved from the OpenIDE plugin store.

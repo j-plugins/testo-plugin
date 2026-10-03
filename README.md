@@ -32,6 +32,21 @@ Testo PHP – is a modern PHP testing library
   <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
 
 
+## OpenIDE
+
+Build the OpenIDE variant with `./gradlew buildPlugin -PphpApi=openide`. It uses PHP for OpenIDE 0.9.4 and
+OpenIDE 2026.2.1. Install the ZIP from `build/openide/distributions/` through **Install Plugin from Disk**.
+The PhpStorm builds remain selected by `-PphpApi=252` and `-PphpApi=262`.
+
+Runs use the project's active PHP interpreter. Infection retains the interpreter selected for the original test run.
+On macOS, Linux, Docker/Compose and WSL, that interpreter needs the `pcntl` and `posix` extensions so Testo can stop
+Infection and its child processes. PHP for OpenIDE checks these requirements before starting Infection; ordinary
+Testo test runs do not require those extensions.
+
+If the connection to an interpreter is lost, Testo keeps the temporary reports and blocks rerun. Use **Stop** to
+retry stopping the same process. After restarting the IDE, check the processes in that interpreter before starting
+a new test run if the previous run could not be confirmed as stopped.
+
 ---
 Plugin based on the [IntelliJ Platform Plugin Template][template].
 

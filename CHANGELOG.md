@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- An OpenIDE build using PHP for OpenIDE, with test discovery, run/debug/coverage configurations, Infection mutation
+  testing and run history. It supports the project's PHP interpreter profiles and keeps unconfirmed remote processes
+  from losing their temporary reports.
+
 ### Changed
 
 - Separate PHP-specific integrations from the shared plugin logic while retaining the PhpStorm builds and saved
