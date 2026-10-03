@@ -1,0 +1,142 @@
+== data set node
+  name=CalcTest.php::median:0:1 actionName=median:0:1
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=<CalcTest>
+  methodName=\App\CalcTest::median:0:1
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=test
+  suites=[Unit]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method node
+  name=CalcTest.php::median actionName=median
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=<CalcTest>
+  methodName=\App\CalcTest::median
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=test
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== class node, bench type
+  name=CalcTest.php::\App\CalcTest actionName=\App\CalcTest
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=<CalcTest>
+  methodName=\App\CalcTest
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=bench
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== function data set node
+  name=functions.php::\App\medianOf:0:0 actionName=\App\medianOf:0:0
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/functions.php
+  methodName=\App\medianOf:0:0
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=test
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== config file node, suite only
+  name=testo.php actionName=testo.php
+  scope=ConfigurationFile
+  selectedType=null
+  directoryPath=null
+  filePath=null
+  methodName=null
+  useAlternativeConfigurationFile=true
+  configurationFilePath=/src/testo.php
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[Unit]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+
+== recognition: row = configuration made from a node, column = context
+  c0 data set node (node)
+  c1 data set node (element)
+  c2 method node (node)
+  c3 method node (element)
+  c4 class node, bench type (node)
+  c5 class node, bench type (element)
+  c6 function data set node (node)
+  c7 function data set node (element)
+  c8 config file node, suite only (node)
+  c9 config file node, suite only (element)
+  X.........  data set node
+  ..X.......  method node
+  ....X.....  class node, bench type
+  ......X...  function data set node
+  ..........  config file node, suite only

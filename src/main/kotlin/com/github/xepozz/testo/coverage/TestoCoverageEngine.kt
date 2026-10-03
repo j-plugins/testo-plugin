@@ -2,29 +2,29 @@ package com.github.xepozz.testo.coverage
 
 import com.github.xepozz.testo.coverage.format.CoverageFormat
 import com.github.xepozz.testo.coverage.format.LineTotals
-import com.github.xepozz.testo.tests.run.TestoRunConfiguration
+import com.github.xepozz.testo.launch.TestoConfiguration
+import com.github.xepozz.testo.php.TestoPhp
+import com.intellij.coverage.BaseCoverageSuite
 import com.intellij.coverage.CoverageAnnotator
 import com.intellij.coverage.CoverageEngine
 import com.intellij.coverage.CoverageFileProvider
 import com.intellij.coverage.CoverageRunner
 import com.intellij.coverage.CoverageSuite
 import com.intellij.coverage.CoverageSuitesBundle
-import com.intellij.coverage.BaseCoverageSuite
 import com.intellij.coverage.view.CoverageViewExtension
 import com.intellij.execution.configurations.RunConfigurationBase
 import com.intellij.execution.configurations.coverage.CoverageEnabledConfiguration
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
-import com.jetbrains.php.lang.psi.PhpFile
 import java.nio.file.Path
 
 /**
  * Testo coverage on 100% public platform API — no `com.intellij.php.coverage.*` (internal, closed to third-party
- * plugins) and no deprecated `com.jetbrains.php.phpunit.coverage.*`. The report path is IDE-managed, so we pass it to
- * the CLI and read it back where the IDE expects it (see [TestoCoverageProgramRunner]).
+ * plugins) and none of the PHP plugin's deprecated PHPUnit coverage classes. The report path is IDE-managed, so we
+ * pass it to the CLI and read it back where the IDE expects it (see the PHP implementation's coverage runner).
  */
 class TestoCoverageEnabledConfiguration(
-    configuration: TestoRunConfiguration,
+    configuration: RunConfigurationBase<*>,
 ) : CoverageEnabledConfiguration(configuration, CoverageRunner.getInstance(TestoCoverageRunner::class.java)) {
     override fun coverageFileNameSeparator(): String = "@"
 }
@@ -75,10 +75,10 @@ class TestoCoverageSuite : BaseCoverageSuite {
 class TestoCoverageEngine : CoverageEngine() {
     override fun getPresentableText(): String = "Testo"
 
-    override fun isApplicableTo(conf: RunConfigurationBase<*>): Boolean = conf is TestoRunConfiguration
+    override fun isApplicableTo(conf: RunConfigurationBase<*>): Boolean = conf is TestoConfiguration
 
     override fun createCoverageEnabledConfiguration(conf: RunConfigurationBase<*>): CoverageEnabledConfiguration =
-        TestoCoverageEnabledConfiguration(conf as TestoRunConfiguration)
+        TestoCoverageEnabledConfiguration(conf)
 
     override fun createCoverageSuite(
         name: String,
@@ -103,7 +103,7 @@ class TestoCoverageEngine : CoverageEngine() {
 
     override fun getCoverageAnnotator(project: Project): CoverageAnnotator = TestoCoverageAnnotator.getInstance(project)
 
-    override fun coverageEditorHighlightingApplicableTo(psiFile: PsiFile): Boolean = psiFile is PhpFile
+    override fun coverageEditorHighlightingApplicableTo(psiFile: PsiFile): Boolean = TestoPhp.getInstance().isPhpFile(psiFile)
 
     override fun acceptedByFilters(psiFile: PsiFile, suite: CoverageSuitesBundle): Boolean = true
 

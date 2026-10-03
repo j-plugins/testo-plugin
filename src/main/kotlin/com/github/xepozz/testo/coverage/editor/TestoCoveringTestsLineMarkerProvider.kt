@@ -4,6 +4,11 @@ import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.coverage.perTest.TEST_ID_ORDER
 import com.github.xepozz.testo.coverage.perTest.TestoCoveringTestsPopup
 import com.github.xepozz.testo.coverage.perTest.testsCoveringElement
+import com.github.xepozz.testo.php.PhpClassView
+import com.github.xepozz.testo.php.PhpDeclarationView
+import com.github.xepozz.testo.php.PhpFunctionView
+import com.github.xepozz.testo.php.PhpLeafKind
+import com.github.xepozz.testo.php.TestoPhp
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.daemon.LineMarkerInfo
 import com.intellij.codeInsight.daemon.LineMarkerProvider
@@ -15,10 +20,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.elementType
 import com.intellij.ui.awt.RelativePoint
-import com.jetbrains.php.lang.lexer.PhpTokenTypes
-import com.jetbrains.php.lang.psi.elements.Function
-import com.jetbrains.php.lang.psi.elements.PhpClass
-import com.jetbrains.php.lang.psi.elements.PhpNamedElement
 
 /**
  * A gutter icon on every method, function and class the per-test coverage recorded as covered: *Run covering tests (N)*,
@@ -30,20 +31,21 @@ import com.jetbrains.php.lang.psi.elements.PhpNamedElement
 class TestoCoveringTestsLineMarkerProvider : LineMarkerProvider {
 
     override fun getLineMarkerInfo(element: PsiElement): LineMarkerInfo<*>? {
-        if (element.elementType != PhpTokenTypes.IDENTIFIER) return null
+        val php = TestoPhp.getInstance()
+        if (php.leafKind(element) != PhpLeafKind.IDENTIFIER) return null
         val owner = element.parent
-        if (owner !is Function && owner !is PhpClass) return null
-        owner as PhpNamedElement
+        val declaration = php.view(owner) as? PhpDeclarationView ?: return null
+        if (declaration !is PhpFunctionView && declaration !is PhpClassView) return null
         // The declaration's own name, and nothing else that parses as an identifier under it — otherwise one
         // declaration can be marked twice.
-        if (owner.nameNode?.psi !== element) return null
+        if (declaration.nameIdentifier !== element) return null
         val project = element.project
         if (!TestoCoveringTestsGutter.getInstance(project).enabled) return null
 
         val tests = testsCoveringElement(owner).sortedWith(TEST_ID_ORDER)
         if (tests.isEmpty()) return null
         val label = TestoBundle.message("testo.coverage.gutter.run.covering", tests.size)
-        val subject = owner.name
+        val subject = declaration.name
 
         return LineMarkerInfo(
             element,
