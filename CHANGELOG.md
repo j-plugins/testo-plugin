@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Added
+
+- An OpenIDE build using PHP for OpenIDE, with test discovery, run/debug/coverage configurations, Infection mutation
+  testing and run history. It supports the project's PHP interpreter profiles and keeps unconfirmed remote processes
+  from losing their temporary reports.
+
 ### Fixed
 
 - List tests sharing a data provider in source order for a consistent default selection.
@@ -27,10 +33,6 @@
 - Mutants in the editor: a gutter mark per line, worst status first, and escaped code underlined; the statuses shown are picked on the *Mutations* toolbar.
 - An MSI column in the Coverage view per file and directory, and *Mutate* for a single file or directory from the Coverage view, the editor or the project view.
 - Mutation runs are kept in the run history with the run they mutate: listed in the *Mutation* group, replayed and exported along.
-
-### Changed
-
-- The JUnit report is written by default, including in existing run configurations that never turned it on.
 
 ### Fixed
 
@@ -141,14 +143,6 @@
 - The Repeat field — Testo's command line has no `--repeat`.
 - The Command field — a test run is always `testo run`; other subcommands are what *Run Anything* is for.
 - Parallel no longer sends a flag Testo does not have: the field is parked at 1 until it does.
-
-### Changed
-
-- A Coverage run at level *auto* now collects branch coverage when the engine is Xdebug and a Cobertura report is on.
-- The *Log Levels* filter is now a minimum-level picker: an `info +` combo box at the right of the channel tabs row
-  shows that level and everything above it (default `info`), instead of per-level checkboxes.
-- The channel console keeps the open channel when you change the log level or switch tests, reselecting the same-named
-  tab after the rebuild; Output now leads the tabs, apart from the channel-aggregating *All*.
 
 ### Fixed
 
