@@ -2,10 +2,9 @@ package com.github.xepozz.testo.tests.actions
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
-import com.github.xepozz.testo.tests.run.TestoRunConfiguration
-import com.github.xepozz.testo.tests.run.TestoRunConfigurationProducer
-import com.intellij.execution.executors.DefaultRunExecutor
+import com.github.xepozz.testo.php.TestoPhp
 import com.intellij.execution.RunManagerEx
+import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.runners.ExecutionUtil
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
@@ -21,15 +20,9 @@ class TestoRunCommandAction(val commandName: String) : AnAction() {
         val project = event.project ?: return
 
         val runManager = RunManagerEx.getInstanceEx(project)
-        val producer = TestoRunConfigurationProducer()
-        val configurationFactory = producer.configurationFactory
+        val configurationFactory = TestoPhp.getInstance().configurationFactory()
 
-        val runConfiguration = TestoRunConfiguration(
-            project,
-            configurationFactory,
-//            TestoBundle.message("action.run.target.command", commandName),
-        )
-//            .apply { settings.commandName = commandName }
+        val runConfiguration = configurationFactory.createTemplateConfiguration(project)
 
         val configuration = runManager.createConfiguration(runConfiguration, configurationFactory)
 

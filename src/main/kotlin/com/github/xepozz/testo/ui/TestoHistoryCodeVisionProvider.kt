@@ -3,6 +3,8 @@ package com.github.xepozz.testo.ui
 import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.isTestoExecutable
 import com.github.xepozz.testo.isTestoFile
+import com.github.xepozz.testo.php.PhpFunctionView
+import com.github.xepozz.testo.php.TestoPhp
 import com.github.xepozz.testo.runs.replayNewestRun
 import com.github.xepozz.testo.runs.showRunHistoryForTest
 import com.github.xepozz.testo.tests.TestoTestRunLineMarkerProvider
@@ -20,7 +22,6 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.SmartPointerManager
 import com.intellij.psi.SyntaxTraverser
-import com.jetbrains.php.lang.psi.elements.Function
 import java.awt.event.MouseEvent
 
 /**
@@ -48,10 +49,10 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
 
     /** Attach to the Testo test declaration (method/function/benchmark), not the name leaf. */
     override fun acceptsElement(element: PsiElement): Boolean =
-        element is Function && element.isTestoExecutable()
+        TestoPhp.getInstance().view(element) is PhpFunctionView && element.isTestoExecutable()
 
     override fun getHint(element: PsiElement, file: PsiFile): String? {
-        val function = element as? Function ?: return null
+        val function = element.takeIf { TestoPhp.getInstance().view(it) is PhpFunctionView } ?: return null
         val url = TestoTestRunLineMarkerProvider.getLocationHint(function)
         if (!TestoHistoryIndex.contains(file.project, url)) return null
         return historyHint(url)
@@ -68,7 +69,7 @@ class TestoHistoryCodeVisionProvider : CodeVisionProviderBase() {
     private fun historyHint(url: String): String? = "Show history"
 
     override fun handleClick(editor: Editor, element: PsiElement, event: MouseEvent?) {
-        val function = element as? Function ?: return openLatestHistory(element.project)
+        val function = element.takeIf { TestoPhp.getInstance().view(it) is PhpFunctionView } ?: return openLatestHistory(element.project)
         val url = TestoTestRunLineMarkerProvider.getLocationHint(function)
         showRunHistoryForTest(element.project, url, editor, event)
     }

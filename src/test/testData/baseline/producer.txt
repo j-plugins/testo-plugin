@@ -1,0 +1,1357 @@
+== file:CalcTest
+  name=CalcTest.php
+  suggestedName=CalcTest.php actionName=CalcTest.php
+  source=PhpFileImpl(CalcTest.php)
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== class:CalcTest
+  name=CalcTest.php
+  suggestedName=CalcTest.php actionName=CalcTest.php
+  source=PhpClassImpl(final class CalcTest)
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method:adds
+  name=CalcTest.php::adds
+  suggestedName=CalcTest.php::adds actionName=adds
+  source=MethodImpl(#[Test])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=adds
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== attr:Test@adds
+  name=CalcTest.php::adds
+  suggestedName=CalcTest.php::adds actionName=adds
+  source=PhpAttributeImpl(Test)
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=adds
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=test
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== attr:Test@median
+  name=CalcTest.php::median
+  suggestedName=CalcTest.php::median actionName=median
+  source=PhpAttributeImpl(Test)
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=median
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=test
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method:median
+  name=CalcTest.php::median
+  suggestedName=CalcTest.php::median actionName=median
+  source=MethodImpl(#[Test])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=median
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method:providedWithoutTest
+  name=CalcTest.php
+  suggestedName=CalcTest.php actionName=CalcTest.php
+  source=PhpClassImpl(final class CalcTest)
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== attr:DataProvider@providedWithoutTest
+  name=CalcTest.php
+  suggestedName=CalcTest.php actionName=CalcTest.php
+  source=PhpClassImpl(final class CalcTest)
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== attr:DataProvider#0@median
+  name=CalcTest.php::median:0
+  suggestedName=CalcTest.php::median:0 actionName=median:0
+  source=PhpAttributeImpl(DataProvider('cases'))
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=median:0
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=test
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=0
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== attr:DataProvider#1@median
+  name=CalcTest.php::median:1
+  suggestedName=CalcTest.php::median:1 actionName=median:1
+  source=PhpAttributeImpl(DataProvider('moreCases'))
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=median:1
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=test
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== arg:DataProvider#0@median
+  name=CalcTest.php::median:0
+  suggestedName=CalcTest.php::median:0 actionName=median:0
+  source=PhpAttributeImpl(DataProvider('cases'))
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=median:0
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=test
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=0
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== provider:cases
+  name=CalcTest.php::median
+  suggestedName=CalcTest.php::median actionName=median
+  source=MethodImpl(#[Test])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=median
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== yield:cases#0
+  name=CalcTest.php::median:0:0
+  suggestedName=CalcTest.php::median:0:0 actionName=median:0:0
+  source=PhpYieldImpl(yield [1])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=median:0:0
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=0
+  dataSetIndex=0
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== yield:cases#1
+  name=CalcTest.php::median:0:1
+  suggestedName=CalcTest.php::median:0:1 actionName=median:0:1
+  source=PhpYieldImpl(yield [2])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=median:0:1
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=0
+  dataSetIndex=1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== return:cases
+  name=CalcTest.php::median
+  suggestedName=CalcTest.php::median actionName=median
+  source=MethodImpl(#[Test])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=median
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== yield:moreCases#0
+  name=CalcTest.php::median:1:0
+  suggestedName=CalcTest.php::median:1:0 actionName=median:1:0
+  source=PhpYieldImpl(yield [3])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=median:1:0
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=1
+  dataSetIndex=0
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== provider:unusedProvider
+  <no run>
+== yield:unusedProvider#0
+  <no run>
+== method:sumBench
+  name=CalcTest.php::sumBench
+  suggestedName=CalcTest.php::sumBench actionName=sumBench
+  source=MethodImpl(#[Bench])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=sumBench
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== attr:Bench@sumBench
+  name=CalcTest.php::sumBench:0
+  suggestedName=CalcTest.php::sumBench:0 actionName=sumBench:0
+  source=PhpAttributeImpl(Bench)
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=sumBench:0
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=bench
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=0
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method:inlineSum
+  name=CalcTest.php::inlineSum
+  suggestedName=CalcTest.php::inlineSum actionName=inlineSum
+  source=MethodImpl(#[TestInline([1, 2])])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=inlineSum
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== attr:TestInline#0@inlineSum
+  name=CalcTest.php::inlineSum:0
+  suggestedName=CalcTest.php::inlineSum:0 actionName=inlineSum:0
+  source=PhpAttributeImpl(TestInline([1, 2]))
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=inlineSum:0
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=inline
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=0
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== attr:TestInline#1@inlineSum
+  name=CalcTest.php::inlineSum:1
+  suggestedName=CalcTest.php::inlineSum:1 actionName=inlineSum:1
+  source=PhpAttributeImpl(TestInline([3, 4]))
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=inlineSum:1
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=inline
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method:testGrouped
+  name=CalcTest.php::testGrouped
+  suggestedName=CalcTest.php::testGrouped actionName=testGrouped
+  source=MethodImpl(#[Group('db', 'slow')])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=testGrouped
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== attr:Group@testGrouped
+  name=Groups 'db', 'slow'
+  suggestedName=Groups 'db', 'slow' actionName=Groups 'db', 'slow'
+  source=PhpAttributeImpl(Group('db', 'slow'))
+  scope=ConfigurationFile
+  selectedType=null
+  directoryPath=null
+  filePath=null
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[db, slow]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== attr:Group(empty)@testUngrouped
+  <no run>
+== method:helper(private)
+  name=CalcTest.php
+  suggestedName=CalcTest.php actionName=CalcTest.php
+  source=PhpClassImpl(final class CalcTest)
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CalcTest.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== provider:shared
+  name=SharedProviderTest.php::first
+  suggestedName=SharedProviderTest.php::first actionName=first
+  source=MethodImpl(#[\Testo\Test])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/SharedProviderTest.php
+  methodName=first
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== yield:shared#0
+  name=SharedProviderTest.php::first:0:0
+  suggestedName=SharedProviderTest.php::first:0:0 actionName=first:0:0
+  source=PhpYieldImpl(yield [1])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/SharedProviderTest.php
+  methodName=first:0:0
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=0
+  dataSetIndex=0
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method:first
+  name=SharedProviderTest.php::first
+  suggestedName=SharedProviderTest.php::first actionName=first
+  source=MethodImpl(#[\Testo\Test])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/SharedProviderTest.php
+  methodName=first
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== class:CaseTest
+  name=CaseTest.php
+  suggestedName=CaseTest.php actionName=CaseTest.php
+  source=PhpClassImpl(#[\Testo\Test])
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CaseTest.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== classAttr:Test@CaseTest
+  name=CaseTest.php
+  suggestedName=CaseTest.php actionName=CaseTest.php
+  source=PhpAttributeImpl(\Testo\Test)
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CaseTest.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=test
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method:itWorks
+  name=CaseTest.php::itWorks
+  suggestedName=CaseTest.php::itWorks actionName=itWorks
+  source=MethodImpl(public function itWorks(): void {})
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CaseTest.php
+  methodName=itWorks
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method:benchIt
+  name=CaseTest.php::benchIt
+  suggestedName=CaseTest.php::benchIt actionName=benchIt
+  source=MethodImpl(#[\Testo\Bench])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/CaseTest.php
+  methodName=benchIt
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== class:SomeRector
+  name=SomeRector.php
+  suggestedName=SomeRector.php actionName=SomeRector.php
+  source=PhpClassImpl(#[\Testo\Bridge\Rector\Testing\TestRectorFixtures('SomeRecto)
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/Rector/SomeRector.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== classAttr:TestRectorFixtures@SomeRector
+  name=SomeRector.php
+  suggestedName=SomeRector.php actionName=SomeRector.php
+  source=PhpAttributeImpl(\Testo\Bridge\Rector\Testing\TestRectorFixtures('SomeRector')
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/Rector/SomeRector.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=rector-fixture
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method:refactor
+  name=SomeRector.php
+  suggestedName=SomeRector.php actionName=SomeRector.php
+  source=PhpClassImpl(#[\Testo\Bridge\Rector\Testing\TestRectorFixtures('SomeRecto)
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/Rector/SomeRector.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== class:AbstractBaseTest
+  name=AbstractBaseTest.php
+  suggestedName=AbstractBaseTest.php actionName=AbstractBaseTest.php...
+  source=PhpClassImpl(abstract class AbstractBaseTest)
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/Base/AbstractBaseTest.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method:inherited
+  name=AbstractBaseTest.php::inherited
+  suggestedName=AbstractBaseTest.php::inherited actionName=inherited
+  source=MethodImpl(#[\Testo\Test])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/Base/AbstractBaseTest.php
+  methodName=inherited
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== class:ConcreteTest
+  name=ConcreteTest.php
+  suggestedName=ConcreteTest.php actionName=ConcreteTest.php
+  source=PhpClassImpl(final class ConcreteTest extends AbstractBaseTest {})
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/Base/ConcreteTest.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== function:medianOf
+  name=functions.php::medianOf
+  suggestedName=functions.php::medianOf actionName=medianOf
+  source=FunctionImpl(#[\Testo\Test])
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/functions.php
+  methodName=medianOf
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== attr:Test@medianOf
+  name=functions.php::medianOf
+  suggestedName=functions.php::medianOf actionName=medianOf
+  source=PhpAttributeImpl(\Testo\Test)
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/functions.php
+  methodName=medianOf
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=test
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== attr:Group@groupedFunction
+  name=Group 'fn'
+  suggestedName=Group 'fn' actionName=Group 'fn'
+  source=PhpAttributeImpl(\Testo\Filter\Group('fn'))
+  scope=ConfigurationFile
+  selectedType=null
+  directoryPath=null
+  filePath=null
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[fn]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== function:helperFunction
+  <no run>
+== class:UserTest
+  name=UserTest.php
+  suggestedName=UserTest.php actionName=UserTest.php
+  source=PhpClassImpl(class UserTest)
+  scope=File
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/UserTest.php
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method:testSomething@UserTest
+  name=UserTest.php::testSomething
+  suggestedName=UserTest.php::testSomething actionName=testSomething
+  source=MethodImpl(public function testSomething(): void {})
+  scope=Method
+  selectedType=null
+  directoryPath=null
+  filePath=/src/tests/UserTest.php
+  methodName=testSomething
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== method:testSomething@PhpUnit
+  <no run>
+== new:ApplicationConfig
+  name=testo.php
+  suggestedName=testo.php actionName=testo.php
+  source=ClassReferenceImpl(ApplicationConfig)
+  scope=ConfigurationFile
+  selectedType=null
+  directoryPath=null
+  filePath=null
+  methodName=null
+  useAlternativeConfigurationFile=true
+  configurationFilePath=/src/testo.php
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== new:SuiteConfig('Unit')
+  name=testo.php
+  suggestedName=testo.php actionName=testo.php
+  source=ClassReferenceImpl(SuiteConfig)
+  scope=ConfigurationFile
+  selectedType=null
+  directoryPath=null
+  filePath=null
+  methodName=null
+  useAlternativeConfigurationFile=true
+  configurationFilePath=/src/testo.php
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[Unit]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== new:SuiteConfig($dynamic)
+  <no run>
+== file:testo.php
+  name=testo.php
+  suggestedName=testo.php actionName=testo.php
+  source=PhpFileImpl(testo.php)
+  scope=ConfigurationFile
+  selectedType=null
+  directoryPath=null
+  filePath=null
+  methodName=null
+  useAlternativeConfigurationFile=true
+  configurationFilePath=/src/testo.php
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+== class:Calculator(non-test)
+  <no run>
+== dir:tests
+  name=tests
+  suggestedName=tests actionName=tests
+  source=PsiJavaDirectoryImpl(tests)
+  scope=Directory
+  selectedType=null
+  directoryPath=/src/tests
+  filePath=null
+  methodName=null
+  useAlternativeConfigurationFile=false
+  configurationFilePath=null
+  testRunnerOptions=-q -n --teamcity
+  command=run
+  testoType=
+  suites=[]
+  groups=[]
+  excludeGroups=[]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=-1
+  dataSetIndex=-1
+  coverageEngine=XDebug
+  coverage=[clover=false, cobertura=true, xml=true]
+  coverageLevel=auto
+  coverageOptions=--type=!bench
+  parallel=1 enabled=false
+  logs=[html=true, junit=true]
+
+== recognition: row = produced configuration, column = context (X = recognised)
+  c0 file:CalcTest
+  c1 class:CalcTest
+  c2 method:adds
+  c3 attr:Test@adds
+  c4 attr:Test@median
+  c5 method:median
+  c6 method:providedWithoutTest
+  c7 attr:DataProvider@providedWithoutTest
+  c8 attr:DataProvider#0@median
+  c9 attr:DataProvider#1@median
+  c10 arg:DataProvider#0@median
+  c11 provider:cases
+  c12 yield:cases#0
+  c13 yield:cases#1
+  c14 return:cases
+  c15 yield:moreCases#0
+  c16 provider:unusedProvider
+  c17 yield:unusedProvider#0
+  c18 method:sumBench
+  c19 attr:Bench@sumBench
+  c20 method:inlineSum
+  c21 attr:TestInline#0@inlineSum
+  c22 attr:TestInline#1@inlineSum
+  c23 method:testGrouped
+  c24 attr:Group@testGrouped
+  c25 attr:Group(empty)@testUngrouped
+  c26 method:helper(private)
+  c27 provider:shared
+  c28 yield:shared#0
+  c29 method:first
+  c30 class:CaseTest
+  c31 classAttr:Test@CaseTest
+  c32 method:itWorks
+  c33 method:benchIt
+  c34 class:SomeRector
+  c35 classAttr:TestRectorFixtures@SomeRector
+  c36 method:refactor
+  c37 class:AbstractBaseTest
+  c38 method:inherited
+  c39 class:ConcreteTest
+  c40 function:medianOf
+  c41 attr:Test@medianOf
+  c42 attr:Group@groupedFunction
+  c43 function:helperFunction
+  c44 class:UserTest
+  c45 method:testSomething@UserTest
+  c46 method:testSomething@PhpUnit
+  c47 new:ApplicationConfig
+  c48 new:SuiteConfig('Unit')
+  c49 new:SuiteConfig($dynamic)
+  c50 file:testo.php
+  c51 class:Calculator(non-test)
+  c52 dir:tests
+  XX....XX..................X..........................  file:CalcTest
+  XX....XX..................X..........................  class:CalcTest
+  ..X..................................................  method:adds
+  ..X..................................................  attr:Test@adds
+  .....X...............................................  attr:Test@median
+  .....X...............................................  method:median
+  XX....XX..................X..........................  method:providedWithoutTest
+  XX....XX..................X..........................  attr:DataProvider@providedWithoutTest
+  .....................................................  attr:DataProvider#0@median
+  .....................................................  attr:DataProvider#1@median
+  .....................................................  arg:DataProvider#0@median
+  .....X...............................................  provider:cases
+  .....................................................  yield:cases#0
+  .....................................................  yield:cases#1
+  .....X...............................................  return:cases
+  .....................................................  yield:moreCases#0
+  ..................X..................................  method:sumBench
+  .....................................................  attr:Bench@sumBench
+  ....................X................................  method:inlineSum
+  .....................................................  attr:TestInline#0@inlineSum
+  .....................................................  attr:TestInline#1@inlineSum
+  .......................X.............................  method:testGrouped
+  ........................X............................  attr:Group@testGrouped
+  XX....XX..................X..........................  method:helper(private)
+  .............................X.......................  provider:shared
+  .....................................................  yield:shared#0
+  .............................X.......................  method:first
+  ..............................X......................  class:CaseTest
+  ...............................X.....................  classAttr:Test@CaseTest
+  ................................X....................  method:itWorks
+  .................................X...................  method:benchIt
+  ..................................X.X................  class:SomeRector
+  ...................................X.................  classAttr:TestRectorFixtures@SomeRector
+  ..................................X.X................  method:refactor
+  .....................................X...............  class:AbstractBaseTest
+  ......................................X..............  method:inherited
+  .......................................X.............  class:ConcreteTest
+  ........................................X............  function:medianOf
+  ........................................X............  attr:Test@medianOf
+  ..........................................X..........  attr:Group@groupedFunction
+  ............................................X........  class:UserTest
+  .............................................X.......  method:testSomething@UserTest
+  ...............................................X.....  new:ApplicationConfig
+  ...............................................XX....  new:SuiteConfig('Unit')
+  ...............................................X.....  file:testo.php
+  ....................................................X  dir:tests

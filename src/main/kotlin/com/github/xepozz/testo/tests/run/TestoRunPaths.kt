@@ -1,10 +1,12 @@
 package com.github.xepozz.testo.tests.run
 
-import com.github.xepozz.testo.TestoComposerConfig
 import com.intellij.openapi.util.io.FileUtil
 
 /** `--path` is relative to the process cwd, so it is computed from local paths, off the interpreter's path mapper. */
 object TestoRunPaths {
+    /** The configuration file Testo looks for in its working directory. */
+    const val DEFAULT_CONFIG_NAME = "testo.php"
+
     sealed interface PathResolution {
         data class Relative(val path: String) : PathResolution
 
@@ -44,7 +46,7 @@ object TestoRunPaths {
 
         var directory = parentPath(FileUtil.toSystemIndependentName(executable).trimEnd('/'))
         while (directory != null) {
-            if (exists(childPath(directory, TestoComposerConfig.DEFAULT_CONFIG_NAME))
+            if (exists(childPath(directory, DEFAULT_CONFIG_NAME))
                 || exists(childPath(directory, COMPOSER_MANIFEST))
             ) return directory
             if (relativePath(directory, basePath) == PathResolution.WorkingDirectory) return null
@@ -62,7 +64,7 @@ object TestoRunPaths {
         val independent = FileUtil.toSystemIndependentName(configurationFilePath)
         // Testo resolves a config's paths against getcwd(), not the file, so only the default testo.php marks the root.
         val name = independent.substringAfterLast('/')
-        if (!name.equals(TestoComposerConfig.DEFAULT_CONFIG_NAME, ignoreCase = true)) return null
+        if (!name.equals(DEFAULT_CONFIG_NAME, ignoreCase = true)) return null
         return parentPath(independent)
     }
 

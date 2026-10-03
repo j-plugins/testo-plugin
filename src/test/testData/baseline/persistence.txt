@@ -1,0 +1,83 @@
+== defaults
+<configuration />
+== every field
+<configuration>
+  <CommandLine parameters="-d memory_limit=1G" pass_parent_envs="false" workingDirectory="/work/app">
+    <PhpTestInterpreterSettings>
+      <option name="interpreterName" value="PHP 8.4 (Docker)" />
+    </PhpTestInterpreterSettings>
+    <envs>
+      <env name="APP_ENV" value="test" />
+      <env name="XDEBUG_MODE" value="off" />
+    </envs>
+  </CommandLine>
+  <TestoRunnerSettings configuration_file="/work/app/testo.php" directory="/work/app/tests" file="/work/app/tests/CalcTest.php" method="\App\CalcTest::med:3:0" scope="Method" selected_type="Unit" options="-q --stop-on-failure" use_alternative_configuration_file="true" command="list" parallel="4" testo_type="bench" coverage_clover="true" coverage_cobertura="false" coverage_xml="false" coverage_level="path" coverage_options="--type=test" log_html="false">
+    <option name="coverageEngine" value="PCov" />
+    <option name="dataProviderIndex" value="3" />
+    <option name="dataSetIndex" value="0" />
+    <exclude_groups>
+      <option value="slow" />
+    </exclude_groups>
+    <groups>
+      <option value="db" />
+      <option value="a,b" />
+    </groups>
+    <option name="parallelTestingEnabled" value="true" />
+    <suites>
+      <option value="Unit" />
+      <option value="My, Suite" />
+    </suites>
+  </TestoRunnerSettings>
+</configuration>
+== every field, read back and written again
+<configuration>
+  <CommandLine parameters="-d memory_limit=1G" pass_parent_envs="false" workingDirectory="/work/app">
+    <PhpTestInterpreterSettings>
+      <option name="interpreterName" value="PHP 8.4 (Docker)" />
+    </PhpTestInterpreterSettings>
+    <envs>
+      <env name="APP_ENV" value="test" />
+      <env name="XDEBUG_MODE" value="off" />
+    </envs>
+  </CommandLine>
+  <TestoRunnerSettings configuration_file="/work/app/testo.php" directory="/work/app/tests" file="/work/app/tests/CalcTest.php" method="\App\CalcTest::med:3:0" scope="Method" selected_type="Unit" options="-q --stop-on-failure" use_alternative_configuration_file="true" command="list" parallel="4" testo_type="bench" coverage_clover="true" coverage_cobertura="false" coverage_xml="false" coverage_level="path" coverage_options="--type=test" log_html="false">
+    <option name="coverageEngine" value="PCov" />
+    <option name="dataProviderIndex" value="3" />
+    <option name="dataSetIndex" value="0" />
+    <exclude_groups>
+      <option value="slow" />
+    </exclude_groups>
+    <groups>
+      <option value="db" />
+      <option value="a,b" />
+    </groups>
+    <option name="parallelTestingEnabled" value="true" />
+    <suites>
+      <option value="Unit" />
+      <option value="My, Suite" />
+    </suites>
+  </TestoRunnerSettings>
+</configuration>
+  scope=Method
+  selectedType=Unit
+  directoryPath=/work/app/tests
+  filePath=/work/app/tests/CalcTest.php
+  methodName=\App\CalcTest::med:3:0
+  useAlternativeConfigurationFile=true
+  configurationFilePath=/work/app/testo.php
+  testRunnerOptions=-q --stop-on-failure
+  command=list
+  testoType=bench
+  suites=[Unit, My, Suite]
+  groups=[db, a,b]
+  excludeGroups=[slow]
+  legacy=[||]
+  rerunFilters=[]
+  dataProviderIndex=3
+  dataSetIndex=0
+  coverageEngine=PCov
+  coverage=[clover=true, cobertura=false, xml=false]
+  coverageLevel=path
+  coverageOptions=--type=test
+  parallel=4 enabled=true
+  logs=[html=false, junit=true]

@@ -2,11 +2,9 @@ package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
-import com.github.xepozz.testo.coverage.TestoCoverageProgramRunner
 import com.github.xepozz.testo.tests.TestoConsoleProperties
-import com.github.xepozz.testo.tests.run.TestoRunConfiguration
+import com.github.xepozz.testo.launch.TestoConfiguration
 import com.intellij.execution.Executor
-import com.intellij.execution.configurations.RunProfile
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.openapi.util.IconLoader
 import com.intellij.openapi.wm.ToolWindowId
@@ -32,27 +30,12 @@ class TestoMutationExecutor : Executor() {
     }
 }
 
-/**
- * Runs the configuration as the Coverage executor does, with the coverage-xml and JUnit reports Infection reads forced
- * on, and starts Infection over them once the run is archived.
- */
-class TestoMutationProgramRunner : TestoCoverageProgramRunner() {
-    override fun getRunnerId(): String = "TestoMutationRunner"
-
-    override fun canRun(executorId: String, profile: RunProfile): Boolean =
-        executorId == TestoMutationExecutor.ID && profile is TestoRunConfiguration
-
-    override fun prepare(configuration: TestoRunConfiguration): TestoRunConfiguration =
-        (configuration.clone() as TestoRunConfiguration).apply {
-            testoSettings.runnerSettings.coverageXml = true
-            testoSettings.runnerSettings.logJunit = true
-        }
-
-    override fun started(env: ExecutionEnvironment, properties: TestoConsoleProperties) {
-        val configuration = env.runProfile as? TestoRunConfiguration ?: return
-        val options = env.runnerAndConfigurationSettings?.configuration as? TestoRunConfiguration ?: configuration
-        properties.afterArchive = { runDir, manifest ->
-            TestoMutationService.getInstance(properties.project).startAfterRun(configuration, runDir, manifest, options)
-        }
+/** Installs the hook before the Testo process finishes; every later file operation uses this run's snapshot. */
+internal fun mutateAfterArchive(env: ExecutionEnvironment, properties: TestoConsoleProperties) {
+    val configuration = properties.configuration as? TestoConfiguration ?: return
+    val options = env.runnerAndConfigurationSettings?.configuration as? TestoConfiguration ?: configuration
+    val snapshot = checkNotNull(properties.toolEnvironment) { "The Testo run has no captured tool environment" }
+    properties.afterArchive = { dir, manifest ->
+        TestoMutationService.getInstance(properties.project).startAfterRun(configuration, dir, manifest, options, snapshot)
     }
 }

@@ -1,11 +1,10 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
-<idea-plugin>
+<idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude">
     <id>com.github.xepozz.testo</id>
     <name>Testo PHP</name>
     <vendor email="xepozz@list.ru" url="https://github.com/xepozz">Dmitrii Derepko (@xepozz)</vendor>
 
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.jetbrains.php</depends>
     <depends optional="true" config-file="coverage.xml">com.intellij.modules.coverage</depends>
 
     <!-- JCEF, for the report tab. Must stay an optional depends: the module form (intellij.platform.ui.jcef in
@@ -14,6 +13,9 @@
 
     <resource-bundle>messages.TestoBundle</resource-bundle>
 
+    <!-- The PHP plugin this build runs on: its dependency and every registration that needs its classes. -->
+    <xi:include href="/META-INF/testo-php.xml"/>
+
     <extensions defaultExtensionNs="com.intellij">
         <fileType
                 name="PHP"
@@ -21,15 +23,9 @@
         <runLineMarkerContributor
                 language="PHP" order="first"
                 implementationClass="com.github.xepozz.testo.tests.TestoTestRunLineMarkerProvider"/>
-        <configurationType
-                implementation="com.github.xepozz.testo.tests.run.TestoRunConfigurationType"/>
-        <runConfigurationProducer
-                implementation="com.github.xepozz.testo.tests.run.TestoRunConfigurationProducer"/>
         <runAnything.executionProvider
                 implementation="com.github.xepozz.testo.tests.runAnything.TestoRunAnythingProvider"/>
 
-        <programRunner
-                implementation="com.github.xepozz.testo.tests.run.TestoDebugRunner"/>
         <implicitUsageProvider
                 implementation="com.github.xepozz.testo.references.TestFunctionImplicitUsageProvider"/>
         <iconProvider
@@ -97,23 +93,6 @@
         <lang.inspectionSuppressor
                 language="PHP"
                 implementationClass="com.github.xepozz.testo.tests.inspections.TestoInspectionSuppressor"/>
-        <localInspection
-                language="PHP"
-                shortName="TestoGroupNameInspection"
-                bundle="messages.TestoBundle"
-                key="inspection.group.display.name"
-                groupBundle="messages.TestoBundle"
-                groupKey="inspection.group"
-                enabledByDefault="true"
-                level="WARNING"
-                implementationClass="com.github.xepozz.testo.tests.inspections.TestoGroupNameInspection"/>
-    </extensions>
-
-    <extensions defaultExtensionNs="com.jetbrains.php">
-        <testFrameworkType
-                implementation="com.github.xepozz.testo.tests.TestoFrameworkType"/>
-        <composerConfigClient
-                implementation="com.github.xepozz.testo.TestoComposerConfig"/>
     </extensions>
 
     <projectListeners>
@@ -122,10 +101,6 @@
     </projectListeners>
 
     <actions>
-        <action id="TestoNewTestFromClass" class="com.github.xepozz.testo.tests.actions.TestoNewTestFromClassAction">
-            <add-to-group group-id="PhpNewTestGroup" anchor="last" />
-        </action>
-
         <!-- Variant A (TestoRerunStyle.MIRROR_AWARE): executor-pinned rerun trio, placed BEFORE the platform
              "Rerun" (FakeRerunAction, which mirrors the current executor). Each button hides itself when it would
              duplicate the platform "Rerun", so there are always 3 distinct rerun options. -->
@@ -198,12 +173,5 @@
             <add-to-group group-id="XDebugger.Frames.TopToolbar" anchor="last"/>
             <add-to-group group-id="XDebugger.Frames.Tree.Popup" anchor="last"/>
         </action>
-        <group id="TestoGenerateGroup">
-            <action
-                    id="TestoGenerateTestMethod"
-                    class="com.github.xepozz.testo.actions.TestoGenerateTestMethodAction"/>
-            <separator/>
-            <add-to-group group-id="GenerateGroup" anchor="first"/>
-        </group>
     </actions>
 </idea-plugin>

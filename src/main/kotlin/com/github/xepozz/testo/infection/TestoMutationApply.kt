@@ -5,6 +5,7 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
@@ -30,6 +31,7 @@ internal object TestoMutationApply {
 
     private fun replace(project: Project, run: TestoMutationRun, mutant: Mutant, applied: Boolean, command: String): Boolean {
         val (file, range) = locate(run, mutant, applied) ?: return false
+        if (!mutationFileBelongsTo(project, file)) return false
         val found = (if (applied) mutant.mutated else mutant.original) ?: return false
         val wanted = (if (applied) mutant.original else mutant.mutated) ?: return false
         val document = FileDocumentManager.getInstance().getDocument(file) ?: return false
@@ -53,6 +55,9 @@ internal object TestoMutationApply {
         return file to range
     }
 }
+
+internal fun mutationFileBelongsTo(project: Project, file: VirtualFile): Boolean =
+    ProjectFileIndex.getInstance(project).isInContent(file.canonicalFile ?: file)
 
 /** Where [snippet] sits in [text] when it starts at the 1-based [firstLine], or null when the text there differs. */
 internal fun snippetRange(text: CharSequence, firstLine: Int, snippet: String): TextRange? {

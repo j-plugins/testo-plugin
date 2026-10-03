@@ -1,6 +1,8 @@
 package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.php.TestoPhp
+import com.github.xepozz.testo.php.TestoStatementTarget
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -13,9 +15,7 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiWhiteSpace
-import com.jetbrains.php.lang.psi.PhpFile
-import com.jetbrains.php.lang.psi.elements.GroupStatement
-import com.jetbrains.php.lang.psi.elements.PhpClass
+import com.intellij.psi.PsiFile
 
 /**
  * Keeps Infection off a mutant's statement with `// @infection-ignore-all` above it. The annotation is the only one
@@ -35,11 +35,11 @@ internal object TestoMutationIgnore {
     fun ignore(project: Project, run: TestoMutationRun, mutant: Mutant): Boolean {
         if (!canIgnore(project, run, mutant)) return false
         val statement = statement(project, run, mutant) ?: return false
-        val file = statement.containingFile.virtualFile ?: return false
+        val file = statement.anchor.containingFile.virtualFile ?: return false
         val document = FileDocumentManager.getInstance().getDocument(file) ?: return false
-        val line = document.getLineNumber(statement.textRange.startOffset)
+        val line = document.getLineNumber(statement.range.startOffset)
         val lineStart = document.getLineStartOffset(line)
-        val indent = document.charsSequence.subSequence(lineStart, statement.textRange.startOffset)
+        val indent = document.charsSequence.subSequence(lineStart, statement.range.startOffset)
         WriteCommandAction.runWriteCommandAction(project, TestoBundle.message("infection.ignore.command", mutant.mutator), null, {
             document.insertString(lineStart, "$indent// $ANNOTATION\n")
         })
@@ -47,9 +47,10 @@ internal object TestoMutationIgnore {
         return true
     }
 
-    private fun statement(project: Project, run: TestoMutationRun, mutant: Mutant): PsiElement? {
+    private fun statement(project: Project, run: TestoMutationRun, mutant: Mutant): TestoStatementTarget? {
         val line = mutant.lines?.first ?: return null
         val file = run.localPath(mutant.file.path)?.let { LocalFileSystem.getInstance().findFileByPath(it) } ?: return null
+        if (!mutationFileBelongsTo(project, file)) return null
         val document = FileDocumentManager.getInstance().getDocument(file) ?: return null
         if (line < 1 || line > document.lineCount) return null
         val psi = psiFile(project, file, document) ?: return null
@@ -60,13 +61,13 @@ internal object TestoMutationIgnore {
         return statementAt(psi.findElementAt(first), document)
     }
 
-    private fun psiFile(project: Project, file: VirtualFile, document: Document): PhpFile? {
+    private fun psiFile(project: Project, file: VirtualFile, document: Document): PsiFile? {
         if (!PsiDocumentManager.getInstance(project).isCommitted(document)) return null
-        return PsiManager.getInstance(project).findFile(file) as? PhpFile
+        return PsiManager.getInstance(project).findFile(file)?.takeIf { TestoPhp.getInstance().isPhpFile(it) }
     }
 
-    private fun isAnnotated(statement: PsiElement): Boolean =
-        generateSequence(statement.prevSibling) { it.prevSibling }
+    private fun isAnnotated(statement: TestoStatementTarget): Boolean =
+        generateSequence(statement.anchor.prevSibling) { it.prevSibling }
             .takeWhile { it is PsiWhiteSpace || it is PsiComment }
             .any { it is PsiComment && ANNOTATION in it.text }
 }
@@ -75,20 +76,5 @@ internal object TestoMutationIgnore {
  * The statement or class member holding [leaf] that opens a line of its own: what `// @infection-ignore-all` goes
  * above, so the comment is that node's and not a neighbour's on the same line.
  */
-internal fun statementAt(leaf: PsiElement?, document: Document): PsiElement? {
-    var element = leaf
-    while (element != null && element !is PhpFile) {
-        val parent = element.parent
-        if ((parent is GroupStatement || parent is PhpClass || parent is PhpFile) && opensLine(element, document)) {
-            return element
-        }
-        element = parent
-    }
-    return null
-}
-
-private fun opensLine(element: PsiElement, document: Document): Boolean {
-    val offset = element.textRange.startOffset
-    val lineStart = document.getLineStartOffset(document.getLineNumber(offset))
-    return document.charsSequence.subSequence(lineStart, offset).isBlank()
-}
+internal fun statementAt(leaf: PsiElement?, document: Document): TestoStatementTarget? =
+    TestoPhp.getInstance().statementAt(leaf, document)
