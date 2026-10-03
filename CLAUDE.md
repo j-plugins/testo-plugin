@@ -20,16 +20,16 @@ Dependabot bumps these regularly — read the files rather than trusting this ta
 
 | Component            | Version / Value                          |
 |----------------------|------------------------------------------|
-| Language             | Kotlin 2.4.0                             |
+| Language             | Kotlin 2.4.20                             |
 | JVM Toolchain        | Java 21                                  |
 | IntelliJ Platform    | 2025.2 / 2026.2 (IU — IDEA Ultimate)     |
 | Build range          | 252–261.* and 262+ (two artifacts)       |
-| Plugin version       | `2026.3.1` (`pluginVersion`)             |
-| Build system         | Gradle wrapper 9.6.0                     |
-| IntelliJ Plugin SDK  | `org.jetbrains.intellij.platform` 2.18.0 |
+| Plugin version       | `2026.16` (`pluginVersion`)             |
+| Build system         | Gradle wrapper 9.8.0                     |
+| IntelliJ Plugin SDK  | `org.jetbrains.intellij.platform` 2.19.0 |
 | Changelog plugin     | `org.jetbrains.changelog` 2.5.0          |
-| Code quality         | Qodana 2026.2.0                          |
-| Coverage             | Kover 0.9.9 (XML report on `check`)      |
+| Code quality         | Qodana 2026.2.1                          |
+| Coverage             | Kover 0.9.10 (XML report on `check`)      |
 | Test framework       | JUnit 4.13.2, OpenTest4J 1.3.0           |
 
 `platformPlugins` (marketplace deps, pinned to builds matching the target platform): `com.jetbrains.php`,
@@ -51,9 +51,8 @@ in `gradle.properties` is declared twice with an API suffix and selected by `php
 
 **The two artifacts no longer differ in source** — coverage runs on 100 % public platform API (`coverage/`, see
 "Generated reports" / the `coverage/` tree), so the old `src/php252/kotlin` vs `src/php262/kotlin` typealias split is
-gone. `phpApi` is now purely a build selector (platform version, since/until, per-platform modules). The enum
-`PhpUnitCoverageEngine.CoverageEngine` (the Xdebug/PCOV driver) is the one PHP coverage symbol still used and did **not**
-move — it is imported directly from `com.jetbrains.php`.
+gone. `phpApi` is a build selector for the platform version, compatibility range and platform modules. The core
+uses its own `TestoCoverageDriver`; only the PhpStorm implementation maps it to the PHP plugin's coverage driver.
 
 Source that is single but not version-agnostic is reached by reflection, never a direct symbol: `XDebuggerManager.newSessionBuilder` (`TestoDebugRunner`) exists only on 262, so a direct call compiles green locally on 262 and breaks the 252 build in CI. Guard any such 262-only platform symbol behind a reflective lookup with a 252 fallback, or compile both variants before calling it done.
 
@@ -68,7 +67,7 @@ it re-enters Gradle (`Exec` on the wrapper) once per remaining API, passing `-Pp
 not fan out again. `./gradlew publishPlugin` is therefore the whole release; `release.yml` just calls it. CI builds and
 verifies both variants via a matrix, and the Marketplace serves each IDE the build matching its since/until range.
 
-> Note: `gradleVersion` in `gradle.properties` (9.5.0) lags the wrapper (9.6.0) — the property only feeds the
+> Note: `gradleVersion` in `gradle.properties` (9.5.0) lags the wrapper (9.8.0) — the property only feeds the
 > `wrapper` task, so running `./gradlew wrapper` would downgrade it. Bump the property when syncing.
 
 ## Build & Run Commands
@@ -86,6 +85,18 @@ Ready-made IDE run configurations live in `.run/`: *Run Plugin*, *Run Tests*, *R
 
 ## Project Structure
 
+The plugin keeps its shared logic in `src/main` and the PhpStorm implementation in `src/phpstorm`.
+The latter is compiled into both existing builds, selected with `-PphpApi=252` or `-PphpApi=262`.
+
+The shared code accesses PHP syntax, symbols and interpreter paths through `php/TestoPhp.kt`.
+Run selections and command arguments are represented by the platform-neutral types in `launch/`.
+Infection uses `TestoToolEnvironment` to prepare a process and manage its output, cancellation and resources.
+Classes extending the PHP plugin's APIs, along with their registrations, live in the PhpStorm source set.
+
+Shared tests belong in `src/test`; implementation-specific tests belong in `src/phpstormTest`.
+`CoreIsolationTest` checks that shared sources do not depend on the PHP implementation.
+The contract tests and snapshots cover run contexts, commands, navigation, saved configurations and reruns.
+
 ```
 src/main/kotlin/com/github/xepozz/testo/
 ├── TestoBundle.kt                  # i18n message bundle (messages/TestoBundle.properties)
@@ -93,21 +104,25 @@ src/main/kotlin/com/github/xepozz/testo/
 ├── TestoContext.kt                 # live template context ("Testo", inside a Testo class body)
 ├── TestoIcons.kt                   # icons, incl. LayeredIcon variants for file/class/function
 ├── TestoUtil.kt                    # isEnabled(project): a Testo framework configuration exists
-├── TestoComposerConfig.kt          # auto-configures the framework from composer (testo/testo → bin/testo)
+├── TestoAttributes.kt              # groupNamesOf: the names a #[Group] spells, as an indexer reads them
 ├── mixin.kt                        # PSI extensions: isTestoMethod/Class/File/Bench/Function/…
 ├── SpellcheckingDictionaryProvider.kt  # testo.dic
+│
+├── launch/                         # run decisions over an IDE-neutral model
+│   ├── TestoRunSelection.kt        # what a configuration runs: scope, filters, suites, groups, coverage options
+│   ├── TestoRunContexts.kt         # the producer's decisions over a TestoRunSelection
+│   ├── TestoCommandLine.kt         # scope → CLI arguments, `--filter`/`--data-provider` selector parsing
+│   ├── TestoCoverageArguments.kt   # `--coverage-*` flags, coverage level, coverage-only options
+│   ├── TestoConfigurationNames.kt  # suggested names and action names of a configuration
+│   ├── TestoConfiguration.kt       # a Testo run configuration as the core sees it
+│   └── TestoReportLocation.kt      # a report's local path and the interpreter's path to it
 │
 ├── util/
 │   ├── PsiUtil.kt                  # MEANINGFUL_ATTRIBUTES, ATTRIBUTE_GROUPS, attribute/yield ordering
 │   └── ExitStatementsVisitor.kt    # indexes yield/return statements inside a data provider
 │
-├── actions/                        # Generate menu
-│   ├── TestoGenerateTestMethodAction.kt
-│   └── TestoGenerateMethodActionBase.kt
-│
 ├── coverage/                       # optional, enabled via META-INF/coverage.xml
-│   ├── TestoCoverageEngine.kt      # PhpUnitCoverageEngine subclass + suite/enabled-configuration
-│   ├── TestoCoverageProgramRunner.kt  # --coverage-* flags on the IDE-managed paths, Xdebug/PCOV toggling
+│   ├── TestoCoverageEngine.kt      # platform CoverageEngine + suite/enabled-configuration
 │   ├── TestoCoverageRunner.kt      # loads a report into ProjectData + the per-test index
 │   ├── TestoCoverageAnnotator.kt   # per-file/dir percentages behind the Coverage view's columns
 │   ├── TestoCoverageViewExtension.kt  # the view's columns (Branches, Tests) and its extra toolbar
@@ -121,14 +136,16 @@ src/main/kotlin/com/github/xepozz/testo/
 ├── index/
 │   ├── TestoDataProvidersIndex.kt  # FileBasedIndex: provider name → {class, method, providerFqn}
 │   ├── TestoGroupsIndex.kt         # FileBasedIndex: every name a #[Filter\Group] in the project spells
-│   └── TestoDataProviderUtils.kt   # isDataProvider / findDataProviderUsages / usage index
+│   ├── TestoDataProviderUtils.kt   # isDataProvider / findDataProviderUsages / usage index
+│   └── PhpInputFilter.kt           # PHP files by file type name, whichever PHP plugin registered the type
 │
 ├── infection/                      # mutation testing: Infection over an archived run's coverage-xml + JUnit
 │   ├── TestoMutationCell.kt        # the reports row's last cell: label, button, options, history, progress, report
-│   ├── TestoInfectionCommand.kt    # the launch (TestoRunConfiguration.infectionLaunch) and its command
+│   ├── TestoInfectionCommand.kt    # report inputs and command preparation through the captured tool environment
+│   ├── TestoToolProcess.kt         # process lifetime, cancellation and output collection
 │   ├── TestoInfectionReports.kt    # readiness off run.json, covered sources, the --coverage directory
 │   ├── TestoInfectionArguments.kt  # CLI flags; where the infection binary is looked for
-│   ├── TestoMutationExecutor.kt    # Run with Mutation: the executor + a Coverage runner that mutates once the run is archived
+│   ├── TestoMutationExecutor.kt    # Run with Mutation: common executor and post-archive hook; runners live in adapters
 │   ├── TestoMutationService.kt     # starts Infection as a background task, no Run tab; runs by source run dir
 │   ├── TestoMutationStream.kt      # `--teamcity` output → TestoMutationModel (files, mutants, statuses, MSI)
 │   ├── TestoMutationTextLog.kt     # `--logger-text` report: every mutant's diff and test output, read at the end
@@ -142,25 +159,20 @@ src/main/kotlin/com/github/xepozz/testo/
 │   └── TestoMutationActions.kt     # that toolbar and popup (Testo.Mutations.Toolbar / .Popup in plugin.xml)
 │
 ├── php/
-│   └── PhpToolLauncher.kt          # any vendor/bin script on any interpreter: paths both ways, the command
+│   ├── TestoPhp.kt                 # neutral PHP reading and run-configuration contract
+│   └── TestoToolEnvironment.kt     # captured interpreter, file exposure, prepared process and cleanup
 │
 ├── references/
 │   └── TestFunctionImplicitUsageProvider.kt  # tests/classes are never "unused"
 │
 ├── tests/
-│   ├── TestoFrameworkType.kt       # PhpTestFrameworkType (ID "Testo", SCHEMA "php_qn")
-│   ├── TestoTestDescriptor.kt      # test class naming (*Test / *TestBase), findTests
-│   ├── TestoTestCreateInfo.kt      # "Create New Test" info (template "Testo Test")
-│   ├── TestoTestLocator.kt         # locationHint → PSI (file / class / method / function)
+│   ├── TestoLocationHints.kt       # the `php_qn://` scheme, parsing a hint back into file / class / member
 │   ├── TestoTestRunLineMarkerProvider.kt      # gutter icons + canonical locationHint builders
 │   ├── TestoTestRunLineMarkerProviderInfo.kt  # Info.shouldReplace = true (wins over PhpStorm's)
 │   ├── TestoStackTraceParser.kt    # failed line/text extraction from a PHP backtrace
 │   ├── TestoConsoleProperties.kt   # console wiring: converter, locator, id-based tree, toolbar
-│   ├── TestoVersionDetector.kt     # `--version --no-ansi` → "Testo <version>"
 │   │
 │   ├── actions/
-│   │   ├── TestoNewTestFromClassAction.kt   # PHP | New | Testo Test
-│   │   ├── TestoRerunFailedTestsAction.kt   # failed leaves → explicit --filter list
 │   │   ├── TestoRerunWithExecutorAction.kt  # rerun in Run/Debug/Coverage + split button
 │   │   ├── TestoRerunStyle.kt               # MIRROR_AWARE vs SPLIT_BUTTON toolbar styles
 │   │   └── TestoRunCommandAction.kt         # "Run Testo <command>" (Run Anything)
@@ -193,24 +205,11 @@ src/main/kotlin/com/github/xepozz/testo/
 │   │
 │   ├── inspections/
 │   │   ├── TestoInspectionSuppressor.kt     # silences PhpUnhandledExceptionInspection for AssertionException
-│   │   └── TestoGroupNameInspection.kt      # warns on unusable #[Group] names (blank, !-prefixed, comma, none)
-│   │
-│   ├── overrides/
-│   │   └── PhpRunInheritorsListCellRenderer.kt   # chooser popup renderer
+│   │   └── TestoGroupNameProblems.kt        # what makes a #[Group] name unusable (blank, !-prefixed, comma)
 │   │
 │   ├── run/
-│   │   ├── TestoRunConfigurationType.kt     # id pinned to "TestoRunConfiguration"
-│   │   ├── TestoRunConfigurationFactory.kt
-│   │   ├── TestoRunConfiguration.kt         # builds the command line, console, rerun action
-│   │   ├── TestoRunConfigurationHandler.kt  # maps scope/settings → CLI flags
 │   │   ├── TestoRunPaths.kt                 # working-directory + Testo-relative `--path` resolution (off the path mapper)
-│   │   ├── TestoRunConfigurationSettings.kt # persistence; default options "-q -n --teamcity"
-│   │   ├── TestoRunnerSettings.kt           # Testo-specific persisted fields + transient rerunFilters
-│   │   ├── TestoTagsField.kt                # the Group / Exclude group fields: removable tags + an add popup
-│   │   ├── TestoRunConfigurationProducer.kt # context → configuration (~615 lines, the trickiest file)
-│   │   ├── TestoTestRunConfigurationEditor.kt  # "Testo Options" panel wrapping the PHP editor
-│   │   ├── TestoTestRunnerSettingsValidator.kt # + the finder that switches the "Cannot find …" gate off
-│   │   └── TestoDebugRunner.kt              # debug session + channel tabs + rerun buttons
+│   │   └── TestoTagsField.kt                # the Group / Exclude group fields: removable tags + an add popup
 │   │
 │   └── runAnything/
 │       └── TestoRunAnythingProvider.kt      # "testo <command>" in Run Anything
@@ -234,8 +233,8 @@ src/main/kotlin/com/github/xepozz/testo/
     └── TestoStackTraceConsoleFolding.kt     # folds `[internal function]` frame runs
 
 src/main/resources/
-├── META-INF/plugin.xml         # main descriptor
-├── META-INF/coverage.xml       # optional descriptor, loaded with com.intellij.modules.coverage
+├── META-INF/plugin.xml         # main descriptor; includes the implementation's testo-php.xml
+├── META-INF/coverage.xml       # optional, with com.intellij.modules.coverage; includes testo-php-coverage.xml
 ├── META-INF/pluginIcon*.svg
 ├── fileTemplates/internal/     # "Testo Test.php.ft" (+ .html description)
 ├── fileTemplates/code/         # "Testo Test Method" template used by TestoTestCreateInfo
@@ -245,13 +244,59 @@ src/main/resources/
 ├── messages/TestoBundle.properties
 └── testo.dic                   # spellchecker dictionary
 
-src/test/kotlin/…               # ~30 JUnit 4 test classes (see "Testing")
-src/test/testData/mixin, rename # PHP fixtures for PSI-backed tests
+src/test/kotlin/…               # JUnit 4 tests of the core (see "Testing")
+src/test/testData/…             # PHP fixtures for PSI-backed tests, baselines of the PhpStorm behaviour
+
+src/phpstorm/kotlin/com/github/xepozz/testo/phpstorm/
+├── PhpStormTestoPhp.kt             # the contract on PhpStorm's PHP PSI, index and interpreters
+├── PhpStormRunSelection.kt         # TestoRunnerSettings ⇄ TestoRunSelection
+├── PhpStormConsole.kt              # console properties on the PHP plugin's path mapper and locator
+├── PhpStormToolEnvironment.kt      # captured interpreter and prepared tool processes
+├── PhpToolLauncher.kt              # interpreter-aware paths, commands and file exposure
+├── TestoComposerConfig.kt          # auto-configures the framework from composer (testo/testo → bin/testo)
+├── actions/                        # Generate | Test Method
+├── coverage/
+│   ├── TestoCoverageProgramRunner.kt  # --coverage-* flags on the IDE-managed paths, Xdebug/PCOV toggling
+│   └── TestoMutationProgramRunner.kt  # coverage followed by a mutation run
+└── tests/
+    ├── TestoFrameworkType.kt       # PhpTestFrameworkType (ID "Testo", SCHEMA "php_qn")
+    ├── TestoTestDescriptor.kt      # test class naming (*Test / *TestBase), findTests
+    ├── TestoTestCreateInfo.kt      # "Create New Test" info (template "Testo Test")
+    ├── TestoTestLocator.kt         # locationHint → PSI (file / class / method / function)
+    ├── TestoVersionDetector.kt     # `--version --no-ansi` → "Testo <version>"
+    ├── actions/
+    │   ├── TestoNewTestFromClassAction.kt   # PHP | New | Testo Test
+    │   └── TestoRerunFailedTestsAction.kt   # failed leaves → explicit --filter list
+    ├── inspections/
+    │   └── TestoGroupNameInspection.kt      # warns on unusable #[Group] names (blank, !-prefixed, comma, none)
+    ├── overrides/
+    │   └── PhpRunInheritorsListCellRenderer.kt   # chooser popup renderer
+    └── run/
+        ├── TestoRunConfigurationType.kt     # id pinned to "TestoRunConfiguration"
+        ├── TestoRunConfigurationFactory.kt
+        ├── TestoRunConfiguration.kt         # builds the command line, console, rerun action
+        ├── TestoRunConfigurationHandler.kt  # maps scope/settings → CLI flags
+        ├── TestoRunConfigurationSettings.kt # persistence; default options "-q -n --teamcity"
+        ├── TestoRunnerSettings.kt           # Testo-specific persisted fields + transient rerunFilters
+        ├── TestoRunConfigurationProducer.kt # context → configuration, around the core's TestoRunContexts
+        ├── TestoTestRunConfigurationEditor.kt  # "Testo Options" panel wrapping the PHP editor
+        ├── TestoTestRunnerSettingsValidator.kt # + the finder that switches the "Cannot find …" gate off
+        ├── TestoReportTarget.kt             # report paths through the PHP plugin's coverage result manager
+        └── TestoDebugRunner.kt              # debug session + channel tabs + rerun buttons
+
+src/phpstorm/resources/META-INF/
+├── testo-php.xml               # the com.jetbrains.php dependency + registrations needing the PHP plugin
+└── testo-php-coverage.xml      # the coverage program runner
+
+src/phpstormTest/kotlin/…        # implementation tests and behavior snapshots
 ```
 
 ## Architecture
 
-### Extension points registered in `plugin.xml`
+### Extension points
+
+The main descriptor includes `src/phpstorm/resources/META-INF/testo-php.xml` for PHP-specific registrations.
+The optional coverage descriptor includes `testo-php-coverage.xml` from the same implementation.
 
 `com.intellij` namespace: `fileType` (maps the `testo`/`testo.php`/`testo.bat` binaries onto PHP),
 `runLineMarkerContributor` (order="first"), `configurationType`, `runConfigurationProducer`,
@@ -260,7 +305,7 @@ src/test/testData/mixin, rename # PHP fixtures for PSI-backed tests
 `toolWindow` (*Mutations*), `defaultLiveTemplates` + `liveTemplateContext`, two `console.folding`s, `fileBasedIndex`,
 `spellchecker.bundledDictionaryProvider`, `lang.inspectionSuppressor`, `localInspection` (`TestoGroupNameInspection`).
 
-`com.jetbrains.php` namespace: `testFrameworkType` (`TestoFrameworkType`), `composerConfigClient`
+`com.jetbrains.php` namespace in the PhpStorm implementation: `testFrameworkType` (`TestoFrameworkType`), `composerConfigClient`
 (`TestoComposerConfig`).
 
 `META-INF/coverage.xml` (optional, `com.intellij.modules.coverage`) adds `coverageEngine`, `coverageRunner`, the
@@ -665,9 +710,21 @@ JUnit 4, two flavours — prefer the first when the logic allows it:
 When adding behaviour, pull the pure logic into a top-level function (as `testoDisplayName` was) so it can be
 tested without the platform fixture.
 
+Run the checks for both supported platform variants:
+
+```shell
+./gradlew check buildPlugin verifyPlugin -PphpApi=252
+./gradlew check buildPlugin verifyPlugin -PphpApi=262
+```
+
+The test task canonicalizes its temporary directory so VFS and filesystem paths agree on macOS.
+
 ## Constraints & Important Notes
 
-- **Platform:** IntelliJ IDEA Ultimate or PhpStorm only (`com.jetbrains.php` is a hard dependency)
+- **Platform:** IntelliJ IDEA Ultimate or PhpStorm (`com.jetbrains.php` is a hard dependency of the PhpStorm implementation).
+- **Keep the core independent of PHP implementations.** Code in `src/main/kotlin` and `src/test/kotlin` uses the
+  contracts in `php/`; PHP-plugin classes and their registrations belong in `src/phpstorm*`.
+  `CoreIsolationTest` enforces this boundary, including references in comments.
 - **Min IDE version:** 2025.2 (build 252+), shipped as two artifacts — see "Two build variants (`phpApi`)"
 - **Kotlin stdlib is NOT bundled** (`kotlin.stdlib.default.dependency = false`) — uses the IDE's own
 - **Gradle Configuration Cache** and **Build Cache** are enabled
@@ -690,7 +747,8 @@ tested without the platform fixture.
 - All source in Kotlin; package root `com.github.xepozz.testo`
 - i18n strings in `messages/TestoBundle.properties`, accessed via `TestoBundle`
 - Icons follow IntelliJ conventions: SVG with a `_dark` variant
-- New extension points must be registered in `plugin.xml` (coverage-only ones in `coverage.xml`)
+- Register shared extension points in `plugin.xml` (coverage-only ones in `coverage.xml`). PHP-specific registrations
+  belong in `src/phpstorm/resources/META-INF/testo-php.xml` or `testo-php-coverage.xml`.
 - Version follows SemVer; `pluginVersion` in `gradle.properties` is the single source of truth
 - Notable user-visible changes go into `CHANGELOG.md` under `## [Unreleased]` (Keep a Changelog format) —
   the release workflow consumes that section

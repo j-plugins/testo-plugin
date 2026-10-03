@@ -1,12 +1,12 @@
 package com.github.xepozz.testo
 
+import com.github.xepozz.testo.launch.TestoConfiguration
+import com.github.xepozz.testo.php.TestoPhp
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.NewChannelDetector
-import com.github.xepozz.testo.tests.run.TestoRunConfigurationType
 import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.process.ProcessOutputTypes
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jetbrains.php.util.pathmapper.PhpPathMapper
 
 /**
  * A test's channel output, fed through the real converter after its node was rendered — which happens on
@@ -61,11 +61,9 @@ class TestoLateChannelConverterPsiTest : BasePlatformTestCase() {
     }
 
     private fun testoProperties(): TestoConsoleProperties {
-        val configuration = TestoRunConfigurationType().createTemplateConfiguration(project)
-        return TestoConsoleProperties(
-            configuration,
-            DefaultRunExecutor.getRunExecutorInstance(),
-            PhpPathMapper.create(project),
-        )
+        val factory = TestoPhp.getInstance().configurationFactory()
+        val configuration = factory.createTemplateConfiguration(project) as TestoConfiguration
+        val executor = DefaultRunExecutor.getRunExecutorInstance()
+        return configuration.createTestConsoleProperties(executor) as TestoConsoleProperties
     }
 }

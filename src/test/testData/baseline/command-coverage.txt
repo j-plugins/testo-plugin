@@ -1,0 +1,86 @@
+== xdebug, default formats, auto level
+  testoArguments=--coverage-cobertura=/work/coverage/Baseline@testo-cobertura.xml --coverage-xml=/work/coverage/Baseline@testo-coverage-xml --coverage-level=branch --type=!bench
+== xdebug, all formats
+  testoArguments=--coverage-clover=/work/coverage/Baseline@testo-clover.xml --coverage-cobertura=/work/coverage/Baseline@testo-cobertura.xml --coverage-xml=/work/coverage/Baseline@testo-coverage-xml --coverage-level=branch --type=!bench
+== xdebug, only coverage-xml, auto level
+  testoArguments=--coverage-xml=/work/coverage/Baseline@testo-coverage-xml --type=!bench
+== xdebug, formats off
+  testoArguments=--coverage --type=!bench
+== xdebug, no base path
+  testoArguments=--coverage --coverage-level=branch --type=!bench
+== xdebug, level line, own options
+  testoArguments=--coverage-cobertura=/work/coverage/Baseline@testo-cobertura.xml --coverage-xml=/work/coverage/Baseline@testo-coverage-xml --coverage-level=line --type=test --no-ansi
+== pcov, default formats, auto level
+  testoArguments=--coverage-cobertura=/work/coverage/Baseline@testo-cobertura.xml --coverage-xml=/work/coverage/Baseline@testo-coverage-xml --type=!bench
+  commandLine=<php-dir>/php -dxdebug.remote_enable=1 -dxdebug.remote_mode=req -dxdebug.remote_port=9003 -dxdebug.remote_host=127.0.0.1 -dxdebug.mode=debug -dxdebug.client_port=9003 -dxdebug.client_host=127.0.0.1 -dpcov.enabled=1 <wd>/vendor/bin/testo run -q -n --teamcity --coverage-cobertura=/work/coverage/Baseline@testo-cobertura.xml --coverage-xml=/work/coverage/Baseline@testo-coverage-xml --type=!bench --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml --path tests/CalcTest.php
+  cwd=<wd>
+  arg=-dxdebug.remote_enable=1
+  arg=-dxdebug.remote_mode=req
+  arg=-dxdebug.remote_port=9003
+  arg=-dxdebug.remote_host=127.0.0.1
+  arg=-dxdebug.mode=debug
+  arg=-dxdebug.client_port=9003
+  arg=-dxdebug.client_host=127.0.0.1
+  arg=-dpcov.enabled=1
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--coverage-cobertura=/work/coverage/Baseline@testo-cobertura.xml
+  arg=--coverage-xml=/work/coverage/Baseline@testo-coverage-xml
+  arg=--type=!bench
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  arg=--path
+  arg=tests/CalcTest.php
+== pcov, level branch, group run
+  testoArguments=--coverage-cobertura=/work/coverage/Baseline@testo-cobertura.xml --coverage-xml=/work/coverage/Baseline@testo-coverage-xml --coverage-level=branch --type=!bench
+  commandLine=<php-dir>/php -dxdebug.remote_enable=1 -dxdebug.remote_mode=req -dxdebug.remote_port=9003 -dxdebug.remote_host=127.0.0.1 -dxdebug.mode=debug -dxdebug.client_port=9003 -dxdebug.client_host=127.0.0.1 -dpcov.enabled=1 <wd>/vendor/bin/testo run -q -n --teamcity --coverage-cobertura=/work/coverage/Baseline@testo-cobertura.xml --coverage-xml=/work/coverage/Baseline@testo-coverage-xml --coverage-level=branch --type=!bench --group db --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  cwd=<wd>
+  arg=-dxdebug.remote_enable=1
+  arg=-dxdebug.remote_mode=req
+  arg=-dxdebug.remote_port=9003
+  arg=-dxdebug.remote_host=127.0.0.1
+  arg=-dxdebug.mode=debug
+  arg=-dxdebug.client_port=9003
+  arg=-dxdebug.client_host=127.0.0.1
+  arg=-dpcov.enabled=1
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--coverage-cobertura=/work/coverage/Baseline@testo-cobertura.xml
+  arg=--coverage-xml=/work/coverage/Baseline@testo-coverage-xml
+  arg=--coverage-level=branch
+  arg=--type=!bench
+  arg=--group
+  arg=db
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+== pcov, options empty, method run
+  testoArguments=--coverage-cobertura=/work/coverage/Baseline@testo-cobertura.xml --coverage-xml=/work/coverage/Baseline@testo-coverage-xml
+  commandLine=<php-dir>/php -dxdebug.remote_enable=1 -dxdebug.remote_mode=req -dxdebug.remote_port=9003 -dxdebug.remote_host=127.0.0.1 -dxdebug.mode=debug -dxdebug.client_port=9003 -dxdebug.client_host=127.0.0.1 -dpcov.enabled=1 <wd>/vendor/bin/testo run -q -n --teamcity --coverage-cobertura=/work/coverage/Baseline@testo-cobertura.xml --coverage-xml=/work/coverage/Baseline@testo-coverage-xml --log-html=<system>/testo/reports/<project-hash>/Baseline/report.html --log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml --path tests/CalcTest.php --filter med:3:0
+  cwd=<wd>
+  arg=-dxdebug.remote_enable=1
+  arg=-dxdebug.remote_mode=req
+  arg=-dxdebug.remote_port=9003
+  arg=-dxdebug.remote_host=127.0.0.1
+  arg=-dxdebug.mode=debug
+  arg=-dxdebug.client_port=9003
+  arg=-dxdebug.client_host=127.0.0.1
+  arg=-dpcov.enabled=1
+  arg=<wd>/vendor/bin/testo
+  arg=run
+  arg=-q
+  arg=-n
+  arg=--teamcity
+  arg=--coverage-cobertura=/work/coverage/Baseline@testo-cobertura.xml
+  arg=--coverage-xml=/work/coverage/Baseline@testo-coverage-xml
+  arg=--log-html=<system>/testo/reports/<project-hash>/Baseline/report.html
+  arg=--log-junit=<system>/testo/reports/<project-hash>/Baseline/junit.xml
+  arg=--path
+  arg=tests/CalcTest.php
+  arg=--filter
+  arg=med:3:0

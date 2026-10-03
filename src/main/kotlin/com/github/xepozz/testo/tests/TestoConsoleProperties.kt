@@ -1,6 +1,9 @@
 package com.github.xepozz.testo.tests
 
 import com.github.xepozz.testo.TestoBundle
+import com.github.xepozz.testo.launch.TestoReportLocation
+import com.github.xepozz.testo.php.TestoPathMapping
+import com.github.xepozz.testo.php.TestoPhp
 import com.github.xepozz.testo.tests.console.ChannelOutputStore
 import com.github.xepozz.testo.tests.console.LogLevelFilter
 import com.github.xepozz.testo.tests.console.TestoMetadataStore
@@ -12,30 +15,30 @@ import com.github.xepozz.testo.tests.console.TestoReportsAction
 import com.github.xepozz.testo.tests.console.TestoRunTimings
 import com.github.xepozz.testo.tests.console.TestoStatusStore
 import com.github.xepozz.testo.tests.console.TestoTargetStore
-import com.github.xepozz.testo.tests.run.TestoReportTarget
-import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.Executor
 import com.intellij.execution.Location
+import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.testframework.TestConsoleProperties
 import com.intellij.execution.testframework.sm.SMCustomMessagesParsing
 import com.intellij.execution.testframework.sm.runner.OutputToGeneralTestEventsConverter
 import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
+import com.intellij.execution.testframework.sm.runner.SMTestLocator
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.pom.Navigatable
-import com.jetbrains.php.lang.psi.elements.Method
-import com.jetbrains.php.phpunit.PhpPsiLocationWithDataSet
-import com.jetbrains.php.util.pathmapper.PhpPathMapper
-import one.util.streamex.StreamEx
 
+/**
+ * [paths] take the paths a run reports back to this machine; [testLocator] finds a results-tree node's source. Both
+ * come from the PHP implementation the configuration runs on.
+ */
 class TestoConsoleProperties(
-    config: TestoRunConfiguration,
+    config: RunConfiguration,
     executor: Executor,
-    val pathMapper: PhpPathMapper,
+    val paths: TestoPathMapping,
+    private val testLocator: SMTestLocator,
 ) : SMTRunnerConsoleProperties(config, TestoBundle.message("testo.local.run.display.name"), executor),
     SMCustomMessagesParsing {
-    val myTestLocator = TestoTestLocator(pathMapper)
 
     val channelStore = ChannelOutputStore()
 
@@ -77,6 +80,9 @@ class TestoConsoleProperties(
     @Volatile
     var workingDirectory: String? = null
 
+    /** The snapshot captured when this tab's Testo process was prepared; absent on an imported archive. */
+    var toolEnvironment: com.github.xepozz.testo.php.TestoToolEnvironment? = null
+
     @Volatile
     var testoVersion: String? = null
 
@@ -92,7 +98,7 @@ class TestoConsoleProperties(
     // The reports this run's own flags point at. Testo announces each under its interpreter-side path, which the
     // interpreter's mappings may not cover.
     @Volatile
-    internal var reportTargets: List<TestoReportTarget> = emptyList()
+    internal var reportTargets: List<TestoReportLocation> = emptyList()
 
     /** Called on a pooled thread once this run's archive is complete; the Mutation executor mutates from there. */
     @Volatile
@@ -100,7 +106,7 @@ class TestoConsoleProperties(
 
     /** An announced report path as a local one; the PHP plugin's mapper may throw over a path it does not know. */
     fun reportLocalPath(path: String): String? =
-        TestoReportTarget.localPathOf(path, reportTargets) ?: pathMapper.getLocalPath(path)
+        TestoReportLocation.localPathOf(path, reportTargets) ?: paths.toLocalPath(path)
 
     // Once per run, whoever needs the reports first: a caller arriving mid-download waits for it.
     private val reportsCopied = lazy { reportTargets.forEach { it.copyToLocal(project) } }
@@ -151,13 +157,14 @@ class TestoConsoleProperties(
         )
 
     override fun getTestStackTraceParser(url: String, proxy: SMTestProxy, project: Project) =
-        TestoStackTraceParser.parse(url, proxy.stacktrace, proxy.errorMessage, testLocator, project)
+        TestoStackTraceParser.parse(url, proxy.stacktrace, proxy.errorMessage, paths, project)
 
-    override fun getTestLocator() = this.myTestLocator
+    override fun getTestLocator() = testLocator
 
     override fun getErrorNavigatable(location: Location<*>, stacktrace: String): Navigatable? {
-        if (location is PhpPsiLocationWithDataSet<*> && location.getPsiElement() !is Method) {
-            return location.navigatable
+        val dataSet = TestoPhp.getInstance().dataSetNavigatable(location)
+        if (dataSet != null) {
+            return dataSet
         } else {
             val reversedStackTrace = StringUtil.splitByLinesKeepSeparators(stacktrace)
                 .reversed()

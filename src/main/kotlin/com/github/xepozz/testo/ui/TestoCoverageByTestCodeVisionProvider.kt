@@ -8,15 +8,18 @@ import com.github.xepozz.testo.coverage.perTest.TestoCoveringTestsLauncher
 import com.github.xepozz.testo.coverage.perTest.navigateToTest
 import com.github.xepozz.testo.coverage.perTest.shortTestLabel
 import com.github.xepozz.testo.coverage.perTest.testsCoveringElement
+import com.github.xepozz.testo.php.PhpFunctionView
+import com.github.xepozz.testo.php.TestoPhp
 import com.intellij.codeInsight.codeVision.CodeVisionAnchorKind
-import com.intellij.icons.AllIcons
 import com.intellij.codeInsight.codeVision.CodeVisionEntry
 import com.intellij.codeInsight.codeVision.CodeVisionRelativeOrdering
 import com.intellij.codeInsight.codeVision.ui.model.ClickableTextCodeVisionEntry
 import com.intellij.codeInsight.hints.InlayHintsUtils
 import com.intellij.codeInsight.hints.codeVision.CodeVisionProviderBase
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -24,9 +27,6 @@ import com.intellij.psi.SmartPointerManager
 import com.intellij.psi.SyntaxTraverser
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.awt.RelativePoint
-import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.jetbrains.php.lang.psi.PhpFile
-import com.jetbrains.php.lang.psi.elements.Function
 import java.awt.event.MouseEvent
 import javax.swing.Icon
 
@@ -49,12 +49,12 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
 
     override val defaultAnchor: CodeVisionAnchorKind get() = CodeVisionAnchorKind.Default
 
-    override fun acceptsFile(file: PsiFile): Boolean = file is PhpFile
+    override fun acceptsFile(file: PsiFile): Boolean = TestoPhp.getInstance().isPhpFile(file)
 
-    override fun acceptsElement(element: PsiElement): Boolean = element is Function
+    override fun acceptsElement(element: PsiElement): Boolean = TestoPhp.getInstance().view(element) is PhpFunctionView
 
     override fun getHint(element: PsiElement, file: PsiFile): String? {
-        val count = testsCoveringElement(element as? Function ?: return null).size
+        val count = testsCoveringElement(element.takeIf { acceptsElement(it) } ?: return null).size
         return when (count) {
             0 -> null
             1 -> TestoBundle.message("testo.coverage.byTest.hint.one")
@@ -63,9 +63,9 @@ class TestoCoverageByTestCodeVisionProvider : CodeVisionProviderBase() {
     }
 
     override fun handleClick(editor: Editor, element: PsiElement, event: MouseEvent?) {
-        val function = element as? Function ?: return
-        val project = function.project
-        val tests = testsCoveringElement(function).sortedWith(TEST_ID_ORDER)
+        val function = TestoPhp.getInstance().view(element) as? PhpFunctionView ?: return
+        val project = element.project
+        val tests = testsCoveringElement(element).sortedWith(TEST_ID_ORDER)
         if (tests.isEmpty()) return
 
         // A run-all action first (like the *Run covering tests* gutter), then one navigable row per test.

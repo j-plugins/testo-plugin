@@ -1,0 +1,45 @@
+== one group
+  suggestedName=Group 'db'
+  actionName=Baseline
+== two groups
+  suggestedName=Groups 'db', 'slow'
+  actionName=Baseline
+== one suite
+  suggestedName=Suite 'Unit'
+  actionName=Baseline
+== two suites
+  suggestedName=Suites 'Unit', 'My Suite'
+  actionName=Baseline
+== type only
+  suggestedName=Type 'bench'
+  actionName=Baseline
+== groups win over suites and type
+  suggestedName=Group 'db'
+  actionName=Baseline
+== excluded groups only
+  suggestedName=
+  actionName=Baseline
+== rerun filters only
+  suggestedName=
+  actionName=Baseline
+== explicit configuration file with a group
+  suggestedName=testo.php
+  actionName=Baseline
+== configuration scope, nothing selected
+  suggestedName=
+  actionName=Baseline
+== qualified selector
+  suggestedName=Calculator.php::med:3:0
+  actionName=med:3:0
+== plain method
+  suggestedName=CalcTest.php::adds
+  actionName=adds
+== file
+  suggestedName=CalcTest.php
+  actionName=Baseline
+== directory
+  suggestedName=tests
+  actionName=Baseline
+== type scope
+  suggestedName=Unit
+  actionName=Baseline

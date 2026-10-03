@@ -1,12 +1,12 @@
 package com.github.xepozz.testo.tests
 
+import com.github.xepozz.testo.php.TestoPathMapping
 import com.github.xepozz.testo.takeWhileInclusive
 import com.intellij.execution.testframework.sm.runner.ui.TestStackTraceParser
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiManager
 import com.intellij.util.DocumentUtil
-import com.jetbrains.php.phpunit.PhpUnitQualifiedNameLocationProvider
 import com.jetbrains.rd.generator.nova.GenerationSpec.Companion.nullIfEmpty
 
 private const val PREFIX = "[internal function]"
@@ -24,7 +24,7 @@ class TestoStackTraceParser(
             url: String,
             stacktrace: String?,
             errorMessage: String?,
-            locator: PhpUnitQualifiedNameLocationProvider,
+            paths: TestoPathMapping,
             project: Project
         ): TestoStackTraceParser {
             if (stacktrace.isNullOrEmpty()) return TestoStackTraceParser(errorMessage)
@@ -40,7 +40,7 @@ class TestoStackTraceParser(
 
             val errorMessage = if (errorMessage.isNullOrEmpty()) lines.first() else errorMessage.nullIfEmpty()
 
-            val parts = url.substringAfter("${TestoFrameworkType.SCHEMA}://").split("::")
+            val parts = url.substringAfter("${TestoLocationHints.SCHEMA}://").split("::")
             val path = parts.getOrNull(0) ?: return TestoStackTraceParser(errorMessage)
             val classFqn = parts.getOrNull(1)
             val classMethod = parts.getOrNull(2)
@@ -53,7 +53,7 @@ class TestoStackTraceParser(
                 .substringBefore(')')
                 .toIntOrNull()
                 ?: -1
-            val failedLineText = getLineText(path, failedLine, project, locator)
+            val failedLineText = getLineText(path, failedLine, project, paths)
 
             if (lastLine.contains("->")) {
                 return TestoStackTraceParser(failedLine, failedLineText, errorMessage, null)
@@ -66,9 +66,9 @@ class TestoStackTraceParser(
             path: String,
             line: Int,
             project: Project,
-            locator: PhpUnitQualifiedNameLocationProvider
+            paths: TestoPathMapping
         ): String? {
-            val vFile = locator.pathMapper.getLocalFile(path) ?: return null
+            val vFile = paths.toLocalFile(path) ?: return null
             val psiFile = PsiManager.getInstance(project).findFile(vFile) ?: return null
             val document = PsiDocumentManager.getInstance(project).getDocument(psiFile) ?: return null
 
