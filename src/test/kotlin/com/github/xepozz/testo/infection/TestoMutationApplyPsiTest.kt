@@ -30,13 +30,13 @@ class TestoMutationApplyPsiTest : BasePlatformTestCase() {
         file.mutants += mutant
         run.files += file
 
-        assertTrue(TestoMutationApply.canApply(run, mutant))
-        assertFalse(TestoMutationApply.isApplied(run, mutant))
+        assertTrue(TestoMutationApply.canApply(project, run, mutant))
+        assertFalse(TestoMutationApply.isApplied(project, run, mutant))
 
         assertTrue(TestoMutationApply.apply(project, run, mutant))
         assertEquals(code.replace("\$a > 1", "\$a >= 1"), document.text)
-        assertTrue(TestoMutationApply.isApplied(run, mutant))
-        assertFalse(TestoMutationApply.canApply(run, mutant))
+        assertTrue(TestoMutationApply.isApplied(project, run, mutant))
+        assertFalse(TestoMutationApply.canApply(project, run, mutant))
 
         assertTrue(TestoMutationApply.revert(project, run, mutant))
         assertEquals(code, document.text)

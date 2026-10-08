@@ -56,6 +56,7 @@ class TestoMutationIgnorePsiTest : BasePlatformTestCase() {
         val (run, mutant, document) = mutantIn(code, 3, " return \$a > 1;\n}\n", inProject = false)
         assertFalse(TestoMutationIgnore.canIgnore(project, run, mutant))
         assertFalse(TestoMutationIgnore.ignore(project, run, mutant))
+        assertFalse(TestoMutationApply.canApply(project, run, mutant))
         assertFalse(TestoMutationApply.apply(project, run, mutant))
         assertEquals(code, document.text)
         val (ownRun, ownMutant, ownDocument) = mutantIn(code, 3, " return \$a > 1;\n}\n")

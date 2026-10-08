@@ -186,7 +186,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         val launcher = PhpToolLauncher(project, interpreter)
         val snapshot = clone() as TestoRunConfiguration
         lastToolEnvironment = PhpStormToolEnvironment(project, interpreter, executablePath, workingDirectory,
-            snapshot.settings.commandLineSettings, env)
+            snapshot.settings.commandLineSettings)
 
         myHandler.prepareArguments(arguments, testoSettings)
         addReportFlags(arguments, interpreter)
