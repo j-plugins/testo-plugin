@@ -379,7 +379,7 @@ Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP suppor
 
 ### Location hints (`php_qn://` URLs)
 
-`TestoTestRunLineMarkerProvider.Companion` owns the canonical format; `TestoTestLocator` parses it back.
+`TestoTestRunLineMarkerProvider.Companion` builds the canonical format; `TestoLocationHints.parse` reads it back.
 Everything that needs to identify a test (line markers, code vision, history index, rerun filters, channel
 storage keys) goes through these:
 
@@ -570,8 +570,8 @@ Non-obvious constraints already paid for in blood — read before touching the r
   converter, so none of our stores fill — an imported tab is a PHPUnit-looking tree. `TestoRunReplayProfile` feeds
   the archived teamcity stream through the *live* properties instead. Three switches keep a replay from acting like
   a run: `replayMode`, `getConfiguration()` answering the replay profile, `reportStore.startedAtOverride`.
-- **A mutation run never gets a Run tab.** Its command comes from a `TestoRunConfiguration` clone with `infectionLaunch`
-  set (so it inherits the interpreter and working directory), but `TestoMutationService` starts it through
+- **A mutation run never gets a Run tab.** Its command comes from the Testo run's `TestoToolEnvironment` (so it
+  inherits the interpreter and working directory), and `PhpStormToolEnvironment` starts it through
   `PhpRunConfiguration.createProcessHandler` itself — which still handles Docker/WSL/SSH. Run through the executor,
   it took over the tab and the Run button of the Testo run it mutates.
 - **`createPathMappings` misses what the interpreter's command line mounts**: a Docker interpreter's project volume is
@@ -664,8 +664,8 @@ Non-obvious constraints already paid for in blood — read before touching the r
 - **`TestoRunConfigurationType.ID` is a pinned literal**, not `::class.simpleName`: renaming the class must not
   invalidate users' saved run configurations.
 - **`getVersion()` of both file-based indexes** (`TestoDataProvidersIndex`, `TestoGroupsIndex`) must be bumped whenever
-  indexing logic changes — for the groups index that includes `TestoRunConfigurationProducer.extractGroupNames`, which
-  it indexes through — or stale on-disk indexes silently stay empty.
+  indexing logic changes — for the groups index that includes `groupNamesOf` (`TestoAttributes.kt`), which it
+  indexes through — or stale on-disk indexes silently stay empty.
 - **The run-configuration editor calls the parent editor's `resetEditorFrom`/`applyEditorTo` reflectively**
   (they are not public on `PhpTestRunConfigurationEditor`) and swallows `ReadOnlyModificationException`.
 - **Parallel is injected into the PHP editor's own form.** The *Test Runner options* row is a one-row
