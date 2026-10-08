@@ -57,7 +57,7 @@ class TestoInfectionCommandTest : LightPlatformTestCase() {
         val launch = launch()
         TestoInfectionCommand.create(environment, launch).use {
             val request = environment.request!!
-            assertEquals(binary.toString(), request.script)
+            assertEquals(binary, Path.of(request.script))
             assertEquals("<file/>", Files.readString(request.inputDirectory.resolve("coverage-xml/src/A.php.xml")))
             assertTrue(Files.isRegularFile(request.inputDirectory.resolve("junit.xml")))
             assertEquals(listOf(launch.htmlReport, launch.textLog), request.outputFiles)

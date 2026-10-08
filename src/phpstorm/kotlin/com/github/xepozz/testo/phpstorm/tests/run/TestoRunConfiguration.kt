@@ -29,7 +29,6 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.util.PathUtil
 import com.intellij.remote.RemoteSdkAdditionalData
-import com.intellij.util.PathMappingSettings
 import com.jetbrains.php.PhpBundle
 import com.jetbrains.php.config.commandLine.PhpCommandLinePathProcessor
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
@@ -122,7 +121,7 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
     private var lastToolEnvironment: TestoToolEnvironment? = null
 
     internal fun captureToolEnvironment(): TestoToolEnvironment {
-        val interpreter = interpreter ?: throw ExecutionException("No PHP interpreter configured")
+        val interpreter = interpreter ?: throw ExecutionException(TestoBundle.message("infection.error.noInterpreter"))
         createCommand(interpreter, mutableMapOf(), mutableListOf(), false)
         return checkNotNull(lastToolEnvironment)
     }
@@ -268,10 +267,6 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
                 ?: interpreter.phpSdkAdditionalData?.javaClass?.simpleName.orEmpty()
         }
 
-        // convertToRemote returns the input unchanged when no mapping matches, which is what an already-remote
-        // framework path needs; a host path (a per-interpreter configuration fabricated from the local one) is mapped.
-        private fun toRemoteIfMapped(path: String, mappings: PathMappingSettings?) =
-            mappings?.convertToRemote(path) ?: path
         private fun fillTestRunnerArguments(
             project: Project,
             workingDirectory: String,

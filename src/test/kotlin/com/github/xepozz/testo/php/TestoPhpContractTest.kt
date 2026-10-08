@@ -2,6 +2,7 @@ package com.github.xepozz.testo.php
 
 import com.github.xepozz.testo.launch.TestoConfiguration
 import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -295,7 +296,7 @@ class TestoPhpContractTest : BasePlatformTestCase() {
     fun testLocalInterpreterPathsAreUnchanged() {
         val paths = php.projectPaths(project)
 
-        assertEquals("/work/app/tests/FooTest.php", paths.toEnvironment("/work/app/tests/FooTest.php"))
+        assertEquals(FileUtil.toSystemDependentName("/work/app/tests/FooTest.php"), paths.toEnvironment("/work/app/tests/FooTest.php"))
     }
 
     fun testTestoIsNotConfiguredWithoutSettings() {
