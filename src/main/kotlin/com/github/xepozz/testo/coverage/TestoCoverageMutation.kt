@@ -64,7 +64,6 @@ internal object TestoCoverageMutation {
                 recipe.optionsFrom,
                 filter = target.filter.takeIf { scoped },
                 scopeName = target.name.takeIf { scoped },
-                capturedEnvironment = recipe.environment,
             )
         )
     }

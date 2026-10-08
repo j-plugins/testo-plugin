@@ -76,18 +76,19 @@ class TestoMutationRerunSelectedAction : TestoMutationAction() {
 class TestoMutationApplyAction : TestoMutationAction() {
     override fun isEnabled(panel: TestoMutationPanel): Boolean {
         val mutant = panel.selectedMutants().singleOrNull() ?: return false
-        return TestoMutationApply.isApplied(panel.run, mutant) || TestoMutationApply.canApply(panel.run, mutant)
+        return TestoMutationApply.isApplied(panel.project, panel.run, mutant) ||
+            TestoMutationApply.canApply(panel.project, panel.run, mutant)
     }
 
     override fun updatePresentation(e: AnActionEvent, panel: TestoMutationPanel) {
-        val applied = panel.selectedMutants().singleOrNull()?.let { TestoMutationApply.isApplied(panel.run, it) } == true
+        val applied = panel.selectedMutants().singleOrNull()?.let { TestoMutationApply.isApplied(panel.project, panel.run, it) } == true
         e.presentation.text = TestoBundle.message(if (applied) "infection.revert.action" else "infection.apply.action")
         e.presentation.icon = if (applied) AllIcons.Actions.Rollback else AllIcons.Actions.Edit
     }
 
     override fun perform(panel: TestoMutationPanel) {
         val mutant = panel.selectedMutants().singleOrNull() ?: return
-        if (TestoMutationApply.isApplied(panel.run, mutant)) TestoMutationApply.revert(panel.project, panel.run, mutant)
+        if (TestoMutationApply.isApplied(panel.project, panel.run, mutant)) TestoMutationApply.revert(panel.project, panel.run, mutant)
         else TestoMutationApply.apply(panel.project, panel.run, mutant)
     }
 }
