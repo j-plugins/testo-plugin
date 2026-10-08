@@ -571,9 +571,9 @@ Non-obvious constraints already paid for in blood — read before touching the r
   the archived teamcity stream through the *live* properties instead. Three switches keep a replay from acting like
   a run: `replayMode`, `getConfiguration()` answering the replay profile, `reportStore.startedAtOverride`.
 - **A mutation run never gets a Run tab.** Its command comes from the Testo run's `TestoToolEnvironment` (so it
-  inherits the interpreter and working directory), and `PhpStormToolEnvironment` starts it through
-  `PhpRunConfiguration.createProcessHandler` itself — which still handles Docker/WSL/SSH. Run through the executor,
-  it took over the tab and the Run button of the Testo run it mutates.
+  inherits the interpreter and working directory), which starts the process itself — in PhpStorm through
+  `PhpRunConfiguration.createProcessHandler`, which still handles Docker/WSL/SSH. Run through the executor, it took
+  over the tab and the Run button of the Testo run it mutates.
 - **`createPathMappings` misses what the interpreter's command line mounts**: a Docker interpreter's project volume is
   known only to `createPathMapper` (the console's translation), so every host ↔ interpreter path goes through
   `PhpToolLauncher`, which falls back to it and to the command's own `getPathProcessor`. The IDE system dir is in none,

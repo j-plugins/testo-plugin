@@ -27,7 +27,7 @@ internal object TestoMutationIgnore {
 
     /** Where the file still reads the mutant as Infection saw it and the statement is not ignored yet. Needs read access. */
     fun canIgnore(project: Project, run: TestoMutationRun, mutant: Mutant): Boolean {
-        if (!TestoMutationApply.canApply(run, mutant)) return false
+        if (!TestoMutationApply.canApply(project, run, mutant)) return false
         val statement = statement(project, run, mutant) ?: return false
         return !isAnnotated(statement)
     }
@@ -50,7 +50,6 @@ internal object TestoMutationIgnore {
     private fun statement(project: Project, run: TestoMutationRun, mutant: Mutant): TestoStatementTarget? {
         val line = mutant.lines?.first ?: return null
         val file = run.localPath(mutant.file.path)?.let { LocalFileSystem.getInstance().findFileByPath(it) } ?: return null
-        if (!mutationFileBelongsTo(project, file)) return null
         val document = FileDocumentManager.getInstance().getDocument(file) ?: return null
         if (line < 1 || line > document.lineCount) return null
         val psi = psiFile(project, file, document) ?: return null

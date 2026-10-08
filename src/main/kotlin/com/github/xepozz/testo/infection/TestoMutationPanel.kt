@@ -206,7 +206,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
             unsaved || fingerprintOf(Path.of(local)) != expected
         }.mapTo(HashSet()) { it.path }
         val appliedNow = ApplicationManager.getApplication().runReadAction(Computable {
-            run.files.filter { it.path in now }.flatMap { it.mutants }.filter { TestoMutationApply.isApplied(run, it) }.mapTo(HashSet()) { it.nodeId }
+            run.files.filter { it.path in now }.flatMap { it.mutants }.filter { TestoMutationApply.isApplied(project, run, it) }.mapTo(HashSet()) { it.nodeId }
         })
         if (now == changed && appliedNow == applied) return
         changed.retainAll(now)

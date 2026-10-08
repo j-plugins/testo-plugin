@@ -247,7 +247,7 @@ class TestoMutationEditorMarks(private val project: Project) : Disposable {
                         TestoMutationToolWindow.show(project, run)
                     }
                 })
-                mutants.singleOrNull()?.takeIf { TestoMutationApply.canApply(run, it) }?.let { mutant ->
+                mutants.singleOrNull()?.takeIf { TestoMutationApply.canApply(project, run, it) }?.let { mutant ->
                     group.add(object : DumbAwareAction(TestoBundle.message("infection.apply.action"), null, AllIcons.Actions.Edit) {
                         override fun actionPerformed(e: AnActionEvent) {
                             TestoMutationApply.apply(project, run, mutant)
