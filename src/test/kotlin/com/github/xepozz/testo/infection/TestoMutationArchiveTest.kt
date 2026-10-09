@@ -196,16 +196,28 @@ class TestoMutationArchiveTest {
     }
 
     @Test
-    fun `retention fails closed for unreadable and missing mutation summaries`() {
+    fun `retention fails closed for a fresh run with an unreadable or missing summary`() {
         for ((index, content) in listOf("", "{", "{}", null).withIndex()) {
             val source = temp.newFolder("bad-$index").toPath()
-            val dir = Files.createDirectories(source.resolve("infection/1000"))
+            val dir = Files.createDirectories(source.resolve("infection/${System.currentTimeMillis()}"))
             val input = Files.writeString(Files.createDirectories(dir.resolve("coverage")).resolve("junit.xml"), "input")
             if (content != null) Files.writeString(dir.resolve(TestoMutationArchive.SUMMARY_FILE), content)
             TestoMutationArchive.prune(source, keep = 0)
             assertTrue(Files.exists(input))
             assertFalse(TestoMutationArchive.deleteRunIfSafe(source))
             assertTrue(Files.exists(input))
+        }
+    }
+
+    @Test
+    fun `a run without a finished summary stops pinning its Testo run after the grace period`() {
+        for ((index, content) in listOf("", "{", "{}", null).withIndex()) {
+            val source = temp.newFolder("stale-$index").toPath()
+            val dir = Files.createDirectories(source.resolve("infection/1000"))
+            Files.writeString(dir.resolve(TestoMutationArchive.STREAM_FILE), "$ php vendor/bin/infection")
+            if (content != null) Files.writeString(dir.resolve(TestoMutationArchive.SUMMARY_FILE), content)
+            assertTrue(TestoMutationArchive.deleteRunIfSafe(source))
+            assertFalse(Files.exists(source))
         }
     }
 

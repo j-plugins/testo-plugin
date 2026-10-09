@@ -169,10 +169,6 @@ class TestoRunStore(private val project: Project) {
         Files.list(root()).use { stream -> stream.filter { it.isDirectory() }.toList() }
     }.getOrDefault(emptyList())
 
-    private fun startedAtOf(dir: Path): Long =
-        dir.name.substringBefore('-').toLongOrNull()
-            ?: runCatching { Files.getLastModifiedTime(dir).toMillis() }.getOrDefault(0L)
-
     private fun delete(dir: Path) {
         // A disconnected interpreter may still be reading the mutation run's coverage copy.
         runCatching { com.github.xepozz.testo.infection.TestoMutationArchive.deleteRunIfSafe(dir) }
@@ -183,7 +179,13 @@ class TestoRunStore(private val project: Project) {
         private val LOG = Logger.getInstance(TestoRunStore::class.java)
         private const val RETENTION_KEY = "testo.runs.retention"
         private const val RETENTION_DEFAULT = 10
-        private const val INCOMPLETE_GRACE_MS = 24L * 60 * 60 * 1000
+        /** How long a run directory without its finishing metadata is left alone: its writer may still be alive. */
+        internal const val INCOMPLETE_GRACE_MS = 24L * 60 * 60 * 1000
+
+        /** When a run directory was started: the timestamp its name leads with, else its modification time. */
+        internal fun startedAtOf(dir: Path): Long =
+            dir.name.substringBefore('-').toLongOrNull()
+                ?: runCatching { Files.getLastModifiedTime(dir).toMillis() }.getOrDefault(0L)
 
         fun getInstance(project: Project): TestoRunStore = project.getService(TestoRunStore::class.java)
 
