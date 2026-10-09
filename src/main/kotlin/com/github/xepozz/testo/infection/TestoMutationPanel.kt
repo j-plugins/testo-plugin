@@ -238,8 +238,8 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
         scheduled.set(false)
         if (dirty.getAndSet(false)) structureModel.invalidateAsync().thenRun { UIUtil.invokeLaterIfNeeded(::expandWhileSmall) }
         summary.icon = when {
-            run.unconfirmedReason != null -> TestoIcons.Status.FAILURE
             run.isBusy -> MutantStatus.RUNNING_ICON
+            run.unconfirmedReason != null -> TestoIcons.Status.FAILURE
             else -> verdictIcon()
         }
         summary.text = summaryText()

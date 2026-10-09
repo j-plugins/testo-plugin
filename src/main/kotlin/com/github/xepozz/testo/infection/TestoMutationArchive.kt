@@ -79,9 +79,10 @@ internal object TestoMutationArchive {
     private fun mustKeep(dir: Path): Boolean {
         if (hasInputUsers(dir)) return true
         // No finished summary: a process the IDE died under may still read the inputs — for hours, not for days.
+        val now = System.currentTimeMillis()
         val state = summary(dir)?.takeIf { it.finishedAt > 0 }
-            ?: return System.currentTimeMillis() - TestoRunStore.startedAtOf(dir) <= TestoRunStore.INCOMPLETE_GRACE_MS
-        return state.unconfirmedReason != null
+            ?: return now - TestoRunStore.startedAtOf(dir) <= TestoRunStore.INCOMPLETE_GRACE_MS
+        return state.unconfirmedReason != null && now - state.finishedAt <= TestoRunStore.INCOMPLETE_GRACE_MS
     }
 
     /** Check and deletion share the same lock as acquisition and summary publication. An unlistable archive fails closed. */
@@ -159,8 +160,12 @@ internal object TestoMutationArchive {
             .forEach { runCatching { NioFiles.deleteRecursively(it) } }
     }
 
+    /** A mutation run of [testoRunDir] whose process may still be alive: its stop went unconfirmed within the grace period. */
     @Synchronized
-    fun unconfirmedRun(testoRunDir: Path): Path? = runs(testoRunDir).firstOrNull { summary(it)?.unconfirmedReason != null }
+    fun unconfirmedRun(testoRunDir: Path): Path? = runs(testoRunDir).firstOrNull { dir ->
+        val state = summary(dir) ?: return@firstOrNull false
+        state.unconfirmedReason != null && System.currentTimeMillis() - state.finishedAt <= TestoRunStore.INCOMPLETE_GRACE_MS
+    }
 
     class Recorder(private val dir: Path) : AutoCloseable {
         private val writer: Writer
