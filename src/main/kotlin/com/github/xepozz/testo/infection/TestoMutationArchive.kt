@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.infection
 
+import com.github.xepozz.testo.runs.TestoRunStore
 import com.google.gson.Gson
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.NioFiles
@@ -77,11 +78,13 @@ internal object TestoMutationArchive {
 
     private fun mustKeep(dir: Path): Boolean {
         if (hasInputUsers(dir)) return true
-        val state = summary(dir) ?: return true
-        return state.finishedAt <= 0 || state.unconfirmedReason != null
+        // No finished summary: a process the IDE died under may still read the inputs — for hours, not for days.
+        val state = summary(dir)?.takeIf { it.finishedAt > 0 }
+            ?: return System.currentTimeMillis() - TestoRunStore.startedAtOf(dir) <= TestoRunStore.INCOMPLETE_GRACE_MS
+        return state.unconfirmedReason != null
     }
 
-    /** Check and deletion share the same lock as acquisition and summary publication. Fail closed on bad metadata. */
+    /** Check and deletion share the same lock as acquisition and summary publication. An unlistable archive fails closed. */
     @Synchronized
     fun deleteRunIfSafe(sourceRunDir: Path): Boolean {
         if (hasInputUsers(sourceRunDir)) return false
