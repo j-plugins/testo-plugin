@@ -1,11 +1,13 @@
 package com.github.xepozz.testo.infection
 
 import com.github.xepozz.testo.runs.TestoRunStore
+import com.intellij.execution.ExecutionException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -248,6 +250,24 @@ class TestoMutationArchiveTest {
         } finally { first.close(); second.close() }
         assertTrue(TestoMutationArchive.deleteRunIfSafe(source))
         assertFalse(Files.exists(source))
+    }
+
+    @Test
+    fun `a run claimed for deletion takes no new inputs and is deleted once`() {
+        val source = temp.newFolder("claimed").toPath()
+        val dir = record(source, 1000)
+
+        assertTrue(TestoMutationArchive.claimForDeletion(source))
+        assertFalse(TestoMutationArchive.claimForDeletion(source))
+        assertFalse(TestoMutationArchive.deleteRunIfSafe(source))
+        assertThrows(ExecutionException::class.java) { TestoMutationArchive.protectInputs(dir.resolve("reruns/2000")) }
+        assertNotNull(TestoMutationArchive.summary(dir))
+
+        TestoMutationArchive.deleteClaimed(source)
+        assertFalse(Files.exists(source))
+        record(source, 2000)
+        TestoMutationArchive.protectInputs(source.resolve("infection/2000")).close()
+        assertTrue(TestoMutationArchive.deleteRunIfSafe(source))
     }
 
     @Test
