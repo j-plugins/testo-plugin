@@ -3,17 +3,17 @@ package com.github.xepozz.testo.tests.actions
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.infection.TestoMutationExecutor
+import com.github.xepozz.testo.launch.TestoConfiguration
 import com.github.xepozz.testo.runs.TestoRunReplayProfile
-import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.ExecutionManager
 import com.intellij.execution.ExecutorRegistry
 import com.intellij.execution.RunManager
 import com.intellij.execution.RunnerAndConfigurationSettings
-import com.intellij.execution.executors.DefaultDebugExecutor
-import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.execution.configurations.RunProfile
 import com.intellij.execution.configurations.WrappingRunConfiguration
+import com.intellij.execution.executors.DefaultDebugExecutor
+import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.ExecutionEnvironmentBuilder
 import com.intellij.execution.runners.ProgramRunner
@@ -28,12 +28,12 @@ import com.intellij.openapi.actionSystem.SplitButtonAction
 import com.intellij.openapi.project.DumbAware
 import javax.swing.Icon
 
-// Unwrap the "Rerun Failed Tests" WrappingRunConfiguration to the real TestoRunConfiguration: keeps our buttons
+// Unwrap the "Rerun Failed Tests" WrappingRunConfiguration to the real Testo configuration: keeps our buttons
 // visible and gives executor runners (notably coverage) a profile they accept, with the failed-subset filters intact.
 internal fun ExecutionEnvironment.testoRunProfile(): RunProfile? =
     when (val profile = runProfile) {
-        is TestoRunConfiguration -> profile
-        is WrappingRunConfiguration<*> -> profile.peer as? TestoRunConfiguration
+        is TestoConfiguration -> profile
+        is WrappingRunConfiguration<*> -> profile.peer as? TestoConfiguration
         // A replayed archive: rerun runs the configuration the archived run was started with, restored from its
         // manifest. (An archive that predates that recording restores a bare template — it reruns nothing useful,
         // but nothing destructive either.)

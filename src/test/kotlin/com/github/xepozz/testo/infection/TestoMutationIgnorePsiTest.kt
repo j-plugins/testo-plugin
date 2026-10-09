@@ -1,6 +1,9 @@
 package com.github.xepozz.testo.infection
 
 import com.intellij.openapi.editor.Document
+import com.intellij.openapi.command.undo.UndoManager
+import com.intellij.openapi.fileEditor.impl.text.TextEditorProvider
+import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
@@ -34,12 +37,43 @@ class TestoMutationIgnorePsiTest : BasePlatformTestCase() {
         assertEquals(code.replace("    public", "    // @infection-ignore-all\n    public"), document.text)
     }
 
-    private fun mutantIn(code: String, line: Int, original: String): Triple<TestoMutationRun, Mutant, Document> {
+    fun testUndoRestoresTheOriginalSource() {
+        // Caret restoration can be a separate platform undo step; this test checks the document command itself.
+        com.intellij.openapi.util.registry.Registry.get("ide.undo.transparent.caret.movement").setValue(true, testRootDisposable)
+        val code = "<?php\nfunction f(\$a) {\n return \$a > 1;\n}\n"
+        val (run, mutant, document) = mutantIn(code, 3, " return \$a > 1;\n}\n")
+        assertTrue(TestoMutationIgnore.ignore(project, run, mutant))
+        val editor = TextEditorProvider.getInstance().getTextEditor(myFixture.editor)
+        val undo = UndoManager.getInstance(project)
+        assertTrue(undo.isUndoAvailable(editor))
+        val action = undo.getUndoActionNameAndDescription(editor)
+        undo.undo(editor)
+        assertEquals(action.toString(), code, document.text)
+    }
+
+    fun testChangedSnippetsAndFilesOutsideTheProjectCannotBeEdited() {
+        val code = "<?php\nfunction f(\$a) {\n return \$a > 1;\n}\n"
+        val (run, mutant, document) = mutantIn(code, 3, " return \$a > 1;\n}\n", inProject = false)
+        assertFalse(TestoMutationIgnore.canIgnore(project, run, mutant))
+        assertFalse(TestoMutationIgnore.ignore(project, run, mutant))
+        assertFalse(TestoMutationApply.canApply(project, run, mutant))
+        assertFalse(TestoMutationApply.apply(project, run, mutant))
+        assertEquals(code, document.text)
+        val (ownRun, ownMutant, ownDocument) = mutantIn(code, 3, " return \$a > 1;\n}\n")
+        WriteCommandAction.runWriteCommandAction(project) { ownDocument.setText(code.replace("> 1", "> 2")) }
+        assertFalse(TestoMutationIgnore.canIgnore(project, ownRun, ownMutant))
+        assertFalse(TestoMutationApply.apply(project, ownRun, ownMutant))
+        assertEquals(code.replace("> 1", "> 2"), ownDocument.text)
+    }
+
+    private fun mutantIn(code: String, line: Int, original: String, inProject: Boolean = true): Triple<TestoMutationRun, Mutant, Document> {
         val dir = Files.createTempDirectory("testo-mutation")
         VfsRootAccess.allowRootAccess(testRootDisposable, dir.toString())
         val source = dir.resolve("A.php")
         Files.writeString(source, code)
         val virtual = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(source)!!
+        if (inProject) com.intellij.testFramework.PsiTestUtil.addContentRoot(module, virtual.parent)
+        myFixture.configureFromExistingVirtualFile(virtual)
         val document = FileDocumentManager.getInstance().getDocument(virtual)!!
 
         val run = TestoMutationRun("t", dir, dir) { it }

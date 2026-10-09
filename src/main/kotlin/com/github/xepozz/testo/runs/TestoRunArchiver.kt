@@ -2,6 +2,7 @@ package com.github.xepozz.testo.runs
 
 import com.github.xepozz.testo.coverage.dedupeCoverageByFormat
 import com.github.xepozz.testo.coverage.perTest.TestoCoverageKeys
+import com.github.xepozz.testo.launch.TestoConfiguration
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoHistoryIndex
 import com.github.xepozz.testo.tests.console.TestoMetadataType
@@ -10,19 +11,16 @@ import com.github.xepozz.testo.tests.console.TestoRunTimings
 import com.github.xepozz.testo.tests.console.isMetadataUrl
 import com.github.xepozz.testo.tests.console.resolveCoverageDataFile
 import com.github.xepozz.testo.tests.console.resolveReport
-import com.github.xepozz.testo.tests.run.TestoRunConfiguration
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.ide.plugins.cl.PluginAwareClassLoader
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.JDOMUtil
-import com.intellij.remote.RemoteSdkAdditionalData
-import com.jetbrains.php.config.interpreters.PhpInterpreter
-import org.jdom.Element
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import org.jdom.Element
 
 /**
  * Finalizes a recorded run once its process ends: closes `output.log`, captures the coverage report files into the
@@ -75,7 +73,7 @@ internal object TestoRunArchiver {
                 val metadataArtifacts = captureMetadataArtifacts(recording, props, mapToLocal)
                 recording.writeLocations()
                 val finishedAt = System.currentTimeMillis()
-                val interpreter = (props.configuration as? TestoRunConfiguration)?.interpreter
+                val configuration = props.configuration as? TestoConfiguration
                 val manifest = TestoRunManifest(
                     configurationName = recording.configurationName,
                     executorId = recording.executorId,
@@ -91,8 +89,8 @@ internal object TestoRunArchiver {
                     metadataArtifacts = metadataArtifacts,
                     exitCode = exitCode,
                     cancelled = stoppedFromIde || props.unfinishedNodes.isNotEmpty(),
-                    interpreterName = interpreter?.name.orEmpty(),
-                    interpreterType = interpreterType(interpreter),
+                    interpreterName = configuration?.interpreterName.orEmpty(),
+                    interpreterType = configuration?.interpreterKind.orEmpty(),
                     pluginVersion = pluginVersion(),
                     testoVersion = props.testoVersion.orEmpty(),
                 )
@@ -159,16 +157,8 @@ internal object TestoRunArchiver {
      * The run configuration as XML — the same form the IDE persists it in, so a replay can restore it and rerun the
      * real thing. Empty when this console is not backed by a Testo configuration (nothing to rerun then).
      */
-    private fun interpreterType(interpreter: PhpInterpreter?): String = when {
-        interpreter == null -> ""
-        !interpreter.isRemote -> "local"
-        else -> (interpreter.phpSdkAdditionalData as? RemoteSdkAdditionalData)
-            ?.let { data -> runCatching { data.remoteConnectionType.name }.getOrNull() }
-            ?: interpreter.phpSdkAdditionalData?.javaClass?.simpleName.orEmpty()
-    }
-
     private fun serializeConfiguration(props: TestoConsoleProperties): String =
-        (props.configuration as? TestoRunConfiguration)?.let { configuration ->
+        (props.configuration as? TestoConfiguration)?.let { configuration ->
             runCatching {
                 val element = Element("configuration")
                 configuration.writeExternal(element)

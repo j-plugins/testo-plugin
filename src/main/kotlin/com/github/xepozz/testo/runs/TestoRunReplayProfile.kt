@@ -6,13 +6,13 @@ import com.github.xepozz.testo.coverage.TestoCoverageReport
 import com.github.xepozz.testo.coverage.applyTestoCoverage
 import com.github.xepozz.testo.coverage.closeTestoCoverage
 import com.github.xepozz.testo.coverage.format.CoverageFormat
+import com.github.xepozz.testo.launch.TestoConfiguration
+import com.github.xepozz.testo.php.TestoPhp
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoConsoleAugmenter
 import com.github.xepozz.testo.tests.console.TestoReplaySelection
 import com.github.xepozz.testo.tests.console.TestoReportRef
 import com.github.xepozz.testo.tests.console.TestoRunTimings
-import com.github.xepozz.testo.tests.run.TestoRunConfiguration
-import com.github.xepozz.testo.tests.run.TestoRunConfigurationType
 import com.intellij.execution.DefaultExecutionResult
 import com.intellij.execution.Executor
 import com.intellij.execution.configurations.RunProfile
@@ -59,7 +59,7 @@ internal class TestoRunReplayProfile(
     val executorId: String get() = manifest.executorId
 
     /** The archived run's own configuration — what the rerun buttons on a replayed tab run. */
-    val testoConfiguration: TestoRunConfiguration by lazy { restoreTestoConfiguration(project, runDir, manifest) }
+    val testoConfiguration: TestoConfiguration by lazy { restoreTestoConfiguration(project, runDir, manifest) }
 
     override fun getState(executor: Executor, environment: ExecutionEnvironment): RunProfileState =
         RunProfileState { _, _ ->
@@ -207,8 +207,8 @@ internal class TestoRunReplayProfile(
  * The configuration an archived run was started with, restored from its manifest. An archive that predates the
  * recording gets a bare template: nothing useful to rerun, but a console or a command can still be built from it.
  */
-internal fun restoreTestoConfiguration(project: Project, runDir: Path, manifest: TestoRunManifest): TestoRunConfiguration {
-    val configuration = TestoRunConfigurationType.INSTANCE.createTemplateConfiguration(project)
+internal fun restoreTestoConfiguration(project: Project, runDir: Path, manifest: TestoRunManifest): TestoConfiguration {
+    val configuration = TestoPhp.getInstance().configurationFactory().createTemplateConfiguration(project) as TestoConfiguration
     manifest.configuration.takeIf { it.isNotBlank() }?.let { xml ->
         runCatching { configuration.readExternal(JDOMUtil.load(xml)) }
             .onFailure { Logger.getInstance(TestoRunReplayProfile::class.java).warn("Failed to restore the run configuration of $runDir", it) }

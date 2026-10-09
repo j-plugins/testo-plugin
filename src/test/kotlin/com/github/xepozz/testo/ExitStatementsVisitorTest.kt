@@ -1,19 +1,13 @@
 package com.github.xepozz.testo
 
-import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.github.xepozz.testo.util.ExitStatementsVisitor
-import com.jetbrains.php.lang.PhpFileType
-import com.jetbrains.php.lang.psi.elements.Function
-import com.jetbrains.php.lang.psi.elements.Method
-import com.jetbrains.php.lang.psi.elements.PhpReturn
-import com.jetbrains.php.lang.psi.elements.PhpYield
 
 class ExitStatementsVisitorTest : BasePlatformTestCase() {
 
     fun testVisitor_countsYieldStatements() {
         val psiFile = myFixture.configureByText(
-            PhpFileType.INSTANCE,
+            PHP_TEST_FILE,
             """<?php
             class Foo {
                 public static function data(): iterable {
@@ -23,8 +17,8 @@ class ExitStatementsVisitorTest : BasePlatformTestCase() {
                 }
             }"""
         )
-        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
-        val yields = PsiTreeUtil.findChildrenOfType(method, PhpYield::class.java).toList()
+        val method = psiFile.phpMethods().first().psi
+        val yields = method.phpYields()
 
         assertEquals("Should find 3 yield statements", 3, yields.size)
 
@@ -36,7 +30,7 @@ class ExitStatementsVisitorTest : BasePlatformTestCase() {
 
     fun testVisitor_countsReturnStatements() {
         val psiFile = myFixture.configureByText(
-            PhpFileType.INSTANCE,
+            PHP_TEST_FILE,
             """<?php
             class Foo {
                 public static function data(): array {
@@ -44,8 +38,8 @@ class ExitStatementsVisitorTest : BasePlatformTestCase() {
                 }
             }"""
         )
-        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
-        val returns = PsiTreeUtil.findChildrenOfType(method, PhpReturn::class.java).toList()
+        val method = psiFile.phpMethods().first().psi
+        val returns = method.phpReturns()
 
         assertEquals("Should find 1 return statement", 1, returns.size)
 
@@ -56,7 +50,7 @@ class ExitStatementsVisitorTest : BasePlatformTestCase() {
 
     fun testVisitor_stopsAtTargetElement() {
         val psiFile = myFixture.configureByText(
-            PhpFileType.INSTANCE,
+            PHP_TEST_FILE,
             """<?php
             class Foo {
                 public static function data(): iterable {
@@ -66,8 +60,8 @@ class ExitStatementsVisitorTest : BasePlatformTestCase() {
                 }
             }"""
         )
-        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
-        val yields = PsiTreeUtil.findChildrenOfType(method, PhpYield::class.java).toList()
+        val method = psiFile.phpMethods().first().psi
+        val yields = method.phpYields()
 
         // Stop at the second yield
         val visitor = ExitStatementsVisitor(yields[1])
@@ -77,7 +71,7 @@ class ExitStatementsVisitorTest : BasePlatformTestCase() {
 
     fun testVisitor_firstYield() {
         val psiFile = myFixture.configureByText(
-            PhpFileType.INSTANCE,
+            PHP_TEST_FILE,
             """<?php
             class Foo {
                 public static function data(): iterable {
@@ -86,8 +80,8 @@ class ExitStatementsVisitorTest : BasePlatformTestCase() {
                 }
             }"""
         )
-        val method = PsiTreeUtil.findChildOfType(psiFile, Method::class.java)!!
-        val yields = PsiTreeUtil.findChildrenOfType(method, PhpYield::class.java).toList()
+        val method = psiFile.phpMethods().first().psi
+        val yields = method.phpYields()
 
         val visitor = ExitStatementsVisitor(yields[0])
         method.accept(visitor)
@@ -96,11 +90,11 @@ class ExitStatementsVisitorTest : BasePlatformTestCase() {
 
     fun testVisitor_initialIndex() {
         val psiFile = myFixture.configureByText(
-            PhpFileType.INSTANCE,
+            PHP_TEST_FILE,
             """<?php function noop(): void {}"""
         )
-        val function = PsiTreeUtil.findChildrenOfType(psiFile, Function::class.java)
-            .first { it !is Method }
+        val function = psiFile.phpFunctions()
+            .first { !it.isMethod }.psi
         val visitor = ExitStatementsVisitor(function)
         assertEquals("Initial index should be -1", -1, visitor.index)
     }

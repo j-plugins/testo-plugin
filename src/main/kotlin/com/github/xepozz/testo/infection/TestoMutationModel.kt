@@ -165,9 +165,39 @@ class TestoMutationRun(
     @Volatile
     internal var stopper: (() -> Unit)? = null
 
+    @Volatile
+    internal var pendingTool: com.github.xepozz.testo.php.TestoPreparedTool? = null
+
+    @Volatile
+    internal var unconfirmedReason: String? = null
+        private set
+
+    @Volatile
+    internal var failureReason: String? = null
+        private set
+
+    @Synchronized
+    internal fun markUnconfirmed(tool: com.github.xepozz.testo.php.TestoPreparedTool, reason: String) {
+        failureReason = reason
+        if (pendingTool === tool && !tool.isTerminationConfirmed) unconfirmedReason = reason
+    }
+
+    @Synchronized
+    internal fun releaseTool(tool: com.github.xepozz.testo.php.TestoPreparedTool) {
+        if (pendingTool !== tool) return
+        unconfirmedReason = null
+        pendingTool = null
+        stopper = null
+        changed()
+    }
+
     val isRunning: Boolean get() = finishedAt == null
 
+    /** A run or rerun is in progress. A process that did not confirm its stop blocks nothing: the next run gets its own inputs. */
     val isBusy: Boolean get() = isRunning || rerunning
+
+    /** This session still holds a process of the run: one in progress, or one whose stop it can still retry. */
+    val holdsProcess: Boolean get() = isBusy || stopper != null
 
     /** SHA-256 of each mutated file as it was when Infection read it, by the interpreter's path: how a change is told. */
     internal val fingerprints = ConcurrentHashMap<String, String>()
@@ -208,10 +238,14 @@ class TestoMutationRun(
     internal fun changed() = listeners.forEach { it() }
 
     /** A run read back from the archive: finished, with the times and outcome it had. */
-    internal fun restore(startedAt: Long, finishedAt: Long, exitCode: Int?, stopped: Boolean, expected: Int) {
+    internal fun restore(startedAt: Long, finishedAt: Long, exitCode: Int?, stopped: Boolean, expected: Int,
+                         rerunStopped: Boolean = false, failureReason: String? = null, unconfirmedReason: String? = null) {
         this.startedAt = startedAt
         this.exitCode = exitCode
         this.stopRequested = stopped
+        this.rerunStopRequested = rerunStopped
+        this.failureReason = failureReason
+        this.unconfirmedReason = unconfirmedReason
         if (expected > 0) this.expected = expected
         this.finishedAt = finishedAt
     }
@@ -261,28 +295,31 @@ internal data class TestoMutationHistoryEntry(
     val running: Boolean,
     val stopped: Boolean,
     val exitCode: Int?,
+    val failureReason: String? = null,
 ) {
-    val verdict: Icon? get() = mutationVerdict(running, stopped, escaped, exitCode, mutants)
+    val verdict: Icon? get() = mutationVerdict(running, stopped, escaped, exitCode, mutants, failureReason)
 
     companion object {
         fun of(run: TestoMutationRun): TestoMutationHistoryEntry {
             val score = run.score()
             return TestoMutationHistoryEntry(
                 run.workDir, run.startedAt, run.elapsedMs(), score.msi, score.escaped, maxOf(run.expected, run.mutants.size),
-                run.finishedCount(), run.isRunning, run.stopRequested, run.exitCode,
+                run.finishedCount(), run.isRunning, run.stopRequested || run.rerunStopRequested, run.exitCode, run.failureReason,
             )
         }
 
         fun of(dir: Path, summary: TestoMutationArchive.Summary) = TestoMutationHistoryEntry(
             dir, summary.startedAt, summary.finishedAt - summary.startedAt, summary.msi, summary.escaped, summary.mutants,
-            summary.mutants, false, summary.stopped, summary.exitCode,
+            summary.mutants, false, summary.stopped || summary.rerunStopped, summary.exitCode, summary.failureReason,
         )
     }
 }
 
 /** The icon a run is judged by, or null while it runs. */
-internal fun mutationVerdict(running: Boolean, stopped: Boolean, escaped: Int, exitCode: Int?, mutants: Int): Icon? = when {
+internal fun mutationVerdict(running: Boolean, stopped: Boolean, escaped: Int, exitCode: Int?, mutants: Int,
+                             failureReason: String? = null): Icon? = when {
     running -> null
+    failureReason != null -> TestoIcons.Status.FAILURE
     stopped -> TestoIcons.Status.FAILURE_CANCELLED
     escaped > 0 || (exitCode != 0 && mutants == 0) -> TestoIcons.Status.FAILURE
     else -> TestoIcons.Status.SUCCESS

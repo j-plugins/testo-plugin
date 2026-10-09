@@ -9,9 +9,9 @@ import com.github.xepozz.testo.tests.actions.testoRunProfile
 import com.github.xepozz.testo.tests.console.TestoProgressAction
 import com.github.xepozz.testo.tests.console.TestoReportIcons
 import com.github.xepozz.testo.tests.console.TestoReportsRowCell
-import com.github.xepozz.testo.tests.run.TestoRunConfiguration
-import com.github.xepozz.testo.tests.run.TestoRunConfigurationType
-import com.github.xepozz.testo.tests.run.TestoRunnerSettings
+import com.github.xepozz.testo.launch.TestoConfiguration
+import com.github.xepozz.testo.php.TestoPhp
+import com.github.xepozz.testo.launch.TestoRunSelection
 import com.intellij.execution.RunManager
 import com.intellij.execution.RunnerAndConfigurationSettings
 import com.intellij.execution.impl.RunDialog
@@ -84,9 +84,9 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
 
     private enum class Zone { LABEL, BUTTON, ARROW, HISTORY, PROGRESS, REPORT, REPORT_ARROW }
 
-    private class Context(val configuration: TestoRunConfiguration, val runDir: Path, val saved: RunnerAndConfigurationSettings?) {
+    private class Context(val configuration: TestoConfiguration, val runDir: Path, val saved: RunnerAndConfigurationSettings?) {
         /** Where the options are read and written: the saved configuration, else the tab's own copy. */
-        val options: TestoRunConfiguration get() = saved?.configuration as? TestoRunConfiguration ?: configuration
+        val options: TestoConfiguration get() = saved?.configuration as? TestoConfiguration ?: configuration
     }
 
     override fun getFont(): Font = UIUtil.getLabelFont()
@@ -157,18 +157,18 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
     }
 
     private fun recipeOf(current: Context): TestoMutationRecipe? = (readiness as? TestoMutationReadiness.Ready)?.let { ready ->
-        TestoMutationRecipe(current.configuration, current.runDir, ready, current.options)
+        TestoMutationRecipe(current.configuration, current.runDir, ready, current.options, capturedEnvironment = properties.toolEnvironment)
     }
 
     private fun resolveContext(): Context? {
         if (project.isDisposed) return null
         val environment = DataManager.getInstance().getDataContext(this).getData(ExecutionDataKeys.EXECUTION_ENVIRONMENT)
             ?: return context
-        val configuration = environment.testoRunProfile() as? TestoRunConfiguration ?: return null
+        val configuration = environment.testoRunProfile() as? TestoConfiguration ?: return null
         val runDir = runCatching { properties.currentRunDir() }.getOrNull() ?: return null
-        val saved = environment.runnerAndConfigurationSettings?.takeIf { it.configuration is TestoRunConfiguration }
+        val saved = environment.runnerAndConfigurationSettings?.takeIf { it.configuration is TestoConfiguration }
             ?: RunManager.getInstance(project)
-                .findConfigurationByTypeAndName(TestoRunConfigurationType.INSTANCE, configuration.name)
+                .findConfigurationByTypeAndName(TestoPhp.getInstance().configurationFactory().type, configuration.name)
         return Context(configuration, runDir, saved)
     }
 
@@ -229,9 +229,11 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         indeterminate = total <= 0
         fraction = if (total > 0) (done.toDouble() / total).coerceIn(0.0, 1.0) else 0.0
         escaped = score.escaped
-        verdict = mutationVerdict(running, mutation.stopRequested, escaped, mutation.exitCode, mutation.mutants.size)
+        verdict = mutationVerdict(running, mutation.stopRequested || mutation.rerunStopRequested, escaped, mutation.exitCode,
+            mutation.mutants.size, mutation.failureReason)
         progressLabel = when {
             running -> TestoBundle.message("infection.widget.running", done.toString(), total.toString())
+            mutation.failureReason != null -> TestoBundle.message("infection.widget.unconfirmed")
             score.msi != null -> TestoBundle.message("infection.widget.msi", score.msi.toString())
             else -> TestoBundle.message("infection.widget.done")
         }
@@ -445,11 +447,11 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         val group = DefaultActionGroup(
             buildList {
                 add(Separator.create(TestoBundle.message("infection.options.scope")))
-                TestoRunnerSettings.INFECTION_SCOPES.forEach { scope ->
+                TestoRunSelection.INFECTION_SCOPES.forEach { scope ->
                     add(option(scopeLabel(scope), current, { it.infectionScope == scope }) { settings, _ -> settings.infectionScope = scope })
                 }
                 add(Separator.create(TestoBundle.message("infection.options.threads")))
-                TestoRunnerSettings.INFECTION_THREADS.forEach { threads ->
+                TestoRunSelection.INFECTION_THREADS.forEach { threads ->
                     add(option(threadsLabel(threads), current, { it.infectionThreads == threads }) { settings, _ -> settings.infectionThreads = threads })
                 }
                 add(Separator.create(TestoBundle.message("infection.options.flags")))
@@ -476,8 +478,8 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
     private fun option(
         text: String,
         current: Context,
-        isOn: (TestoRunnerSettings) -> Boolean,
-        set: (TestoRunnerSettings, Boolean) -> Unit,
+        isOn: (TestoRunSelection) -> Boolean,
+        set: (TestoRunSelection, Boolean) -> Unit,
     ) = object : DumbAwareToggleAction(text) {
         init {
             templatePresentation.keepPopupOnPerform = KeepPopupOnPerform.Always
@@ -485,16 +487,16 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
 
         override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
-        override fun isSelected(e: AnActionEvent): Boolean = isOn(current.options.testoSettings.runnerSettings)
+        override fun isSelected(e: AnActionEvent): Boolean = isOn(current.options.selection)
 
         override fun setSelected(e: AnActionEvent, state: Boolean) {
-            set(current.options.testoSettings.runnerSettings, state)
+            current.options.selection = current.options.selection.apply { set(this, state) }
         }
     }
 
     private fun scopeLabel(scope: String) = when (scope) {
-        TestoRunnerSettings.INFECTION_SCOPE_GIT_LINES -> TestoBundle.message("infection.scope.gitLines")
-        TestoRunnerSettings.INFECTION_SCOPE_ALL -> TestoBundle.message("infection.scope.all")
+        TestoRunSelection.INFECTION_SCOPE_GIT_LINES -> TestoBundle.message("infection.scope.gitLines")
+        TestoRunSelection.INFECTION_SCOPE_ALL -> TestoBundle.message("infection.scope.all")
         else -> TestoBundle.message("infection.scope.covered")
     }
 

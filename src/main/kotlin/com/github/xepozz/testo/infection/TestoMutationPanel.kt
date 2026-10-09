@@ -206,7 +206,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
             unsaved || fingerprintOf(Path.of(local)) != expected
         }.mapTo(HashSet()) { it.path }
         val appliedNow = ApplicationManager.getApplication().runReadAction(Computable {
-            run.files.filter { it.path in now }.flatMap { it.mutants }.filter { TestoMutationApply.isApplied(run, it) }.mapTo(HashSet()) { it.nodeId }
+            run.files.filter { it.path in now }.flatMap { it.mutants }.filter { TestoMutationApply.isApplied(project, run, it) }.mapTo(HashSet()) { it.nodeId }
         })
         if (now == changed && appliedNow == applied) return
         changed.retainAll(now)
@@ -237,7 +237,11 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     private fun refresh() {
         scheduled.set(false)
         if (dirty.getAndSet(false)) structureModel.invalidateAsync().thenRun { UIUtil.invokeLaterIfNeeded(::expandWhileSmall) }
-        summary.icon = if (run.isBusy) MutantStatus.RUNNING_ICON else verdictIcon()
+        summary.icon = when {
+            run.isBusy -> MutantStatus.RUNNING_ICON
+            run.unconfirmedReason != null -> TestoIcons.Status.FAILURE
+            else -> verdictIcon()
+        }
         summary.text = summaryText()
         showDetails()
         if (run.isBusy) schedule()
@@ -256,6 +260,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     }
 
     private fun verdictIcon() = when {
+        run.failureReason != null -> TestoIcons.Status.FAILURE
         run.stopRequested -> TestoIcons.Status.FAILURE_CANCELLED
         run.exitCode != 0 && run.mutants.isEmpty() -> TestoIcons.Status.FAILURE
         run.score().escaped > 0 -> TestoIcons.Status.FAILURE
@@ -263,6 +268,10 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     }
 
     private fun summaryText(): String {
+        run.unconfirmedReason?.let {
+            return TestoBundle.message(if (run.pendingTool != null) "infection.error.unconfirmed" else "infection.error.unconfirmedRestored", it)
+        }
+        run.failureReason?.let { return TestoBundle.message("infection.error.observationFailed", it) }
         val score = run.score()
         val done = run.finishedCount().toString()
         val total = maxOf(run.expected, run.mutants.size).toString()

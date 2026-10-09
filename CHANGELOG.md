@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- List tests sharing a data provider in source order for a consistent default selection.
+- Preserve stopped mutation reruns in run history after restarting the IDE, and protect active mutation archives
+  during cleanup.
+
 ## [2026.16.262] - 2026-10-01
 
 ### Fixed

@@ -3,6 +3,7 @@ package com.github.xepozz.testo.ui
 import com.github.xepozz.testo.TestoIcons
 import com.github.xepozz.testo.TestoUtil
 import com.github.xepozz.testo.isTestoFile
+import com.github.xepozz.testo.php.TestoPhp
 import com.github.xepozz.testo.topLevelClasses
 import com.intellij.ide.IconProvider
 import com.intellij.openapi.diagnostic.logger
@@ -10,8 +11,8 @@ import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.Iconable
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
 import com.intellij.psi.search.GlobalSearchScopesCore
-import com.jetbrains.php.lang.psi.PhpFile
 import javax.swing.Icon
 
 class TestoIconProvider : IconProvider() {
@@ -19,7 +20,7 @@ class TestoIconProvider : IconProvider() {
 
     override fun getIcon(element: PsiElement, @Iconable.IconFlags flags: Int): Icon? {
         return try {
-            val phpFile = element as? PhpFile ?: return null
+            val phpFile = (element as? PsiFile)?.takeIf { TestoPhp.getInstance().isPhpFile(it) } ?: return null
             val project = element.project
             if (!TestoUtil.isEnabled(project)) return null
 
@@ -42,8 +43,8 @@ class TestoIconProvider : IconProvider() {
             when {
                 phpClasses.isEmpty() -> TestoIcons.Layered.FUNCTION
                 phpClasses.size > 1 -> TestoIcons.Layered.FILE
-                phpClasses.first().modifier.isAbstract -> TestoIcons.Layered.Class.CLASS_ABSTRACT
-                phpClasses.first().modifier.isFinal -> TestoIcons.Layered.Class.CLASS_FINAL
+                phpClasses.first().isAbstract -> TestoIcons.Layered.Class.CLASS_ABSTRACT
+                phpClasses.first().isFinal -> TestoIcons.Layered.Class.CLASS_FINAL
                 else -> TestoIcons.Layered.Class.CLASS
             }
         } catch (e: ProcessCanceledException) {

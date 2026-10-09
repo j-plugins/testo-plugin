@@ -1,53 +1,50 @@
 package com.github.xepozz.testo
 
-import com.github.xepozz.testo.tests.TestoTestDescriptor
+import com.github.xepozz.testo.php.PhpClassView
+import com.github.xepozz.testo.php.PhpDeclarationView
+import com.github.xepozz.testo.php.PhpFunctionView
+import com.github.xepozz.testo.php.TestoPhp
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
-import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.util.CommonProcessors
-import com.jetbrains.php.lang.psi.PhpFile
-import com.jetbrains.php.lang.psi.elements.Method
-import com.jetbrains.php.lang.psi.elements.Function
-import com.jetbrains.php.lang.psi.elements.PhpAttributesOwner
-import com.jetbrains.php.lang.psi.elements.ClassReference
-import com.jetbrains.php.lang.psi.elements.NewExpression
-import com.jetbrains.php.lang.psi.elements.PhpClass
-import com.jetbrains.php.PhpClassHierarchyUtils
-import com.jetbrains.php.PhpIndex
 
 private val LOG = Logger.getInstance("#com.github.xepozz.testo.mixin")
 
+private val php: TestoPhp get() = TestoPhp.getInstance()
+
+/** A class name Testo treats as a test case by convention: `…Test` or `…TestBase`. */
+fun isTestoTestClassName(name: String) = name.endsWith("Test") || name.endsWith("TestBase")
+
 fun PsiElement.isTestoExecutable() = isTestoFunction() || isTestoMethod() || isTestoBench()
 
-fun PsiElement.isTestoBench() = when(this) {
-    is Method -> hasAnyAttribute(*TestoClasses.BENCH_ATTRIBUTES)
-    else -> false
+fun PsiElement.isTestoBench(): Boolean {
+    val function = php.view(this) as? PhpFunctionView ?: return false
+    return function.isMethod && function.hasAnyAttribute(*TestoClasses.BENCH_ATTRIBUTES)
 }
 
-fun PsiElement.isTestoFunction() = when(this) {
-    is Function -> hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
-    else -> false
+fun PsiElement.isTestoFunction(): Boolean {
+    val function = php.view(this) as? PhpFunctionView ?: return false
+    return function.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
 }
 
-fun PsiElement.isTestoMethod(resolveHierarchy: Boolean = true) = when (this) {
-    is Method -> hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
-            || (modifier.isPublic && name.startsWith("test"))
-            || isPublicMethodOfTestoMarkedClass(resolveHierarchy)
-    else -> false
+fun PsiElement.isTestoMethod(resolveHierarchy: Boolean = true): Boolean {
+    val method = (php.view(this) as? PhpFunctionView)?.takeIf { it.isMethod } ?: return false
+    return method.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
+        || (method.isPublic && method.name.startsWith("test"))
+        || method.isPublicMethodOfTestoMarkedClass(resolveHierarchy)
 }
 
 // A public static method is a data provider (see isTestoDataProviderLike), and a #[Bench] method is a benchmark — both
 // live in test-marked classes without being tests themselves, and running either as `--type=test` would be wrong.
-private fun Method.isPublicMethodOfTestoMarkedClass(resolveHierarchy: Boolean) = when {
-    !modifier.isPublic -> false
-    modifier.isAbstract -> false
-    modifier.isStatic -> false
+private fun PhpFunctionView.isPublicMethodOfTestoMarkedClass(resolveHierarchy: Boolean) = when {
+    !isPublic -> false
+    isAbstract -> false
+    isStatic -> false
     name.startsWith("__") -> false
-    isTestoBench() -> false
+    psi.isTestoBench() -> false
     else -> {
         val cls = containingClass
         when {
@@ -60,41 +57,40 @@ private fun Method.isPublicMethodOfTestoMarkedClass(resolveHierarchy: Boolean) =
     }
 }
 
-private fun hasTestoSubclass(cls: PhpClass): Boolean {
-    if (DumbService.isDumb(cls.project)) return false
-    return PhpIndex.getInstance(cls.project).getAllSubclasses(cls.fqn).any { sub ->
-        TestoTestDescriptor.isTestClassName(sub.name)
+private fun hasTestoSubclass(cls: PhpClassView): Boolean {
+    val project = cls.psi.project
+    if (DumbService.isDumb(project)) return false
+    return php.allSubclasses(project, cls.fqn).any { sub ->
+        isTestoTestClassName(sub.name)
             || sub.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
             || sub.hasAnyAttribute(*TestoClasses.TEST_CASE_ATTRIBUTES)
     }
 }
 
 // #[Test] on a base class marks every inheritor a case, even one declaring no marker of its own.
-private fun PhpClass.hasTestoAncestor(): Boolean {
-    if (DumbService.isDumb(project)) return false
-    val find = object : CommonProcessors.FindProcessor<PhpClass>() {
-        override fun accept(cls: PhpClass) = cls.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
-    }
-    PhpClassHierarchyUtils.processSuperClasses(this, false, false, find)
-    return find.isFound
+private fun PhpClassView.hasTestoAncestor(): Boolean {
+    if (DumbService.isDumb(psi.project)) return false
+    return php.anySuperClass(this) { it.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES) }
 }
 
-fun PsiElement.isTestoDataProviderLike() = when (this) {
-    is Method -> modifier.isPublic && modifier.isStatic
-    is Function -> true
-    else -> false
+fun PsiElement.isTestoDataProviderLike(): Boolean {
+    val function = php.view(this) as? PhpFunctionView ?: return false
+    return !function.isMethod || (function.isPublic && function.isStatic)
 }
 
-fun PhpAttributesOwner.hasAttribute(fqn: String) = getAttributes(fqn).isNotEmpty()
-fun PhpAttributesOwner.hasAnyAttribute(vararg fqn: String) = attributes.any { it.fqn in fqn }
+fun PsiElement.hasAttribute(fqn: String) = (php.view(this) as? PhpDeclarationView)?.attributes(fqn)?.isNotEmpty() == true
 
-fun PsiElement.isTestoClass(resolveHierarchy: Boolean = true) = when (this) {
-    is PhpClass -> TestoTestDescriptor.isTestClassName(name)
-            || hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
-            || isTestoCaseClass()
-            || ownMethods.any { it.isTestoMethod(resolveHierarchy) || it.isTestoBench() }
-            || (resolveHierarchy && hasTestoAncestor())
-    else -> false
+fun PsiElement.hasAnyAttribute(vararg fqn: String) = (php.view(this) as? PhpDeclarationView)?.hasAnyAttribute(*fqn) == true
+
+fun PhpDeclarationView.hasAnyAttribute(vararg fqn: String) = attributes.any { it.fqn in fqn }
+
+fun PsiElement.isTestoClass(resolveHierarchy: Boolean = true): Boolean {
+    val cls = php.view(this) as? PhpClassView ?: return false
+    return isTestoTestClassName(cls.name)
+        || cls.hasAnyAttribute(*TestoClasses.TEST_ATTRIBUTES)
+        || cls.psi.isTestoCaseClass()
+        || cls.ownMethods.any { it.psi.isTestoMethod(resolveHierarchy) || it.psi.isTestoBench() }
+        || (resolveHierarchy && cls.hasTestoAncestor())
 }
 
 /**
@@ -102,13 +98,11 @@ fun PsiElement.isTestoClass(resolveHierarchy: Boolean = true) = when (this) {
  * of such a case are synthesized by the framework, so — unlike a class carrying `#[Test]` — its own public methods must
  * not be treated as tests.
  */
-fun PsiElement.isTestoCaseClass() = when (this) {
-    is PhpClass -> hasAnyAttribute(*TestoClasses.TEST_CASE_ATTRIBUTES)
-    else -> false
-}
+fun PsiElement.isTestoCaseClass() =
+    (php.view(this) as? PhpClassView)?.hasAnyAttribute(*TestoClasses.TEST_CASE_ATTRIBUTES) == true
 
 fun PsiFile.isTestoFile(): Boolean {
-    if (this !is PhpFile) return false
+    if (!php.isPhpFile(this)) return false
     val vFile = virtualFile ?: return false
     if (!vFile.isValid) return false
 
@@ -117,7 +111,7 @@ fun PsiFile.isTestoFile(): Boolean {
     if (fileIndex.isExcluded(vFile)) return false
     if (fileIndex.isUnderIgnored(vFile)) return false
 
-    if (TestoTestDescriptor.isTestClassName(name.substringBeforeLast("."))) return true
+    if (isTestoTestClassName(name.substringBeforeLast("."))) return true
     if (DumbService.isDumb(project)) return false
 
     return try {
@@ -134,17 +128,16 @@ fun PsiFile.isTestoFile(): Boolean {
 
 // No AST walks unless unavoidable: isTestoFile runs for every file the project view paints, and loading an AST behind
 // a stale stub index is what the platform reports as "Outdated stub in index".
-fun PhpFile.isTestoConfigFile() = viewProvider.contents.contains(APPLICATION_CONFIG_SHORT_NAME)
-    && PsiTreeUtil.findChildrenOfType(this, ClassReference::class.java)
-        .any { it.parent is NewExpression && it.fqn == TestoClasses.APPLICATION_CONFIG }
+fun PsiFile.isTestoConfigFile() = viewProvider.contents.contains(APPLICATION_CONFIG_SHORT_NAME)
+    && php.classReferencesIn(this).any { it.newExpression != null && it.fqn == TestoClasses.APPLICATION_CONFIG }
 
 private val APPLICATION_CONFIG_SHORT_NAME = TestoClasses.APPLICATION_CONFIG.substringAfterLast('\\')
 
-fun PhpFile.topLevelClasses() = topLevelDefs.values().filterIsInstance<PhpClass>()
+fun PsiFile.topLevelClasses(): List<PhpClassView> = php.topLevelClasses(this)
 
-fun PhpFile.isTestoClassFile() = topLevelClasses().any { it.isTestoClass() }
+fun PsiFile.isTestoClassFile() = topLevelClasses().any { it.psi.isTestoClass() }
 
-fun PhpFile.isTestoFunctionFile() = topLevelDefs.values().any { it is Function && it.isTestoFunction() }
+fun PsiFile.isTestoFunctionFile() = php.topLevelFunctions(this).any { it.psi.isTestoFunction() }
 
 fun <T> Sequence<T>.takeWhileInclusive(predicate: (T) -> Boolean) = sequence {
     with(iterator()) {

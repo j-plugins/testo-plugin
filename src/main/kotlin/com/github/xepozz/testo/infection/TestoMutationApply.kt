@@ -5,6 +5,7 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
@@ -16,10 +17,12 @@ import com.intellij.openapi.vfs.VirtualFile
  */
 internal object TestoMutationApply {
     /** Where the file reads the mutant's original snippet: it can be applied. Needs read access. */
-    fun canApply(run: TestoMutationRun, mutant: Mutant): Boolean = locate(run, mutant, applied = false) != null
+    fun canApply(project: Project, run: TestoMutationRun, mutant: Mutant): Boolean =
+        locate(project, run, mutant, applied = false) != null
 
     /** Where the file reads the mutated snippet instead: it is applied, and can be reverted. Needs read access. */
-    fun isApplied(run: TestoMutationRun, mutant: Mutant): Boolean = locate(run, mutant, applied = true) != null
+    fun isApplied(project: Project, run: TestoMutationRun, mutant: Mutant): Boolean =
+        locate(project, run, mutant, applied = true) != null
 
     fun apply(project: Project, run: TestoMutationRun, mutant: Mutant): Boolean =
         replace(project, run, mutant, applied = false, TestoBundle.message("infection.apply.command", mutant.mutator))
@@ -29,7 +32,7 @@ internal object TestoMutationApply {
         replace(project, run, mutant, applied = true, TestoBundle.message("infection.revert.command", mutant.mutator))
 
     private fun replace(project: Project, run: TestoMutationRun, mutant: Mutant, applied: Boolean, command: String): Boolean {
-        val (file, range) = locate(run, mutant, applied) ?: return false
+        val (file, range) = locate(project, run, mutant, applied) ?: return false
         val found = (if (applied) mutant.mutated else mutant.original) ?: return false
         val wanted = (if (applied) mutant.original else mutant.mutated) ?: return false
         val document = FileDocumentManager.getInstance().getDocument(file) ?: return false
@@ -42,17 +45,21 @@ internal object TestoMutationApply {
         return true
     }
 
-    private fun locate(run: TestoMutationRun, mutant: Mutant, applied: Boolean): Pair<VirtualFile, TextRange>? {
+    private fun locate(project: Project, run: TestoMutationRun, mutant: Mutant, applied: Boolean): Pair<VirtualFile, TextRange>? {
         val original = mutant.original ?: return null
         val mutated = mutant.mutated ?: return null
         if (original == mutated) return null
         val firstLine = mutant.firstLine ?: return null
         val file = run.localPath(mutant.file.path)?.let { LocalFileSystem.getInstance().findFileByPath(it) } ?: return null
+        if (!mutationFileBelongsTo(project, file)) return null
         val document = FileDocumentManager.getInstance().getDocument(file) ?: return null
         val range = snippetRange(document.charsSequence, firstLine, if (applied) mutated else original) ?: return null
         return file to range
     }
 }
+
+internal fun mutationFileBelongsTo(project: Project, file: VirtualFile): Boolean =
+    ProjectFileIndex.getInstance(project).isInContent(file.canonicalFile ?: file)
 
 /** Where [snippet] sits in [text] when it starts at the 1-based [firstLine], or null when the text there differs. */
 internal fun snippetRange(text: CharSequence, firstLine: Int, snippet: String): TextRange? {

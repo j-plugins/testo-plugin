@@ -10,10 +10,11 @@ class TestoMutationApplyPsiTest : BasePlatformTestCase() {
     fun testAMutantIsAppliedWhereTheFileStillReadsItsSnippetAndRevertedBack() {
         val dir = Files.createTempDirectory("testo-mutation")
         VfsRootAccess.allowRootAccess(testRootDisposable, dir.toString())
-        val source = dir.resolve("A.php")
         val code = "<?php\n\nfunction f(\$a)\n{\n    return \$a > 1;\n}\n"
+        val source = dir.resolve("A.php")
         Files.writeString(source, code)
         val virtual = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(source)!!
+        com.intellij.testFramework.PsiTestUtil.addContentRoot(module, virtual.parent)
         val document = FileDocumentManager.getInstance().getDocument(virtual)!!
 
         val run = TestoMutationRun("t", dir, dir) { it }
@@ -29,13 +30,13 @@ class TestoMutationApplyPsiTest : BasePlatformTestCase() {
         file.mutants += mutant
         run.files += file
 
-        assertTrue(TestoMutationApply.canApply(run, mutant))
-        assertFalse(TestoMutationApply.isApplied(run, mutant))
+        assertTrue(TestoMutationApply.canApply(project, run, mutant))
+        assertFalse(TestoMutationApply.isApplied(project, run, mutant))
 
         assertTrue(TestoMutationApply.apply(project, run, mutant))
         assertEquals(code.replace("\$a > 1", "\$a >= 1"), document.text)
-        assertTrue(TestoMutationApply.isApplied(run, mutant))
-        assertFalse(TestoMutationApply.canApply(run, mutant))
+        assertTrue(TestoMutationApply.isApplied(project, run, mutant))
+        assertFalse(TestoMutationApply.canApply(project, run, mutant))
 
         assertTrue(TestoMutationApply.revert(project, run, mutant))
         assertEquals(code, document.text)

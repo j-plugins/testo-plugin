@@ -1,0 +1,48 @@
+<!-- Testo on PhpStorm's PHP plugin: the dependency on it and every registration that needs its classes. Included by
+     plugin.xml; the coverage counterpart is testo-php-coverage.xml, included by coverage.xml. -->
+<idea-plugin>
+    <depends>com.jetbrains.php</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <applicationService
+                serviceInterface="com.github.xepozz.testo.php.TestoPhp"
+                serviceImplementation="com.github.xepozz.testo.phpstorm.PhpStormTestoPhp"/>
+        <configurationType
+                implementation="com.github.xepozz.testo.phpstorm.tests.run.TestoRunConfigurationType"/>
+        <runConfigurationProducer
+                implementation="com.github.xepozz.testo.phpstorm.tests.run.TestoRunConfigurationProducer"/>
+        <programRunner
+                implementation="com.github.xepozz.testo.phpstorm.tests.run.TestoDebugRunner"/>
+        <localInspection
+                language="PHP"
+                shortName="TestoGroupNameInspection"
+                bundle="messages.TestoBundle"
+                key="inspection.group.display.name"
+                groupBundle="messages.TestoBundle"
+                groupKey="inspection.group"
+                enabledByDefault="true"
+                level="WARNING"
+                implementationClass="com.github.xepozz.testo.phpstorm.tests.inspections.TestoGroupNameInspection"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.jetbrains.php">
+        <testFrameworkType
+                implementation="com.github.xepozz.testo.phpstorm.tests.TestoFrameworkType"/>
+        <composerConfigClient
+                implementation="com.github.xepozz.testo.phpstorm.TestoComposerConfig"/>
+    </extensions>
+
+    <actions>
+        <action id="TestoNewTestFromClass" class="com.github.xepozz.testo.phpstorm.tests.actions.TestoNewTestFromClassAction">
+            <add-to-group group-id="PhpNewTestGroup" anchor="last" />
+        </action>
+
+        <group id="TestoGenerateGroup">
+            <action
+                    id="TestoGenerateTestMethod"
+                    class="com.github.xepozz.testo.phpstorm.actions.TestoGenerateTestMethodAction"/>
+            <separator/>
+            <add-to-group group-id="GenerateGroup" anchor="first"/>
+        </group>
+    </actions>
+</idea-plugin>

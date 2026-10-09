@@ -1,13 +1,13 @@
 package com.github.xepozz.testo.index
 
 import com.github.xepozz.testo.TestoClasses
-import com.github.xepozz.testo.tests.run.TestoRunConfigurationProducer
+import com.github.xepozz.testo.groupNamesOf
+import com.github.xepozz.testo.php.TestoPhp
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiFile
 import com.intellij.psi.search.GlobalSearchScope
-import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.indexing.DataIndexer
 import com.intellij.util.indexing.FileBasedIndex
 import com.intellij.util.indexing.FileBasedIndexExtension
@@ -16,8 +16,6 @@ import com.intellij.util.indexing.ID
 import com.intellij.util.io.BooleanDataDescriptor
 import com.intellij.util.io.DataExternalizer
 import com.intellij.util.io.EnumeratorStringDescriptor
-import com.jetbrains.php.lang.PhpFileType
-import com.jetbrains.php.lang.psi.elements.PhpAttribute
 
 /**
  * Every group name a `#[\Testo\Filter\Group]` in the project spells, so the run configuration can offer them instead
@@ -43,7 +41,7 @@ class TestoGroupsIndex : FileBasedIndexExtension<String, Boolean>() {
 
     override fun getVersion() = 1
 
-    override fun getInputFilter() = FileBasedIndex.InputFilter { it.fileType is PhpFileType }
+    override fun getInputFilter() = PHP_INPUT_FILTER
 
     override fun dependsOnFileContent() = true
 
@@ -53,9 +51,9 @@ class TestoGroupsIndex : FileBasedIndexExtension<String, Boolean>() {
         private const val ATTRIBUTE_SHORT_NAME = "Group"
 
         fun groupNamesIn(file: PsiFile): Set<String> =
-            PsiTreeUtil.findChildrenOfType(file, PhpAttribute::class.java)
+            TestoPhp.getInstance().attributesIn(file)
                 .filter { it.fqn == TestoClasses.FILTER_GROUP }
-                .flatMapTo(mutableSetOf()) { TestoRunConfigurationProducer.extractGroupNames(it) }
+                .flatMapTo(mutableSetOf()) { groupNamesOf(it) }
 
         /** Every group declared in the project, deduplicated and sorted. Empty while the index is still building. */
         fun allGroups(project: Project): List<String> {

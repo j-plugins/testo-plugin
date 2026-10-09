@@ -32,6 +32,17 @@ kotlin {
     jvmToolchain(21)
 }
 
+// PHP-specific implementations and registrations are compiled alongside the shared core.
+sourceSets {
+    main {
+        kotlin.srcDir("src/phpstorm/kotlin")
+        resources.srcDir("src/phpstorm/resources")
+    }
+    test {
+        kotlin.srcDir("src/phpstormTest/kotlin")
+    }
+}
+
 // Configure project's dependencies
 repositories {
     mavenCentral()
@@ -129,6 +140,9 @@ tasks {
         autoReload = false
     }
     test {
+        // VFS resolves macOS /var symlinks; fixtures and file lookups must use the same temporary path.
+        systemProperty("java.io.tmpdir", file(System.getProperty("java.io.tmpdir")).canonicalPath)
+
         // The bundled Kotlin plugin's KotlinScriptDefinitionCodeVisionProvider cannot be instantiated in the 2026.2
         // test fixture (its message bundle is missing the provider's name key), and the error is logged from a
         // project startup activity — outside any window a test could guard — failing whichever test the project
