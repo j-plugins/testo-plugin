@@ -225,15 +225,15 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         val score = mutation.score()
         val done = mutation.finishedCount()
         val total = maxOf(mutation.expected, mutation.mutants.size)
-        val running = mutation.isBusy && mutation.unconfirmedReason == null
+        val running = mutation.isBusy
         indeterminate = total <= 0
         fraction = if (total > 0) (done.toDouble() / total).coerceIn(0.0, 1.0) else 0.0
         escaped = score.escaped
         verdict = mutationVerdict(running, mutation.stopRequested || mutation.rerunStopRequested, escaped, mutation.exitCode,
             mutation.mutants.size, mutation.failureReason)
         progressLabel = when {
-            mutation.failureReason != null -> TestoBundle.message("infection.widget.unconfirmed")
             running -> TestoBundle.message("infection.widget.running", done.toString(), total.toString())
+            mutation.failureReason != null -> TestoBundle.message("infection.widget.unconfirmed")
             score.msi != null -> TestoBundle.message("infection.widget.msi", score.msi.toString())
             else -> TestoBundle.message("infection.widget.done")
         }

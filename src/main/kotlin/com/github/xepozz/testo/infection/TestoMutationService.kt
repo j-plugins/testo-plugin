@@ -116,15 +116,8 @@ class TestoMutationService(private val project: Project) {
     /** Runs Infection over the reports of [recipe]'s Testo run. Call on the EDT. */
     internal fun start(recipe: TestoMutationRecipe) {
         val runDir = recipe.runDir
-        runs[runDir]?.takeIf { it.isBusy }?.let { return TestoMutationToolWindow.show(project, it) }
-        TestoMutationArchive.unconfirmedRun(runDir)?.let { dir ->
-            TestoMutationArchive.load(runDir, dir)?.let { restored ->
-                restored.recipe = recipe
-                track(restored)
-                TestoMutationToolWindow.show(project, restored)
-            }
-            return
-        }
+        val previous = runs[runDir]
+        previous?.takeIf { it.isBusy }?.let { return TestoMutationToolWindow.show(project, it) }
 
         val sources = coveredSources(recipe)
         TestoMutationArchive.prune(runDir, TestoMutationArchive.KEEP - 1)
@@ -136,6 +129,7 @@ class TestoMutationService(private val project: Project) {
 
         object : Task.Backgroundable(project, TestoBundle.message("infection.task.title", recipe.configuration.name), true) {
             override fun run(indicator: ProgressIndicator) {
+                val lingering = lingeringReason(runDir, previous)
                 try {
                     TestoMutationArchive.Recorder(launch.workDir).use { recorder ->
                         run.startedAt = System.currentTimeMillis()
@@ -151,19 +145,32 @@ class TestoMutationService(private val project: Project) {
                     throw e
                 } catch (e: Exception) {
                     if (e !is ExecutionException) thisLogger().warn("Mutation testing failed to start", e)
-                    run.appendLog(e.message.orEmpty())
+                    val message = withLingering(e.message ?: e.javaClass.simpleName, lingering)
+                    run.appendLog(message)
                     if (run.isRunning) run.finish(null)
-                    notifyFailed(run, e.message ?: e.javaClass.simpleName)
+                    notifyFailed(run, message)
                 } finally {
                     runCatching { TestoMutationArchive.writeSummary(launch.workDir, run) }
                         .onFailure { thisLogger().warn("Could not save mutation run", it) }
                     release(launch)
                 }
                 scored(runDir)
-                if (run.exitCode != null) notifyFinished(run)
+                if (run.exitCode != null) notifyFinished(run, lingering)
             }
         }.queue()
     }
+
+    /**
+     * Why an earlier mutation process of [sourceRunDir] may still be alive, if one may: [previous] still holds one it could
+     * not stop, or a summary from an earlier session says so. Reads summaries: not on the EDT.
+     */
+    private fun lingeringReason(sourceRunDir: Path, previous: TestoMutationRun?): String? =
+        previous?.takeIf { it.holdsProcess }?.unconfirmedReason
+            ?: runCatching { TestoMutationArchive.unconfirmedRun(sourceRunDir)?.let(TestoMutationArchive::summary)?.unconfirmedReason }
+                .getOrNull()
+
+    private fun withLingering(message: String, lingering: String?): String =
+        lingering?.let { "$message\n${TestoBundle.message("infection.error.mayLinger", it)}" } ?: message
 
     /**
      * Every file the mutation runs of the Testo run at [sourceRunDir] have judged, by host path, each by the run that did
@@ -217,6 +224,7 @@ class TestoMutationService(private val project: Project) {
         val recipe = run.recipe ?: return
         val targets = mutants.distinct().filter { it.finished }
         if (run.isBusy || targets.isEmpty()) return
+        val lingering = run.unconfirmedReason
         val before = targets.associateWith { it.status to it.previousStatus }
         targets.forEach { mutant ->
             mutant.previousStatus = mutant.status
@@ -257,7 +265,7 @@ class TestoMutationService(private val project: Project) {
                     throw e
                 } catch (e: Exception) {
                     if (e !is ExecutionException) thisLogger().warn("Mutant rerun failed to start", e)
-                    run.appendLog(e.message.orEmpty())
+                    run.appendLog(withLingering(e.message.orEmpty(), lingering))
                 } finally {
                     // A mutant no process reported keeps what it had: stopped before its turn, or its code changed and
                     // Infection gave it another ID.
@@ -358,11 +366,12 @@ class TestoMutationService(private val project: Project) {
         notify(run, content, type)
     }
 
-    private fun notifyFinished(run: TestoMutationRun) {
+    private fun notifyFinished(run: TestoMutationRun, lingering: String?) {
         val score = run.score()
         val content = when {
             run.stopRequested -> TestoBundle.message("infection.finished.stopped")
-            run.exitCode != 0 && run.mutants.isEmpty() -> TestoBundle.message("infection.finished.failed", run.exitCode.toString())
+            run.exitCode != 0 && run.mutants.isEmpty() ->
+                withLingering(TestoBundle.message("infection.finished.failed", run.exitCode.toString()), lingering)
             else -> TestoBundle.message(
                 "infection.finished.score",
                 score.msi?.toString() ?: "–",
