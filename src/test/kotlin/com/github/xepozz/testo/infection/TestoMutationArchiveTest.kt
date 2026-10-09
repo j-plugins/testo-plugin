@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.infection
 
+import com.github.xepozz.testo.runs.TestoRunStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -168,18 +169,27 @@ class TestoMutationArchiveTest {
     }
 
     @Test
-    fun `an unconfirmed run stays blocked after reload and is not pruned`() {
+    fun `an unconfirmed run blocks nothing after reload and keeps its inputs for the grace period`() {
         val source = temp.newFolder("unconfirmed").toPath()
         val dir = record(source, 1000)
         val run = TestoMutationArchive.load(source, dir)!!
-        run.restore(1000, 2000, null, false, 19, failureReason = "transport lost", unconfirmedReason = "transport lost")
+        val stoppedAt = System.currentTimeMillis()
+        run.restore(1000, stoppedAt, null, false, 19, failureReason = "transport lost", unconfirmedReason = "transport lost")
         TestoMutationArchive.writeSummary(dir, run)
         val restored = TestoMutationArchive.load(source, dir)!!
-        assertTrue(restored.isBusy)
+        assertFalse(restored.isBusy)
+        assertFalse(restored.holdsProcess)
         assertEquals("transport lost", restored.failureReason)
         assertEquals(dir, TestoMutationArchive.unconfirmedRun(source))
         TestoMutationArchive.prune(source, keep = 0)
         assertTrue(Files.isDirectory(dir))
+
+        restored.restore(1000, stoppedAt - TestoRunStore.INCOMPLETE_GRACE_MS - 1, null, false, 19,
+            failureReason = "transport lost", unconfirmedReason = "transport lost")
+        TestoMutationArchive.writeSummary(dir, restored)
+        assertNull(TestoMutationArchive.unconfirmedRun(source))
+        TestoMutationArchive.prune(source, keep = 0)
+        assertFalse(Files.isDirectory(dir))
     }
 
     @Test

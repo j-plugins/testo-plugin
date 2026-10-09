@@ -193,8 +193,11 @@ class TestoMutationRun(
 
     val isRunning: Boolean get() = finishedAt == null
 
-    val isBusy: Boolean get() = isRunning || rerunning || unconfirmedReason != null ||
-        pendingTool?.let { !it.isTerminationConfirmed } == true
+    /** A run or rerun is in progress. A process that did not confirm its stop blocks nothing: the next run gets its own inputs. */
+    val isBusy: Boolean get() = isRunning || rerunning
+
+    /** This session still holds a process of the run: one in progress, or one whose stop it can still retry. */
+    val holdsProcess: Boolean get() = isBusy || stopper != null
 
     /** SHA-256 of each mutated file as it was when Infection read it, by the interpreter's path: how a change is told. */
     internal val fingerprints = ConcurrentHashMap<String, String>()
@@ -315,8 +318,8 @@ internal data class TestoMutationHistoryEntry(
 /** The icon a run is judged by, or null while it runs. */
 internal fun mutationVerdict(running: Boolean, stopped: Boolean, escaped: Int, exitCode: Int?, mutants: Int,
                              failureReason: String? = null): Icon? = when {
-    failureReason != null -> TestoIcons.Status.FAILURE
     running -> null
+    failureReason != null -> TestoIcons.Status.FAILURE
     stopped -> TestoIcons.Status.FAILURE_CANCELLED
     escaped > 0 || (exitCode != 0 && mutants == 0) -> TestoIcons.Status.FAILURE
     else -> TestoIcons.Status.SUCCESS
