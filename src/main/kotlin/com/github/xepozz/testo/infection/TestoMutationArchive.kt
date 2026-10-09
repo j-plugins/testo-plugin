@@ -1,7 +1,9 @@
 package com.github.xepozz.testo.infection
 
+import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.runs.TestoRunStore
 import com.google.gson.Gson
+import com.intellij.execution.ExecutionException
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.NioFiles
 import java.io.Writer
@@ -54,11 +56,16 @@ internal object TestoMutationArchive {
 
     private val gson = Gson()
     private val inputUsers = HashMap<Path, Int>()
+    private val deleting = HashSet<Path>()
 
-    /** Protects inputs before preparation, including the interval before an uncertain result is saved. */
+    /**
+     * Protects inputs before preparation, including the interval before an uncertain result is saved. Refuses a directory
+     * whose Testo run is already being deleted.
+     */
     @Synchronized
     fun protectInputs(dir: Path): AutoCloseable {
         val path = dir.toAbsolutePath().normalize()
+        if (deleting.any { path.startsWith(it) }) throw ExecutionException(TestoBundle.message("infection.error.runDeleted"))
         inputUsers[path] = inputUsers.getOrDefault(path, 0) + 1
         val released = AtomicBoolean()
         return AutoCloseable {
@@ -85,10 +92,21 @@ internal object TestoMutationArchive {
         return state.unconfirmedReason != null && now - state.finishedAt <= TestoRunStore.INCOMPLETE_GRACE_MS
     }
 
-    /** Check and deletion share the same lock as acquisition and summary publication. An unlistable archive fails closed. */
-    @Synchronized
     fun deleteRunIfSafe(sourceRunDir: Path): Boolean {
-        if (hasInputUsers(sourceRunDir)) return false
+        if (!claimForDeletion(sourceRunDir)) return false
+        deleteClaimed(sourceRunDir)
+        return true
+    }
+
+    /**
+     * Decides under the lock that input acquisition and summary publication share, and marks the run so neither can
+     * follow; the files go in [deleteClaimed], outside it, so a reader waits for the check alone. An unlistable archive
+     * fails closed.
+     */
+    @Synchronized
+    internal fun claimForDeletion(sourceRunDir: Path): Boolean {
+        val path = sourceRunDir.toAbsolutePath().normalize()
+        if (path in deleting || hasInputUsers(sourceRunDir)) return false
         val root = sourceRunDir.resolve(DIR)
         if (!Files.notExists(root)) {
             val protected = runCatching {
@@ -96,8 +114,16 @@ internal object TestoMutationArchive {
             }.getOrDefault(true)
             if (protected) return false
         }
-        NioFiles.deleteRecursively(sourceRunDir)
+        deleting.add(path)
         return true
+    }
+
+    internal fun deleteClaimed(sourceRunDir: Path) {
+        try {
+            NioFiles.deleteRecursively(sourceRunDir)
+        } finally {
+            synchronized(this) { deleting.remove(sourceRunDir.toAbsolutePath().normalize()) }
+        }
     }
 
     class Summary(
