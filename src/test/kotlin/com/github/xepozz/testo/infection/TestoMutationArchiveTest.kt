@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.infection
 
+import com.github.xepozz.testo.php.TestoPreparedTool
 import com.github.xepozz.testo.runs.TestoRunStore
 import com.intellij.execution.ExecutionException
 import org.junit.Assert.assertEquals
@@ -189,6 +190,42 @@ class TestoMutationArchiveTest {
         restored.restore(1000, stoppedAt - TestoRunStore.INCOMPLETE_GRACE_MS - 1, null, false, 19,
             failureReason = "transport lost", unconfirmedReason = "transport lost")
         TestoMutationArchive.writeSummary(dir, restored)
+        assertNull(TestoMutationArchive.unconfirmedRun(source))
+        TestoMutationArchive.prune(source, keep = 0)
+        assertFalse(Files.isDirectory(dir))
+    }
+
+    @Test
+    fun `a rerun stop that went unconfirmed is timed from the stop, not from when the run finished`() {
+        val source = temp.newFolder("rerun-unconfirmed").toPath()
+        val dir = record(source, 1000)
+        val run = TestoMutationArchive.load(source, dir)!!
+        run.restore(1000, System.currentTimeMillis() - TestoRunStore.INCOMPLETE_GRACE_MS - 1, 0, false, 19)
+        val tool = TestoPreparedTool("php infection", { error("must not start") })
+        run.pendingTool = tool
+        run.markUnconfirmed(tool, "transport lost")
+        TestoMutationArchive.writeSummary(dir, run)
+
+        val restored = TestoMutationArchive.load(source, dir)!!
+        assertTrue(restored.unconfirmedAt > 0)
+        assertEquals(dir, TestoMutationArchive.unconfirmedRun(source))
+        TestoMutationArchive.prune(source, keep = 0)
+        assertTrue(Files.isDirectory(dir))
+    }
+
+    @Test
+    fun `a summary without the unconfirmed time falls back to when the run finished`() {
+        val source = temp.newFolder("legacy-unconfirmed").toPath()
+        val dir = record(source, 1000)
+        val run = TestoMutationArchive.load(source, dir)!!
+        run.restore(1000, System.currentTimeMillis() - TestoRunStore.INCOMPLETE_GRACE_MS - 1, null, false, 19,
+            failureReason = "transport lost", unconfirmedReason = "transport lost", unconfirmedAt = System.currentTimeMillis())
+        TestoMutationArchive.writeSummary(dir, run)
+        val summary = dir.resolve(TestoMutationArchive.SUMMARY_FILE)
+        val legacy = Files.readString(summary).replace(Regex("\"unconfirmedAt\":\\d+,"), "")
+        assertFalse(legacy.contains("unconfirmedAt"))
+        Files.writeString(summary, legacy)
+
         assertNull(TestoMutationArchive.unconfirmedRun(source))
         TestoMutationArchive.prune(source, keep = 0)
         assertFalse(Files.isDirectory(dir))
