@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.infection
 
+import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.php.TestoPreparedTool
 import com.github.xepozz.testo.runs.TestoRunStore
 import com.intellij.execution.ExecutionException
@@ -305,6 +306,53 @@ class TestoMutationArchiveTest {
         record(source, 2000)
         TestoMutationArchive.protectInputs(source.resolve("infection/2000")).close()
         assertTrue(TestoMutationArchive.deleteRunIfSafe(source))
+    }
+
+    @Test
+    fun `a summary write into a run claimed for deletion writes nothing`() {
+        val source = temp.newFolder("claimed-summary").toPath()
+        val dir = record(source, 1000)
+        val run = TestoMutationArchive.load(source, dir)!!
+        val summary = dir.resolve(TestoMutationArchive.SUMMARY_FILE)
+
+        assertTrue(TestoMutationArchive.claimForDeletion(source))
+        Files.delete(summary)
+        TestoMutationArchive.writeSummary(dir, run)
+        assertFalse(Files.exists(summary))
+        assertEquals(0L, Files.list(dir).use { paths -> paths.filter { it.fileName.toString().endsWith(".tmp") }.count() })
+
+        TestoMutationArchive.deleteClaimed(source)
+        assertFalse(Files.exists(source))
+        TestoMutationArchive.writeSummary(dir, run)
+        assertFalse(Files.exists(source))
+    }
+
+    @Test
+    fun `input protection taken before the run directory exists keeps the Testo run from being claimed`() {
+        val source = temp.newFolder("protected-first").toPath()
+        record(source, 1000)
+        val dir = TestoMutationArchive.newRunDir(source, 2000)
+
+        val protection = TestoMutationArchive.protectRunInputs(source, dir)
+        assertFalse(Files.exists(dir))
+        assertFalse(TestoMutationArchive.claimForDeletion(source))
+        protection.close()
+
+        assertTrue(TestoMutationArchive.claimForDeletion(source))
+        TestoMutationArchive.deleteClaimed(source)
+        assertFalse(Files.exists(source))
+    }
+
+    @Test
+    fun `inputs of a Testo run already deleted are refused`() {
+        val source = temp.root.toPath().resolve("deleted")
+
+        val error = assertThrows(ExecutionException::class.java) {
+            TestoMutationArchive.protectRunInputs(source, TestoMutationArchive.newRunDir(source, 1000))
+        }
+        assertEquals(TestoBundle.message("infection.error.runDeleted"), error.message)
+        assertFalse(Files.exists(source))
+        assertTrue(TestoMutationArchive.deleteRunIfSafe(Files.createDirectories(source)))
     }
 
     @Test
