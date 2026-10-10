@@ -131,6 +131,7 @@ class TestoMutationService(private val project: Project) {
             override fun run(indicator: ProgressIndicator) {
                 val lingering = lingeringReason(runDir, previous)
                 try {
+                    launch.inputProtection = TestoMutationArchive.protectRunInputs(runDir, launch.workDir)
                     TestoMutationArchive.Recorder(launch.workDir).use { recorder ->
                         run.startedAt = System.currentTimeMillis()
                         val stream = TestoMutationStream(run, recorder::line, onFile = run::fingerprint)
@@ -301,6 +302,7 @@ class TestoMutationService(private val project: Project) {
         val dir = TestoMutationArchive.newRerunDir(run.workDir, System.currentTimeMillis())
         val launch = TestoInfectionLaunch(recipe.ready, sources, dir, options, withHtml = false)
         try {
+            launch.inputProtection = TestoMutationArchive.protectRunInputs(run.sourceRunDir, dir)
             TestoMutationArchive.Recorder(dir).use { recorder ->
                 val stream = TestoMutationStream(run, recorder::line, rerun = true)
                 execute(recipe.environment, run, launch, stream, recorder, indicator) { run.rerunStopRequested }
@@ -344,7 +346,6 @@ class TestoMutationService(private val project: Project) {
         indicator: ProgressIndicator,
         stopped: () -> Boolean,
     ): Int {
-        launch.inputProtection = TestoMutationArchive.protectInputs(launch.workDir)
         val prepared = TestoInfectionCommand.create(environment, launch)
         val exitCode = executeToolProcess(prepared, run, stream, indicator, stopped, recorder::line)
         TestoMutationArchive.applyTextLog(launch.textLog, run)

@@ -65,7 +65,7 @@ internal object TestoMutationArchive {
     @Synchronized
     fun protectInputs(dir: Path): AutoCloseable {
         val path = dir.toAbsolutePath().normalize()
-        if (deleting.any { path.startsWith(it) }) throw ExecutionException(TestoBundle.message("infection.error.runDeleted"))
+        if (isBeingDeleted(path)) throw ExecutionException(TestoBundle.message("infection.error.runDeleted"))
         inputUsers[path] = inputUsers.getOrDefault(path, 0) + 1
         val released = AtomicBoolean()
         return AutoCloseable {
@@ -76,6 +76,18 @@ internal object TestoMutationArchive {
                 }
             }
         }
+    }
+
+    /** [protectInputs] for [dir] of the Testo run at [sourceRunDir], refusing a run whose deletion already finished. */
+    @Synchronized
+    fun protectRunInputs(sourceRunDir: Path, dir: Path): AutoCloseable {
+        if (!Files.isDirectory(sourceRunDir)) throw ExecutionException(TestoBundle.message("infection.error.runDeleted"))
+        return protectInputs(dir)
+    }
+
+    private fun isBeingDeleted(path: Path): Boolean {
+        val normalized = path.toAbsolutePath().normalize()
+        return deleting.any { normalized.startsWith(it) }
     }
 
     private fun hasInputUsers(dir: Path): Boolean {
@@ -224,6 +236,7 @@ internal object TestoMutationArchive {
     /** Writes [run]'s summary; the files in [rescored] were just judged again, the rest keep when they last were. */
     @Synchronized
     fun writeSummary(dir: Path, run: TestoMutationRun, rescored: Set<String> = emptySet()) {
+        if (isBeingDeleted(dir) || !Files.isDirectory(dir)) return
         val score = run.score()
         val previous = summary(dir)?.scores.orEmpty()
         val now = System.currentTimeMillis()
