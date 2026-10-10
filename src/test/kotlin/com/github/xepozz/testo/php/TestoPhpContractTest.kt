@@ -296,7 +296,7 @@ class TestoPhpContractTest : BasePlatformTestCase() {
     fun testLocalInterpreterPathsAreUnchanged() {
         val paths = php.projectPaths(project)
 
-        assertEquals(FileUtil.toSystemDependentName("/work/app/tests/FooTest.php"), paths.toEnvironment("/work/app/tests/FooTest.php"))
+        assertEquals("/work/app/tests/FooTest.php", FileUtil.toSystemIndependentName(paths.toEnvironment("/work/app/tests/FooTest.php")))
     }
 
     fun testTestoIsNotConfiguredWithoutSettings() {
