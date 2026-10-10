@@ -223,7 +223,8 @@ class TestoMutationService(private val project: Project) {
     fun rerun(run: TestoMutationRun, mutants: List<Mutant>) {
         val recipe = run.recipe ?: return
         val targets = mutants.distinct().filter { it.finished }
-        if (run.isBusy || targets.isEmpty()) return
+        // A rerun writes into this run's single process slot: it would drop a process whose stop went unconfirmed.
+        if (run.holdsProcess || targets.isEmpty()) return
         val lingering = run.unconfirmedReason
         val before = targets.associateWith { it.status to it.previousStatus }
         targets.forEach { mutant ->

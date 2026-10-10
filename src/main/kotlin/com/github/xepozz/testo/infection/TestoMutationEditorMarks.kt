@@ -239,7 +239,7 @@ class TestoMutationEditorMarks(private val project: Project) : Disposable {
                     override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
                     override fun update(e: AnActionEvent) {
-                        e.presentation.isEnabled = !run.isBusy && run.recipe != null
+                        e.presentation.isEnabled = !run.holdsProcess && run.recipe != null
                     }
 
                     override fun actionPerformed(e: AnActionEvent) {

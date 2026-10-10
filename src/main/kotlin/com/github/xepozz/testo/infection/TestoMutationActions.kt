@@ -66,7 +66,7 @@ class TestoMutationRerunSelectedAction : TestoMutationAction() {
     }
 
     override fun isEnabled(panel: TestoMutationPanel) =
-        !panel.run.isBusy && panel.run.recipe != null && panel.selectedForRerun().any { it.finished }
+        !panel.run.holdsProcess && panel.run.recipe != null && panel.selectedForRerun().any { it.finished }
 
     override fun perform(panel: TestoMutationPanel) =
         TestoMutationService.getInstance(panel.project).rerun(panel.run, panel.selectedForRerun())
@@ -113,7 +113,7 @@ class TestoMutationRerunEscapedAction : TestoMutationAction() {
     private fun escaped(panel: TestoMutationPanel) = panel.run.mutants.filter { it.status == MutantStatus.ESCAPED }
 
     override fun isEnabled(panel: TestoMutationPanel) =
-        !panel.run.isBusy && panel.run.recipe != null && escaped(panel).isNotEmpty()
+        !panel.run.holdsProcess && panel.run.recipe != null && escaped(panel).isNotEmpty()
 
     override fun perform(panel: TestoMutationPanel) =
         TestoMutationService.getInstance(panel.project).rerun(panel.run, escaped(panel))
