@@ -780,7 +780,7 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
   `verifyPlugin` → release draft for the PhpStorm builds. Runs on `ubuntu-latest`, Java 21 (Zulu), free-disk-space
   step first. Run the OpenIDE checks separately with Java 25 and `-PphpApi=openide`.
 - **release.yml** (on GitHub release): publish to JetBrains Marketplace, patch the changelog, open a PR back;
-  a matrix builds 252 and 262 and attaches each ZIP to the release.
+  a matrix builds 252, 262 and `openide` and attaches each ZIP to the release.
 - **run-ui-tests.yml** (manual): UI tests on Ubuntu / Windows / macOS via robot-server.
 
 ## Conventions

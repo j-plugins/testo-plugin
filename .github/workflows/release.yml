@@ -21,6 +21,7 @@ jobs:
         include:
           - { phpApi: 252, buildDir: build }
           - { phpApi: 262, buildDir: build }
+          - { phpApi: openide, buildDir: build/openide }
     steps:
 
       # Free GitHub Actions Environment Disk Space
