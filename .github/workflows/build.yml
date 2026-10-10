@@ -30,10 +30,14 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    # One artifact per PHP coverage API — see the `phpApi` comment in gradle.properties.
+    # One artifact per PHP coverage API — see the `phpApi` comment in gradle.properties. OpenIDE builds into build/openide.
     strategy:
+      fail-fast: false
       matrix:
-        phpApi: [ 252, 262 ]
+        include:
+          - { phpApi: 252, buildDir: build }
+          - { phpApi: 262, buildDir: build }
+          - { phpApi: openide, buildDir: build/openide }
     steps:
 
       # Free GitHub Actions Environment Disk Space
@@ -67,7 +71,7 @@ jobs:
         id: artifact
         shell: bash
         run: |
-          cd ${{ github.workspace }}/build/distributions
+          cd ${{ github.workspace }}/${{ matrix.buildDir }}/distributions
           FILENAME=`ls *.zip`
           unzip "$FILENAME" -d content
 
@@ -78,13 +82,19 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.artifact.outputs.filename }}
-          path: ./build/distributions/content/*/*
+          path: ./${{ matrix.buildDir }}/distributions/content/*/*
 
   # Run tests and upload a code coverage report
   test:
     name: Test
     needs: [ build ]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { phpApi: 262, buildDir: build }
+          - { phpApi: openide, buildDir: build/openide }
     steps:
 
       # Free GitHub Actions Environment Disk Space
@@ -113,18 +123,19 @@ jobs:
 
       # Run tests
       - name: Run Tests
-        run: ./gradlew check
+        run: ./gradlew check -PphpApi=${{ matrix.phpApi }}
 
       # Collect Tests Result of failed tests
       - name: Collect Tests Result
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
         with:
-          name: tests-result
-          path: ${{ github.workspace }}/build/reports/tests
+          name: tests-result-${{ matrix.phpApi }}
+          path: ${{ github.workspace }}/${{ matrix.buildDir }}/reports/tests
 
       # Upload the Kover report to CodeCov
       - name: Upload Code Coverage Report
+        if: ${{ matrix.phpApi == 262 }}
         uses: codecov/codecov-action@v7
         with:
           files: ${{ github.workspace }}/build/reports/kover/report.xml
@@ -174,8 +185,12 @@ jobs:
     needs: [ build ]
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        phpApi: [ 252, 262 ]
+        include:
+          - { phpApi: 252, buildDir: build }
+          - { phpApi: 262, buildDir: build }
+          - { phpApi: openide, buildDir: build/openide }
     steps:
 
       # Free GitHub Actions Environment Disk Space
@@ -212,7 +227,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: pluginVerifier-result-${{ matrix.phpApi }}
-          path: ${{ github.workspace }}/build/reports/pluginVerifier
+          path: ${{ github.workspace }}/${{ matrix.buildDir }}/reports/pluginVerifier
 
   # Prepare a draft release for GitHub Releases page for the manual verification
   # If accepted and published, the release workflow would be triggered
