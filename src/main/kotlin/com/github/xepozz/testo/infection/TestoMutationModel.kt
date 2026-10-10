@@ -173,19 +173,27 @@ class TestoMutationRun(
         private set
 
     @Volatile
+    internal var unconfirmedAt: Long = 0
+        private set
+
+    @Volatile
     internal var failureReason: String? = null
         private set
 
     @Synchronized
     internal fun markUnconfirmed(tool: com.github.xepozz.testo.php.TestoPreparedTool, reason: String) {
         failureReason = reason
-        if (pendingTool === tool && !tool.isTerminationConfirmed) unconfirmedReason = reason
+        if (pendingTool === tool && !tool.isTerminationConfirmed) {
+            unconfirmedReason = reason
+            unconfirmedAt = System.currentTimeMillis()
+        }
     }
 
     @Synchronized
     internal fun releaseTool(tool: com.github.xepozz.testo.php.TestoPreparedTool) {
         if (pendingTool !== tool) return
         unconfirmedReason = null
+        unconfirmedAt = 0
         pendingTool = null
         stopper = null
         changed()
@@ -239,13 +247,15 @@ class TestoMutationRun(
 
     /** A run read back from the archive: finished, with the times and outcome it had. */
     internal fun restore(startedAt: Long, finishedAt: Long, exitCode: Int?, stopped: Boolean, expected: Int,
-                         rerunStopped: Boolean = false, failureReason: String? = null, unconfirmedReason: String? = null) {
+                         rerunStopped: Boolean = false, failureReason: String? = null, unconfirmedReason: String? = null,
+                         unconfirmedAt: Long = 0) {
         this.startedAt = startedAt
         this.exitCode = exitCode
         this.stopRequested = stopped
         this.rerunStopRequested = rerunStopped
         this.failureReason = failureReason
         this.unconfirmedReason = unconfirmedReason
+        this.unconfirmedAt = unconfirmedAt
         if (expected > 0) this.expected = expected
         this.finishedAt = finishedAt
     }

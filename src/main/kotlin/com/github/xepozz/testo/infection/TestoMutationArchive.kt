@@ -89,7 +89,14 @@ internal object TestoMutationArchive {
         val now = System.currentTimeMillis()
         val state = summary(dir)?.takeIf { it.finishedAt > 0 }
             ?: return now - TestoRunStore.startedAtOf(dir) <= TestoRunStore.INCOMPLETE_GRACE_MS
-        return state.unconfirmedReason != null && now - state.finishedAt <= TestoRunStore.INCOMPLETE_GRACE_MS
+        return isUnconfirmedWithinGrace(state, now)
+    }
+
+    // Summaries written before unconfirmedAt existed carry only the run's finishedAt.
+    private fun isUnconfirmedWithinGrace(state: Summary, now: Long): Boolean {
+        if (state.unconfirmedReason == null) return false
+        val at = state.unconfirmedAt.takeIf { it > 0 } ?: state.finishedAt
+        return now - at <= TestoRunStore.INCOMPLETE_GRACE_MS
     }
 
     fun deleteRunIfSafe(sourceRunDir: Path): Boolean {
@@ -135,6 +142,7 @@ internal object TestoMutationArchive {
         val rerunStopped: Boolean = false,
         val failureReason: String? = null,
         val unconfirmedReason: String? = null,
+        val unconfirmedAt: Long = 0,
         val expected: Int = 0,
         /** Interpreter path → host path of every mutated file, as the interpreter's mappings resolved it then. */
         val localPaths: Map<String, String> = emptyMap(),
@@ -190,7 +198,7 @@ internal object TestoMutationArchive {
     @Synchronized
     fun unconfirmedRun(testoRunDir: Path): Path? = runs(testoRunDir).firstOrNull { dir ->
         val state = summary(dir) ?: return@firstOrNull false
-        state.unconfirmedReason != null && System.currentTimeMillis() - state.finishedAt <= TestoRunStore.INCOMPLETE_GRACE_MS
+        isUnconfirmedWithinGrace(state, System.currentTimeMillis())
     }
 
     class Recorder(private val dir: Path) : AutoCloseable {
@@ -234,6 +242,7 @@ internal object TestoMutationArchive {
             rerunStopped = run.rerunStopRequested,
             failureReason = run.failureReason,
             unconfirmedReason = run.unconfirmedReason,
+            unconfirmedAt = run.unconfirmedAt,
             expected = run.expected,
             localPaths = run.files.mapNotNull { file -> run.localPath(file.path)?.let { file.path to it } }.toMap(),
             msi = score.msi,
@@ -271,7 +280,7 @@ internal object TestoMutationArchive {
         reruns(dir).forEach { replay(it, TestoMutationStream(run, rerun = true), run) }
         run.fingerprints.putAll(summary.fingerprints)
         run.restore(summary.startedAt, summary.finishedAt, summary.exitCode, summary.stopped, summary.expected,
-            summary.rerunStopped, summary.failureReason, summary.unconfirmedReason)
+            summary.rerunStopped, summary.failureReason, summary.unconfirmedReason, summary.unconfirmedAt)
         return run
     }
 
