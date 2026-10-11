@@ -28,7 +28,7 @@ jobs:
 
   # Prepare the environment and build the plugin
   build:
-    name: Build
+    name: Build (${{ matrix.phpApi }})
     runs-on: ubuntu-latest
     # One artifact per PHP coverage API — see the `phpApi` comment in gradle.properties. OpenIDE builds into build/openide.
     strategy:
@@ -86,12 +86,16 @@ jobs:
 
   # Run tests and upload a code coverage report
   test:
-    name: Test
+    name: Test (${{ matrix.phpApi }}, ${{ matrix.os }})
     needs: [ build ]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    # Windows is informational until its known failures are fixed (#120, #122).
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ ubuntu-latest, windows-latest ]
+        phpApi: [ 262, openide ]
         include:
           - { phpApi: 262, buildDir: build }
           - { phpApi: openide, buildDir: build/openide }
@@ -99,6 +103,7 @@ jobs:
 
       # Free GitHub Actions Environment Disk Space
       - name: Maximize Build Space
+        if: runner.os == 'Linux'
         uses: jlumbroso/free-disk-space@v2.0.0
         with:
           tool-cache: false
@@ -130,12 +135,12 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
         with:
-          name: tests-result-${{ matrix.phpApi }}
+          name: tests-result-${{ matrix.phpApi }}-${{ matrix.os }}
           path: ${{ github.workspace }}/${{ matrix.buildDir }}/reports/tests
 
       # Upload the Kover report to CodeCov
       - name: Upload Code Coverage Report
-        if: ${{ matrix.phpApi == 262 }}
+        if: ${{ matrix.phpApi == 262 && runner.os == 'Linux' }}
         uses: codecov/codecov-action@v7
         with:
           files: ${{ github.workspace }}/build/reports/kover/report.xml
@@ -181,7 +186,7 @@ jobs:
 
   # Run plugin structure verification along with IntelliJ Plugin Verifier
   verify:
-    name: Verify plugin
+    name: Verify plugin (${{ matrix.phpApi }})
     needs: [ build ]
     runs-on: ubuntu-latest
     strategy:
