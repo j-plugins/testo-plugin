@@ -6,15 +6,13 @@
 
 ### Added
 
-- An OpenIDE build using PHP for OpenIDE, with test discovery, run/debug/coverage configurations, Infection mutation
-  testing and run history. It supports the project's PHP interpreter profiles and keeps unconfirmed remote processes
-  from losing their temporary reports.
+- An OpenIDE 2026.2 build, installed alongside PHP for OpenIDE: test discovery and gutter runs, Run / Debug / Coverage configurations, the channel console, run history, the Coverage view and mutation testing with Infection.
+- On OpenIDE a run takes the project's active PHP interpreter profile; an HTML or JUnit report the interpreter cannot reach is skipped with a notification instead of failing the run.
 
 ### Fixed
 
-- List tests sharing a data provider in source order for a consistent default selection.
-- Preserve stopped mutation reruns in run history after restarting the IDE, and protect active mutation archives
-  during cleanup.
+- Tests sharing a data provider are listed in source order, so the chooser preselects the same one every time.
+- A stopped mutant rerun stays in the run history after an IDE restart, and cleanup no longer deletes the archive of a mutation run in progress.
 
 ## [2026.16.262] - 2026-10-01
 
