@@ -112,7 +112,7 @@ internal class TestoLaunch(
     class LogReports(val reports: List<Report>, val unreachable: String? = null)
 
     /**
-     * The command: `php [phpArguments] <binary> <command> <runner options> [testoArguments] <selection> <reports>
+     * The command: `php [interpreter options] [phpArguments] <binary> <command> <runner options> [testoArguments] <selection> <reports>
      * [--config <file>] <scope>`, the order a PhpStorm run has.
      */
     fun commandLine(
@@ -136,7 +136,8 @@ internal class TestoLaunch(
             addAll(scopeArguments())
         }
         val command = environment.command(
-            phpArgs = phpArguments + environment.toEnvironment(binary) + arguments,
+            // The runner's own -d settings come later, so php keeps them over the user's.
+            phpArgs = ParametersList.parse(options.interpreterOptions.orEmpty()).toList() + phpArguments + environment.toEnvironment(binary) + arguments,
             workDir = File(workingDirectory),
             env = options.environmentVariables + environmentVariables,
             exposures = exposures + reports.map { it.exposed },

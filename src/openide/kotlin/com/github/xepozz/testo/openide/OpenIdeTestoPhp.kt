@@ -68,8 +68,10 @@ import java.util.concurrent.ConcurrentMap
  * - of the segments of a written name (`\Testo\Filter\Group`) only the last is an identifier leaf.
  */
 class OpenIdeTestoPhp : TestoPhp {
-    override fun toolEnvironment(configuration: TestoConfiguration): TestoToolEnvironment =
-        OpenIdeToolEnvironment(configuration as TestoRunConfiguration, TestoRunConfiguration.environmentProvider(configuration.project))
+    override fun toolEnvironment(configuration: TestoConfiguration): TestoToolEnvironment {
+        val testo = configuration as TestoRunConfiguration
+        return OpenIdeToolEnvironment(testo, testo.lastEnvironment ?: testo.launchEnvironment())
+    }
 
     override fun statementAt(leaf: PsiElement?, document: Document): TestoStatementTarget? {
         val file = leaf?.containingFile ?: return null
@@ -259,7 +261,7 @@ class OpenIdeTestoPhp : TestoPhp {
     }
 }
 
-/** Paths through the launch environment of the active interpreter profile. */
+/** Paths through one launch environment. */
 class OpenIdePathMapping(private val environment: PhpLaunchEnvironment) : TestoPathMapping {
     override fun toEnvironment(localPath: String): String = environment.toEnvironment(localPath)
 

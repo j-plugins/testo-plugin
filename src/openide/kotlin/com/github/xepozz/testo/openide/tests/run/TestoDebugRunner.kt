@@ -89,7 +89,7 @@ class TestoDebugRunner : AsyncProgramRunner<RunnerSettings>() {
 
         /** The debug launch and the process for [configuration]; the launch is abandoned when the process fails. */
         internal fun prepare(configuration: TestoRunConfiguration): Debugged {
-            val environment = TestoRunConfiguration.environmentProvider(configuration.project)
+            val environment = configuration.launchEnvironment()
             val debug = debugLaunchProvider(configuration.project, environment)
             val run = try {
                 configuration.prepare(
