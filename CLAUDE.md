@@ -777,8 +777,9 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 ## CI/CD
 
 - **build.yml** (push to `main`, all PRs): `buildPlugin` → `check` (Kover XML → Codecov) → Qodana →
-  `verifyPlugin` → release draft for the PhpStorm builds. Runs on `ubuntu-latest`, Java 21 (Zulu), free-disk-space
-  step first. Run the OpenIDE checks separately with Java 25 and `-PphpApi=openide`.
+  `verifyPlugin` → release draft. Build and verify run for 252, 262 and `openide`; tests for 262 and `openide` on
+  Ubuntu and Windows, where Windows does not fail the run until its known failures are fixed (#120, #122).
+  Gradle provisions the OpenIDE variant's Java 25 toolchain itself.
 - **release.yml** (on GitHub release): publish to JetBrains Marketplace, patch the changelog, open a PR back.
 - **run-ui-tests.yml** (manual): UI tests on Ubuntu / Windows / macOS via robot-server.
 
