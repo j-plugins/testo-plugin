@@ -739,7 +739,8 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 
 - **build.yml** (push to `main`, all PRs): `buildPlugin` → `check` (Kover XML → Codecov) → Qodana →
   `verifyPlugin` → release draft. Runs on `ubuntu-latest`, Java 21 (Zulu), free-disk-space step first.
-- **release.yml** (on GitHub release): publish to JetBrains Marketplace, patch the changelog, open a PR back.
+- **release.yml** (on GitHub release): publish to JetBrains Marketplace, patch the changelog, open a PR back;
+  a matrix builds 252 and 262 and attaches each ZIP to the release.
 - **run-ui-tests.yml** (manual): UI tests on Ubuntu / Windows / macOS via robot-server.
 
 ## Conventions
