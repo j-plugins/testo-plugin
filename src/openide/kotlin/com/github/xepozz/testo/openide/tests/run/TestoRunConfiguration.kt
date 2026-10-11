@@ -176,8 +176,8 @@ class TestoRunConfiguration(
 
     /**
      * Everything a run needs before its console: the environment is taken, the binary checked, the command built and
-     * the process created, not started. Off the EDT. [addition] is what a runner adds on top — the coverage flags and
-     * the reports they write — decided with the launch at hand.
+     * the process started, its handler not yet. Off the EDT. [addition] is what a runner adds on top — the coverage
+     * flags and the reports they write — decided with the launch at hand.
      */
     internal fun prepare(
         environment: PhpLaunchEnvironment = environmentProvider(project),

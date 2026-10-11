@@ -1,11 +1,14 @@
 package com.github.xepozz.testo.openide.tests.run
 
 import com.intellij.execution.ExecutionException
+import com.intellij.execution.KillableProcess
 import com.intellij.execution.configurations.RunProfile
 import com.intellij.execution.configurations.RunProfileState
 import com.intellij.execution.configurations.RunnerSettings
 import com.intellij.execution.configurations.WrappingRunConfiguration
 import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.execution.process.BaseProcessHandler
+import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.runners.AsyncProgramRunner
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.RunContentBuilder
@@ -30,7 +33,7 @@ class TestoProgramRunner : AsyncProgramRunner<RunnerSettings>() {
         return inBackgroundThenOnEdt(
             prepare = { configuration.prepare() },
             show = { prepared -> RunContentBuilder(runState.show(prepared), environment).showRunContent(environment.contentToReuse) },
-            abandon = { prepared -> prepared.handler.destroyProcess() },
+            abandon = { prepared -> prepared.handler.terminateAbandoned() },
         )
     }
 }
@@ -68,4 +71,20 @@ internal fun <T> inBackgroundThenOnEdt(
         }
     }
     return promise
+}
+
+/**
+ * Ends the process of a launch whose console never came up. Until `startNotify`, `destroyProcess` only queues the
+ * destruction for a start that will not come, so a process the handler never started is killed outright.
+ */
+internal fun ProcessHandler.terminateAbandoned() {
+    when {
+        isStartNotified -> destroyProcess()
+        this is KillableProcess -> killProcess()
+        this is BaseProcessHandler<*> -> process.destroyForcibly()
+        else -> {
+            startNotify()
+            destroyProcess()
+        }
+    }
 }

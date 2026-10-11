@@ -10,6 +10,7 @@ import com.github.xepozz.testo.openide.tests.run.TestoLaunch
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfiguration
 import com.github.xepozz.testo.openide.tests.run.TestoRunState
 import com.github.xepozz.testo.openide.tests.run.inBackgroundThenOnEdt
+import com.github.xepozz.testo.openide.tests.run.terminateAbandoned
 import com.github.xepozz.testo.openide.tests.run.testoConfigurationOf
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.intellij.coverage.CoverageRunnerData
@@ -57,7 +58,7 @@ open class TestoCoverageProgramRunner : AsyncProgramRunner<RunnerSettings>() {
         return inBackgroundThenOnEdt(
             prepare = { prepare(configuration, localCoverage) },
             show = { covered -> show(configuration, environment, covered) },
-            abandon = { covered -> covered.run.handler.destroyProcess() },
+            abandon = { covered -> covered.run.handler.terminateAbandoned() },
         )
     }
 
