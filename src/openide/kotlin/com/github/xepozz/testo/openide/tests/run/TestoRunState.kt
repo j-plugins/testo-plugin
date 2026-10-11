@@ -21,7 +21,7 @@ internal class TestoRunState(
 ) : RunProfileState {
     override fun execute(executor: Executor, runner: ProgramRunner<*>): ExecutionResult = show(configuration.prepare())
 
-    /** The console for a [prepared] run, on the EDT. The platform starts the process once the content is shown. */
+    /** The console for a [prepared] run, on the EDT. The platform starts the handler once the content is shown. */
     fun show(prepared: TestoRunConfiguration.PreparedRun): ExecutionResult {
         val properties = configuration.createTestConsoleProperties(environment.executor) as TestoConsoleProperties
         val console = SMTestRunnerConnectionUtil.createAndAttachConsole(

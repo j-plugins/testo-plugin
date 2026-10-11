@@ -6,6 +6,7 @@ import com.github.xepozz.testo.openide.tests.run.TestoRunConfiguration
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfigurationType
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.executors.DefaultDebugExecutor
+import com.intellij.execution.process.BaseProcessHandler
 import com.intellij.execution.process.NopProcessHandler
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.runners.ExecutionEnvironmentBuilder
@@ -21,6 +22,7 @@ import com.intellij.xdebugger.evaluation.XDebuggerEditorsProvider
 import ru.openide.openphp.debugger.launch.PhpDebugLaunch
 import ru.openide.openphp.settings.launch.PhpLaunchEnvironment
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 /** A debug run: PHP's debug arguments first, the session on Testo's console and process, nothing left behind on failure. */
 class TestoDebugRunnerTest : BasePlatformTestCase() {
@@ -105,6 +107,22 @@ class TestoDebugRunnerTest : BasePlatformTestCase() {
         thrown<ExecutionException> { TestoDebugRunner.prepare(configuration(binary = "/nowhere/testo")) }
 
         assertTrue("The listener is let go", debug.abandoned)
+    }
+
+    fun testAnAbandonedDebugLaunchKillsItsProcess() {
+        val debug = FakeDebugLaunch()
+        TestoDebugRunner.debugLaunchProvider = { _, _ -> debug }
+        TestoDebugRunner.processHandlerProvider = { PhpDebugLaunch.processHandler(sleepingCommand()) }
+        val debugged = TestoDebugRunner.prepare(configuration())
+        val process = (debugged.run.handler as BaseProcessHandler<*>).process
+        try {
+            debugged.abandon()
+
+            assertTrue("The listener is let go", debug.abandoned)
+            assertTrue("The process outlived its abandoned launch", process.waitFor(10, TimeUnit.SECONDS))
+        } finally {
+            process.destroyForcibly()
+        }
     }
 
     fun testTheSessionStartsOnTestosConsoleAndProcess() {
