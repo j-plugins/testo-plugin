@@ -189,8 +189,10 @@ class TestoRunConfiguration(
         val launch = ReadAction.compute<TestoLaunch, ExecutionException> { launch(environment) }
         val check = launch.checkBinary()
         if (check.refuses) throw ExecutionException(check.message)
-        val logReports = launch.reportTargets()
+        val logs = launch.logReports()
+        val logReports = logs.reports
         val added = addition(launch)
+        logs.unreachable?.let { TestoUnreachableReportsNotice.getInstance(project).tell(environment.displayName, name, it) }
         val command = launch.commandLine(
             logReports,
             phpArguments,

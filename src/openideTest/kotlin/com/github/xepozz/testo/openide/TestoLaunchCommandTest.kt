@@ -3,10 +3,12 @@ package com.github.xepozz.testo.openide
 import com.github.xepozz.testo.launch.TestoScope
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfiguration
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfigurationType
-import com.intellij.execution.ExecutionException
 import com.intellij.execution.process.NopProcessHandler
+import com.intellij.notification.Notification
+import com.intellij.notification.Notifications
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.util.io.FileUtil
+import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import ru.openide.openphp.settings.launch.PhpExposedPath
 import ru.openide.openphp.settings.launch.PhpLaunchEnvironment
@@ -85,15 +87,39 @@ class TestoLaunchCommandTest : BasePlatformTestCase() {
         )
     }
 
-    fun testAReportOutOfReachRefusesTheRun() {
+    fun testAReportOutOfReachRunsWithoutTheReports() {
         val unreachable = FakeLaunchEnvironment(
             locality = PhpLaunchLocality.Container("host.docker.internal"),
             mappings = mapOf(wd to "/app"),
             exposed = { PhpExposedPath.Unreachable("the service mounts no directory for it") },
         )
+        val configuration = configuration().apply { selection = selection.apply { logJunit = true } }
 
-        val refusal = thrown<ExecutionException> { commandIn(unreachable) }
-        assertTrue(refusal.message, refusal.message!!.contains("the service mounts no directory for it"))
-        assertFalse("Without a report nothing is out of reach", commandIn(unreachable, configuration(logHtml = false)).contains("--log-html"))
+        val command = commandIn(unreachable, configuration)
+
+        assertTrue(command, command.endsWith("php /app/vendor/bin/testo run -q -n --teamcity --group db --path tests/CalcTest.php --filter median:0:1"))
+        assertFalse(command, command.contains("--log-"))
+    }
+
+    fun testAReportOutOfReachIsToldOncePerEnvironmentAndConfiguration() {
+        val told = mutableListOf<String>()
+        project.messageBus.connect(testRootDisposable).subscribe(Notifications.TOPIC, object : Notifications {
+            override fun notify(notification: Notification) {
+                told += notification.content
+            }
+        })
+        fun unreachable(name: String) = FakeLaunchEnvironment(
+            displayName = name,
+            exposed = { PhpExposedPath.Unreachable("the service mounts no directory for it") },
+        )
+
+        commandIn(unreachable("compose"))
+        commandIn(unreachable("compose"))
+        commandIn(unreachable("compose"), configuration().apply { name = "Other" })
+        commandIn(unreachable("docker"))
+        PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+
+        assertEquals(told.joinToString("\n"), 3, told.size)
+        assertTrue(told.first(), told.first().contains("compose") && told.first().contains("the service mounts no directory for it"))
     }
 }

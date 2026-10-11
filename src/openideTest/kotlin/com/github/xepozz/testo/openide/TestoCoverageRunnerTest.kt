@@ -112,5 +112,6 @@ class TestoCoverageRunnerTest : BasePlatformTestCase() {
 
         val refusal = thrown<ExecutionException> { covered(TestoCoverageDriver.XDEBUG, unreachable) }
         assertTrue(refusal.message, refusal.message!!.contains("no volume holds"))
+        assertTrue("The coverage report refuses, not the skipped JUnit one: ${refusal.message}", refusal.message!!.contains("Covered@testo-"))
     }
 }
