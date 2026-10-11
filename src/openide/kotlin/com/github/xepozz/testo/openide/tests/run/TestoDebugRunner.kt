@@ -51,7 +51,7 @@ class TestoDebugRunner : AsyncProgramRunner<RunnerSettings>() {
     internal class Debugged(val debug: PhpDebugLaunch, val run: TestoRunConfiguration.PreparedRun) {
         fun abandon() {
             debug.abandon()
-            run.handler.destroyProcess()
+            run.handler.terminateAbandoned()
         }
     }
 
