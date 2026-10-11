@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.openide.tests.run
 
+import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.launch.TestoCommandLine
 import com.github.xepozz.testo.launch.TestoReportLocation
 import com.github.xepozz.testo.launch.TestoRunSelection
@@ -75,29 +76,40 @@ internal class TestoLaunch(
     fun checkBinary(): BinaryCheck = checkBinary(binary, environment)
 
     /**
-     * The `--log-html` / `--log-junit` reports of this run, made visible to the environment. A report the environment
-     * cannot see refuses the run rather than getting lost.
+     * The `--log-html` / `--log-junit` reports of this run, made visible to the environment. When the environment cannot
+     * see one of them, both are left to whatever testo.php configures, as on PhpStorm.
      */
-    fun reportTargets(): List<Report> {
-        if (!selection.logHtml && !selection.logJunit) return emptyList()
-        return listOfNotNull(
+    fun logReports(): LogReports {
+        if (!selection.logHtml && !selection.logJunit) return LogReports(emptyList())
+        val exposed = listOfNotNull(
             TestoReportFlags.htmlReportFile(project, configurationName).takeIf { selection.logHtml },
             TestoReportFlags.junitReportFile(project, configurationName).takeIf { selection.logJunit },
-        ).map { local -> report(local) }
+        ).map { local -> local to expose(local) }
+        exposed.firstNotNullOfOrNull { (_, path) -> path as? PhpExposedPath.Unreachable }
+            ?.let { return LogReports(emptyList(), it.reason) }
+        return LogReports(exposed.map { (local, path) -> report(local, path) })
     }
 
-    fun report(local: Path): Report {
+    /** A coverage report: without it the run collects nothing, so one the environment cannot see refuses the run. */
+    fun coverageReport(local: Path): Report = report(local, expose(local))
+
+    private fun expose(local: Path): PhpExposedPath {
         // Testo's writers create the directory themselves, but a missing one is the one avoidable failure between here
         // and a written report — and a container can only mount a directory that exists.
         runCatching { Files.createDirectories(local.parent) }
-        return when (val exposed = environment.exposeFile(local.toString())) {
-            is PhpExposedPath.Visible -> Report(local.toString(), exposed.pathInEnvironment, exposed)
-            is PhpExposedPath.Mounted -> Report(local.toString(), exposed.pathInEnvironment, exposed)
-            is PhpExposedPath.Unreachable -> throw ExecutionException(
-                "Cannot run Testo: the report $local is out of reach of ${environment.displayName}: ${exposed.reason}",
-            )
-        }
+        return environment.exposeFile(local.toString())
     }
+
+    private fun report(local: Path, exposed: PhpExposedPath): Report = when (exposed) {
+        is PhpExposedPath.Visible -> Report(local.toString(), exposed.pathInEnvironment, exposed)
+        is PhpExposedPath.Mounted -> Report(local.toString(), exposed.pathInEnvironment, exposed)
+        is PhpExposedPath.Unreachable -> throw ExecutionException(
+            TestoBundle.message("run.report.unreachable", local, environment.displayName, exposed.reason),
+        )
+    }
+
+    /** The log reports a run writes, or none and [unreachable] saying why the environment cannot see them. */
+    class LogReports(val reports: List<Report>, val unreachable: String? = null)
 
     /**
      * The command: `php [phpArguments] <binary> <command> <runner options> [testoArguments] <selection> <reports>
