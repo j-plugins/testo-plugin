@@ -116,7 +116,7 @@ open class TestoCoverageProgramRunner : AsyncProgramRunner<RunnerSettings>() {
             var unverified: String? = null
             val addition = { launch: TestoLaunch ->
                 unverified = checkExtension(driver, launch)
-                val reports = flags.map { (_, local) -> launch.report(Path.of(local)) }
+                val reports = flags.map { (_, local) -> launch.coverageReport(Path.of(local)) }
                 TestoRunConfiguration.RunAddition(
                     TestoCoverageArguments.reportArguments(flags, reports.map { it.path }) +
                         TestoCoverageArguments.extraArguments(selection),
