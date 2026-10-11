@@ -25,12 +25,13 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
 import com.intellij.util.PathUtil
+import ru.openide.openphp.settings.PhpSettings
 import ru.openide.openphp.settings.launch.PhpLaunchEnvironment
 import ru.openide.openphp.settings.launch.PhpLaunchLocality
 
 /**
- * A Testo run configuration on OpenIDE. It keeps what to run as a [TestoRunSelection] and runs under the active
- * interpreter profile of the project, which it does not store: switching the profile switches every run.
+ * A Testo run configuration on OpenIDE. It keeps what to run as a [TestoRunSelection] and runs under the interpreter
+ * profile it names, or the project's active one when it names none.
  */
 class TestoRunConfiguration(
     project: Project,
@@ -122,14 +123,32 @@ class TestoRunConfiguration(
         }
 
     override val interpreterName: String
-        get() = PhpLaunchEnvironment.of(project).displayName
+        get() = archivedEnvironment()?.displayName.orEmpty()
 
     override val interpreterKind: String
-        get() = when (PhpLaunchEnvironment.of(project).locality) {
+        get() = when (archivedEnvironment()?.locality) {
             PhpLaunchLocality.SameHost -> "local"
             is PhpLaunchLocality.Container -> "container"
             is PhpLaunchLocality.WslDistribution -> "wsl"
+            null -> ""
         }
+
+    private fun archivedEnvironment(): PhpLaunchEnvironment? =
+        lastEnvironment ?: runCatching { launchEnvironment() }.getOrNull()
+
+    /**
+     * The launch environment of the interpreter this configuration names, else of the project's active profile. A
+     * profile removed since is refused rather than replaced: the run would go somewhere the user did not choose.
+     */
+    internal fun launchEnvironment(): PhpLaunchEnvironment {
+        val id = options.interpreterId?.takeIf { it.isNotBlank() } ?: return environmentProvider(project)
+        return profileEnvironmentProvider(project, id) ?: throw ExecutionException(missingInterpreterMessage())
+    }
+
+    private fun missingInterpreterMessage(): String {
+        val name = options.interpreterName?.takeIf { it.isNotBlank() } ?: options.interpreterId
+        return "PHP interpreter '$name' no longer exists. Choose another one in the configuration, or the project default."
+    }
 
     /** Named after what it runs, the way PhpStorm names a test configuration, unless Testo has a better name. */
     override fun suggestedName(): String {
@@ -160,7 +179,12 @@ class TestoRunConfiguration(
      * project's composer files, as the platform's check does elsewhere, under the read action it is called in.
      */
     override fun checkConfiguration() {
-        val launch = launch(environmentProvider(project))
+        val environment = try {
+            launchEnvironment()
+        } catch (e: ExecutionException) {
+            throw RuntimeConfigurationError(e.message)
+        }
+        val launch = launch(environment)
         launch.checkBinary().let { check ->
             val message = check.message ?: return@let
             if (check is BinaryCheck.NotFound) throw RuntimeConfigurationError(message)
@@ -180,7 +204,7 @@ class TestoRunConfiguration(
      * flags and the reports they write — decided with the launch at hand.
      */
     internal fun prepare(
-        environment: PhpLaunchEnvironment = environmentProvider(project),
+        environment: PhpLaunchEnvironment = launchEnvironment(),
         phpArguments: List<String> = emptyList(),
         environmentVariables: Map<String, String> = emptyMap(),
         addition: (TestoLaunch) -> RunAddition = { RunAddition() },
@@ -229,16 +253,54 @@ class TestoRunConfiguration(
     private var lastReportTargets: List<TestoReportLocation> = emptyList()
 
     override fun createTestConsoleProperties(executor: Executor): SMTRunnerConsoleProperties =
-        openIdeConsoleProperties(this, executor, lastEnvironment ?: environmentProvider(project)).also {
+        openIdeConsoleProperties(this, executor, archivedEnvironment() ?: environmentProvider(project)).also {
             it.workingDirectory = lastWorkingDirectory
             it.reportTargets = lastReportTargets
             it.toolEnvironment = lastToolEnvironment
         }
 
     companion object {
-        /** Where a run takes its launch environment from: the active interpreter profile. Tests put their own in. */
+        /** The project default: the active interpreter profile. Tests put their own in. */
         @Volatile
         internal var environmentProvider: (Project) -> PhpLaunchEnvironment = { PhpLaunchEnvironment.of(it) }
+
+        /** The launch environment of the interpreter profile with an id; null once it is removed. Tests put their own in. */
+        @Volatile
+        internal var profileEnvironmentProvider: (Project, String) -> PhpLaunchEnvironment? = { project, id ->
+            val settings = PhpSettings.getInstance(project)
+            profileEnvironment(id, settings.activeProfile?.id, profilesProvider(project), PhpLaunchEnvironment.allOf(project))
+        }
+
+        /** The interpreter profiles a configuration can name, as id and name. Tests put their own in. */
+        @Volatile
+        internal var profilesProvider: (Project) -> List<Pair<String, String>> = { project ->
+            PhpSettings.getInstance(project).allProfiles.map { it.id to it.name }
+        }
+
+        /**
+         * The environment of profile [id] among [environments], as `PhpLaunchEnvironment.allOf` lists them: the active
+         * profile first, then every other one of [profiles] once, in their order. That list is the only published way to
+         * an environment of a profile that is not active, and its entries carry no id; so they are matched by position,
+         * and a list that disagrees with [profiles] in length or names is refused rather than guessed at.
+         */
+        internal fun profileEnvironment(
+            id: String,
+            activeId: String?,
+            profiles: List<Pair<String, String>>,
+            environments: List<PhpLaunchEnvironment>,
+        ): PhpLaunchEnvironment? {
+            val name = profiles.firstOrNull { it.first == id }?.second ?: return null
+            val order = listOf(activeId) + profiles.map { it.first }.filter { it != activeId }.distinct()
+            val environment = environments.getOrNull(order.indexOf(id))
+            if (environments.size != order.size || environment == null || (name.isNotBlank() && environment.displayName != name)) {
+                throw ExecutionException("Cannot tell which launch environment belongs to PHP interpreter '$name'.")
+            }
+            return environment
+        }
+
+        /** The name of the project's active profile, for the form's default entry; null when none is active. */
+        @Volatile
+        internal var activeProfileNameProvider: (Project) -> String? = { PhpSettings.getInstance(it).activeProfile?.name }
 
         internal fun defaultProcessHandler(command: GeneralCommandLine): ProcessHandler =
             KillableColoredProcessHandler(command).also { ProcessTerminatedListener.attach(it) }
