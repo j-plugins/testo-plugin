@@ -35,6 +35,10 @@ class TestoTestRunConfigurationEditor(
     private val parentEditor: PhpTestRunConfigurationEditor,
     val configuration: TestoRunConfiguration
 ) : SettingsEditor<TestoRunConfiguration>() {
+    private val typeField = TestoTagsField(
+        TestoBundle.message("testo.tags.types.empty"),
+        TestoBundle.message("testo.tags.types.add"),
+    )
     private val suiteField = TestoTagsField(
         TestoBundle.message("testo.tags.suites.empty"),
         TestoBundle.message("testo.tags.suites.add"),
@@ -108,6 +112,15 @@ class TestoTestRunConfigurationEditor(
         }
 
         group("Filter") {
+            row {
+                label("Type")
+                    .gap(RightGap.COLUMNS)
+                cell(typeField)
+                    .align(AlignX.FILL)
+            }
+                .layout(RowLayout.PARENT_GRID)
+                .rowComment("One --type=<name> per tag, e.g. test, inline, bench; !<name> excludes the type")
+
             row {
                 label("Suite")
                     .gap(RightGap.COLUMNS)
@@ -255,6 +268,7 @@ class TestoTestRunConfigurationEditor(
             override fun textChanged(e: DocumentEvent) = listener()
         }
 
+        typeField.addChangeListener(listener)
         suiteField.addChangeListener(listener)
         groupField.addChangeListener(listener)
         excludeGroupField.addChangeListener(listener)
@@ -282,7 +296,8 @@ class TestoTestRunConfigurationEditor(
 
     override fun isSpecificallyModified(): Boolean {
         val runner = configuration.testoSettings.runnerSettings
-        return suiteField.names != runner.suites
+        return typeField.names != runner.testoTypes
+                || suiteField.names != runner.suites
                 || groupField.names != runner.groups
                 || excludeGroupField.names != runner.excludeGroups
                 || (parallelField.value as Int) != runner.parallel
@@ -308,6 +323,7 @@ class TestoTestRunConfigurationEditor(
 
     override fun resetEditorFrom(testoRunConfiguration: TestoRunConfiguration) {
         val runnerSettings = testoRunConfiguration.testoSettings.runnerSettings
+        typeField.names = runnerSettings.testoTypes
         suiteField.names = runnerSettings.suites
         groupField.names = runnerSettings.groups
         excludeGroupField.names = runnerSettings.excludeGroups
@@ -350,6 +366,7 @@ class TestoTestRunConfigurationEditor(
         } ?: parentEditor.applyTo(testoRunConfiguration)
 
         val runnerSettings = testoRunConfiguration.testoSettings.runnerSettings
+        runnerSettings.testoTypes = typeField.names.toMutableList()
         runnerSettings.suites = suiteField.names.toMutableList()
         runnerSettings.groups = groupField.names.toMutableList()
         runnerSettings.excludeGroups = excludeGroupField.names.toMutableList()
