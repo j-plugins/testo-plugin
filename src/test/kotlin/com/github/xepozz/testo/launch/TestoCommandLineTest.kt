@@ -10,7 +10,7 @@ class TestoCommandLineTest {
     @Test
     fun selectionArgumentsComeInAFixedOrder() {
         val selection = TestoRunSelection(
-            testoType = "bench",
+            testoTypes = listOf("bench", "!inline"),
             suites = listOf("Unit", "My Suite"),
             groups = listOf("db"),
             excludeGroups = listOf("slow", "!flaky"),
@@ -19,7 +19,7 @@ class TestoCommandLineTest {
 
         assertEquals(
             listOf(
-                "--type", "bench",
+                "--type", "bench", "--type", "!inline",
                 "--suite", "Unit", "--suite", "My Suite",
                 "--group", "db",
                 "--group", "!slow", "--group", "!flaky",

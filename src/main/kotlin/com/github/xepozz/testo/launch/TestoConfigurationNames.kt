@@ -28,7 +28,11 @@ object TestoConfigurationNames {
                 val quoted = suites.joinToString(", ") { "'$it'" }
                 return if (suites.size == 1) "Suite $quoted" else "Suites $quoted"
             }
-            if (selection.testoType.isNotEmpty()) return "Type '${selection.testoType}'"
+            val types = selection.testoTypes
+            if (types.isNotEmpty()) {
+                val quoted = types.joinToString(", ") { "'$it'" }
+                return if (types.size == 1) "Type $quoted" else "Types $quoted"
+            }
         }
 
         qualifiedMethodTail(selection)?.let {
@@ -63,7 +67,7 @@ object TestoConfigurationNames {
         return selection.groups.isNotEmpty()
             || selection.excludeGroups.isNotEmpty()
             || selection.suites.isNotEmpty()
-            || selection.testoType.isNotEmpty()
+            || selection.testoTypes.isNotEmpty()
             || selection.rerunFilters.isNotEmpty()
     }
 }

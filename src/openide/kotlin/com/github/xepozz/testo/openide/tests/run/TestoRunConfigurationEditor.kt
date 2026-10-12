@@ -43,7 +43,10 @@ class TestoRunConfigurationEditor(private val project: Project) : SettingsEditor
     }
     private val runnerOptionsField = RawCommandLineEditor()
 
-    private val testoTypeField = JBTextField()
+    private val testoTypeField = TestoTagsField(
+        TestoBundle.message("testo.tags.types.empty"),
+        TestoBundle.message("testo.tags.types.add"),
+    )
     private val suiteField = TestoTagsField(
         TestoBundle.message("testo.tags.suites.empty"),
         TestoBundle.message("testo.tags.suites.add"),
@@ -137,7 +140,8 @@ class TestoRunConfigurationEditor(private val project: Project) : SettingsEditor
             row("Environment variables:") { cell(environmentField).align(AlignX.FILL) }
         }
         group("Filter") {
-            row("Type:") { cell(testoTypeField) }.rowComment("--type=<name>, e.g. test, inline, bench")
+            row("Types:") { cell(testoTypeField).align(AlignX.FILL) }
+                .rowComment("One --type=<name> per tag, e.g. test, inline, bench; !<name> excludes the type")
             row("Suites:") { cell(suiteField).align(AlignX.FILL) }
                 .rowComment("One --suite=<name> per tag, on top of the scope; type a name and press Enter")
             row("Groups:") { cell(groupField).align(AlignX.FILL) }
@@ -194,7 +198,7 @@ class TestoRunConfigurationEditor(private val project: Project) : SettingsEditor
         useConfigurationFileBox.isSelected = selection.useAlternativeConfigurationFile
         configurationFileField.text = selection.configurationFilePath.orEmpty()
         runnerOptionsField.text = selection.testRunnerOptions.orEmpty()
-        testoTypeField.text = selection.testoType
+        testoTypeField.names = selection.testoTypes
         suiteField.names = selection.suites
         groupField.names = selection.groups
         excludeGroupField.names = selection.excludeGroups
@@ -258,7 +262,7 @@ class TestoRunConfigurationEditor(private val project: Project) : SettingsEditor
         selection.useAlternativeConfigurationFile = useConfigurationFileBox.isSelected
         selection.configurationFilePath = configurationFileField.text.trim().ifEmpty { null }
         selection.testRunnerOptions = runnerOptionsField.text.trim().ifEmpty { null }
-        selection.testoType = testoTypeField.text.trim()
+        selection.testoTypes = testoTypeField.names
         selection.suites = suiteField.names
         selection.groups = groupField.names
         selection.excludeGroups = excludeGroupField.names

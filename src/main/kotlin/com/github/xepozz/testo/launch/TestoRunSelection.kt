@@ -21,7 +21,7 @@ data class TestoRunSelection(
     var configurationFilePath: String? = null,
     var testRunnerOptions: String? = null,
     var command: String = "run",
-    var testoType: String = "",
+    var testoTypes: List<String> = emptyList(),
     var suites: List<String> = emptyList(),
     var groups: List<String> = emptyList(),
     var excludeGroups: List<String> = emptyList(),
@@ -60,7 +60,7 @@ data class TestoRunSelection(
         configurationFilePath = other.configurationFilePath
         testRunnerOptions = other.testRunnerOptions
         command = other.command
-        testoType = other.testoType
+        testoTypes = other.testoTypes
         suites = other.suites
         groups = other.groups
         excludeGroups = other.excludeGroups

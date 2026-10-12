@@ -112,6 +112,19 @@ class TestoRunnerSettingsSerializationTest : TestCase() {
         assertFalse("The legacy attribute is gone after a save", serialize(restored).contains("suite=\""))
     }
 
+    fun testLegacySingleTypeBecomesAOneItemList() {
+        val restored = deserialize("""<TestoRunnerSettings testo_type="bench" />""")
+
+        restored.migrateLegacyNames()
+
+        assertEquals(listOf("bench"), restored.testoTypes)
+        assertEquals("", restored.legacyTestoType)
+        val xml = serialize(restored)
+        assertFalse("The legacy attribute is gone after a save", xml.contains("testo_type=\""))
+        assertTrue(xml.contains("<testo_types>"))
+        assertEquals(listOf("bench"), deserialize(xml).testoTypes)
+    }
+
     fun testMigrationIsIdempotentAndKeepsExistingLists() {
         val settings = TestoRunnerSettings().apply { groups = mutableListOf("db") }
 

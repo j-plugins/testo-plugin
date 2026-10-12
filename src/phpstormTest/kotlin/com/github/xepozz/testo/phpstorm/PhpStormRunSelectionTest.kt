@@ -22,7 +22,7 @@ class PhpStormRunSelectionTest : TestCase() {
         configurationFilePath = "/work/app/testo.php",
         testRunnerOptions = "-q --stop-on-failure",
         command = "list",
-        testoType = "bench",
+        testoTypes = listOf("bench"),
         suites = listOf("Unit", "My, Suite"),
         groups = listOf("db", "a,b"),
         excludeGroups = listOf("slow"),
