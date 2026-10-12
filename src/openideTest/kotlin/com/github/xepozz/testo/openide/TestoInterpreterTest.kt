@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.openide
 
 import com.github.xepozz.testo.launch.TestoScope
+import com.github.xepozz.testo.openide.tests.TestoFrameworkType
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfiguration
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfigurationEditor
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfigurationType
@@ -13,6 +14,9 @@ import com.intellij.openapi.util.JDOMUtil
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import org.jdom.Element
+import ru.openide.openphp.run.testing.settings.PhpTestFrameworkSettings
+import ru.openide.openphp.settings.InterpreterProfile
+import ru.openide.openphp.settings.PhpInterpreterRegistry
 import ru.openide.openphp.settings.launch.PhpLaunchEnvironment
 import ru.openide.openphp.settings.launch.PhpLaunchLocality
 import java.io.File
@@ -104,6 +108,28 @@ class TestoInterpreterTest : BasePlatformTestCase() {
         assertEquals(listOf("-d", "memory_limit=1G", "-dpcov.enabled=1"), arguments.subList(php + 1, php + 4))
     }
 
+    fun testTheChosenInterpreterTakesItsOwnTestFrameworkSettings() {
+        val settings = PhpTestFrameworkSettings.getInstance(project)
+        val registry = PhpInterpreterRegistry.getInstance()
+        registry.addProfile(InterpreterProfile.Local("compose-id", "Compose", "php"))
+        try {
+            settings.update(TestoFrameworkType.ID, "/project/vendor/bin/testo", "/project/testo.php")
+            settings.updateProfile(TestoFrameworkType.ID, "compose-id", "/app/vendor/bin/testo", "")
+            val configuration = configuration().apply { options.binaryPath = null }
+            val onActive = configuration.launch(active)
+            assertEquals("/project/vendor/bin/testo", onActive.binary)
+            assertEquals("/project/testo.php", onActive.configFile)
+
+            configuration.options.interpreterId = "compose-id"
+            val onCompose = configuration.launch(compose)
+            assertEquals("/app/vendor/bin/testo", onCompose.binary)
+            assertEquals("A field the profile leaves empty falls back to the project's", "/project/testo.php", onCompose.configFile)
+        } finally {
+            registry.removeProfile("compose-id")
+            settings.loadState(PhpTestFrameworkSettings.State())
+        }
+    }
+
     fun testARemovedInterpreterRefusesTheRunInsteadOfFallingBack() {
         val configuration = configuration().apply {
             options.interpreterId = "gone-id"
@@ -115,27 +141,6 @@ class TestoInterpreterTest : BasePlatformTestCase() {
         val refusal = thrown<ExecutionException> { configuration.prepare(processHandler = { NopProcessHandler() }) }
         assertTrue(refusal.message, refusal.message!!.contains("Old Docker"))
         assertTrue(thrown<ExecutionException> { configuration.launchEnvironment() }.message!!.contains("no longer exists"))
-    }
-
-    fun testAProfileIsFoundInTheEnvironmentListByItsPlace() {
-        val local = FakeLaunchEnvironment(displayName = "Local")
-        val docker = FakeLaunchEnvironment(displayName = "Docker")
-        val wsl = FakeLaunchEnvironment(displayName = "WSL")
-        val profiles = listOf("l" to "Local", "d" to "Docker", "w" to "WSL")
-
-        // The active profile leads the list; the others follow in their own order.
-        val environments = listOf(docker, local, wsl)
-        assertSame(docker, TestoRunConfiguration.profileEnvironment("d", "d", profiles, environments))
-        assertSame(local, TestoRunConfiguration.profileEnvironment("l", "d", profiles, environments))
-        assertSame(wsl, TestoRunConfiguration.profileEnvironment("w", "d", profiles, environments))
-        assertNull(TestoRunConfiguration.profileEnvironment("x", "d", profiles, environments))
-
-        // No active profile: the list opens with the plain PHP on the path.
-        val path = FakeLaunchEnvironment(displayName = "PHP on PATH")
-        assertSame(local, TestoRunConfiguration.profileEnvironment("l", null, profiles, listOf(path, local, docker, wsl)))
-
-        thrown<ExecutionException> { TestoRunConfiguration.profileEnvironment("w", "d", profiles, listOf(docker, local)) }
-        thrown<ExecutionException> { TestoRunConfiguration.profileEnvironment("l", "d", profiles, listOf(docker, wsl, local)) }
     }
 
     fun testTheFormKeepsTheInterpreterTheCommandAndARemovedProfile() {

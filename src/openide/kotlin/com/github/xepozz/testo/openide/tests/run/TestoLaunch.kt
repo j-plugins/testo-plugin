@@ -33,15 +33,25 @@ internal class TestoLaunch(
     private val configurationName: String,
     val environment: PhpLaunchEnvironment,
 ) {
+    private val framework = TestoFrameworkType.instance()
+
+    // Without a profile id PhpTestFrameworks answers for the active profile, not the configuration's interpreter.
+    private val profileId: String? = options.interpreterId?.takeIf { it.isNotBlank() }
+
     /** The binary: the configuration's, else the test framework page's, else composer's; null when there is none. */
-    val binary: String? = options.binaryPath?.takeIf { it.isNotBlank() }
-        ?: TestoFrameworkType.instance()?.let { PhpTestFrameworks.binaryPath(project, it, options.workingDirectory) }
+    val binary: String? = options.binaryPath?.takeIf { it.isNotBlank() } ?: framework?.let { framework ->
+        val cwd = options.workingDirectory
+        if (profileId == null) PhpTestFrameworks.binaryPath(project, framework, cwd)
+        else PhpTestFrameworks.binaryPath(project, framework, cwd, profileId)
+    }
 
     /** The configuration file passed with `--config`: the one the configuration names, else the framework's. */
     val configFile: String? =
         if (selection.useAlternativeConfigurationFile) selection.configurationFilePath?.takeIf { it.isNotBlank() }
-        else TestoFrameworkType.instance()?.let {
-            PhpTestFrameworks.configFile(project, it, options.workingDirectory?.takeIf(String::isNotBlank) ?: binaryProjectRoot())
+        else framework?.let { framework ->
+            val start = options.workingDirectory?.takeIf(String::isNotBlank) ?: binaryProjectRoot()
+            if (profileId == null) PhpTestFrameworks.configFile(project, framework, start)
+            else PhpTestFrameworks.configFile(project, framework, start, profileId)
         }
 
     /**

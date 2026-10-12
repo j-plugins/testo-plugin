@@ -611,11 +611,9 @@ Non-obvious constraints already paid for in blood — read before touching the r
   inherits the interpreter and working directory), which starts the process itself — in PhpStorm through
   `PhpRunConfiguration.createProcessHandler`, which still handles Docker/WSL/SSH. Run through the executor, it took
   over the tab and the Run button of the Testo run it mutates.
-- **On OpenIDE a profile reaches its launch environment only through `PhpLaunchEnvironment.allOf(project)`.**
-  `PhpLaunchEnvironments.of(profile, …)` is Kotlin-`internal` and `ProfileLaunchEnvironment` is `@ApiStatus.Internal`,
-  and `allOf`'s entries carry no id. So `TestoRunConfiguration.profileEnvironment` matches a saved `interpreterId` by
-  position (active profile first, then the rest in registry order), checked against the display name, and refuses a list
-  that does not line up.
+- **On OpenIDE a configuration's interpreter is a profile id**, resolved through `PhpLaunchEnvironment.of(project, id)` and
+  the `profileId` overloads of `PhpTestFrameworks.binaryPath`/`configFile` (PHP for OpenIDE 0.9.8+). The overloads without it
+  answer for the active profile, whatever the configuration names.
 - **`createPathMappings` misses what the interpreter's command line mounts**: a Docker interpreter's project volume is
   known only to `createPathMapper` (the console's translation), so every host ↔ interpreter path goes through
   `PhpToolLauncher`, which falls back to it and to the command's own `getPathProcessor`. The IDE system dir is in none,
