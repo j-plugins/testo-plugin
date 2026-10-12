@@ -1,6 +1,9 @@
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import java.nio.file.FileSystems
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 plugins {
     id("java") // Java support
@@ -224,6 +227,37 @@ tasks {
         val prepareVerifierPlugins = register<Sync>("prepareVerifierPlugins") {
             from(configurations.named("intellijPlatformPluginDependency"))
             into(verifierHome.map { it.dir("loaded-plugins") })
+            // Since 0.9.7 PHP for OpenIDE describes itself in Russian. The verifier requires a description to open with
+            // 40 Latin characters (DescriptionNotStartingWithLatinCharacters) and otherwise drops the dependency as
+            // "Unavailable", so the staged copy gets a Latin opening sentence; the plugin itself is untouched.
+            val loadedPlugins = verifierHome.map { it.dir("loaded-plugins").asFile }
+            doLast {
+                val opening = "<description><![CDATA["
+                val latinOpening = "PHP for OpenIDE, staged for the Plugin Verifier. "
+                loadedPlugins.get().listFiles { file -> file.name.endsWith(".zip") }.orEmpty().forEach { zip ->
+                    FileSystems.newFileSystem(zip.toPath()).use { outer ->
+                        Files.walk(outer.getPath("/")).use { paths ->
+                            paths.filter { it.toString().endsWith(".jar") }.toList()
+                        }.forEach { jar ->
+                            val copy = Files.createTempFile("verifier-plugin", ".jar")
+                            Files.copy(jar, copy, StandardCopyOption.REPLACE_EXISTING)
+                            val changed = FileSystems.newFileSystem(copy).use { inner ->
+                                val xml = inner.getPath("META-INF/plugin.xml")
+                                if (!Files.exists(xml)) return@use false
+                                val text = Files.readString(xml)
+                                val start = text.indexOf(opening).takeIf { it >= 0 }?.plus(opening.length)
+                                    ?: return@use false
+                                val visible = text.substring(start).replace(Regex("<[^>]*>"), "").trimStart().take(40)
+                                if (visible.all { it.code < 128 }) return@use false
+                                Files.writeString(xml, text.substring(0, start) + latinOpening + text.substring(start))
+                                true
+                            }
+                            if (changed) Files.copy(copy, jar, StandardCopyOption.REPLACE_EXISTING)
+                            Files.delete(copy)
+                        }
+                    }
+                }
+            }
         }
         verifyPlugin {
             dependsOn(prepareVerifierPlugins)
