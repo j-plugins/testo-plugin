@@ -121,7 +121,7 @@ class RunContextsBaselineTest : BasePlatformTestCase() {
             appendLine("  configurationFilePath=$configurationFilePath")
             appendLine("  testRunnerOptions=$testRunnerOptions")
             appendLine("  command=$command")
-            appendLine("  testoType=$testoType")
+            appendLine("  testoTypes=$testoTypes")
             appendLine("  suites=$suites")
             appendLine("  groups=$groups")
             appendLine("  excludeGroups=$excludeGroups")

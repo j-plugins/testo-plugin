@@ -374,8 +374,8 @@ Each build must be installed with its corresponding PHP plugin.
   The `--teamcity` flag is what makes Testo emit the SM service messages this plugin parses.
 - Runner flags from `TestoRunnerSettings` (only emitted when non-empty): `--type`, `--suite`, `--group`,
   plus one `--filter <selector>` per entry in `rerunFilters` (no `--parallel` — Testo's CLI does not take it yet).
-  `suites`, `groups`/`excludeGroups` are persisted
-  **lists** (`@XCollection`), one `--group` flag each — Testo ORs repeated `--group`s and reads a `!name` prefix as an
+  `testoTypes`, `suites`, `groups`/`excludeGroups` are persisted
+  **lists** (`@XCollection`), one flag each — Testo ORs repeated `--type`s and `--group`s and reads a `!name` prefix as an
   exclusion, which is the only exclusion form its CLI has. A name is opaque: whatever `#[Group]` spells reaches the
   CLI untouched.
 - `--log-html`/`--log-junit` at an IDE-managed path (`TestoReportFlags`, both on by default),

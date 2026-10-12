@@ -51,7 +51,7 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
         val result = producer.setupConfiguration(settings, attribute, attribute.containingFile.virtualFile)
 
         assertNotNull("#[Test] attribute must produce a run configuration", result)
-        assertEquals("#[Test] runs with --type=test", "test", settings.testoType)
+        assertEquals("#[Test] runs with --type=test", listOf("test"), settings.testoTypes)
         assertEquals("#[Test] is not a data provider", -1, settings.dataProviderIndex)
         assertEquals("#[Test] is not a dataset", -1, settings.dataSetIndex)
         assertFalse(
@@ -85,7 +85,7 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
         val result = producer.setupConfiguration(settings, attribute, attribute.containingFile.virtualFile)
 
         assertNotNull("#[Test] on a DataProvider method must still produce a config", result)
-        assertEquals("#[Test] runs with --type=test", "test", settings.testoType)
+        assertEquals("#[Test] runs with --type=test", listOf("test"), settings.testoTypes)
         assertFalse(
             "#[Test] must NOT inherit a :index suffix from sibling DataProvider, was '${settings.methodName}'",
             settings.methodName.matches(Regex(".*:\\d+$"))
@@ -117,7 +117,7 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
         val result = producer.setupConfiguration(settings, attribute, attribute.containingFile.virtualFile)
 
         assertNotNull("#[DataProvider] attribute must produce a run configuration", result)
-        assertEquals("#[DataProvider] runs with --type=test", "test", settings.testoType)
+        assertEquals("#[DataProvider] runs with --type=test", listOf("test"), settings.testoTypes)
         assertEquals("First data attribute has index 0", 0, settings.dataProviderIndex)
         assertEquals("Not a dataset run", -1, settings.dataSetIndex)
         assertTrue(
@@ -144,8 +144,8 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
         assertNotNull("#[TestRectorFixtures] must produce a run configuration", result)
         assertEquals(
             "A rule's fixtures run as the synthesized rector-fixture type",
-            TestoRunConfigurationProducer.RECTOR_FIXTURE_TYPE,
-            settings.testoType,
+            listOf(TestoRunConfigurationProducer.RECTOR_FIXTURE_TYPE),
+            settings.testoTypes,
         )
         assertEquals("The case is the class, so it is run through its file", Scope.File, settings.scope)
         assertTrue("No method selector for a case class", settings.methodName.isNullOrEmpty())
@@ -166,7 +166,7 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
         val result = producer.setupConfiguration(settings, phpClass, psiFile.virtualFile)
 
         assertNotNull("Running the rule class itself must produce a configuration", result)
-        assertEquals("Running a class runs everything it holds — no type filter", "", settings.testoType)
+        assertEquals("Running a class runs everything it holds — no type filter", emptyList<String>(), settings.testoTypes)
         assertEquals(Scope.File, settings.scope)
     }
 
@@ -180,7 +180,7 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
         val settings = TestoRunnerSettings()
         producer.setupConfiguration(settings, phpClass, psiFile.virtualFile)
 
-        assertEquals("A plain test class run stays untyped", "", settings.testoType)
+        assertEquals("A plain test class run stays untyped", emptyList<String>(), settings.testoTypes)
     }
 
     fun testSetupConfiguration_classWithTestAttribute_keepsNoTestoType() {
@@ -202,7 +202,7 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
 
         // `--type=test` here would silently drop the class's #[Bench] methods from the run; that narrowing is only
         // applied when the run starts from the #[Test] attribute itself.
-        assertEquals("Running the class itself must stay untyped", "", settings.testoType)
+        assertEquals("Running the class itself must stay untyped", emptyList<String>(), settings.testoTypes)
     }
 
     fun testIsConfigurationFromContext_typedAndUntypedClassRunsAreDifferentContexts() {
@@ -251,7 +251,7 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
 
         assertNotNull("#[Test] on a class runs that class", result)
         assertEquals(Scope.File, settings.scope)
-        assertEquals("Running from the attribute narrows to its type", "test", settings.testoType)
+        assertEquals("Running from the attribute narrows to its type", listOf("test"), settings.testoTypes)
     }
 
     // ---- #[Group] — run everything in that group, nothing else ----
@@ -281,7 +281,7 @@ class TestoRunConfigurationProducerPsiTest : BasePlatformTestCase() {
         )
         assertTrue("No path selector for a group run", settings.filePath.isNullOrEmpty())
         assertTrue("No method selector for a group run", settings.methodName.isNullOrEmpty())
-        assertEquals("No --type for a group run", "", settings.testoType)
+        assertEquals("No --type for a group run", emptyList<String>(), settings.testoTypes)
         assertEquals(-1, settings.dataProviderIndex)
         assertEquals(-1, settings.dataSetIndex)
     }

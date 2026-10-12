@@ -21,7 +21,7 @@ import javax.swing.SwingUtilities
 import javax.swing.border.CompoundBorder
 
 /**
- * A list of names shown as removable tags. A suite or group name is opaque to the toolchain — whatever the CLI is
+ * A list of names shown as removable tags. A suite, group or type name is opaque to the toolchain — whatever the CLI is
  * handed is what it selects — so a free-form field had no separator it could safely own; tags remove the question.
  */
 class TestoTagsField(
