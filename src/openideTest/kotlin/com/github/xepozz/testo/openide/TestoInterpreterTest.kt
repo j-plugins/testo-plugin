@@ -1,6 +1,8 @@
 package com.github.xepozz.testo.openide
 
 import com.github.xepozz.testo.launch.TestoScope
+import com.github.xepozz.testo.openide.tests.TestoFrameworkType
+import com.github.xepozz.testo.openide.tests.run.TestoLaunch
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfiguration
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfigurationEditor
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfigurationType
@@ -13,6 +15,7 @@ import com.intellij.openapi.util.JDOMUtil
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import org.jdom.Element
+import ru.openide.openphp.run.testing.settings.PhpTestFrameworkSettings
 import ru.openide.openphp.settings.launch.PhpLaunchEnvironment
 import ru.openide.openphp.settings.launch.PhpLaunchLocality
 import java.io.File
@@ -102,6 +105,35 @@ class TestoInterpreterTest : BasePlatformTestCase() {
         val arguments = prepared.command.parametersList.list
         val php = arguments.indexOf("php")
         assertEquals(listOf("-d", "memory_limit=1G", "-dpcov.enabled=1"), arguments.subList(php + 1, php + 4))
+    }
+
+    fun testTheChosenInterpreterTakesItsOwnTestFrameworkSettings() {
+        val settings = PhpTestFrameworkSettings.getInstance(project)
+        try {
+            settings.update(TestoFrameworkType.ID, "/project/vendor/bin/testo", "/project/testo.php")
+            settings.updateProfile(TestoFrameworkType.ID, "compose-id", "/app/vendor/bin/testo", "")
+            val configuration = configuration().apply { options.binaryPath = null }
+            val onActive = configuration.launch(active)
+            assertEquals("/project/vendor/bin/testo", onActive.binary)
+            assertEquals("/project/testo.php", onActive.configFile)
+
+            configuration.options.interpreterId = "compose-id"
+            val onCompose = configuration.launch(compose)
+            assertEquals("/app/vendor/bin/testo", onCompose.binary)
+            assertEquals("A field the profile leaves empty falls back to the project's", "/project/testo.php", onCompose.configFile)
+        } finally {
+            settings.loadState(PhpTestFrameworkSettings.State())
+        }
+    }
+
+    fun testAConfigFileIsLookedForFromTheStartUpToTheProject() {
+        val root = FileUtil.createTempDirectory("testo-config", null)
+        val nested = File(root, "app/tests").apply { mkdirs() }
+        File(root, "app/testo.php").writeText("<?php\n")
+        val names = listOf("testo.php", "testo.dist.php")
+        assertEquals(File(root, "app/testo.php").absolutePath, TestoLaunch.findConfigFile(names, nested.path, root.path))
+        assertNull(TestoLaunch.findConfigFile(names, nested.path, File(root, "app/tests").path))
+        assertNull(TestoLaunch.findConfigFile(names, root.parent, root.path))
     }
 
     fun testARemovedInterpreterRefusesTheRunInsteadOfFallingBack() {

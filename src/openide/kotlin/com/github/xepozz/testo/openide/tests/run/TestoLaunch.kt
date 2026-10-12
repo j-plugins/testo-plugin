@@ -11,15 +11,19 @@ import com.github.xepozz.testo.tests.run.TestoRunPaths
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.configurations.ParametersList
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.io.FileUtil
 import ru.openide.openphp.run.testing.PhpTestFrameworks
+import ru.openide.openphp.run.testing.settings.PhpTestFrameworkDetector
+import ru.openide.openphp.run.testing.settings.PhpTestFrameworkSettings
 import ru.openide.openphp.settings.launch.PhpExposedPath
 import ru.openide.openphp.settings.launch.PhpLaunchEnvironment
 import ru.openide.openphp.settings.launch.PhpLaunchLocality
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * One run of a Testo configuration in one launch environment: the binary, the working directory, the configuration file
@@ -33,16 +37,38 @@ internal class TestoLaunch(
     private val configurationName: String,
     val environment: PhpLaunchEnvironment,
 ) {
+    private val framework = TestoFrameworkType.instance()
+
+    // PhpTestFrameworks answers for the active profile only. A configuration on another interpreter reads that
+    // profile's Test Frameworks entry, which only PHP for OpenIDE's internal API exposes; should that API change, the
+    // run falls back to the active profile's settings instead of failing.
+    private val profileEntry: ProfileEntry? = options.interpreterId?.takeIf { it.isNotBlank() }?.let { id ->
+        framework?.let { framework -> internalApi { PhpTestFrameworkSettings.getInstance(project).resolved(framework.id, id) }
+            ?.let { ProfileEntry(it.binaryPath, it.configFile) } }
+    }
+
     /** The binary: the configuration's, else the test framework page's, else composer's; null when there is none. */
-    val binary: String? = options.binaryPath?.takeIf { it.isNotBlank() }
-        ?: TestoFrameworkType.instance()?.let { PhpTestFrameworks.binaryPath(project, it, options.workingDirectory) }
+    val binary: String? = options.binaryPath?.takeIf { it.isNotBlank() } ?: framework?.let { framework ->
+        val cwd = options.workingDirectory
+        val detected = profileEntry?.takeIf { it.binaryPath.isBlank() }
+            ?.let { internalApi { PhpTestFrameworkDetector.detect(project, framework, cwd) } }
+        when {
+            profileEntry != null && profileEntry.binaryPath.isNotBlank() -> profileEntry.binaryPath
+            detected != null -> detected.binaryPath
+            else -> PhpTestFrameworks.binaryPath(project, framework, cwd)
+        }
+    }
 
     /** The configuration file passed with `--config`: the one the configuration names, else the framework's. */
     val configFile: String? =
         if (selection.useAlternativeConfigurationFile) selection.configurationFilePath?.takeIf { it.isNotBlank() }
-        else TestoFrameworkType.instance()?.let {
-            PhpTestFrameworks.configFile(project, it, options.workingDirectory?.takeIf(String::isNotBlank) ?: binaryProjectRoot())
+        else framework?.let { framework ->
+            val start = options.workingDirectory?.takeIf(String::isNotBlank) ?: binaryProjectRoot()
+            if (profileEntry == null) PhpTestFrameworks.configFile(project, framework, start)
+            else profileEntry.configFile.ifBlank { findConfigFile(framework.configFileNames, start ?: project.basePath, project.basePath) }
         }
+
+    private class ProfileEntry(val binaryPath: String, val configFile: String)
 
     /**
      * Where the process runs, by Testo's rules: the configuration's own directory, else that of a `testo.php` it runs,
@@ -170,6 +196,17 @@ internal class TestoLaunch(
     }
 
     companion object {
+        /** The nearest of [names] from [start] up to [base], as PHP for OpenIDE looks for a framework's own file. */
+        fun findConfigFile(names: List<String>, start: String?, base: String?): String? {
+            val root = File(base ?: return null)
+            var directory: File? = File(start ?: return null)
+            while (directory != null && FileUtil.isAncestor(root, directory, false)) {
+                names.map { File(directory, it) }.firstOrNull { it.exists() }?.let { return it.absolutePath }
+                directory = directory.parentFile
+            }
+            return null
+        }
+
         /**
          * Whether [binary] is there, checked only where the IDE can tell. A path in the host's form is checked on the
          * host. In WSL a path of the distribution is checked through its translation to the host, and one that
@@ -196,6 +233,18 @@ internal class TestoLaunch(
         }
     }
 }
+
+/** A call into PHP for OpenIDE's internal API; null, and logged once, when a later version no longer links with it. */
+private inline fun <T : Any> internalApi(call: () -> T): T? = try {
+    call()
+} catch (e: LinkageError) {
+    if (internalApiBroken.compareAndSet(false, true)) {
+        logger<TestoLaunch>().warn("PHP for OpenIDE's per-profile test framework settings are unavailable", e)
+    }
+    null
+}
+
+private val internalApiBroken = AtomicBoolean(false)
 
 /** What the IDE can tell about the Testo binary before a run. */
 sealed interface BinaryCheck {
