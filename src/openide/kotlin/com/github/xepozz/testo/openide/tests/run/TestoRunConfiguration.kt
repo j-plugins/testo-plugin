@@ -269,35 +269,13 @@ class TestoRunConfiguration(
         /** The launch environment of the interpreter profile with an id; null once it is removed. Tests put their own in. */
         @Volatile
         internal var profileEnvironmentProvider: (Project, String) -> PhpLaunchEnvironment? = { project, id ->
-            val settings = PhpSettings.getInstance(project)
-            profileEnvironment(id, settings.activeProfile?.id, profilesProvider(project), PhpLaunchEnvironment.allOf(project))
+            PhpLaunchEnvironment.of(project, id)
         }
 
         /** The interpreter profiles a configuration can name, as id and name. Tests put their own in. */
         @Volatile
         internal var profilesProvider: (Project) -> List<Pair<String, String>> = { project ->
             PhpSettings.getInstance(project).allProfiles.map { it.id to it.name }
-        }
-
-        /**
-         * The environment of profile [id] among [environments], as `PhpLaunchEnvironment.allOf` lists them: the active
-         * profile first, then every other one of [profiles] once, in their order. That list is the only published way to
-         * an environment of a profile that is not active, and its entries carry no id; so they are matched by position,
-         * and a list that disagrees with [profiles] in length or names is refused rather than guessed at.
-         */
-        internal fun profileEnvironment(
-            id: String,
-            activeId: String?,
-            profiles: List<Pair<String, String>>,
-            environments: List<PhpLaunchEnvironment>,
-        ): PhpLaunchEnvironment? {
-            val name = profiles.firstOrNull { it.first == id }?.second ?: return null
-            val order = listOf(activeId) + profiles.map { it.first }.filter { it != activeId }.distinct()
-            val environment = environments.getOrNull(order.indexOf(id))
-            if (environments.size != order.size || environment == null || (name.isNotBlank() && environment.displayName != name)) {
-                throw ExecutionException("Cannot tell which launch environment belongs to PHP interpreter '$name'.")
-            }
-            return environment
         }
 
         /** The name of the project's active profile, for the form's default entry; null when none is active. */
