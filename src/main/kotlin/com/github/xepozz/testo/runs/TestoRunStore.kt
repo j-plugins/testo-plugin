@@ -1,8 +1,12 @@
 package com.github.xepozz.testo.runs
 
+import com.github.xepozz.testo.coverage.closeTestoCoverageOf
+import com.github.xepozz.testo.infection.TestoMutationArchive
+import com.github.xepozz.testo.infection.TestoMutationService
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.intellij.ide.util.PropertiesComponent
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
@@ -127,18 +131,20 @@ class TestoRunStore(private val project: Project) {
         val keep = retentionLimit()
         val now = System.currentTimeMillis()
         val rotating = ArrayList<Pair<Path, Long>>()
+        val deleted = ArrayList<Path>()
         for (dir in runDirectories()) {
             val manifest = readManifest(dir)
             when {
                 manifest == null ->
                     // A directory that never got its manifest: the run crashed or the IDE died mid-write.
-                    if (now - startedAtOf(dir) > INCOMPLETE_GRACE_MS) delete(dir)
-                manifest.retention == RunRetention.DISCARD -> delete(dir)
+                    if (now - startedAtOf(dir) > INCOMPLETE_GRACE_MS) delete(dir, deleted)
+                manifest.retention == RunRetention.DISCARD -> delete(dir, deleted)
                 manifest.retention == RunRetention.LOCKED -> Unit
                 else -> rotating += dir to manifest.startedAt
             }
         }
-        rotating.sortedByDescending { it.second }.drop(keep).forEach { delete(it.first) }
+        rotating.sortedByDescending { it.second }.drop(keep).forEach { delete(it.first, deleted) }
+        forget(deleted)
     }
 
     /**
@@ -147,32 +153,44 @@ class TestoRunStore(private val project: Project) {
      * @param keepLocked leave [RunRetention.LOCKED] runs where they are.
      * @param spare the run a tab is currently showing: it is marked [RunRetention.DISCARD] rather than deleted, so the
      *        open tab keeps the files it is built on — it leaves the history now and the disk at the next prune, and
-     *        setting *Keep* on that tab brings it back.
+     *        setting *Keep* on that tab brings it back. A run being mutated is marked the same way.
      */
     fun clearHistory(keepLocked: Boolean, spare: Path?) {
         val spared = spare?.let { runCatching { it.toAbsolutePath().normalize() }.getOrNull() }
         val now = System.currentTimeMillis()
+        val deleted = ArrayList<Path>()
         for (dir in runDirectories()) {
             val retention = retentionOf(dir)
             // No manifest yet = possibly another tab's run still being written — same grace as prune().
             if (retention == null && now - startedAtOf(dir) <= INCOMPLETE_GRACE_MS) continue
             if (keepLocked && retention == RunRetention.LOCKED) continue
-            if (dir.toAbsolutePath().normalize() == spared) {
+            if (dir.toAbsolutePath().normalize() == spared || TestoMutationService.getInstance(project).isBusy(dir)) {
                 setRetention(dir, RunRetention.DISCARD)
                 continue
             }
-            delete(dir)
+            delete(dir, deleted)
         }
+        forget(deleted)
     }
 
     private fun runDirectories(): List<Path> = runCatching {
         Files.list(root()).use { stream -> stream.filter { it.isDirectory() }.toList() }
     }.getOrDefault(emptyList())
 
-    private fun delete(dir: Path) {
+    private fun delete(dir: Path, deleted: MutableList<Path>) {
+        // Between its processes a mutation run holds no inputs, yet its next one writes into this archive.
+        if (TestoMutationService.getInstance(project).isBusy(dir)) return
         // A disconnected interpreter may still be reading the mutation run's coverage copy.
-        runCatching { com.github.xepozz.testo.infection.TestoMutationArchive.deleteRunIfSafe(dir) }
+        runCatching { TestoMutationArchive.deleteRunIfSafe(dir) }
+            .onSuccess { if (it) deleted.add(dir) }
             .onFailure { LOG.warn("Failed to delete archived Testo run $dir", it) }
+    }
+
+    // Mutation marks and an applied coverage bundle outlive their run's files otherwise, and lead into deleted reports.
+    private fun forget(deleted: List<Path>) {
+        if (deleted.isEmpty()) return
+        TestoMutationService.getInstance(project).forget(deleted)
+        ApplicationManager.getApplication().invokeLater({ closeTestoCoverageOf(project, deleted) }, project.disposed)
     }
 
     companion object {

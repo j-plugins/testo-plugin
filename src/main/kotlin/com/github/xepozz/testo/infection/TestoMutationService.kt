@@ -60,6 +60,8 @@ class TestoMutationService(private val project: Project) {
                 val latest = TestoMutationArchive.runs(sourceRunDir).lastOrNull() ?: return@executeOnPooledThread
                 val loaded = TestoMutationArchive.load(sourceRunDir, latest) ?: return@executeOnPooledThread
                 runs.putIfAbsent(sourceRunDir, loaded)
+                // The history may have deleted the run, and forgotten it, while this read it.
+                if (!Files.isDirectory(sourceRunDir)) runs.remove(sourceRunDir, loaded)
                 TestoMutationEditorMarks.getInstance(project).refresh()
             }
         }
@@ -72,6 +74,27 @@ class TestoMutationService(private val project: Project) {
 
     /** The run the editor marks show: the *Mutations* window's selected tab, else the latest started. */
     fun current(): TestoMutationRun? = selected ?: runs.values.maxByOrNull { it.startedAt }
+
+    /** Drops what is kept of the Testo runs archived at [sourceRunDirs], which are deleted, and the marks they drew. */
+    internal fun forget(sourceRunDirs: Collection<Path>) {
+        val gone = sourceRunDirs.map { it.toAbsolutePath().normalize() }
+        fun isGone(dir: Path) = isUnder(dir, gone)
+        runs.keys.removeIf(::isGone)
+        probed.removeIf(::isGone)
+        scoreCache.keys.removeIf(::isGone)
+        // Keyed by the coverage-xml inside the run's archive, not by the run itself.
+        coveringIndexes.keys.removeIf(::isGone)
+        if (selected?.let { isGone(it.sourceRunDir) } == true) selected = null
+        // A tab left open would make its run current again, and its Restart would write into the deleted archive.
+        ApplicationManager.getApplication().invokeLater({ TestoMutationToolWindow.close(project, gone) }, project.disposed)
+        TestoMutationEditorMarks.getInstance(project).refresh()
+    }
+
+    /** Whether a mutation run of the Testo run archived at [sourceRunDir] is going: its archive must stay. */
+    fun isBusy(sourceRunDir: Path): Boolean {
+        val dir = sourceRunDir.toAbsolutePath().normalize()
+        return runs.entries.any { (key, run) -> run.isBusy && key.toAbsolutePath().normalize() == dir }
+    }
 
     /** The mutation runs of the Testo run archived at [sourceRunDir], newest first. Reads the archive: not on the EDT. */
     internal fun history(sourceRunDir: Path): List<TestoMutationHistoryEntry> {
@@ -457,6 +480,12 @@ internal fun rerunUnits(targets: List<Mutant>, wholeFiles: Boolean): List<RerunU
         if (wholeFiles && mutants.size > 1 && file.mutants.all { it in wanted }) listOf(RerunUnit.File(file))
         else mutants.map(RerunUnit::One)
     }
+}
+
+/** Whether [path] is one of [dirs], given absolute and normalized, or lies inside one. */
+internal fun isUnder(path: Path, dirs: Collection<Path>): Boolean {
+    val normalized = path.toAbsolutePath().normalize()
+    return dirs.any(normalized::startsWith)
 }
 
 /** The coverage's spelling of [path], a mutated file as the interpreter sees it: the source it ends with. */

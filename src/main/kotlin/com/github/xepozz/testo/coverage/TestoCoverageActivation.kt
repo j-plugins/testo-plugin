@@ -51,6 +51,8 @@ fun applyTestoCoverage(project: Project, reports: List<TestoCoverageReport>, run
         val loaded = suites.map { it.getCoverageData(manager) }
         ApplicationManager.getApplication().invokeLater({
             if (APPLIES.getValue(project).get() != generation) return@invokeLater
+            // The history may have deleted the run, and closed its coverage, while the reports were read.
+            if (runDir != null && !Files.isDirectory(runDir)) return@invokeLater
             // Before the bundle is handed over, not after: the highlighter paints on `coverageDataCalculated`, and that
             // fires from inside chooseSuitesBundle. Its other install point, the annotator's onSuiteChosen, is not
             // reached on the first bundle of a session at all — the platform calls it only when a bundle is reloaded or closed.
@@ -93,6 +95,23 @@ fun closeTestoCoverage(project: Project) {
     APPLIES.getValue(project).incrementAndGet()
     val manager = CoverageDataManager.getInstance(project)
     manager.activeSuites().filter { it.coverageEngine is TestoCoverageEngine }.forEach { manager.closeSuitesBundle(it) }
+}
+
+/** Closes the shown Testo bundle when it is the coverage of one of [runDirs], whose archive is gone. EDT. */
+fun closeTestoCoverageOf(project: Project, runDirs: Collection<Path>) {
+    val manager = CoverageDataManager.getInstance(project)
+    manager.activeSuites()
+        .filter { bundle ->
+            bundle.coverageEngine is TestoCoverageEngine &&
+                isCoverageOf(bundle.suites.filterIsInstance<TestoCoverageSuite>().map { it.runDir }, runDirs)
+        }
+        .forEach { manager.closeSuitesBundle(it) }
+}
+
+/** Whether suites archived in [suiteRunDirs] hold the coverage of one of [gone]. */
+internal fun isCoverageOf(suiteRunDirs: List<Path?>, gone: Collection<Path>): Boolean {
+    val dirs = gone.mapTo(HashSet()) { it.toAbsolutePath().normalize() }
+    return suiteRunDirs.any { it?.toAbsolutePath()?.normalize() in dirs }
 }
 
 /** Whether a Testo coverage bundle is currently applied. */
