@@ -13,6 +13,7 @@
 
 - Tests sharing a data provider are listed in source order, so the chooser preselects the same one every time.
 - A stopped mutant rerun stays in the run history after an IDE restart, and cleanup no longer deletes the archive of a mutation run in progress.
+- Clearing the run history, or retention deleting a run, now also removes that run's mutant marks and coverage.
 
 ## [2026.16.262] - 2026-10-01
 
