@@ -73,7 +73,7 @@ verifies both variants via a matrix, and the Marketplace serves each IDE the bui
 ### OpenIDE build (`phpApi=openide`)
 
 `-PphpApi=openide` selects `src/openide` and `src/openideTest` instead of the PhpStorm implementation.
-It compiles against OpenIDE 2026.2.1 and PHP for OpenIDE 0.9.7, using Java 25. The PHP dependency is resolved
+It compiles against OpenIDE 2026.2.1 and PHP for OpenIDE 0.9.8, using Java 25. The PHP dependency is resolved
 from the OpenIDE plugin store. Both implementations run the shared contract and run-context tests; isolation
 checks prevent dependencies between the two adapters.
 
