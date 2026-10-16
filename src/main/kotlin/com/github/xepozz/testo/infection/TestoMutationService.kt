@@ -73,6 +73,18 @@ class TestoMutationService(private val project: Project) {
     /** The run the editor marks show: the *Mutations* window's selected tab, else the latest started. */
     fun current(): TestoMutationRun? = selected ?: runs.values.maxByOrNull { it.startedAt }
 
+    /** Drops what is kept of the Testo runs archived at [sourceRunDirs], which are deleted, and the marks they drew. */
+    internal fun forget(sourceRunDirs: Collection<Path>) {
+        val gone = sourceRunDirs.mapTo(HashSet()) { it.toAbsolutePath().normalize() }
+        fun isGone(dir: Path) = dir.toAbsolutePath().normalize() in gone
+        runs.keys.removeIf(::isGone)
+        probed.removeIf(::isGone)
+        scoreCache.keys.removeIf(::isGone)
+        coveringIndexes.keys.removeIf(::isGone)
+        if (selected?.let { isGone(it.sourceRunDir) } == true) selected = null
+        TestoMutationEditorMarks.getInstance(project).refresh()
+    }
+
     /** The mutation runs of the Testo run archived at [sourceRunDir], newest first. Reads the archive: not on the EDT. */
     internal fun history(sourceRunDir: Path): List<TestoMutationHistoryEntry> {
         val live = runs[sourceRunDir]

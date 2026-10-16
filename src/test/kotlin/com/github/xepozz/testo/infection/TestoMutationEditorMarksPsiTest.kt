@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.infection
 
+import com.github.xepozz.testo.runs.TestoRunStore
 import com.intellij.openapi.editor.markup.GutterIconRenderer
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
@@ -61,5 +62,48 @@ class TestoMutationEditorMarksPsiTest : BasePlatformTestCase() {
         } finally {
             marks.hiddenStatuses = emptySet()
         }
+    }
+
+    fun testClearingTheHistoryTakesTheMarksOfADeletedRunAway() {
+        val dir = Files.createTempDirectory("testo-mutation")
+        VfsRootAccess.allowRootAccess(testRootDisposable, dir.toString())
+        val source = dir.resolve("A.php")
+        val code = "<?php\n\nreturn \$a > 1;\n"
+        Files.writeString(source, code)
+        val virtual = LocalFileSystem.getInstance().refreshAndFindFileByNioFile(source)!!
+        myFixture.openFileInEditor(virtual)
+
+        // An old timestamp in the name: past the grace a run without a manifest is left alone for.
+        val runDir = Files.createDirectories(TestoRunStore.getInstance(project).root().resolve("1000-Old run"))
+        val run = TestoMutationRun("t", runDir, runDir.resolve("infection")) { it }
+        val file = MutatedFile("f1", "A.php", source.toString())
+        val at = code.indexOf("\$a > 1")
+        file.mutants += Mutant("m1", file, "Infection\\Mutator\\ConditionalBoundary\\GreaterThan", "h1", at, at + 5)
+            .apply { status = MutantStatus.ESCAPED; finished = true }
+        run.files += file
+        run.fingerprints[file.path] = fingerprintOf(source)!!
+        run.finish(0)
+        val service = TestoMutationService.getInstance(project)
+        service.track(run)
+
+        val editor = myFixture.editor
+        fun gutters() = editor.markupModel.allHighlighters.filter { it.gutterIconRenderer != null }
+        val shown = System.currentTimeMillis() + 5_000
+        while (gutters().isEmpty() && System.currentTimeMillis() < shown) {
+            PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+            Thread.sleep(50)
+        }
+        assertEquals(1, gutters().size)
+
+        TestoRunStore.getInstance(project).clearHistory(keepLocked = false, spare = null)
+
+        assertFalse(Files.exists(runDir))
+        assertNotSame(run, service.current())
+        val cleared = System.currentTimeMillis() + 5_000
+        while (gutters().isNotEmpty() && System.currentTimeMillis() < cleared) {
+            PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
+            Thread.sleep(50)
+        }
+        assertEmpty(gutters())
     }
 }

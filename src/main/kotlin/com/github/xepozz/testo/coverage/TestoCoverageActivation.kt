@@ -95,6 +95,18 @@ fun closeTestoCoverage(project: Project) {
     manager.activeSuites().filter { it.coverageEngine is TestoCoverageEngine }.forEach { manager.closeSuitesBundle(it) }
 }
 
+/** Closes the shown Testo bundle when it is the coverage of one of [runDirs], whose archive is gone. EDT. */
+fun closeTestoCoverageOf(project: Project, runDirs: Collection<Path>) {
+    val gone = runDirs.mapTo(HashSet()) { it.toAbsolutePath().normalize() }
+    val manager = CoverageDataManager.getInstance(project)
+    manager.activeSuites()
+        .filter { bundle ->
+            bundle.coverageEngine is TestoCoverageEngine &&
+                bundle.suites.filterIsInstance<TestoCoverageSuite>().any { it.runDir?.toAbsolutePath()?.normalize() in gone }
+        }
+        .forEach { manager.closeSuitesBundle(it) }
+}
+
 /** Whether a Testo coverage bundle is currently applied. */
 fun isTestoCoverageActive(project: Project): Boolean =
     CoverageDataManager.getInstance(project).activeSuites().any { it.coverageEngine is TestoCoverageEngine }
