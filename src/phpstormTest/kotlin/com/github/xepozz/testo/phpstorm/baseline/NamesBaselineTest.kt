@@ -24,9 +24,9 @@ class NamesBaselineTest : BasePlatformTestCase() {
         out.case("two groups") { scope = Scope.ConfigurationFile; groups = mutableListOf("db", "slow") }
         out.case("one suite") { scope = Scope.ConfigurationFile; suites = mutableListOf("Unit") }
         out.case("two suites") { scope = Scope.ConfigurationFile; suites = mutableListOf("Unit", "My Suite") }
-        out.case("type only") { scope = Scope.ConfigurationFile; testoType = "bench" }
+        out.case("type only") { scope = Scope.ConfigurationFile; testoTypes = mutableListOf("bench") }
         out.case("groups win over suites and type") {
-            scope = Scope.ConfigurationFile; groups = mutableListOf("db"); suites = mutableListOf("Unit"); testoType = "test"
+            scope = Scope.ConfigurationFile; groups = mutableListOf("db"); suites = mutableListOf("Unit"); testoTypes = mutableListOf("test")
         }
         out.case("excluded groups only") { scope = Scope.ConfigurationFile; excludeGroups = mutableListOf("slow") }
         out.case("rerun filters only") { scope = Scope.ConfigurationFile; rerunFilters = listOf("\\App\\CalcTest::adds") }

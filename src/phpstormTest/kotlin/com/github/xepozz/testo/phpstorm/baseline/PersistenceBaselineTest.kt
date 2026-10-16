@@ -37,7 +37,7 @@ class PersistenceBaselineTest : BasePlatformTestCase() {
             configurationFilePath = "/work/app/testo.php"
             testRunnerOptions = "-q --stop-on-failure"
             command = "list"
-            testoType = "bench"
+            testoTypes = mutableListOf("bench")
             suites = mutableListOf("Unit", "My, Suite")
             groups = mutableListOf("db", "a,b")
             excludeGroups = mutableListOf("slow")
@@ -77,10 +77,11 @@ class PersistenceBaselineTest : BasePlatformTestCase() {
     fun testLegacyShape() {
         val saved = JDOMUtil.load(write(full()))
         val runner = checkNotNull(find(saved, "TestoRunnerSettings")) { "No TestoRunnerSettings in the saved XML" }
-        runner.children.filter { it.name in setOf("groups", "exclude_groups", "suites") }.forEach { runner.removeContent(it) }
+        runner.children.filter { it.name in setOf("groups", "exclude_groups", "suites", "testo_types") }.forEach { runner.removeContent(it) }
         runner.setAttribute("group", "db, slow ,,x")
         runner.setAttribute("exclude_group", "flaky")
         runner.setAttribute("suite", "Unit, slow")
+        runner.setAttribute("testo_type", "bench")
         val legacy = JDOMUtil.write(saved)
 
         val restored = BaselineSettings.newConfiguration(project, "Legacy")

@@ -12,9 +12,9 @@ object TestoCommandLine {
 
     /** `--type`, `--suite`, `--group`, excluded `--group !…` and rerun `--filter`, in that order. */
     fun selectionArguments(selection: TestoRunSelection): List<String> = buildList {
-        if (selection.testoType.isNotEmpty()) {
+        for (type in selection.testoTypes) {
             add("--type")
-            add(selection.testoType)
+            add(type)
         }
         for (suite in selection.suites) {
             add("--suite")

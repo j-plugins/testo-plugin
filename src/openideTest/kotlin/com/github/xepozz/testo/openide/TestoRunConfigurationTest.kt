@@ -72,7 +72,7 @@ class TestoRunConfigurationTest : BasePlatformTestCase() {
             configurationFilePath = "/work/app/testo.php"
             testRunnerOptions = "--no-ansi"
             command = "list"
-            testoType = "test"
+            testoTypes = listOf("test", "!bench")
             suites = listOf("Unit", "My Suite")
             groups = listOf("db")
             excludeGroups = listOf("slow")
@@ -115,6 +115,28 @@ class TestoRunConfigurationTest : BasePlatformTestCase() {
         assertEquals(saved.selection, clone.selection)
         clone.selection = clone.selection.copy(infectionThreads = "8")
         assertEquals("4", saved.selection.infectionThreads)
+    }
+
+    fun testASingleTypeSavedByAnEarlierBuildIsReadAsAList() {
+        val element = Element("configuration")
+        configuration().writeExternal(element)
+        element.addContent(Element("option").setAttribute("name", "testoType").setAttribute("value", "bench"))
+
+        val read = configuration()
+        read.readExternal(element)
+        assertEquals(listOf("bench"), read.selection.testoTypes)
+
+        read.selection = read.selection.copy(testoTypes = listOf("test", "inline"))
+        val written = Element("configuration")
+        read.writeExternal(written)
+        val xml = org.jdom.output.XMLOutputter().outputString(written)
+        assertFalse(xml, xml.contains("\"testoType\" value="))
+        val reread = configuration()
+        reread.readExternal(written)
+        assertEquals(listOf("test", "inline"), reread.selection.testoTypes)
+
+        reread.selection = reread.selection.copy(testoTypes = emptyList())
+        assertEquals(emptyList<String>(), reread.selection.testoTypes)
     }
 
     fun testJunitDefaultsToEnabledAndAnExplicitOptOutIsPreserved() {

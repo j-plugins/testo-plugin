@@ -80,7 +80,7 @@ class TestoRunContexts(private val host: Host) {
             // where it lives. ConfigurationFile scope is what keeps the path/filter flags out of the command line.
             selection.scope = TestoScope.CONFIGURATION_FILE
             selection.groups = groups
-            selection.testoType = ""
+            selection.testoTypes = emptyList()
             selection.dataProviderIndex = -1
             selection.dataSetIndex = -1
             return element
@@ -92,7 +92,7 @@ class TestoRunContexts(private val host: Host) {
             val phpClass = view.owner!!
             if (!phpClass.isTestoClass()) return null
             setup(selection, phpClass, element.containingFile.virtualFile) ?: return null
-            selection.testoType = testoTypeOf(element)
+            selection.testoTypes = typesOf(testoTypeOf(element))
             return element
         }
         if (view is PhpAttributeView) {
@@ -107,7 +107,7 @@ class TestoRunContexts(private val host: Host) {
             if (index == -1) {
                 selection.dataProviderIndex = -1
                 selection.dataSetIndex = -1
-                selection.testoType = testoTypeOf(element)
+                selection.testoTypes = typesOf(testoTypeOf(element))
 
                 return element
             }
@@ -115,7 +115,7 @@ class TestoRunContexts(private val host: Host) {
             selection.methodName += ":$index"
             selection.dataProviderIndex = index
             selection.dataSetIndex = -1
-            selection.testoType = testoTypeOf(element)
+            selection.testoTypes = typesOf(testoTypeOf(element))
 
             return element
         }
@@ -216,7 +216,7 @@ class TestoRunContexts(private val host: Host) {
     private fun classMatches(selection: TestoRunSelection, phpClass: PsiElement, testoType: String): Boolean =
         selection.scope == TestoScope.FILE
             && selection.filePath == phpClass.containingFile.virtualFile.path
-            && selection.testoType == testoType
+            && selection.testoTypes == typesOf(testoType)
 
     /**
      * Whether [selection] is the run of a results-tree node announced as [target]; null to leave it to the
@@ -227,7 +227,7 @@ class TestoRunContexts(private val host: Host) {
         // announced with, and reusing it would run the whole file. The match is therefore exact on all three: a class
         // node and a method node of the same class agree on suite and type, so those alone are not enough.
         if (selection.suites != listOfNotNull(target.suite?.takeIf { it.isNotBlank() })) return false
-        if (selection.testoType != target.type.orEmpty()) return false
+        if (selection.testoTypes != typesOf(target.type.orEmpty())) return false
 
         target.filter?.let {
             return selection.scope == TestoScope.METHOD && selection.methodName == it
@@ -238,7 +238,7 @@ class TestoRunContexts(private val host: Host) {
         val found = element?.let { findTestElement(it) }
         if (found != null && php.view(found) is PhpClassView) return classMatches(selection, found, target.type.orEmpty())
 
-        // A free function falls through untyped: its element-based check never compares testoType, so once Testo
+        // A free function falls through untyped: its element-based check never compares types, so once Testo
         // sends `testType` a typed function configuration could pass for an untyped one — the mirror of the class
         // case above. Latent until then: without the attributes such a target is empty and never stored.
         return null
@@ -316,6 +316,9 @@ class TestoRunContexts(private val host: Host) {
             }
         }
 
+        /** The `--type` list of a run narrowed to [type], empty for none. */
+        fun typesOf(type: String): List<String> = listOfNotNull(type.takeIf { it.isNotEmpty() })
+
         private fun testoTypeOfAttribute(attribute: PhpAttributeView): String {
             val fqn = attribute.fqn ?: return ""
             return when (fqn) {
@@ -347,7 +350,7 @@ class TestoRunContexts(private val host: Host) {
         /** Lays what a results-tree node announced over the run its source element produced. */
         fun applyTreeTarget(selection: TestoRunSelection, target: TestoRunTarget) {
             target.suite?.takeIf { it.isNotBlank() }?.let { selection.suites = listOf(it) }
-            target.type?.takeIf { it.isNotBlank() }?.let { selection.testoType = it }
+            target.type?.takeIf { it.isNotBlank() }?.let { selection.testoTypes = listOf(it) }
 
             // The whole selector, class and all: a bare method name would also match a namesake in the same file, and
             // a case needs it too, since `--path` alone runs every case the file declares. `--path` stays as it was.

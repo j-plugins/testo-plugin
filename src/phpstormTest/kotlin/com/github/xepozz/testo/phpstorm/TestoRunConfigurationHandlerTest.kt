@@ -55,7 +55,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_withTestoType_bench() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.testoType = "bench"
+        settings.runnerSettings.testoTypes = mutableListOf("bench")
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
@@ -67,7 +67,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_withTestoType_test() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.testoType = "test"
+        settings.runnerSettings.testoTypes = mutableListOf("test")
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
@@ -77,9 +77,19 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertEquals("test", arguments[1])
     }
 
+    fun testPrepareArguments_severalTypes_oneFlagEach() {
+        val settings = TestoRunConfigurationSettings()
+        settings.runnerSettings.testoTypes = mutableListOf("test", "inline", "!bench")
+        val arguments = mutableListOf<String?>()
+
+        TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
+
+        assertEquals(listOf("--type", "test", "--type", "inline", "--type", "!bench"), arguments)
+    }
+
     fun testPrepareArguments_withTestoType_inline() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.testoType = "inline"
+        settings.runnerSettings.testoTypes = mutableListOf("inline")
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
@@ -91,12 +101,12 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_withTestoType_empty_skipped() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.testoType = ""
+        settings.runnerSettings.testoTypes = mutableListOf()
         val arguments = mutableListOf<String?>()
 
         TestoRunConfigurationHandler.INSTANCE.prepareArguments(arguments, settings)
 
-        assertTrue("Empty testoType should not add arguments", arguments.isEmpty())
+        assertTrue("Empty testoTypes should not add arguments", arguments.isEmpty())
     }
 
     fun testPrepareArguments_defaultTestoType_noTypeFlag() {
@@ -109,7 +119,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
         assertEquals(2, arguments.size)
         assertEquals("--suite", arguments[0])
         assertEquals("unit", arguments[1])
-        assertFalse("No --type flag when testoType is default", arguments.contains("--type"))
+        assertFalse("No --type flag when testoTypes is default", arguments.contains("--type"))
     }
 
     fun testPrepareArguments_withSuite() {
@@ -226,7 +236,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_allOptions() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.testoType = "bench"
+        settings.runnerSettings.testoTypes = mutableListOf("bench")
         settings.runnerSettings.suites = mutableListOf("integration")
         settings.runnerSettings.groups = mutableListOf("db")
         settings.runnerSettings.excludeGroups = mutableListOf("slow")
@@ -301,7 +311,7 @@ class TestoRunConfigurationHandlerTest : TestCase() {
 
     fun testPrepareArguments_orderIsCorrect() {
         val settings = TestoRunConfigurationSettings()
-        settings.runnerSettings.testoType = "bench"
+        settings.runnerSettings.testoTypes = mutableListOf("bench")
         settings.runnerSettings.suites = mutableListOf("unit")
         settings.runnerSettings.groups = mutableListOf("fast")
         val arguments = mutableListOf<String?>()

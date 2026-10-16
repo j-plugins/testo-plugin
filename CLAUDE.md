@@ -374,8 +374,8 @@ Each build must be installed with its corresponding PHP plugin.
   The `--teamcity` flag is what makes Testo emit the SM service messages this plugin parses.
 - Runner flags from `TestoRunnerSettings` (only emitted when non-empty): `--type`, `--suite`, `--group`,
   plus one `--filter <selector>` per entry in `rerunFilters` (no `--parallel` — Testo's CLI does not take it yet).
-  `suites`, `groups`/`excludeGroups` are persisted
-  **lists** (`@XCollection`), one `--group` flag each — Testo ORs repeated `--group`s and reads a `!name` prefix as an
+  `testoTypes`, `suites`, `groups`/`excludeGroups` are persisted
+  **lists** (`@XCollection`), one flag each — Testo ORs repeated `--type`s and `--group`s and reads a `!name` prefix as an
   exclusion, which is the only exclusion form its CLI has. A name is opaque: whatever `#[Group]` spells reaches the
   CLI untouched.
 - `--log-html`/`--log-junit` at an IDE-managed path (`TestoReportFlags`, both on by default),
@@ -611,6 +611,9 @@ Non-obvious constraints already paid for in blood — read before touching the r
   inherits the interpreter and working directory), which starts the process itself — in PhpStorm through
   `PhpRunConfiguration.createProcessHandler`, which still handles Docker/WSL/SSH. Run through the executor, it took
   over the tab and the Run button of the Testo run it mutates.
+- **On OpenIDE a configuration's interpreter is a profile id**, resolved through `PhpLaunchEnvironment.of(project, id)` and
+  the `profileId` overloads of `PhpTestFrameworks.binaryPath`/`configFile` (PHP for OpenIDE 0.9.8+). The overloads without it
+  answer for the active profile, whatever the configuration names.
 - **`createPathMappings` misses what the interpreter's command line mounts**: a Docker interpreter's project volume is
   known only to `createPathMapper` (the console's translation), so every host ↔ interpreter path goes through
   `PhpToolLauncher`, which falls back to it and to the command's own `getPathProcessor`. The IDE system dir is in none,
