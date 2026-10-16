@@ -8,6 +8,7 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.pom.Navigatable
+import com.intellij.util.PsiNavigateUtil
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.psi.PsiElement
 
@@ -32,12 +33,12 @@ interface TestoTestIdentityMapper {
 
 /** Opens [id]'s method. The class is looked up in the index, which the EDT may not read: off it, then back to navigate. */
 fun navigateToTest(project: Project, id: TestId) {
-    ReadAction.nonBlocking<Navigatable?> {
-        (TestoTestIdentityMapper.getInstance().resolve(id, project) as? Navigatable)?.takeIf { it.canNavigate() }
+    ReadAction.nonBlocking<PsiElement?> {
+        TestoTestIdentityMapper.getInstance().resolve(id, project)?.takeIf { (it as? Navigatable)?.canNavigate() == true }
     }
         .inSmartMode(project)
         .expireWith(project)
-        .finishOnUiThread(ModalityState.defaultModalityState()) { it?.navigate(true) }
+        .finishOnUiThread(ModalityState.defaultModalityState()) { PsiNavigateUtil.navigate(it, true) }
         .submit(AppExecutorUtil.getAppExecutorService())
 }
 
