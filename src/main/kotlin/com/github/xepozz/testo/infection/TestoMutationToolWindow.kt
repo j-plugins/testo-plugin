@@ -88,6 +88,14 @@ internal object TestoMutationToolWindow {
         return true
     }
 
+    /** Closes the tabs, pinned ones too, of the Testo runs once archived in [sourceRunDirs]. Call on the EDT. */
+    fun close(project: Project, sourceRunDirs: Collection<Path>) {
+        val manager = ToolWindowManager.getInstance(project).getToolWindow(ID)?.contentManager ?: return
+        manager.contents
+            .filter { content -> content.getUserData(RUN_KEY)?.let { isUnder(it.sourceRunDir, sourceRunDirs) } == true }
+            .forEach { manager.removeContent(it, true) }
+    }
+
     private fun contentOf(window: ToolWindow, workDir: Path): Content? =
         window.contentManager.contents.firstOrNull { it.getUserData(RUN_KEY)?.workDir == workDir }
 
