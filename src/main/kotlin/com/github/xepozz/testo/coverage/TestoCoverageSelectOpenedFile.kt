@@ -3,6 +3,7 @@ package com.github.xepozz.testo.coverage
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -14,9 +15,13 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiFile
 import com.intellij.ui.tree.TreeVisitor
+import com.intellij.util.ui.tree.TreeModelAdapter
 import com.intellij.util.ui.tree.TreeUtil
 import java.lang.ref.WeakReference
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JTree
+import javax.swing.event.TreeModelEvent
+import javax.swing.tree.TreePath
 
 /**
  * Selects the file open in the editor in the Coverage view's tree — our answer to the platform's *Always select
@@ -35,6 +40,8 @@ class TestoCoverageSelectOpenedFile(private val project: Project) : Disposable {
     // a closed view is collected, and a stale one is caught by isShowing.
     @Volatile
     private var tree: WeakReference<JTree>? = null
+
+    private val selectPending = AtomicBoolean(false)
 
     var enabled: Boolean
         get() = PropertiesComponent.getInstance(project).getBoolean(KEY, false)
@@ -56,7 +63,26 @@ class TestoCoverageSelectOpenedFile(private val project: Project) : Disposable {
 
     /** Called from the toolbar action's update, which is the one place the view's own component is handed to us. */
     fun rememberTree(candidate: JTree) {
-        if (tree?.get() !== candidate) tree = WeakReference(candidate)
+        if (candidate.getClientProperty(LISTENED_MODEL) !== candidate.model) {
+            candidate.putClientProperty(LISTENED_MODEL, candidate.model)
+            candidate.model.addTreeModelListener(object : TreeModelAdapter() {
+                override fun treeStructureChanged(event: TreeModelEvent) {
+                    if (enabled && isRootRebuild(event.treePath)) scheduleSelect()
+                }
+            })
+        }
+        if (tree?.get() === candidate) return
+        tree = WeakReference(candidate)
+        if (enabled) scheduleSelect()
+    }
+
+    // Not from inside the action update that hands the tree over.
+    private fun scheduleSelect() {
+        if (!selectPending.compareAndSet(false, true)) return
+        ApplicationManager.getApplication().invokeLater({
+            selectPending.set(false)
+            selectCurrentFile()
+        }, project.disposed)
     }
 
     private fun selectCurrentFile() {
@@ -85,8 +111,11 @@ class TestoCoverageSelectOpenedFile(private val project: Project) : Disposable {
 
     companion object {
         private const val KEY = "testo.coverage.view.selectOpenedFile"
+        private const val LISTENED_MODEL = "testo.coverage.view.selectOpenedFile.model"
 
         fun getInstance(project: Project): TestoCoverageSelectOpenedFile =
             project.getService(TestoCoverageSelectOpenedFile::class.java)
     }
 }
+
+internal fun isRootRebuild(path: TreePath?): Boolean = path == null || path.pathCount <= 1
