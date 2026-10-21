@@ -8,6 +8,7 @@
 
 - An OpenIDE 2026.2 build, installed alongside PHP for OpenIDE: test discovery and gutter runs, Run / Debug / Coverage configurations, the channel console, run history, the Coverage view and mutation testing with Infection.
 - On OpenIDE a run takes the project's active PHP interpreter profile; an HTML or JUnit report the interpreter cannot reach is skipped with a notification instead of failing the run.
+- The run configuration's Type filter takes several types as tags, each passed as its own `--type`; existing configurations keep their type.
 
 ### Fixed
 

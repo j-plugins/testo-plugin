@@ -374,8 +374,8 @@ Each build must be installed with its corresponding PHP plugin.
   The `--teamcity` flag is what makes Testo emit the SM service messages this plugin parses.
 - Runner flags from `TestoRunnerSettings` (only emitted when non-empty): `--type`, `--suite`, `--group`,
   plus one `--filter <selector>` per entry in `rerunFilters` (no `--parallel` — Testo's CLI does not take it yet).
-  `suites`, `groups`/`excludeGroups` are persisted
-  **lists** (`@XCollection`), one `--group` flag each — Testo ORs repeated `--group`s and reads a `!name` prefix as an
+  `testoTypes`, `suites`, `groups`/`excludeGroups` are persisted
+  **lists** (`@XCollection`), one flag each — Testo ORs repeated `--type`s and `--group`s and reads a `!name` prefix as an
   exclusion, which is the only exclusion form its CLI has. A name is opaque: whatever `#[Group]` spells reaches the
   CLI untouched.
 - `--log-html`/`--log-junit` at an IDE-managed path (`TestoReportFlags`, both on by default),
@@ -691,7 +691,7 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `RunTab.TopToolbar`, which the debug tab does not use — so the action's hide branch is gated on *not* the Debug
   executor. A descriptor's restart actions are constructor-only, so this cannot be fixed by handing the debug
   `RunContentDescriptor` its own.
-- **Suite and group names are lists everywhere.** `TestoRunnerSettings` persists `suites`/`groups`/`excludeGroups`
+- **Type, suite and group names are lists everywhere.** `TestoRunnerSettings` persists `testoTypes`/`suites`/`groups`/`excludeGroups`
   via `@XCollection`, the editor shows them as tags (`TestoTagsField`), and a name is never split on anything — the
   comma lives only in the legacy persisted form. `migrateLegacyNames` folds that form in, called from
   `TestoRunConfigurationSettings.getTestoRunnerSettings` — the first point every reader passes after deserialization.

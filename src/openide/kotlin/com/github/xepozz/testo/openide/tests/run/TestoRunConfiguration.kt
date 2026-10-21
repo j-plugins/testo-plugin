@@ -3,6 +3,7 @@ package com.github.xepozz.testo.openide.tests.run
 import com.github.xepozz.testo.launch.TestoConfiguration
 import com.github.xepozz.testo.launch.TestoConfigurationNames
 import com.github.xepozz.testo.launch.TestoReportLocation
+import com.github.xepozz.testo.launch.TestoRunContexts
 import com.github.xepozz.testo.launch.TestoRunSelection
 import com.github.xepozz.testo.launch.TestoScope
 import com.github.xepozz.testo.openide.openIdeConsoleProperties
@@ -55,7 +56,7 @@ class TestoRunConfiguration(
                 configurationFilePath = configurationFilePath,
                 testRunnerOptions = testRunnerOptions,
                 command = command ?: TestoRunConfigurationOptions.DEFAULT_COMMAND,
-                testoType = testoType.orEmpty(),
+                testoTypes = testoTypes.toList().ifEmpty { TestoRunContexts.typesOf(testoType.orEmpty()) },
                 suites = suites.toList(),
                 groups = groups.toList(),
                 excludeGroups = excludeGroups.toList(),
@@ -93,7 +94,8 @@ class TestoRunConfiguration(
             configurationFilePath = value.configurationFilePath
             testRunnerOptions = value.testRunnerOptions
             command = value.command
-            testoType = value.testoType
+            testoTypes = value.testoTypes.toMutableList()
+            testoType = ""
             suites = value.suites.toMutableList()
             groups = value.groups.toMutableList()
             excludeGroups = value.excludeGroups.toMutableList()

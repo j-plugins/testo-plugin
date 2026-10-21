@@ -16,7 +16,7 @@ class TestoRunnerSettingsTest : TestCase() {
         assertTrue(settings.groups.isEmpty())
         assertTrue(settings.excludeGroups.isEmpty())
         assertEquals(1, settings.parallel)
-        assertEquals("", settings.testoType)
+        assertTrue(settings.testoTypes.isEmpty())
         assertEquals("auto", settings.coverageLevel)
         assertEquals("--type=!bench", settings.coverageOptions)
         assertTrue("rerunFilters defaults to empty", settings.rerunFilters.isEmpty())
@@ -29,8 +29,8 @@ class TestoRunnerSettingsTest : TestCase() {
             parallelTestingEnabled = true,
             command = "list",
             parallel = 4,
-            testoType = "bench",
         ).apply {
+            testoTypes = mutableListOf("bench")
             suites = mutableListOf("unit")
             groups = mutableListOf("fast")
             excludeGroups = mutableListOf("slow")
@@ -43,7 +43,7 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals(listOf("fast"), settings.groups)
         assertEquals(listOf("slow"), settings.excludeGroups)
         assertEquals(4, settings.parallel)
-        assertEquals("bench", settings.testoType)
+        assertEquals(listOf("bench"), settings.testoTypes)
     }
 
     fun testFromPhpTestRunnerSettings_baseSettings() {
@@ -74,7 +74,7 @@ class TestoRunnerSettingsTest : TestCase() {
         assertTrue(result.groups.isEmpty())
         assertTrue(result.excludeGroups.isEmpty())
         assertEquals(1, result.parallel)
-        assertEquals("", result.testoType)
+        assertTrue(result.testoTypes.isEmpty())
     }
 
     fun testFromPhpTestRunnerSettings_testoSettings() {
@@ -84,10 +84,10 @@ class TestoRunnerSettingsTest : TestCase() {
             parallelTestingEnabled = true,
             command = "debug",
             parallel = 8,
-            testoType = "inline",
             coverageLevel = "branch",
             coverageOptions = "--type=!bench",
         )
+        source.testoTypes = mutableListOf("inline")
         source.suites = mutableListOf("integration")
         source.groups = mutableListOf("database")
         source.excludeGroups = mutableListOf("slow")
@@ -111,7 +111,7 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals(listOf("database"), result.groups)
         assertEquals(listOf("slow"), result.excludeGroups)
         assertEquals(8, result.parallel)
-        assertEquals("inline", result.testoType)
+        assertEquals(listOf("inline"), result.testoTypes)
         assertEquals("branch", result.coverageLevel)
         assertEquals("--type=!bench", result.coverageOptions)
         // rerunFilters is @Transient and intentionally NOT copied — stays empty on the result.

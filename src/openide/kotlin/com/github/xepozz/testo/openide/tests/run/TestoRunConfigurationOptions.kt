@@ -20,7 +20,9 @@ class TestoRunConfigurationOptions : LocatableRunConfigurationOptions() {
     var configurationFilePath by string()
     var testRunnerOptions by string(DEFAULT_RUNNER_OPTIONS)
     var command by string(DEFAULT_COMMAND)
+    /** The single type earlier builds saved; read only while [testoTypes] is empty, cleared on save. */
     var testoType by string("")
+    var testoTypes by list<String>()
     var suites by list<String>()
     var groups by list<String>()
     var excludeGroups by list<String>()

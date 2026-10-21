@@ -137,7 +137,7 @@ class CommandBaselineTest : BasePlatformTestCase() {
             run(configuration {
                 scope = Scope.ConfigurationFile
                 suites = mutableListOf("Unit", "My Suite")
-                testoType = "bench"
+                testoTypes = mutableListOf("bench")
             })
         }
         out.case("rerun filters") {

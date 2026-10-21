@@ -22,9 +22,6 @@ class TestoRunnerSettings(
     @Attribute("parallel")
     var parallel: Int = 1,
 
-    @Attribute("testo_type")
-    var testoType: String = "",
-
     // Which coverage reports a Coverage run requests via CLI flags. Clover is off by default: cobertura carries
     // the same lines and branches. coverage-xml adds the per-test overlay.
     @Attribute("coverage_clover")
@@ -84,6 +81,10 @@ class TestoRunnerSettings(
     @Attribute("infection_options")
     var infectionOptions: String = "",
 ) : PhpTestRunnerSettings() {
+    /** Types to run, one `--type` flag each (Testo ORs them); a `!` prefix excludes the type. */
+    @get:XCollection(propertyElementName = "testo_types", style = XCollection.Style.v2)
+    var testoTypes: MutableList<String> = mutableListOf()
+
     /** Suite names to run, one `--suite` flag each (Testo ORs them). A name is opaque — spaces and all. */
     @get:XCollection(propertyElementName = "suites", style = XCollection.Style.v2)
     var suites: MutableList<String> = mutableListOf()
@@ -111,6 +112,10 @@ class TestoRunnerSettings(
     @get:Attribute("suite")
     var legacySuite: String = ""
 
+    /** The single-type persisted form of [testoTypes]; see [legacySuite]. */
+    @get:Attribute("testo_type")
+    var legacyTestoType: String = ""
+
     // Set only on a "Rerun Failed Tests" clone, never persisted to the saved configuration.
     @get:Transient
     var rerunFilters: List<String> = emptyList()
@@ -128,6 +133,10 @@ class TestoRunnerSettings(
         if (legacySuite.isNotEmpty()) {
             suites = mutableListOf(legacySuite)
             legacySuite = ""
+        }
+        if (legacyTestoType.isNotEmpty()) {
+            testoTypes = mutableListOf(legacyTestoType)
+            legacyTestoType = ""
         }
     }
 
@@ -208,8 +217,9 @@ class TestoRunnerSettings(
                 runnerSettings.legacyGroup = settings.legacyGroup
                 runnerSettings.legacyExcludeGroup = settings.legacyExcludeGroup
                 runnerSettings.legacySuite = settings.legacySuite
+                runnerSettings.legacyTestoType = settings.legacyTestoType
                 runnerSettings.parallel = settings.parallel
-                runnerSettings.testoType = settings.testoType
+                runnerSettings.testoTypes = settings.testoTypes.toMutableList()
                 runnerSettings.coverageClover = settings.coverageClover
                 runnerSettings.coverageCobertura = settings.coverageCobertura
                 runnerSettings.coverageXml = settings.coverageXml

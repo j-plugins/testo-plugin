@@ -43,7 +43,10 @@ class TestoRunConfigurationEditor(private val project: Project) : SettingsEditor
     }
 
     private val commandField = JBTextField()
-    private val testoTypeField = JBTextField()
+    private val testoTypeField = TestoTagsField(
+        TestoBundle.message("testo.tags.types.empty"),
+        TestoBundle.message("testo.tags.types.add"),
+    )
     private val suiteField = TestoTagsField(
         TestoBundle.message("testo.tags.suites.empty"),
         TestoBundle.message("testo.tags.suites.add"),
@@ -116,7 +119,8 @@ class TestoRunConfigurationEditor(private val project: Project) : SettingsEditor
             row("Test runner options:") { cell(runnerOptionsField).align(AlignX.FILL) }
         }
         group("Filter") {
-            row("Type:") { cell(testoTypeField) }.rowComment("--type=<name>, e.g. test, inline, bench")
+            row("Type:") { cell(testoTypeField).align(AlignX.FILL) }
+                .rowComment("One --type=<name> per tag, e.g. test, inline, bench; !<name> excludes the type")
             row("Suite:") { cell(suiteField).align(AlignX.FILL) }
                 .rowComment("One --suite=<name> per tag; type a name and press Enter")
             row("Group:") { cell(groupField).align(AlignX.FILL) }
@@ -180,7 +184,7 @@ class TestoRunConfigurationEditor(private val project: Project) : SettingsEditor
         configurationFileField.text = selection.configurationFilePath.orEmpty()
         commandField.text = selection.command
         runnerOptionsField.text = selection.testRunnerOptions.orEmpty()
-        testoTypeField.text = selection.testoType
+        testoTypeField.names = selection.testoTypes
         suiteField.names = selection.suites
         groupField.names = selection.groups
         excludeGroupField.names = selection.excludeGroups
@@ -228,7 +232,7 @@ class TestoRunConfigurationEditor(private val project: Project) : SettingsEditor
         selection.configurationFilePath = configurationFileField.text.trim().ifEmpty { null }
         selection.command = commandField.text.trim().ifEmpty { TestoRunConfigurationOptions.DEFAULT_COMMAND }
         selection.testRunnerOptions = runnerOptionsField.text.trim().ifEmpty { null }
-        selection.testoType = testoTypeField.text.trim()
+        selection.testoTypes = testoTypeField.names
         selection.suites = suiteField.names
         selection.groups = groupField.names
         selection.excludeGroups = excludeGroupField.names
