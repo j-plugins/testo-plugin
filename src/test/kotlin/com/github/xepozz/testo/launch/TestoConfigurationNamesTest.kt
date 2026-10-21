@@ -14,7 +14,8 @@ class TestoConfigurationNamesTest {
         assertEquals("Group 'db'", TestoConfigurationNames.suggestedName(filterOnly.copy(groups = listOf("db"))))
         assertEquals("Groups 'db', 'slow'", TestoConfigurationNames.suggestedName(filterOnly.copy(groups = listOf("db", "slow"))))
         assertEquals("Suite 'Unit'", TestoConfigurationNames.suggestedName(filterOnly.copy(suites = listOf("Unit"))))
-        assertEquals("Type 'bench'", TestoConfigurationNames.suggestedName(filterOnly.copy(testoType = "bench")))
+        assertEquals("Type 'bench'", TestoConfigurationNames.suggestedName(filterOnly.copy(testoTypes = listOf("bench"))))
+        assertEquals("Types 'test', '!bench'", TestoConfigurationNames.suggestedName(filterOnly.copy(testoTypes = listOf("test", "!bench"))))
         assertEquals("Group 'db'", TestoConfigurationNames.suggestedName(filterOnly.copy(groups = listOf("db"), suites = listOf("Unit"))))
     }
 
@@ -33,7 +34,7 @@ class TestoConfigurationNamesTest {
         assertTrue(TestoConfigurationNames.isFilterOnlyRun(filterOnly.copy(groups = listOf("db"))))
         assertTrue(TestoConfigurationNames.isFilterOnlyRun(filterOnly.copy(excludeGroups = listOf("slow"))))
         assertTrue(TestoConfigurationNames.isFilterOnlyRun(filterOnly.copy(suites = listOf("Unit"))))
-        assertTrue(TestoConfigurationNames.isFilterOnlyRun(filterOnly.copy(testoType = "test")))
+        assertTrue(TestoConfigurationNames.isFilterOnlyRun(filterOnly.copy(testoTypes = listOf("test"))))
         assertTrue(TestoConfigurationNames.isFilterOnlyRun(filterOnly.copy(rerunFilters = listOf("\\A::b"))))
         assertFalse("Nothing selects it", TestoConfigurationNames.isFilterOnlyRun(filterOnly))
         assertFalse(

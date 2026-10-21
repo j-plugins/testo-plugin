@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- The run configuration's Type filter takes several types as tags, each passed as its own `--type`; existing configurations keep their type.
+
 ### Fixed
 
 - List tests sharing a data provider in source order for a consistent default selection.

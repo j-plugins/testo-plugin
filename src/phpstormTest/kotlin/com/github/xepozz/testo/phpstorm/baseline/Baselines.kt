@@ -18,7 +18,7 @@ object Baselines {
         appendLine("  configurationFilePath=${settings.configurationFilePath}")
         appendLine("  testRunnerOptions=${settings.testRunnerOptions}")
         appendLine("  command=${settings.command}")
-        appendLine("  testoType=${settings.testoType}")
+        appendLine("  testoTypes=${settings.testoTypes}")
         appendLine("  suites=${settings.suites}")
         appendLine("  groups=${settings.groups}")
         appendLine("  excludeGroups=${settings.excludeGroups}")

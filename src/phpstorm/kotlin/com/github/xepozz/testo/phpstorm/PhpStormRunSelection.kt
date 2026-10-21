@@ -7,7 +7,7 @@ import com.github.xepozz.testo.phpstorm.tests.run.TestoRunnerSettings
 import com.jetbrains.php.phpunit.coverage.PhpUnitCoverageEngine.CoverageEngine
 import com.jetbrains.php.testFramework.run.PhpTestRunnerSettings.Scope
 
-/** The saved settings as a [TestoRunSelection]. The pre-list `group`/`exclude_group`/`suite` forms are not part of it. */
+/** The saved settings as a [TestoRunSelection]. The pre-list `group`/`exclude_group`/`suite`/`testo_type` forms are not part of it. */
 fun TestoRunnerSettings.toSelection() = TestoRunSelection(
     scope = scope.toTesto(),
     selectedType = selectedType,
@@ -18,7 +18,7 @@ fun TestoRunnerSettings.toSelection() = TestoRunSelection(
     configurationFilePath = configurationFilePath,
     testRunnerOptions = testRunnerOptions,
     command = command,
-    testoType = testoType,
+    testoTypes = testoTypes.toList(),
     suites = suites.toList(),
     groups = groups.toList(),
     excludeGroups = excludeGroups.toList(),
@@ -57,7 +57,7 @@ fun TestoRunnerSettings.load(selection: TestoRunSelection) {
     configurationFilePath = selection.configurationFilePath
     testRunnerOptions = selection.testRunnerOptions
     command = selection.command
-    testoType = selection.testoType
+    testoTypes = selection.testoTypes.toMutableList()
     suites = selection.suites.toMutableList()
     groups = selection.groups.toMutableList()
     excludeGroups = selection.excludeGroups.toMutableList()

@@ -11,7 +11,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -38,7 +38,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -65,7 +65,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -92,7 +92,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=test
+  testoTypes=[test]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -119,7 +119,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=test
+  testoTypes=[test]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -146,7 +146,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -173,7 +173,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -200,7 +200,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -227,7 +227,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=test
+  testoTypes=[test]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -254,7 +254,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=test
+  testoTypes=[test]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -281,7 +281,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=test
+  testoTypes=[test]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -308,7 +308,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -335,7 +335,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -362,7 +362,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -389,7 +389,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -416,7 +416,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -447,7 +447,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -474,7 +474,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=bench
+  testoTypes=[bench]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -501,7 +501,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -528,7 +528,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=inline
+  testoTypes=[inline]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -555,7 +555,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=inline
+  testoTypes=[inline]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -582,7 +582,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -609,7 +609,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[db, slow]
   excludeGroups=[]
@@ -638,7 +638,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -665,7 +665,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -692,7 +692,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -719,7 +719,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -746,7 +746,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -773,7 +773,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=test
+  testoTypes=[test]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -800,7 +800,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -827,7 +827,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -854,7 +854,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -881,7 +881,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=rector-fixture
+  testoTypes=[rector-fixture]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -908,7 +908,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -935,7 +935,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -962,7 +962,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -989,7 +989,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -1016,7 +1016,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -1043,7 +1043,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=test
+  testoTypes=[test]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -1070,7 +1070,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[fn]
   excludeGroups=[]
@@ -1099,7 +1099,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -1126,7 +1126,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -1155,7 +1155,7 @@
   configurationFilePath=/src/testo.php
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -1182,7 +1182,7 @@
   configurationFilePath=/src/testo.php
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[Unit]
   groups=[]
   excludeGroups=[]
@@ -1211,7 +1211,7 @@
   configurationFilePath=/src/testo.php
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]
@@ -1240,7 +1240,7 @@
   configurationFilePath=null
   testRunnerOptions=-q -n --teamcity
   command=run
-  testoType=
+  testoTypes=[]
   suites=[]
   groups=[]
   excludeGroups=[]

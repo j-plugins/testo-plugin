@@ -11,7 +11,7 @@
       <env name="XDEBUG_MODE" value="off" />
     </envs>
   </CommandLine>
-  <TestoRunnerSettings configuration_file="/work/app/testo.php" directory="/work/app/tests" file="/work/app/tests/CalcTest.php" method="\App\CalcTest::med:3:0" scope="Method" selected_type="Unit" options="-q --stop-on-failure" use_alternative_configuration_file="true" command="list" parallel="4" testo_type="bench" coverage_clover="true" coverage_cobertura="false" coverage_xml="false" coverage_level="path" coverage_options="--type=test" log_html="false">
+  <TestoRunnerSettings configuration_file="/work/app/testo.php" directory="/work/app/tests" file="/work/app/tests/CalcTest.php" method="\App\CalcTest::med:3:0" scope="Method" selected_type="Unit" options="-q --stop-on-failure" use_alternative_configuration_file="true" command="list" parallel="4" coverage_clover="true" coverage_cobertura="false" coverage_xml="false" coverage_level="path" coverage_options="--type=test" log_html="false">
     <option name="coverageEngine" value="PCov" />
     <option name="dataProviderIndex" value="3" />
     <option name="dataSetIndex" value="0" />
@@ -27,6 +27,9 @@
       <option value="Unit" />
       <option value="My, Suite" />
     </suites>
+    <testo_types>
+      <option value="bench" />
+    </testo_types>
   </TestoRunnerSettings>
 </configuration>
 == every field, read back and written again
@@ -40,7 +43,7 @@
       <env name="XDEBUG_MODE" value="off" />
     </envs>
   </CommandLine>
-  <TestoRunnerSettings configuration_file="/work/app/testo.php" directory="/work/app/tests" file="/work/app/tests/CalcTest.php" method="\App\CalcTest::med:3:0" scope="Method" selected_type="Unit" options="-q --stop-on-failure" use_alternative_configuration_file="true" command="list" parallel="4" testo_type="bench" coverage_clover="true" coverage_cobertura="false" coverage_xml="false" coverage_level="path" coverage_options="--type=test" log_html="false">
+  <TestoRunnerSettings configuration_file="/work/app/testo.php" directory="/work/app/tests" file="/work/app/tests/CalcTest.php" method="\App\CalcTest::med:3:0" scope="Method" selected_type="Unit" options="-q --stop-on-failure" use_alternative_configuration_file="true" command="list" parallel="4" coverage_clover="true" coverage_cobertura="false" coverage_xml="false" coverage_level="path" coverage_options="--type=test" log_html="false">
     <option name="coverageEngine" value="PCov" />
     <option name="dataProviderIndex" value="3" />
     <option name="dataSetIndex" value="0" />
@@ -56,6 +59,9 @@
       <option value="Unit" />
       <option value="My, Suite" />
     </suites>
+    <testo_types>
+      <option value="bench" />
+    </testo_types>
   </TestoRunnerSettings>
 </configuration>
   scope=Method
@@ -67,7 +73,7 @@
   configurationFilePath=/work/app/testo.php
   testRunnerOptions=-q --stop-on-failure
   command=list
-  testoType=bench
+  testoTypes=[bench]
   suites=[Unit, My, Suite]
   groups=[db, a,b]
   excludeGroups=[slow]
