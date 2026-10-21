@@ -9,7 +9,7 @@ import com.intellij.psi.PsiElement
 
 class TestoInspectionSuppressor : InspectionSuppressor {
     override fun isSuppressedFor(element: PsiElement, inspectionId: String): Boolean {
-        if (inspectionId != "PhpUnhandledExceptionInspection") return false
+        if (inspectionId !in UNHANDLED_EXCEPTION_IDS) return false
         if (!element.containingFile.isTestoFile()) return false
 
         return TestoPhp.getInstance().callThrows(element.parent, TestoClasses.ASSERTION_EXCEPTION)
@@ -19,4 +19,9 @@ class TestoInspectionSuppressor : InspectionSuppressor {
         element: PsiElement?,
         inspectionId: String
     ): Array<out SuppressQuickFix> = emptyArray()
+
+    private companion object {
+        // PhpStorm's id and PHP for OpenIDE's.
+        val UNHANDLED_EXCEPTION_IDS = setOf("PhpUnhandledExceptionInspection", "PhpUnhandledException")
+    }
 }
