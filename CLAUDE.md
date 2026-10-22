@@ -738,9 +738,12 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 ## CI/CD
 
 - **build.yml** (push to `main`, all PRs): `buildPlugin` → `check` (Kover XML → Codecov) → Qodana →
-  `verifyPlugin` → release draft. Runs on `ubuntu-latest`, Java 21 (Zulu), free-disk-space step first.
-- **release.yml** (on GitHub release): publish to JetBrains Marketplace, patch the changelog, open a PR back;
-  a matrix builds 252 and 262 and attaches each ZIP to the release.
+  `verifyPlugin` → release PR. Runs on `ubuntu-latest`, Java 21 (Zulu), free-disk-space step first.
+- **Release PR** (the last `build.yml` job, on `main`): a `pluginVersion` whose `## [version]` section is on `main`
+  is released — tag `v<version>` plus a GitHub release; a non-empty `[Unreleased]` is kept in the `release/next` PR
+  (version bumped, changelog patched), rebuilt on every push. The PR is opened by `GITHUB_TOKEN`, so no checks run on it.
+- **release.yml** (on GitHub release): publish to JetBrains Marketplace; a matrix builds 252 and 262 and attaches each
+  ZIP to the release.
 - **run-ui-tests.yml** (manual): UI tests on Ubuntu / Windows / macOS via robot-server.
 
 ## Conventions
@@ -750,6 +753,7 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 - Icons follow IntelliJ conventions: SVG with a `_dark` variant
 - Register shared extension points in `plugin.xml` (coverage-only ones in `coverage.xml`). PHP-specific registrations
   belong in `src/phpstorm/resources/META-INF/testo-php.xml` or `testo-php-coverage.xml`.
-- Version follows SemVer; `pluginVersion` in `gradle.properties` is the single source of truth
+- Version is `<year>.<N>`: every release bumps N, a new year starts at `<year>.0`, never a third component;
+  `pluginVersion` in `gradle.properties` is the single source of truth, bumped only by the release PR
 - Notable user-visible changes go into `CHANGELOG.md` under `## [Unreleased]` (Keep a Changelog format) —
-  the release workflow consumes that section
+  the release PR consumes that section, and only it writes a version section
