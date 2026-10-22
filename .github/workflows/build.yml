@@ -22,7 +22,8 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # A run on main may be publishing; cancelling it would leave a release half uploaded.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
   
 jobs:
 
@@ -221,6 +222,8 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: [ build, test, inspectCode, verify ]
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
     permissions:
       contents: write
       pull-requests: write
@@ -247,6 +250,7 @@ jobs:
           cache-read-only: true
 
       - name: Release or Update Release PR
+        id: release
         run: |
           GRADLE="./gradlew --quiet --console=plain"
           NOTES="./build/tmp/release_note.txt"
@@ -257,6 +261,7 @@ jobs:
             if ! git ls-remote --exit-code --tags origin "refs/tags/v$CURRENT" > /dev/null; then
               $GRADLE getChangelog --project-version="$CURRENT" --no-header --no-links --output-file="$NOTES"
               gh release create "v$CURRENT" --target "$GITHUB_SHA" --title "$CURRENT" --notes-file "$NOTES"
+              echo "tag=v$CURRENT" >> "$GITHUB_OUTPUT"
             fi
             YEAR=$(date -u +%Y)
             if [ "${CURRENT%%.*}" = "$YEAR" ]; then NEXT="$YEAR.$(( ${CURRENT#*.} + 1 ))"; else NEXT="$YEAR.0"; fi
@@ -284,3 +289,15 @@ jobs:
           else
             gh pr create --base main --head "$BRANCH" --title "release: $NEXT" --body-file "$NOTES"
           fi
+
+  # Publishes the release the job above has just created
+  publish:
+    name: Publish
+    needs: [ releasePr ]
+    if: needs.releasePr.outputs.tag != ''
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.releasePr.outputs.tag }}
+    secrets: inherit

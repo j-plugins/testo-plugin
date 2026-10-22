@@ -738,12 +738,14 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 ## CI/CD
 
 - **build.yml** (push to `main`, all PRs): `buildPlugin` → `check` (Kover XML → Codecov) → Qodana →
-  `verifyPlugin` → release PR. Runs on `ubuntu-latest`, Java 21 (Zulu), free-disk-space step first.
-- **Release PR** (the last `build.yml` job, on `main`): a `pluginVersion` whose `## [version]` section is on `main`
-  is released — tag `v<version>` plus a GitHub release; a non-empty `[Unreleased]` is kept in the `release/next` PR
-  (version bumped, changelog patched), rebuilt on every push. The PR is opened by `GITHUB_TOKEN`, so no checks run on it.
-- **release.yml** (on GitHub release): publish to JetBrains Marketplace; a matrix builds 252 and 262 and attaches each
-  ZIP to the release.
+  `verifyPlugin` → release PR → publish. Runs on `ubuntu-latest`, Java 21 (Zulu), free-disk-space step first. A run
+  on `main` is never cancelled by the next push: it may be mid-publish.
+- **Release PR** (`build.yml` job, on `main`): a `pluginVersion` whose `## [version]` section is on `main` and has no
+  `v<version>` tag gets the tag plus a GitHub release; a non-empty `[Unreleased]` is kept in the `release/next` PR
+  (version bumped, changelog patched), rebuilt on every push. Both the PR and the release come from `GITHUB_TOKEN`,
+  whose events start no workflow: checks on the PR start only by hand, and publishing is called, not triggered.
+- **release.yml** (`workflow_call` from the publish job, `workflow_dispatch` with a `tag` to retry): publish to
+  JetBrains Marketplace; a matrix builds 252 and 262 and attaches each ZIP to the release.
 - **run-ui-tests.yml** (manual): UI tests on Ubuntu / Windows / macOS via robot-server.
 
 ## Conventions
