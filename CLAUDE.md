@@ -777,14 +777,16 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 ## CI/CD
 
 - **build.yml** (push to `main`, all PRs): `buildPlugin` → `check` (Kover XML → Codecov) → Qodana →
-  `verifyPlugin` → release PR. Build and verify run for 252, 262 and `openide`; tests for 262 and `openide` on
-  Ubuntu and Windows, where Windows does not fail the run until its known failures are fixed (#120, #122).
-  Gradle provisions the OpenIDE variant's Java 25 toolchain itself.
-- **Release PR** (the last `build.yml` job, on `main`): a `pluginVersion` whose `## [version]` section is on `main`
-  is released — tag `v<version>` plus a GitHub release; a non-empty `[Unreleased]` is kept in the `release/next` PR
-  (version bumped, changelog patched), rebuilt on every push. The PR is opened by `GITHUB_TOKEN`, so no checks run on it.
-- **release.yml** (on GitHub release): publish to JetBrains Marketplace; a matrix builds 252, 262 and `openide` and
-  attaches each ZIP to the release.
+  `verifyPlugin` → release PR → publish. Build and verify run for 252, 262 and `openide`; tests for 262 and `openide`
+  on Ubuntu and Windows, where Windows does not fail the run until its known failures are fixed (#120, #122).
+  Gradle provisions the OpenIDE variant's Java 25 toolchain itself. A run on `main` is never cancelled by the next
+  push: it may be mid-publish.
+- **Release PR** (`build.yml` job, on `main`): a `pluginVersion` whose `## [version]` section is on `main` and has no
+  `v<version>` tag gets the tag plus a GitHub release; a non-empty `[Unreleased]` is kept in the `release/next` PR
+  (version bumped, changelog patched), rebuilt on every push. Both the PR and the release come from `GITHUB_TOKEN`,
+  whose events start no workflow: checks on the PR start only by hand, and publishing is called, not triggered.
+- **release.yml** (`workflow_call` from the publish job, `workflow_dispatch` with a `tag` to retry): publish to
+  JetBrains Marketplace; a matrix builds 252, 262 and `openide` and attaches each ZIP to the release.
 - **run-ui-tests.yml** (manual): UI tests on Ubuntu / Windows / macOS via robot-server.
 
 ## Conventions
