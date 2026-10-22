@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [2026.17] - 2026-10-22
+
 ### Added
 
 - An OpenIDE 2026.2 build, installed alongside PHP for OpenIDE: test discovery and gutter runs, Run / Debug / Coverage configurations, the channel console, run history, the Coverage view and mutation testing with Infection.
@@ -264,7 +266,7 @@
 - Concurrent tests no longer nest inside one another in the test tree: the tree is built from the `nodeId`/`parentNodeId`
   Testo reports rather than from the order messages arrive in.
 
-[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.16.262...HEAD
+[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.17...HEAD
 [2026.16.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.15.262...v2026.16.262
 [2026.15.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.14.262...v2026.15.262
 [2026.14.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.13.262...v2026.14.262
@@ -277,3 +279,4 @@
 [2026.5.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.4.262...v2026.5.262
 [2026.4.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.3.1...v2026.4.262
 [2026.3.1]: https://github.com/j-plugins/testo-plugin/commits/v2026.3.1
+[2026.17]: https://github.com/j-plugins/testo-plugin/compare/v2026.16.262...v2026.17
