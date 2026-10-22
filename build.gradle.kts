@@ -330,4 +330,9 @@ if (!providers.gradleProperty("phpApiSingle").isPresent && !isOpenIde) {
         }
 
     tasks.named("publishPlugin") { dependsOn(otherVariants) }
+
+    // The nested build writes the same build/ directory, and the configuration cache runs this build's tasks in
+    // parallel with it: the 262 archive took the 252 plugin.xml. Nothing here starts until the nested builds are done.
+    val nestedNames = otherVariants.map { it.name }.toSet()
+    tasks.configureEach { if (name !in nestedNames) mustRunAfter(otherVariants) }
 }
