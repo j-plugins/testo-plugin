@@ -64,8 +64,10 @@ uploads by version and rejects a second upload carrying a version it already has
 
 `publishPlugin` releases **every** variant listed in `phpApis`: since one Gradle build resolves exactly one platform,
 it re-enters Gradle (`Exec` on the wrapper) once per remaining API, passing `-PphpApiSingle=true` so the nested run does
-not fan out again. `./gradlew publishPlugin` is therefore the whole release; `release.yml` just calls it. CI builds and
-verifies both variants via a matrix, and the Marketplace serves each IDE the build matching its since/until range.
+not fan out again. Both builds share `build/`, and the configuration cache runs tasks of one project in parallel, so
+everything of the outer build `mustRunAfter` the nested ones — without it the 262 archive shipped the 252 `plugin.xml`.
+`release.yml` does not fan out: it runs one `-PphpApiSingle=true` publish per API in turn, so a failed upload is retried
+for the missing variants only (`apis` input). The Marketplace serves each IDE the build matching its since/until range.
 
 > Note: `gradleVersion` in `gradle.properties` (9.5.0) lags the wrapper (9.8.0) — the property only feeds the
 > `wrapper` task, so running `./gradlew wrapper` would downgrade it. Bump the property when syncing.
