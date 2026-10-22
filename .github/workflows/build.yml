@@ -4,7 +4,7 @@
 # - Run Qodana inspections.
 # - Run the 'buildPlugin' task and prepare artifact for further tests.
 # - Run the 'runPluginVerifier' task.
-# - Create a draft release.
+# - Tag a released version, or keep the next release in a pull request.
 #
 # The workflow is triggered on push and pull_request events.
 #
@@ -234,40 +234,73 @@ jobs:
           name: pluginVerifier-result-${{ matrix.phpApi }}
           path: ${{ github.workspace }}/${{ matrix.buildDir }}/reports/pluginVerifier
 
-  # Prepare a draft release for GitHub Releases page for the manual verification
-  # If accepted and published, the release workflow would be triggered
-  releaseDraft:
-    name: Release draft
+  # A version whose changelog section is on main gets its tag and GitHub release (which runs release.yml); the rest of
+  # [Unreleased] is kept in a "release: <next>" pull request. Versions are <year>.<N>: N grows, a new year starts at 0.
+  releasePr:
+    name: Release PR
     if: github.event_name != 'pull_request'
     needs: [ build, test, inspectCode, verify ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      BRANCH: release/next
     steps:
 
       # Check out the current repository
       - name: Fetch Sources
         uses: actions/checkout@v7
 
-      # Remove old release drafts by using the curl request for the available releases with a draft flag
-      - name: Remove Old Release Drafts
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api repos/{owner}/{repo}/releases \
-            --jq '.[] | select(.draft == true) | .id' \
-            | xargs -I '{}' gh api -X DELETE repos/{owner}/{repo}/releases/{}
+      # Set up the Java environment for the next steps
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: zulu
+          java-version: 21
 
-      # Create a new release draft which is not publicly visible and requires manual acceptance
-      - name: Create Release Draft
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Setup Gradle
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6.4.0
+        with:
+          cache-read-only: true
+
+      - name: Release or Update Release PR
         run: |
-          VERSION=$(./gradlew properties --property version --quiet --console=plain | tail -n 1 | cut -f2- -d ' ')
-          RELEASE_NOTE="./build/tmp/release_note.txt"
-          ./gradlew getChangelog --unreleased --no-header --quiet --console=plain --output-file=$RELEASE_NOTE
-          
-          gh release create $VERSION \
-            --draft \
-            --title $VERSION \
-            --notes-file $RELEASE_NOTE
+          GRADLE="./gradlew --quiet --console=plain"
+          NOTES="./build/tmp/release_note.txt"
+          mkdir -p "$(dirname "$NOTES")"
+          CURRENT=$($GRADLE properties --property pluginVersion | tail -n 1 | cut -f2- -d ' ')
+
+          if grep -Fq "## [$CURRENT]" CHANGELOG.md; then
+            if ! git ls-remote --exit-code --tags origin "refs/tags/v$CURRENT" > /dev/null; then
+              $GRADLE getChangelog --project-version="$CURRENT" --no-header --no-links --output-file="$NOTES"
+              gh release create "v$CURRENT" --target "$GITHUB_SHA" --title "$CURRENT" --notes-file "$NOTES"
+            fi
+            YEAR=$(date -u +%Y)
+            if [ "${CURRENT%%.*}" = "$YEAR" ]; then NEXT="$YEAR.$(( ${CURRENT#*.} + 1 ))"; else NEXT="$YEAR.0"; fi
+          else
+            NEXT="$CURRENT"
+          fi
+
+          $GRADLE getChangelog --unreleased --no-header --no-empty-sections --no-links --output-file="$NOTES"
+          if ! grep -q '^- ' "$NOTES"; then
+            echo "Nothing unreleased"
+            exit 0
+          fi
+
+          sed -i "s/^pluginVersion = .*/pluginVersion = $NEXT/" gradle.properties
+          $GRADLE patchChangelog
+
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git checkout -B "$BRANCH"
+          git commit -qam "release: $NEXT"
+          git push --force origin "$BRANCH"
+
+          if [ "$(gh pr view "$BRANCH" --json state --jq .state 2>/dev/null)" = "OPEN" ]; then
+            gh pr edit "$BRANCH" --title "release: $NEXT" --body-file "$NOTES"
+          else
+            gh pr create --base main --head "$BRANCH" --title "release: $NEXT" --body-file "$NOTES"
+          fi

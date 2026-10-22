@@ -1,3 +1,4 @@
+import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
@@ -129,6 +130,19 @@ intellijPlatform {
             }
         }
 
+        // Both variants take the notes of the bare pluginVersion: the changelog knows no API suffix.
+        val changelog = project.changelog
+        changeNotes = providers.gradleProperty("pluginVersion").map { pluginVersion ->
+            with(changelog) {
+                renderItem(
+                    (getOrNull(pluginVersion) ?: getUnreleased())
+                        .withHeader(false)
+                        .withEmptySections(false),
+                    Changelog.OutputType.HTML,
+                )
+            }
+        }
+
         ideaVersion {
             sinceBuild = apiProperty("pluginSinceBuild")
             untilBuild = apiProperty("pluginUntilBuild").map { it.trim() }.filter { it.isNotEmpty() }
@@ -166,6 +180,14 @@ intellijPlatform {
             }
         }
     }
+}
+
+changelog {
+    version = providers.gradleProperty("pluginVersion")
+    // pluginVersion has two components, which the default SemVer-only header parser rejects.
+    headerParserRegex = """(\d+(?:\.\d+){1,3}(?:-[\w.]+)?)""".toRegex()
+    groups.empty()
+    repositoryUrl = providers.gradleProperty("pluginRepositoryUrl")
 }
 
 // Configure Gradle Kover Plugin - read more: https://github.com/Kotlin/kotlinx-kover#configuration

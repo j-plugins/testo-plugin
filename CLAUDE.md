@@ -777,11 +777,14 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 ## CI/CD
 
 - **build.yml** (push to `main`, all PRs): `buildPlugin` → `check` (Kover XML → Codecov) → Qodana →
-  `verifyPlugin` → release draft. Build and verify run for 252, 262 and `openide`; tests for 262 and `openide` on
+  `verifyPlugin` → release PR. Build and verify run for 252, 262 and `openide`; tests for 262 and `openide` on
   Ubuntu and Windows, where Windows does not fail the run until its known failures are fixed (#120, #122).
   Gradle provisions the OpenIDE variant's Java 25 toolchain itself.
-- **release.yml** (on GitHub release): publish to JetBrains Marketplace, patch the changelog, open a PR back;
-  a matrix builds 252, 262 and `openide` and attaches each ZIP to the release.
+- **Release PR** (the last `build.yml` job, on `main`): a `pluginVersion` whose `## [version]` section is on `main`
+  is released — tag `v<version>` plus a GitHub release; a non-empty `[Unreleased]` is kept in the `release/next` PR
+  (version bumped, changelog patched), rebuilt on every push. The PR is opened by `GITHUB_TOKEN`, so no checks run on it.
+- **release.yml** (on GitHub release): publish to JetBrains Marketplace; a matrix builds 252, 262 and `openide` and
+  attaches each ZIP to the release.
 - **run-ui-tests.yml** (manual): UI tests on Ubuntu / Windows / macOS via robot-server.
 
 ## Conventions
@@ -791,6 +794,7 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 - Icons follow IntelliJ conventions: SVG with a `_dark` variant
 - Register shared extension points in `plugin.xml` (coverage-only ones in `coverage.xml`). PHP-specific registrations
   belong in the selected implementation's `META-INF/testo-php.xml` or `testo-php-coverage.xml`.
-- Version follows SemVer; `pluginVersion` in `gradle.properties` is the single source of truth
+- Version is `<year>.<N>`: every release bumps N, a new year starts at `<year>.0`, never a third component;
+  `pluginVersion` in `gradle.properties` is the single source of truth, bumped only by the release PR
 - Notable user-visible changes go into `CHANGELOG.md` under `## [Unreleased]` (Keep a Changelog format) —
-  the release workflow consumes that section
+  the release PR consumes that section, and only it writes a version section
