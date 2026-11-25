@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- The OpenIDE build targets OpenIDE 2026.3 with PHP for OpenIDE 0.9.10.
+
 ## [2026.17] - 2026-10-22
 
 ### Added

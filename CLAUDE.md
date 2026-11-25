@@ -22,8 +22,8 @@ Dependabot bumps these regularly — read the files rather than trusting this ta
 |----------------------|------------------------------------------|
 | Language             | Kotlin 2.4.20                             |
 | JVM Toolchain        | Java 21 (PhpStorm), Java 25 (OpenIDE)                                  |
-| IntelliJ Platform    | 2025.2 / 2026.2 (IU), OpenIDE 2026.2.1     |
-| Build range          | PhpStorm: 252–261.* and 262+; OpenIDE: 262.*       |
+| IntelliJ Platform    | 2025.2 / 2026.2 (IU), OpenIDE 2026.3         |
+| Build range          | PhpStorm: 252–261.* and 262+; OpenIDE: 263.*       |
 | Plugin version       | `2026.16` (`pluginVersion`)             |
 | Build system         | Gradle wrapper 9.8.0                     |
 | IntelliJ Plugin SDK  | `org.jetbrains.intellij.platform` 2.19.0 |
@@ -75,7 +75,7 @@ for the missing variants only (`apis` input). The Marketplace serves each IDE th
 ### OpenIDE build (`phpApi=openide`)
 
 `-PphpApi=openide` selects `src/openide` and `src/openideTest` instead of the PhpStorm implementation.
-It compiles against OpenIDE 2026.2.1 and PHP for OpenIDE 0.9.9, using Java 25. The PHP dependency is resolved
+It compiles against OpenIDE 2026.3 and PHP for OpenIDE 0.9.10, using Java 25. The PHP dependency is resolved
 from the OpenIDE plugin store. Both implementations run the shared contract and run-context tests; isolation
 checks prevent dependencies between the two adapters.
 
@@ -765,7 +765,7 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 - **Keep the core independent of PHP implementations.** Code in `src/main/kotlin` and `src/test/kotlin` uses the
   contracts in `php/`; PHP-plugin classes and their registrations belong in `src/phpstorm*` or `src/openide*`.
   `CoreIsolationTest` enforces these boundaries and prevents references between implementations, including comments.
-- **Min IDE version:** 2025.2 (build 252+) for PhpStorm; 2026.2 (build 262) for OpenIDE.
+- **Min IDE version:** 2025.2 (build 252+) for PhpStorm; 2026.3 (build 263) for OpenIDE.
 - **Kotlin stdlib is NOT bundled** (`kotlin.stdlib.default.dependency = false`) — uses the IDE's own
 - **Gradle Configuration Cache** and **Build Cache** are enabled
 - **Code and comments language:** English. Comments should explain *why* (platform quirks, race conditions),

@@ -108,6 +108,10 @@ dependencies {
         bundledModules(apiProperty("platformBundledModules").map { it.split(',') })
 
         testFramework(TestFrameworkType.Platform)
+        // Since 263 XML is a plugin of its own rather than part of the platform; only the tests use it.
+        if (isOpenIde) {
+            testBundledPlugin("com.intellij.xml")
+        }
     }
 }
 
@@ -265,8 +269,12 @@ tasks {
 
         if (isOpenIde) {
             // OpenIDE bundles some fifty plugins, and a LOG.error from any of them while it starts fails the test that
-            // happens to be running. Load only this plugin and PHP for OpenIDE into the test IDE.
-            systemProperty("idea.load.plugins.id", "com.github.xepozz.testo,ru.openide.openphp")
+            // happens to be running. Load only what the tests need: this plugin, PHP for OpenIDE, XML, and pty4j, which
+            // since 263 is a plugin and carries the platform's LocalProcessService that every OSProcessHandler asks for.
+            systemProperty(
+                "idea.load.plugins.id",
+                "com.github.xepozz.testo,ru.openide.openphp,com.intellij.xml,com.intellij.modules.pty4j",
+            )
             // The OpenIDE Pro promotion plugin shares a message bundle name with another bundled plugin; on the test
             // classpath, where every bundled plugin's jars end up together, the wrong bundle wins and the notification
             // groups fail to load. Nothing here needs it.

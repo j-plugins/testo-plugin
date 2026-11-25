@@ -34,8 +34,8 @@ Testo PHP – is a modern PHP testing library
 
 ## OpenIDE
 
-Build the OpenIDE variant with `./gradlew buildPlugin -PphpApi=openide`. It uses PHP for OpenIDE 0.9.9 and
-OpenIDE 2026.2.1. Install the ZIP from `build/openide/distributions/` through **Install Plugin from Disk**.
+Build the OpenIDE variant with `./gradlew buildPlugin -PphpApi=openide`. It uses PHP for OpenIDE 0.9.10 and
+OpenIDE 2026.3. Install the ZIP from `build/openide/distributions/` through **Install Plugin from Disk**.
 The PhpStorm builds remain selected by `-PphpApi=252` and `-PphpApi=262`.
 
 Runs use the project's active PHP interpreter. Infection retains the interpreter selected for the original test run.

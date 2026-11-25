@@ -17,6 +17,7 @@ import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.runners.ExecutionEnvironmentBuilder
 import com.intellij.execution.runners.ProgramRunner
+import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
@@ -188,7 +189,7 @@ internal fun rerunIcon(e: AnActionEvent, environment: ExecutionEnvironment): Ico
 }
 
 private fun isProcessAlive(e: AnActionEvent): Boolean {
-    val handler = e.getData(LangDataKeys.RUN_CONTENT_DESCRIPTOR)?.processHandler ?: return false
+    val handler = (e.getData(LangDataKeys.RUN_CONTENT_DESCRIPTOR) as? RunContentDescriptor)?.processHandler ?: return false
     return !handler.isProcessTerminated
 }
 
