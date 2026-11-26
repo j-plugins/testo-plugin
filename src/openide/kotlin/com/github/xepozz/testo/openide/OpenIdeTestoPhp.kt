@@ -123,11 +123,12 @@ class OpenIdeTestoPhp : TestoPhp {
         PhpDeclarations.inFile(file, topLevelOnly = false).filter(::isNamedClass).map(::OpenIdeClass)
 
     override fun mayContainDataProvider(content: FileContent): Boolean {
-        // User data may contain a PSI snapshot supplied by the platform.
-        if (content !is FileContentImpl || content.isTransientContent || !content.isUserDataEmpty) return true
+        if (content !is FileContentImpl || content.isTransientContent) return true
 
+        // User data may supply a different PSI snapshot. The view provider exposes its committed text.
+        val text = if (content.isUserDataEmpty) content.contentAsText else content.psiFile.viewProvider.contents
         // The short name must occur in the attribute reference or in its import in this file.
-        return content.contentAsText.contains(dataProviderShortName, ignoreCase = true)
+        return text.contains(dataProviderShortName, ignoreCase = true)
     }
 
     override fun attributesIn(file: PsiFile): List<PhpAttributeView> =

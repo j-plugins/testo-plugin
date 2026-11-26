@@ -84,6 +84,20 @@ class OpenIdeDataProvidersIndexTest : BasePlatformTestCase() {
         assertEquals(setOf("cases"), indexer.map(delegated).keys)
     }
 
+    fun testPhysicalInputWithSuppliedPsiUsesItsCommittedText() {
+        val psi = myFixture.configureByText("Provider.php", provider("", "\\Testo\\Data\\DataProvider"))
+        val documents = PsiDocumentManager.getInstance(project)
+        val document = checkNotNull(documents.getDocument(psi))
+        WriteCommandAction.runWriteCommandAction(project) {
+            document.setText(PLAIN_PHP)
+        }
+        assertTrue(documents.isUncommited(document))
+
+        val input = physical(PLAIN_PHP)
+        input.putUserData(IndexingDataKeys.PSI_FILE, psi)
+        assertEquals(setOf("cases"), indexer.map(input).keys)
+    }
+
     private fun provider(imports: String, attribute: String): String = """
         <?php
         namespace TestoIndexFixture;
