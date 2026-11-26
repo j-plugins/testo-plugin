@@ -25,9 +25,12 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
     override fun getName() = KEY
 
     override fun getIndexer() = DataIndexer<String, TestoDataProvidersIndexType, FileContent?> { inputData ->
+        val php = TestoPhp.getInstance()
+        if (!php.mayContainDataProvider(inputData)) return@DataIndexer emptyMap()
+
         val map = mutableMapOf<String, TestoDataProvidersIndexType>()
 
-        for (testClass in TestoPhp.getInstance().allClasses(inputData.psiFile)) {
+        for (testClass in php.allClasses(inputData.psiFile)) {
             // An indexer must not query the global class index: it loads other files' stubs mid-indexing.
             if (!testClass.psi.isTestoClass(resolveHierarchy = false)) continue
             for (method in testClass.ownMethods) {
@@ -48,8 +51,8 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
     override fun getValueExternalizer(): DataExternalizer<TestoDataProvidersIndexType> =
         DataProviderUsageExternalizer.INSTANCE
 
-    // Bump on any indexing-logic change so stale on-disk indexes rebuild: 2 corrected DATA_PROVIDER_ATTRIBUTE;
-    // 3 stopped resolving subclasses.
+    // Bump when stored results or their format change. Version 2 corrected DATA_PROVIDER_ATTRIBUTE.
+    // Version 3 stopped resolving subclasses. The fast path preserves empty results.
     override fun getVersion() = 3
 
     override fun getInputFilter() = PHP_INPUT_FILTER
