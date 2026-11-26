@@ -73,8 +73,10 @@ import java.util.concurrent.ConcurrentMap
 class OpenIdeTestoPhp : TestoPhp {
     private val dataProviderShortName = TestoClasses.DATA_PROVIDER.substringAfterLast('\\')
 
-    override fun toolEnvironment(configuration: TestoConfiguration): TestoToolEnvironment =
-        OpenIdeToolEnvironment(configuration as TestoRunConfiguration, TestoRunConfiguration.environmentProvider(configuration.project))
+    override fun toolEnvironment(configuration: TestoConfiguration): TestoToolEnvironment {
+        val testo = configuration as TestoRunConfiguration
+        return OpenIdeToolEnvironment(testo, testo.lastEnvironment ?: testo.launchEnvironment())
+    }
 
     override fun statementAt(leaf: PsiElement?, document: Document): TestoStatementTarget? {
         val file = leaf?.containingFile ?: return null
@@ -273,7 +275,7 @@ class OpenIdeTestoPhp : TestoPhp {
     }
 }
 
-/** Paths through the launch environment of the active interpreter profile. */
+/** Paths through one launch environment. */
 class OpenIdePathMapping(private val environment: PhpLaunchEnvironment) : TestoPathMapping {
     override fun toEnvironment(localPath: String): String = environment.toEnvironment(localPath)
 

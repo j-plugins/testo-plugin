@@ -4,11 +4,12 @@ import com.github.xepozz.testo.launch.TestoCoverageDriver
 import com.github.xepozz.testo.launch.TestoRunSelection
 import com.github.xepozz.testo.launch.TestoScope
 import com.intellij.execution.configurations.LocatableRunConfigurationOptions
+import org.jdom.Element
 
 /**
- * What an OpenIDE Testo configuration saves: every field of [TestoRunSelection] but the rerun filters, which only a
- * "Rerun Failed Tests" clone carries, and the launch fields OpenIDE's own form edits. No interpreter: a run takes the
- * active interpreter profile of the project.
+ * What an OpenIDE Testo configuration holds: every field of [TestoRunSelection] but the rerun filters, which only a
+ * "Rerun Failed Tests" clone carries, and the launch fields OpenIDE's own form edits. Saved through
+ * [com.github.xepozz.testo.launch.TestoSavedConfiguration], not in this shape, which only earlier builds wrote.
  */
 class TestoRunConfigurationOptions : LocatableRunConfigurationOptions() {
     var scope by enum(TestoScope.CONFIGURATION_FILE)
@@ -19,6 +20,7 @@ class TestoRunConfigurationOptions : LocatableRunConfigurationOptions() {
     var useAlternativeConfigurationFile by property(false)
     var configurationFilePath by string()
     var testRunnerOptions by string(DEFAULT_RUNNER_OPTIONS)
+    /** Not on the form, as on PhpStorm; a saved value still runs. */
     var command by string(DEFAULT_COMMAND)
     /** The single type earlier builds saved; read only while [testoTypes] is empty, cleared on save. */
     var testoType by string("")
@@ -48,6 +50,15 @@ class TestoRunConfigurationOptions : LocatableRunConfigurationOptions() {
     var infectionStaticAnalysisTool by string("")
     var infectionOptions by string("")
 
+    /** The interpreter profile a run takes; empty follows the project's active profile. */
+    var interpreterId by string()
+
+    /** The profile's name when it was chosen, to name it once the profile is gone. */
+    var interpreterName by string()
+
+    /** Arguments to php itself, ahead of the ones a debug or coverage run adds. */
+    var interpreterOptions by string()
+
     /** The Testo binary; empty takes the one of the test framework page, then of composer. */
     var binaryPath by string()
 
@@ -61,5 +72,15 @@ class TestoRunConfigurationOptions : LocatableRunConfigurationOptions() {
         const val DEFAULT_RUNNER_OPTIONS = "-q -n --teamcity"
 
         const val DEFAULT_COMMAND = "run"
+
+        /** The names the fields of this class save under; earlier builds wrote them as `<option>`s of the configuration. */
+        private val NAMES: Set<String> = TestoRunConfigurationOptions::class.java.declaredFields
+            .map { it.name.removeSuffix("\$delegate") }
+            .toSet()
+
+        fun owns(option: Element): Boolean = option.name == "option" && option.getAttributeValue("name") in NAMES
+
+        /** Whether [configuration] was saved by an earlier build, in this class's own shape. */
+        fun isSavedIn(configuration: Element): Boolean = configuration.getChildren("option").any(::owns)
     }
 }

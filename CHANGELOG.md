@@ -4,9 +4,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- The OpenIDE run configuration is laid out like PhpStorm's and has its own PHP interpreter and interpreter options; by default it follows the project's active interpreter profile.
+
 ### Changed
 
 - The OpenIDE build targets OpenIDE 2026.3 with PHP for OpenIDE 0.9.10.
+- Testo run configurations are saved in one format on PhpStorm and OpenIDE, so a shared `.run.xml` works in both; OpenIDE converts configurations saved by earlier builds.
+
+### Fixed
+
+- Mutating from the Coverage view no longer resolves the interpreter on the UI thread (a "slow operations on EDT" error).
 
 ## [2026.17] - 2026-10-22
 

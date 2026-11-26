@@ -138,6 +138,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoCoverageArguments.kt   # `--coverage-*` flags, coverage level, coverage-only options
 │   ├── TestoConfigurationNames.kt  # suggested names and action names of a configuration
 │   ├── TestoConfiguration.kt       # a Testo run configuration as the core sees it
+│   ├── TestoSavedConfiguration.kt  # the saved XML both builds share: <TestoRunnerSettings> + <CommandLine>
 │   └── TestoReportLocation.kt      # a report's local path and the interpreter's path to it
 │
 ├── util/
@@ -613,6 +614,9 @@ Non-obvious constraints already paid for in blood — read before touching the r
   inherits the interpreter and working directory), which starts the process itself — in PhpStorm through
   `PhpRunConfiguration.createProcessHandler`, which still handles Docker/WSL/SSH. Run through the executor, it took
   over the tab and the Run button of the Testo run it mutates.
+- **On OpenIDE a configuration's interpreter is a profile id**, resolved through `PhpLaunchEnvironment.of(project, id)` and
+  the `profileId` overloads of `PhpTestFrameworks.binaryPath`/`configFile` (PHP for OpenIDE 0.9.8+). The overloads without it
+  answer for the active profile, whatever the configuration names.
 - **`createPathMappings` misses what the interpreter's command line mounts**: a Docker interpreter's project volume is
   known only to `createPathMapper` (the console's translation), so every host ↔ interpreter path goes through
   `PhpToolLauncher`, which falls back to it and to the command's own `getPathProcessor`. The IDE system dir is in none,
@@ -700,6 +704,12 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `TestoRunnerSettingsSerializationTest` pins the XML shape.
 - **`rerunFilters` is `@Transient`** — it lives only on the throwaway clone a "rerun failed" launch creates, and
   that clone's scope is reset to `ConfigurationFile` so no scope flag narrows the filters away.
+- **One `.run.xml` serves both builds.** PhpStorm's `XmlSerializer` output is the format; OpenIDE writes it through
+  `TestoSavedConfiguration`, which `TestoSavedConfigurationTest` checks against `persistence.txt`. A new runner field
+  goes into both, with the same attribute name. OpenIDE configurations saved by earlier builds as top-level `<option>`s
+  are read from those and rewritten. OpenIDE's interpreter options are `<CommandLine parameters>`; its profile id is
+  `interpreter_id`, and only while that is set does it write `<PhpTestInterpreterSettings>` — otherwise an Apply with
+  no interpreter chosen would erase PhpStorm's.
 - **`TestoRunConfigurationType.ID` is a pinned literal**, not `::class.simpleName`: renaming the class must not
   invalidate users' saved run configurations.
 - **`getVersion()` of both file-based indexes** (`TestoDataProvidersIndex`, `TestoGroupsIndex`) must be bumped whenever

@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.phpstorm
 
+import com.github.xepozz.testo.phpstorm.tests.run.TestoRunConfigurationSettings
 import com.github.xepozz.testo.phpstorm.tests.run.TestoRunnerSettings
 import com.jetbrains.php.testFramework.run.PhpTestRunnerSettings
 import junit.framework.TestCase
@@ -116,5 +117,24 @@ class TestoRunnerSettingsTest : TestCase() {
         assertEquals("--type=!bench", result.coverageOptions)
         // rerunFilters is @Transient and intentionally NOT copied — stays empty on the result.
         assertTrue("rerunFilters is not copied (transient)", result.rerunFilters.isEmpty())
+    }
+
+    fun testSettingsOfThePhpPluginsTypeKeepTheTestoFields() {
+        val configuration = TestoRunConfigurationSettings()
+        configuration.setTestoRunnerSettings(
+            TestoRunnerSettings(binaryPath = "/opt/testo/bin/testo", command = "list", dataProviderIndex = 3).apply { suites = mutableListOf("Unit") }
+        )
+
+        configuration.setRunnerSettings(PhpTestRunnerSettings().apply { directoryPath = "tests" })
+        with(configuration.getTestoRunnerSettings()) {
+            assertEquals("tests", directoryPath)
+            assertEquals("/opt/testo/bin/testo", binaryPath)
+            assertEquals("list", command)
+            assertEquals(3, dataProviderIndex)
+            assertEquals(listOf("Unit"), suites)
+        }
+
+        configuration.setRunnerSettings(TestoRunnerSettings())
+        assertEquals("", configuration.getTestoRunnerSettings().binaryPath)
     }
 }

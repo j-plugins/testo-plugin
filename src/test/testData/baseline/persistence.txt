@@ -11,7 +11,7 @@
       <env name="XDEBUG_MODE" value="off" />
     </envs>
   </CommandLine>
-  <TestoRunnerSettings configuration_file="/work/app/testo.php" directory="/work/app/tests" file="/work/app/tests/CalcTest.php" method="\App\CalcTest::med:3:0" scope="Method" selected_type="Unit" options="-q --stop-on-failure" use_alternative_configuration_file="true" command="list" parallel="4" coverage_clover="true" coverage_cobertura="false" coverage_xml="false" coverage_level="path" coverage_options="--type=test" log_html="false">
+  <TestoRunnerSettings configuration_file="/work/app/testo.php" directory="/work/app/tests" file="/work/app/tests/CalcTest.php" method="\App\CalcTest::med:3:0" scope="Method" selected_type="Unit" options="-q --stop-on-failure" use_alternative_configuration_file="true" command="list" parallel="4" coverage_clover="true" coverage_cobertura="false" coverage_xml="false" coverage_level="path" coverage_options="--type=test" log_html="false" infection_scope="git-lines" infection_git_diff_base="main" infection_threads="4" infection_only_covering_test_cases="true" infection_with_uncovered="true" infection_timeouts_as_escaped="true" infection_mutators="@default" infection_static_analysis_tool="phpstan" infection_options="--debug" binary="/opt/testo/bin/testo" interpreter_id="compose-id">
     <option name="coverageEngine" value="PCov" />
     <option name="dataProviderIndex" value="3" />
     <option name="dataSetIndex" value="0" />
@@ -43,7 +43,7 @@
       <env name="XDEBUG_MODE" value="off" />
     </envs>
   </CommandLine>
-  <TestoRunnerSettings configuration_file="/work/app/testo.php" directory="/work/app/tests" file="/work/app/tests/CalcTest.php" method="\App\CalcTest::med:3:0" scope="Method" selected_type="Unit" options="-q --stop-on-failure" use_alternative_configuration_file="true" command="list" parallel="4" coverage_clover="true" coverage_cobertura="false" coverage_xml="false" coverage_level="path" coverage_options="--type=test" log_html="false">
+  <TestoRunnerSettings configuration_file="/work/app/testo.php" directory="/work/app/tests" file="/work/app/tests/CalcTest.php" method="\App\CalcTest::med:3:0" scope="Method" selected_type="Unit" options="-q --stop-on-failure" use_alternative_configuration_file="true" command="list" parallel="4" coverage_clover="true" coverage_cobertura="false" coverage_xml="false" coverage_level="path" coverage_options="--type=test" log_html="false" infection_scope="git-lines" infection_git_diff_base="main" infection_threads="4" infection_only_covering_test_cases="true" infection_with_uncovered="true" infection_timeouts_as_escaped="true" infection_mutators="@default" infection_static_analysis_tool="phpstan" infection_options="--debug" binary="/opt/testo/bin/testo" interpreter_id="compose-id">
     <option name="coverageEngine" value="PCov" />
     <option name="dataProviderIndex" value="3" />
     <option name="dataSetIndex" value="0" />
@@ -87,3 +87,6 @@
   coverageOptions=--type=test
   parallel=4 enabled=true
   logs=[html=false, junit=true]
+  infection=[git-lines|main|4|true|true|true|@default|phpstan|--debug]
+  binaryPath=/opt/testo/bin/testo
+  interpreterId=compose-id
