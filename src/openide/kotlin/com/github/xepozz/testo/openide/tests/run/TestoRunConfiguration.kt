@@ -2,9 +2,11 @@ package com.github.xepozz.testo.openide.tests.run
 
 import com.github.xepozz.testo.launch.TestoConfiguration
 import com.github.xepozz.testo.launch.TestoConfigurationNames
+import com.github.xepozz.testo.launch.TestoLaunchSettings
 import com.github.xepozz.testo.launch.TestoReportLocation
 import com.github.xepozz.testo.launch.TestoRunContexts
 import com.github.xepozz.testo.launch.TestoRunSelection
+import com.github.xepozz.testo.launch.TestoSavedConfiguration
 import com.github.xepozz.testo.launch.TestoScope
 import com.github.xepozz.testo.openide.openIdeConsoleProperties
 import com.github.xepozz.testo.openide.OpenIdeToolEnvironment
@@ -26,6 +28,7 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
 import com.intellij.util.PathUtil
+import org.jdom.Element
 import ru.openide.openphp.settings.PhpSettings
 import ru.openide.openphp.settings.launch.PhpLaunchEnvironment
 import ru.openide.openphp.settings.launch.PhpLaunchLocality
@@ -123,6 +126,49 @@ class TestoRunConfiguration(
             infectionStaticAnalysisTool = value.infectionStaticAnalysisTool
             infectionOptions = value.infectionOptions
         }
+
+    private var launchSettings: TestoLaunchSettings
+        get() = with(options) {
+            TestoLaunchSettings(
+                binaryPath = binaryPath.orEmpty(),
+                workingDirectory = workingDirectory,
+                environmentVariables = environmentVariables.toMap(),
+                passParentEnvironment = passParentEnvironment,
+                interpreterId = interpreterId.orEmpty(),
+                interpreterName = interpreterName,
+                interpreterOptions = interpreterOptions,
+            )
+        }
+        set(value) = with(options) {
+            binaryPath = value.binaryPath.ifEmpty { null }
+            workingDirectory = value.workingDirectory
+            environmentVariables = value.environmentVariables.toMutableMap()
+            passParentEnvironment = value.passParentEnvironment
+            interpreterId = value.interpreterId.ifEmpty { null }
+            interpreterName = value.interpreterName
+            interpreterOptions = value.interpreterOptions
+        }
+
+    /** What the file held when read: a save writes back what this build does not edit, such as another build's interpreter. */
+    private var saved: TestoSavedConfiguration? = null
+
+    override fun readExternal(element: Element) {
+        super<LocatableConfigurationBase>.readExternal(element)
+        val file = TestoSavedConfiguration.readFrom(element)
+        saved = file
+        // Earlier builds saved the options as they are; those hold what was last edited here.
+        if (TestoRunConfigurationOptions.isSavedIn(element)) return
+        selection = file.selection
+        launchSettings = file.launch
+    }
+
+    override fun writeExternal(element: Element) {
+        super<LocatableConfigurationBase>.writeExternal(element)
+        element.getChildren("option").filter(TestoRunConfigurationOptions::owns).forEach(element::removeContent)
+        val file = saved?.with(selection, launchSettings) ?: TestoSavedConfiguration(selection, launchSettings)
+        file.writeTo(element)
+        saved = TestoSavedConfiguration.readFrom(element)
+    }
 
     override val interpreterName: String
         get() = archivedEnvironment()?.displayName.orEmpty()

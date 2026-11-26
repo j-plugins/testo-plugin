@@ -4,10 +4,12 @@ import com.github.xepozz.testo.launch.TestoCoverageDriver
 import com.github.xepozz.testo.launch.TestoRunSelection
 import com.github.xepozz.testo.launch.TestoScope
 import com.intellij.execution.configurations.LocatableRunConfigurationOptions
+import org.jdom.Element
 
 /**
- * What an OpenIDE Testo configuration saves: every field of [TestoRunSelection] but the rerun filters, which only a
- * "Rerun Failed Tests" clone carries, and the launch fields OpenIDE's own form edits.
+ * What an OpenIDE Testo configuration holds: every field of [TestoRunSelection] but the rerun filters, which only a
+ * "Rerun Failed Tests" clone carries, and the launch fields OpenIDE's own form edits. Saved through
+ * [com.github.xepozz.testo.launch.TestoSavedConfiguration], not in this shape, which only earlier builds wrote.
  */
 class TestoRunConfigurationOptions : LocatableRunConfigurationOptions() {
     var scope by enum(TestoScope.CONFIGURATION_FILE)
@@ -70,5 +72,15 @@ class TestoRunConfigurationOptions : LocatableRunConfigurationOptions() {
         const val DEFAULT_RUNNER_OPTIONS = "-q -n --teamcity"
 
         const val DEFAULT_COMMAND = "run"
+
+        /** The names the fields of this class save under; earlier builds wrote them as `<option>`s of the configuration. */
+        private val NAMES: Set<String> = TestoRunConfigurationOptions::class.java.declaredFields
+            .map { it.name.removeSuffix("\$delegate") }
+            .toSet()
+
+        fun owns(option: Element): Boolean = option.name == "option" && option.getAttributeValue("name") in NAMES
+
+        /** Whether [configuration] was saved by an earlier build, in this class's own shape. */
+        fun isSavedIn(configuration: Element): Boolean = configuration.getChildren("option").any(::owns)
     }
 }
