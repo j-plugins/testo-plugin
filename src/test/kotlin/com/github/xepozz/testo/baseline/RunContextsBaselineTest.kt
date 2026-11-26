@@ -12,6 +12,7 @@ import com.intellij.execution.actions.ConfigurationContext
 import com.intellij.execution.actions.RunConfigurationProducer
 import com.intellij.execution.configurations.LocatableConfigurationBase
 import com.intellij.execution.configurations.RunConfiguration
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -46,6 +47,38 @@ class RunContextsBaselineTest : BasePlatformTestCase() {
             addSuppressedException(e)
         } finally {
             super.tearDown()
+        }
+    }
+
+    fun testClassAndAttributeContextsRecogniseNativePaths() {
+        val elements = projectFixture.contexts().toMap()
+        val wholeClass = ConfigurationContext(elements.getValue("class:CaseTest"))
+        val testAttribute = ConfigurationContext(elements.getValue("classAttr:Test@CaseTest"))
+        val otherClass = ConfigurationContext(elements.getValue("class:CalcTest"))
+
+        for ((ownContext, otherType) in listOf(wholeClass to testAttribute, testAttribute to wholeClass)) {
+            val run = checkNotNull(producer.createConfigurationFromContext(ownContext)).configuration as TestoConfiguration
+            val path = checkNotNull(ownContext.psiLocation).containingFile.virtualFile.path
+            run.selection = run.selection.copy(filePath = FileUtil.toSystemDependentName(path))
+            assertTrue(producer.isConfigurationFromContext(run, ownContext))
+            assertFalse(producer.isConfigurationFromContext(run, otherType))
+            assertFalse(producer.isConfigurationFromContext(run, otherClass))
+        }
+    }
+
+    fun testApplicationAndSuiteContextsRecogniseNativeConfigurationPaths() {
+        val elements = projectFixture.contexts().toMap()
+        val otherPath = elements.getValue("class:CalcTest").containingFile.virtualFile.path
+        for (label in listOf("new:ApplicationConfig", "new:SuiteConfig('Unit')")) {
+            val element = elements.getValue(label)
+            val context = ConfigurationContext(element)
+            val run = checkNotNull(producer.createConfigurationFromContext(context)).configuration as TestoConfiguration
+            val selection = run.selection
+            val path = element.containingFile.virtualFile.path
+            run.selection = selection.copy(configurationFilePath = FileUtil.toSystemDependentName(path))
+            assertTrue(label, producer.isConfigurationFromContext(run, context))
+            run.selection = selection.copy(configurationFilePath = FileUtil.toSystemDependentName(otherPath))
+            assertFalse(label, producer.isConfigurationFromContext(run, context))
         }
     }
 
