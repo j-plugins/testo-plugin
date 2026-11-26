@@ -40,7 +40,6 @@ import com.intellij.psi.util.PsiModificationTracker
 import com.intellij.util.containers.ConcurrentFactoryMap
 import com.intellij.util.indexing.FileContent
 import com.intellij.util.indexing.FileContentImpl
-import com.intellij.util.indexing.IndexingDataKeys
 import ru.openide.openphp.lang.psi.symbols.PhpAttribute
 import ru.openide.openphp.lang.psi.symbols.PhpAttributes
 import ru.openide.openphp.lang.psi.symbols.PhpClassInfo
@@ -124,9 +123,8 @@ class OpenIdeTestoPhp : TestoPhp {
         PhpDeclarations.inFile(file, topLevelOnly = false).filter(::isNamedClass).map(::OpenIdeClass)
 
     override fun mayContainDataProvider(content: FileContent): Boolean {
-        if (content !is FileContentImpl || content.isTransientContent ||
-            content.getUserData(IndexingDataKeys.PSI_FILE) != null
-        ) return true
+        // User data may contain a PSI snapshot supplied by the platform.
+        if (content !is FileContentImpl || content.isTransientContent || !content.isUserDataEmpty) return true
 
         // The short name must occur in the attribute reference or in its import in this file.
         return content.contentAsText.contains(dataProviderShortName, ignoreCase = true)
