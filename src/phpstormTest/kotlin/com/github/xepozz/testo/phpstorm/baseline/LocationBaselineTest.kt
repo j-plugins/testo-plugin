@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.phpstorm.baseline
 
+import com.github.xepozz.testo.baseline.BaselineFiles
 import com.github.xepozz.testo.baseline.BaselineFixture
 import com.github.xepozz.testo.phpstorm.tests.TestoFrameworkType
 import com.github.xepozz.testo.phpstorm.tests.TestoTestLocator
@@ -64,11 +65,18 @@ class LocationBaselineTest : BasePlatformTestCase() {
             for (leaf in PsiTreeUtil.collectElements(file) { it.firstChild == null }) {
                 if (leaf.text.isBlank()) continue
                 val info = provider.getInfo(leaf) ?: continue
-                val url = address(leaf)
+                val url = normalizeAddress(address(leaf))
                 out.appendLine("  ${position(file, leaf)} ${leaf.text} -> ${url} actions=${info.actions.size}")
             }
         }
         Baselines.assertMatches("gutter", out.toString())
+    }
+
+    private fun normalizeAddress(url: String?): String? {
+        val protocol = "php_qn://"
+        if (url == null || !url.startsWith(protocol)) return url
+        val hostPath = url.removePrefix(protocol).substringBefore("::")
+        return protocol + BaselineFiles.hostPath(hostPath) + url.substring(protocol.length + hostPath.length)
     }
 
     fun testAddressParsingAndNavigation() {

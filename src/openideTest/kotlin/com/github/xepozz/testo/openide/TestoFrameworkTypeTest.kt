@@ -4,6 +4,7 @@ import com.github.xepozz.testo.openide.tests.TestoFrameworkType
 import com.github.xepozz.testo.tests.TestoTestRunLineMarkerProvider
 import com.intellij.execution.lineMarker.RunLineMarkerContributor
 import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import ru.openide.openphp.run.testing.PhpTestFrameworks
 
@@ -30,7 +31,8 @@ class TestoFrameworkTypeTest : BasePlatformTestCase() {
         val testo = TestoFrameworkType.instance()!!
         val root = project.guessProjectDir()!!.path
 
-        assertEquals("$root/vendor/bin/testo", PhpTestFrameworks.binaryPath(project, testo))
+        val binary = checkNotNull(PhpTestFrameworks.binaryPath(project, testo))
+        assertEquals("$root/vendor/bin/testo", FileUtil.toSystemIndependentName(binary))
         assertEquals("0.10.54", PhpTestFrameworks.knownVersion(project, testo))
         assertEquals("0.10.54", testo.versionProbe.parse("Testo 0.10.54\n"))
         assertNull("Not Testo's output", testo.versionProbe.parse("PHPUnit 11.0.0"))

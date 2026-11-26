@@ -58,7 +58,9 @@ class TestoLaunchCommandTest : BasePlatformTestCase() {
     private fun commandIn(environment: PhpLaunchEnvironment, configuration: TestoRunConfiguration = configuration()): String {
         TestoRunConfiguration.environmentProvider = { environment }
         val prepared = configuration.prepare(processHandler = { NopProcessHandler() })
-        return prepared.command.commandLineString
+        val line = prepared.command.commandLineString
+        val portable = if (environment.locality == PhpLaunchLocality.SameHost) FileUtil.toSystemIndependentName(line) else line
+        return portable
             .replace(FileUtil.toSystemIndependentName(PathManager.getSystemPath()), "<system>")
             .replace(project.locationHash, "<project>")
             .replace(wd, "<wd>")

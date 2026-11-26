@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.openide
 
 import com.intellij.execution.configurations.GeneralCommandLine
+import com.intellij.openapi.util.io.FileUtil
 import ru.openide.openphp.settings.launch.PhpExposedPath
 import ru.openide.openphp.settings.launch.PhpLaunchEnvironment
 import ru.openide.openphp.settings.launch.PhpLaunchLocality
@@ -38,9 +39,13 @@ class FakeLaunchEnvironment(
         }
     }
 
-    override fun toEnvironment(hostPath: String): String =
-        mappings.entries.firstOrNull { hostPath == it.key || hostPath.startsWith(it.key + "/") }
-            ?.let { it.value + hostPath.removePrefix(it.key) } ?: hostPath
+    override fun toEnvironment(hostPath: String): String {
+        val path = FileUtil.toSystemIndependentName(hostPath)
+        return mappings.entries.firstNotNullOfOrNull { (hostRoot, environmentRoot) ->
+            val root = FileUtil.toSystemIndependentName(hostRoot)
+            if (path == root || path.startsWith("$root/")) environmentRoot + path.removePrefix(root) else null
+        } ?: hostPath
+    }
 
     override fun toHost(pathInEnvironment: String): String =
         mappings.entries.firstOrNull { pathInEnvironment == it.value || pathInEnvironment.startsWith(it.value + "/") }

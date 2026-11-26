@@ -8,6 +8,8 @@ import com.github.xepozz.testo.phpstorm.tests.run.TestoRunnerSettings
 import com.intellij.execution.process.OSProcessHandler
 import com.intellij.execution.process.ProcessHandler
 import com.intellij.openapi.application.PathManager
+import com.intellij.openapi.util.SystemInfo
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
 import com.jetbrains.php.config.interpreters.PhpInterpreter
@@ -35,9 +37,26 @@ class CommandBaselineTest : BasePlatformTestCase() {
         phpDir = Files.createTempDirectory("testo-baseline-php")
         record = phpDir.resolve("argv.txt")
         // Records where it ran and every argument on its own line, so the baseline shows the exact argv.
-        val php = phpDir.resolve("php")
-        Files.writeString(php, "#!/bin/sh\n{ echo \"cwd=${'$'}(pwd -P)\"; for a in \"${'$'}@\"; do echo \"arg=${'$'}a\"; done; } > '${record}'\nexit 0\n")
-        php.toFile().setExecutable(true)
+        val php = phpDir.resolve(if (SystemInfo.isWindows) "php.cmd" else "php")
+        val script = if (SystemInfo.isWindows) {
+            """
+                @echo off
+                setlocal DisableDelayedExpansion
+                >"%~dp0argv.txt" echo(cwd=%CD%
+                :record
+                if "%~1"=="" exit /b 0
+                set "arg=%~1"
+                setlocal EnableDelayedExpansion
+                >>"%~dp0argv.txt" echo(arg=!arg!
+                endlocal
+                shift
+                goto record
+            """.trimIndent().replace("\n", "\r\n") + "\r\n"
+        } else {
+            "#!/bin/sh\n{ echo \"cwd=${'$'}(pwd -P)\"; for a in \"${'$'}@\"; do echo \"arg=${'$'}a\"; done; } > '$record'\nexit 0\n"
+        }
+        Files.writeString(php, script)
+        if (!SystemInfo.isWindows) check(php.toFile().setExecutable(true))
         interpreter = PhpInterpreter().apply {
             name = "Baseline PHP"
             homePath = php.toString()
@@ -80,21 +99,32 @@ class CommandBaselineTest : BasePlatformTestCase() {
         val process = (handler as OSProcessHandler).process
         try {
             check(process.waitFor(20, TimeUnit.SECONDS)) { "The stand-in php did not exit" }
-            val argv = if (Files.exists(record)) Files.readString(record).trimEnd() else "<not started>"
+            check(process.exitValue() == 0) { "The stand-in php exited with ${process.exitValue()}" }
+            val argv = Files.readString(record).trimEnd()
             return normalise("commandLine=${handler.commandLine}\n$argv")
         } finally {
             handler.destroyProcess()
         }
     }
 
-    private fun normalise(text: String) = text
-        .replace(wd, "<wd>")
-        .replace(phpDir.toRealPath().toString(), "<php-dir>")
-        .replace(phpDir.toString(), "<php-dir>")
-        .replace(PathManager.getSystemPath(), "<system>")
-        .replace(project.basePath.orEmpty(), "<project>")
-        // The IDE-managed report folder is keyed by the project's location hash, which a light test project generates.
-        .replace(project.locationHash, "<project-hash>")
+    private fun normalise(text: String): String {
+        val roots = listOf(
+            wd to "<wd>",
+            phpDir.toRealPath().toString() to "<php-dir>",
+            phpDir.toString() to "<php-dir>",
+            PathManager.getSystemPath() to "<system>",
+            project.basePath.orEmpty() to "<project>",
+        )
+        val canonical = roots.fold(text) { result, (root, label) ->
+            if (root.isEmpty()) result else result
+                .replace(FileUtil.toSystemIndependentName(root), label)
+                .replace(FileUtil.toSystemDependentName(root), label)
+        }
+        return FIXTURE_PATH.replace(canonical) { FileUtil.toSystemIndependentName(it.value) }
+            .replace("<php-dir>/php.cmd", "<php-dir>/php")
+            // The IDE-managed report folder is keyed by the project's location hash.
+            .replace(project.locationHash, "<project-hash>")
+    }
 
     private fun StringBuilder.case(label: String, block: () -> String) {
         appendLine("== $label")
@@ -197,7 +227,7 @@ class CommandBaselineTest : BasePlatformTestCase() {
             if (flags.isEmpty()) listOf("--coverage")
             else flags.zip(targets) { (format, _), target -> runner.coverageFlagFor(format, target.path) }
         val arguments = reportArguments + runner.extraCoverageArguments(settings)
-        val header = "testoArguments=${arguments.joinToString(" ")}"
+        val header = normalise("testoArguments=${arguments.joinToString(" ")}")
         if (settings.coverageEngine != CoverageEngine.PCOV) return header
         val command = runner.createTestoCoverageCommand(configuration, interpreter, arguments, localCoverage, localCoverage)
         return header + "\n" + commandLineOf(command, configuration)
@@ -241,5 +271,7 @@ class CommandBaselineTest : BasePlatformTestCase() {
 
     private companion object {
         const val COVERAGE = "/work/coverage/Baseline@testo.xml"
+        // Convert fixture paths only, leaving PHP names such as \App\CalcTest intact.
+        val FIXTURE_PATH = Regex("""(?<![\w\\])(?:<(?:wd|php-dir|system|project)>|[\\/]work|[\\/]elsewhere|tests)[\\/][^\s"'<>]+""")
     }
 }

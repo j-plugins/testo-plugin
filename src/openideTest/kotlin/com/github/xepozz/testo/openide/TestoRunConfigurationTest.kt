@@ -45,9 +45,8 @@ class TestoRunConfigurationTest : BasePlatformTestCase() {
         TestoRunConfiguration.environmentProvider = { environment }
     }
 
-    private fun declareTestoInComposer() {
+    private fun declareTestoInComposer() =
         myFixture.addFileToProject("composer.json", """{"require-dev": {"testo/testo": "^0.10"}}""")
-    }
 
     private fun warningOf(configuration: TestoRunConfiguration): String? =
         try {
@@ -180,18 +179,23 @@ class TestoRunConfigurationTest : BasePlatformTestCase() {
         val warning = warningOf(configuration)
         assertTrue(warning, warning!!.contains("composer install") && warning.contains("Test Frameworks"))
         val refusal = thrown<ExecutionException> { configuration.prepare(processHandler = { NopProcessHandler() }) }
-        assertTrue(refusal.message, refusal.message!!.contains("vendor/testo/testo/bin/testo") && refusal.message!!.contains("composer install"))
+        val binary = FileUtil.toSystemDependentName("vendor/testo/testo/bin/testo")
+        assertTrue(refusal.message, refusal.message!!.contains(binary) && refusal.message!!.contains("composer install"))
     }
 
     fun testADeclaredPackageNotInstalledOnlyWarnsForAContainer() {
-        declareTestoInComposer()
-        runIn(FakeLaunchEnvironment(locality = PhpLaunchLocality.Container("host.docker.internal")))
+        val composer = declareTestoInComposer()
+        runIn(FakeLaunchEnvironment(
+            locality = PhpLaunchLocality.Container("host.docker.internal"),
+            mappings = mapOf(composer.virtualFile.parent.path to "/app"),
+        ))
         val configuration = configuration()
 
         val warning = warningOf(configuration)
         assertTrue(warning, warning!!.contains("container"))
         val prepared = configuration.prepare(processHandler = { NopProcessHandler() })
-        assertTrue(prepared.command.commandLineString, prepared.command.commandLineString.contains("vendor/testo/testo/bin/testo run"))
+        val invocation = listOf("php", "/app/vendor/testo/testo/bin/testo", "run")
+        assertTrue(prepared.command.commandLineString, invocation in prepared.command.parametersList.list.windowed(3))
     }
 
     fun testAPathGivenAsIsIsCheckedByLocality() {
