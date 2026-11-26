@@ -4,18 +4,25 @@
 
 ## [Unreleased]
 
+### Added
+
+- The OpenIDE run configuration is laid out like PhpStorm's and has its own PHP interpreter and interpreter options; by default it follows the project's active interpreter profile.
+
 ### Changed
 
 - The OpenIDE build targets OpenIDE 2026.3 with PHP for OpenIDE 0.9.10.
 - Testo run configurations are saved in one format on PhpStorm and OpenIDE, so a shared `.run.xml` works in both; OpenIDE converts configurations saved by earlier builds.
+
+### Fixed
+
+- Mutating from the Coverage view no longer resolves the interpreter on the UI thread (a "slow operations on EDT" error).
 
 ## [2026.17] - 2026-10-22
 
 ### Added
 
 - An OpenIDE 2026.2 build, installed alongside PHP for OpenIDE: test discovery and gutter runs, Run / Debug / Coverage configurations, the channel console, run history, the Coverage view and mutation testing with Infection.
-- On OpenIDE an HTML or JUnit report the interpreter cannot reach is skipped with a notification instead of failing the run.
-- The OpenIDE run configuration is laid out like PhpStorm's and has its own PHP interpreter and interpreter options; by default it follows the project's active interpreter profile.
+- On OpenIDE a run takes the project's active PHP interpreter profile; an HTML or JUnit report the interpreter cannot reach is skipped with a notification instead of failing the run.
 - The run configuration's Type filter takes several types as tags, each passed as its own `--type`; existing configurations keep their type.
 
 ### Fixed
@@ -24,7 +31,6 @@
 - A stopped mutant rerun stays in the run history after an IDE restart, and cleanup no longer deletes the archive of a mutation run in progress.
 - Clearing the run history, or retention deleting a run, now also removes that run's mutant marks and coverage.
 - The Coverage view selects the opened file as soon as coverage loads, including from history.
-- Mutating from the Coverage view no longer resolves the interpreter on the UI thread (a "slow operations on EDT" error).
 
 ## [2026.16.262] - 2026-10-01
 
