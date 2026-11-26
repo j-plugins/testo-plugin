@@ -206,6 +206,13 @@ internal object TestoMutationArchive {
             .forEach { runCatching { NioFiles.deleteRecursively(it) } }
     }
 
+    /** Deletes [dir], a mutation run not worth keeping, unless a process still reads its inputs: then prune takes it later. */
+    @Synchronized
+    fun discard(dir: Path) {
+        if (hasInputUsers(dir) || isBeingDeleted(dir)) return
+        runCatching { NioFiles.deleteRecursively(dir) }
+    }
+
     /** A mutation run of [testoRunDir] whose process may still be alive: its stop went unconfirmed within the grace period. */
     @Synchronized
     fun unconfirmedRun(testoRunDir: Path): Path? = runs(testoRunDir).firstOrNull { dir ->

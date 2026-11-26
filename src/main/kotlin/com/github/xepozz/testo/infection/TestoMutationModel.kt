@@ -180,6 +180,15 @@ class TestoMutationRun(
     internal var failureReason: String? = null
         private set
 
+    /** What starting Infection threw, when it did. */
+    @Volatile
+    internal var startError: String? = null
+
+    val failed: Boolean get() = isFailedMutationRun(isRunning, stopRequested, exitCode, mutants.size)
+
+    internal fun failureDetail(): String =
+        startError ?: TestoBundle.message("infection.failed.exitCode", exitCode?.toString() ?: "–")
+
     @Synchronized
     internal fun markUnconfirmed(tool: com.github.xepozz.testo.php.TestoPreparedTool, reason: String) {
         failureReason = reason
@@ -331,9 +340,16 @@ internal fun mutationVerdict(running: Boolean, stopped: Boolean, escaped: Int, e
     running -> null
     failureReason != null -> TestoIcons.Status.FAILURE
     stopped -> TestoIcons.Status.FAILURE_CANCELLED
-    escaped > 0 || (exitCode != 0 && mutants == 0) -> TestoIcons.Status.FAILURE
+    escaped > 0 || isFailedMutationRun(running, stopped, exitCode, mutants) -> TestoIcons.Status.FAILURE
     else -> TestoIcons.Status.SUCCESS
 }
+
+/**
+ * Infection could not be started, or gave up before its first mutant: not a run to keep. One that exits 0 with no
+ * mutant found nothing to mutate, which is an answer.
+ */
+internal fun isFailedMutationRun(running: Boolean, stopped: Boolean, exitCode: Int?, mutants: Int): Boolean =
+    !running && !stopped && mutants == 0 && exitCode != 0
 
 /** SHA-256 of [file]'s bytes, or null when it cannot be read. */
 internal fun fingerprintOf(file: Path): String? = runCatching {

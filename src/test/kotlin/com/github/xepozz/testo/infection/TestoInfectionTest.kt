@@ -4,6 +4,7 @@ import com.github.xepozz.testo.runs.StoredReport
 import com.github.xepozz.testo.runs.TestoRunManifest
 import com.github.xepozz.testo.launch.TestoRunSelection
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -319,5 +320,15 @@ class TestoInfectionTest {
 
         assertEquals(listOf("/app/src/A.php", "b1", "b2", "c1"), describe(rerunUnits(targets, true)))
         assertEquals(listOf("a1", "a2", "b1", "b2", "c1"), describe(rerunUnits(targets, false)))
+    }
+
+    @Test
+    fun `a run that ends without a mutant fails unless Infection exited cleanly or was stopped`() {
+        assertTrue("a non-zero exit", isFailedMutationRun(running = false, stopped = false, exitCode = 1, mutants = 0))
+        assertTrue("no process to exit", isFailedMutationRun(running = false, stopped = false, exitCode = null, mutants = 0))
+        assertFalse("nothing to mutate", isFailedMutationRun(running = false, stopped = false, exitCode = 0, mutants = 0))
+        assertFalse("stopped", isFailedMutationRun(running = false, stopped = true, exitCode = 143, mutants = 0))
+        assertFalse("still running", isFailedMutationRun(running = true, stopped = false, exitCode = null, mutants = 0))
+        assertFalse("below --min-msi", isFailedMutationRun(running = false, stopped = false, exitCode = 1, mutants = 3))
     }
 }

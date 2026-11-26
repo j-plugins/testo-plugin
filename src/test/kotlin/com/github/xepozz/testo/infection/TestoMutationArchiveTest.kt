@@ -402,4 +402,19 @@ class TestoMutationArchiveTest {
 
         assertEquals(listOf("3"), TestoMutationArchive.runs(testoRun).map { it.fileName.toString() })
     }
+
+    @Test
+    fun `a discarded run leaves the history, unless a process still reads its inputs`() {
+        val testoRun = temp.newFolder("run").toPath()
+        val kept = record(testoRun, 1)
+        val failed = TestoMutationArchive.newRunDir(testoRun, 2)
+        TestoMutationArchive.Recorder(failed).use { it.line("$ php vendor/bin/infection") }
+
+        TestoMutationArchive.protectInputs(failed).use { TestoMutationArchive.discard(failed) }
+        assertTrue(Files.isDirectory(failed))
+
+        TestoMutationArchive.discard(failed)
+        assertFalse(Files.exists(failed))
+        assertEquals(listOf(kept), TestoMutationArchive.runs(testoRun))
+    }
 }

@@ -234,6 +234,7 @@ internal class TestoMutationCell(private val properties: TestoConsoleProperties)
         progressLabel = when {
             running -> TestoBundle.message("infection.widget.running", done.toString(), total.toString())
             mutation.failureReason != null -> TestoBundle.message("infection.widget.unconfirmed")
+            mutation.failed -> TestoBundle.message("infection.widget.failed")
             score.msi != null -> TestoBundle.message("infection.widget.msi", score.msi.toString())
             else -> TestoBundle.message("infection.widget.done")
         }

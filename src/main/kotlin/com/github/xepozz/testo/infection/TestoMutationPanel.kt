@@ -262,7 +262,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     private fun verdictIcon() = when {
         run.failureReason != null -> TestoIcons.Status.FAILURE
         run.stopRequested -> TestoIcons.Status.FAILURE_CANCELLED
-        run.exitCode != 0 && run.mutants.isEmpty() -> TestoIcons.Status.FAILURE
+        run.failed -> TestoIcons.Status.FAILURE
         run.score().escaped > 0 -> TestoIcons.Status.FAILURE
         else -> TestoIcons.Status.SUCCESS
     }
@@ -272,6 +272,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
             return TestoBundle.message(if (run.pendingTool != null) "infection.error.unconfirmed" else "infection.error.unconfirmedRestored", it)
         }
         run.failureReason?.let { return TestoBundle.message("infection.error.observationFailed", it) }
+        if (run.failed) return TestoBundle.message("infection.summary.failed", run.failureDetail())
         val score = run.score()
         val done = run.finishedCount().toString()
         val total = maxOf(run.expected, run.mutants.size).toString()

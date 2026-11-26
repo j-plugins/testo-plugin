@@ -102,7 +102,8 @@ class TestoMutationService(private val project: Project) {
         val archived = TestoMutationArchive.runs(sourceRunDir)
             .filter { it != live?.workDir }
             .mapNotNull { dir -> TestoMutationArchive.summary(dir)?.let { TestoMutationHistoryEntry.of(dir, it) } }
-        return (archived + listOfNotNull(live?.let(TestoMutationHistoryEntry::of))).sortedByDescending { it.startedAt }
+        val kept = live?.takeUnless { it.failed && Files.notExists(it.workDir.resolve(TestoMutationArchive.SUMMARY_FILE)) }
+        return (archived + listOfNotNull(kept?.let(TestoMutationHistoryEntry::of))).sortedByDescending { it.startedAt }
     }
 
     /** Brings up the mutation run archived in [dir]: its tab when one is open, else a new tab read from the archive. */
@@ -143,7 +144,6 @@ class TestoMutationService(private val project: Project) {
         previous?.takeIf { it.isBusy }?.let { return TestoMutationToolWindow.show(project, it) }
 
         val sources = coveredSources(recipe)
-        TestoMutationArchive.prune(runDir, TestoMutationArchive.KEEP - 1)
         val launch = TestoInfectionLaunch(recipe.ready, sources, TestoMutationArchive.newRunDir(runDir, System.currentTimeMillis()), recipe.options())
         val run = TestoMutationRun(recipe.title, runDir, launch.workDir) { recipe.environment.toLocal(it) }
         run.recipe = recipe
@@ -161,7 +161,6 @@ class TestoMutationService(private val project: Project) {
                         val exitCode = execute(recipe.environment, run, launch, stream, recorder, indicator) { run.stopRequested }
                         TestoInfectionHtmlReport.clean(launch.htmlReport)
                         run.finish(exitCode)
-                        recorder.summary(run)
                     }
                 } catch (e: ProcessCanceledException) {
                     run.stop()
@@ -170,13 +169,23 @@ class TestoMutationService(private val project: Project) {
                 } catch (e: Exception) {
                     if (e !is ExecutionException) thisLogger().warn("Mutation testing failed to start", e)
                     val message = withLingering(e.message ?: e.javaClass.simpleName, lingering)
+                    run.startError = e.message ?: e.javaClass.simpleName
                     run.appendLog(message)
                     if (run.isRunning) run.finish(null)
                     notifyFailed(run, message)
                 } finally {
-                    runCatching { TestoMutationArchive.writeSummary(launch.workDir, run) }
-                        .onFailure { thisLogger().warn("Could not save mutation run", it) }
+                    // An unconfirmed stop keeps its summary: it tells the next start that a process may still be alive.
+                    val discarded = run.failed && run.unconfirmedReason == null
+                    if (discarded) {
+                        thisLogger().warn("Mutation testing of ${recipe.title} failed: ${run.failureDetail()}\n${run.log().takeLast(LOGGED_OUTPUT)}")
+                    } else {
+                        runCatching {
+                            TestoMutationArchive.writeSummary(launch.workDir, run)
+                            TestoMutationArchive.prune(runDir)
+                        }.onFailure { thisLogger().warn("Could not save mutation run", it) }
+                    }
                     release(launch)
+                    if (discarded) TestoMutationArchive.discard(launch.workDir)
                 }
                 scored(runDir)
                 if (run.exitCode != null) notifyFinished(run, lingering)
@@ -435,6 +444,7 @@ class TestoMutationService(private val project: Project) {
 
     companion object {
         private const val MAX_RUNS = 10
+        private const val LOGGED_OUTPUT = 4000
 
         fun getInstance(project: Project): TestoMutationService = project.service()
     }
