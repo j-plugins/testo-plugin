@@ -11,6 +11,7 @@ import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.util.execution.ParametersListUtil
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
 import com.jetbrains.php.config.interpreters.PhpInterpreter
 import com.jetbrains.php.phpunit.coverage.PhpUnitCoverageEngine.CoverageEngine
@@ -43,14 +44,8 @@ class CommandBaselineTest : BasePlatformTestCase() {
                 @echo off
                 setlocal DisableDelayedExpansion
                 >"%~dp0argv.txt" echo(cwd=%CD%
-                :record
-                if "%~1"=="" exit /b 0
-                set "arg=%~1"
-                setlocal EnableDelayedExpansion
-                >>"%~dp0argv.txt" echo(arg=!arg!
-                endlocal
-                shift
-                goto record
+                >>"%~dp0argv.txt" echo(args=%*
+                exit /b 0
             """.trimIndent().replace("\n", "\r\n") + "\r\n"
         } else {
             "#!/bin/sh\n{ echo \"cwd=${'$'}(pwd -P)\"; for a in \"${'$'}@\"; do echo \"arg=${'$'}a\"; done; } > '$record'\nexit 0\n"
@@ -100,7 +95,15 @@ class CommandBaselineTest : BasePlatformTestCase() {
         try {
             check(process.waitFor(20, TimeUnit.SECONDS)) { "The stand-in php did not exit" }
             check(process.exitValue() == 0) { "The stand-in php exited with ${process.exitValue()}" }
-            val argv = Files.readString(record).trimEnd()
+            val argv = if (SystemInfo.isWindows) {
+                // Batch positional parameters split on '=', so record and parse the full command tail instead.
+                val (cwd, arguments) = Files.readAllLines(record)
+                check(cwd.startsWith("cwd=") && arguments.startsWith("args="))
+                val params = ParametersListUtil.parse(arguments.removePrefix("args="))
+                (listOf(cwd) + params.map { "arg=$it" }).joinToString("\n")
+            } else {
+                Files.readString(record).trimEnd()
+            }
             return normalise("commandLine=${handler.commandLine}\n$argv")
         } finally {
             handler.destroyProcess()
