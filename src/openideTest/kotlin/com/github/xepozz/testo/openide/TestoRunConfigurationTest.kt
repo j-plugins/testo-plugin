@@ -6,12 +6,14 @@ import com.github.xepozz.testo.openide.tests.TestoFrameworkType
 import com.github.xepozz.testo.openide.tests.run.BinaryCheck
 import com.github.xepozz.testo.openide.tests.run.TestoLaunch
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfiguration
+import com.github.xepozz.testo.openide.tests.run.TestoRunConfigurationOptions
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfigurationType
 import com.github.xepozz.testo.php.TestoPhp
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.configurations.RuntimeConfigurationError
 import com.intellij.execution.configurations.RuntimeConfigurationWarning
 import com.intellij.execution.process.NopProcessHandler
+import com.intellij.openapi.util.JDOMUtil
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import org.jdom.Element
@@ -99,6 +101,9 @@ class TestoRunConfigurationTest : BasePlatformTestCase() {
             workingDirectory = "/work/app"
             environmentVariables = mutableMapOf("APP_ENV" to "test")
             passParentEnvironment = false
+            interpreterId = "compose-id"
+            interpreterName = "PHP 8.4 (Docker)"
+            interpreterOptions = "-d memory_limit=1G"
         }
         val element = Element("configuration")
         saved.writeExternal(element)
@@ -109,6 +114,9 @@ class TestoRunConfigurationTest : BasePlatformTestCase() {
         assertEquals(saved.selection, read.selection)
         assertEquals("/opt/testo/bin/testo", read.options.binaryPath)
         assertEquals("/work/app", read.options.workingDirectory)
+        assertEquals("compose-id", read.options.interpreterId)
+        assertEquals("PHP 8.4 (Docker)", read.options.interpreterName)
+        assertEquals("-d memory_limit=1G", read.options.interpreterOptions)
         assertEquals(mapOf("APP_ENV" to "test"), read.options.environmentVariables)
         assertFalse(read.options.passParentEnvironment)
         val clone = saved.clone() as TestoRunConfiguration
@@ -137,6 +145,115 @@ class TestoRunConfigurationTest : BasePlatformTestCase() {
 
         reread.selection = reread.selection.copy(testoTypes = emptyList())
         assertEquals(emptyList<String>(), reread.selection.testoTypes)
+    }
+
+    private fun xml(element: Element): String = org.jdom.output.XMLOutputter().outputString(element)
+
+    private fun savedXml(element: Element, name: String): String = JDOMUtil.write(checkNotNull(element.getChild(name)) { name })
+
+    fun testTheBaselineConfigurationIsReadAndWrittenBackAsItWas() {
+        val lines = File("src/test/testData/baseline/persistence.txt").readLines()
+        val start = lines.indexOf("== every field") + 1
+        val end = start + lines.subList(start, lines.size).indexOf("</configuration>")
+        val source = JDOMUtil.load(lines.subList(start, end + 1).joinToString("\n"))
+
+        val read = configuration()
+        read.readExternal(source)
+
+        with(read.selection) {
+            assertEquals(TestoScope.METHOD, scope)
+            assertEquals("\\App\\CalcTest::med:3:0", methodName)
+            assertEquals("-q --stop-on-failure", testRunnerOptions)
+            assertEquals(listOf("Unit", "My, Suite"), suites)
+            assertEquals(TestoCoverageDriver.PCOV, coverageDriver)
+            assertEquals("--debug", infectionOptions)
+        }
+        assertEquals("/opt/testo/bin/testo", read.options.binaryPath)
+        assertEquals("/work/app", read.options.workingDirectory)
+        assertEquals(mapOf("APP_ENV" to "test", "XDEBUG_MODE" to "off"), read.options.environmentVariables)
+        assertEquals("compose-id", read.options.interpreterId)
+        assertEquals("PHP 8.4 (Docker)", read.options.interpreterName)
+        assertEquals("-d memory_limit=1G", read.options.interpreterOptions)
+        assertFalse(read.options.passParentEnvironment)
+
+        val written = Element("configuration")
+        read.writeExternal(written)
+        assertEquals(savedXml(source, "CommandLine"), savedXml(written, "CommandLine"))
+        assertEquals(savedXml(source, "TestoRunnerSettings"), savedXml(written, "TestoRunnerSettings"))
+    }
+
+    fun testOptionsOfAnEarlierBuildAreReadAndSavedInTheSharedShape() {
+        val source = JDOMUtil.load(
+            """
+            <configuration default="false" name="Unit" type="TestoRunConfiguration">
+              <option name="infectionGitDiffBase"/>
+              <option name="infectionMutators"/>
+              <option name="infectionOptions"/>
+              <option name="infectionStaticAnalysisTool"/>
+              <option name="infectionThreads"/>
+              <option name="suites">
+                <list>
+                  <option value="Unit"/>
+                </list>
+              </option>
+              <option name="testoType"/>
+              <TestoRunnerSettings directory="/stale" method="" options="-q -n --teamcity"/>
+              <method v="2"/>
+            </configuration>
+            """.trimIndent()
+        )
+        val read = configuration()
+        read.readExternal(source)
+
+        assertEquals("What this build saved wins over what another left beside it", TestoScope.CONFIGURATION_FILE, read.selection.scope)
+        assertEquals(listOf("Unit"), read.selection.suites)
+        assertNull(read.selection.directoryPath)
+
+        val written = Element("configuration")
+        read.writeExternal(written)
+        assertTrue(xml(written), written.getChildren("option").none(TestoRunConfigurationOptions::owns))
+        val runner = checkNotNull(written.getChild("TestoRunnerSettings")) { xml(written) }
+        assertEquals("ConfigurationFile", runner.getAttributeValue("scope"))
+        assertEquals("-q -n --teamcity", runner.getAttributeValue("options"))
+        assertEquals(listOf("Unit"), runner.getChild("suites").getChildren("option").map { it.getAttributeValue("value") })
+
+        val reread = configuration()
+        reread.readExternal(written)
+        assertEquals(read.selection, reread.selection)
+    }
+
+    fun testEnvironmentVariablesAreSavedInTheOrderRead() {
+        val names = listOf("ZETA", "ALPHA", "MID", "BETA", "OMEGA", "APP_ENV", "XDEBUG_MODE", "A1", "Q")
+        val source = Element("configuration").addContent(
+            Element("CommandLine").addContent(
+                Element("envs").apply { names.forEach { addContent(Element("env").setAttribute("name", it).setAttribute("value", "1")) } }
+            )
+        )
+        val read = configuration()
+        read.readExternal(source)
+        val written = Element("configuration")
+        read.writeExternal(written)
+
+        assertEquals(names, written.getChild("CommandLine").getChild("envs").getChildren("env").map { it.getAttributeValue("name") })
+    }
+
+    fun testAScopeOfANewerBuildCanBeChangedBackToDirectory() {
+        val read = configuration()
+        read.readExternal(JDOMUtil.load("""<configuration><TestoRunnerSettings scope="Pattern" /></configuration>"""))
+        fun savedScope() = Element("configuration").also(read::writeExternal).getChild("TestoRunnerSettings")?.getAttributeValue("scope")
+        assertEquals("Pattern", savedScope())
+
+        read.selection = read.selection.copy(scope = TestoScope.FILE)
+        assertEquals("File", savedScope())
+        read.selection = read.selection.copy(scope = TestoScope.DIRECTORY)
+        assertNull(savedScope())
+    }
+
+    fun testTheOptionsOfEarlierBuildsAreRecognisedByName() {
+        for (name in listOf("scope", "suites", "testoType", "infectionOptions", "binaryPath", "environmentVariables")) {
+            assertTrue(name, TestoRunConfigurationOptions.owns(Element("option").setAttribute("name", name)))
+        }
+        assertFalse(TestoRunConfigurationOptions.owns(Element("option").setAttribute("name", "isNameGenerated")))
     }
 
     fun testJunitDefaultsToEnabledAndAnExplicitOptOutIsPreserved() {

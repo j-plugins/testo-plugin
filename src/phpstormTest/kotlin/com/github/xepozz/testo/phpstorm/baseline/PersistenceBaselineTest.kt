@@ -53,6 +53,17 @@ class PersistenceBaselineTest : BasePlatformTestCase() {
             parallelTestingEnabled = true
             logHtml = false
             logJunit = true
+            infectionScope = "git-lines"
+            infectionGitDiffBase = "main"
+            infectionThreads = "4"
+            infectionOnlyCoveringTestCases = true
+            infectionWithUncovered = true
+            infectionTimeoutsAsEscaped = true
+            infectionMutators = "@default"
+            infectionStaticAnalysisTool = "phpstan"
+            infectionOptions = "--debug"
+            binaryPath = "/opt/testo/bin/testo"
+            interpreterId = "compose-id"
         }
     }
 
@@ -67,7 +78,16 @@ class PersistenceBaselineTest : BasePlatformTestCase() {
         val restored = BaselineSettings.newConfiguration(project, "Restored")
         restored.readExternal(JDOMUtil.load(write(full)))
         out.appendLine(write(restored))
-        out.appendLine(Baselines.dump(restored.testoSettings.getTestoRunnerSettings()))
+        val settings = restored.testoSettings.getTestoRunnerSettings()
+        out.appendLine(Baselines.dump(settings))
+        out.appendLine(
+            "  infection=[${settings.infectionScope}|${settings.infectionGitDiffBase}|${settings.infectionThreads}|" +
+                "${settings.infectionOnlyCoveringTestCases}|${settings.infectionWithUncovered}|" +
+                "${settings.infectionTimeoutsAsEscaped}|${settings.infectionMutators}|" +
+                "${settings.infectionStaticAnalysisTool}|${settings.infectionOptions}]"
+        )
+        out.appendLine("  binaryPath=${settings.binaryPath}")
+        out.appendLine("  interpreterId=${settings.interpreterId}")
         Baselines.assertMatches("persistence", out.toString())
     }
 
