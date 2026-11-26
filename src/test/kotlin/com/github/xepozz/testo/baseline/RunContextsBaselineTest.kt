@@ -12,7 +12,6 @@ import com.intellij.execution.actions.ConfigurationContext
 import com.intellij.execution.actions.RunConfigurationProducer
 import com.intellij.execution.configurations.LocatableConfigurationBase
 import com.intellij.execution.configurations.RunConfiguration
-import com.intellij.openapi.util.io.FileUtil
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
@@ -59,7 +58,7 @@ class RunContextsBaselineTest : BasePlatformTestCase() {
         for ((ownContext, otherType) in listOf(wholeClass to testAttribute, testAttribute to wholeClass)) {
             val run = checkNotNull(producer.createConfigurationFromContext(ownContext)).configuration as TestoConfiguration
             val path = checkNotNull(ownContext.psiLocation).containingFile.virtualFile.path
-            run.selection = run.selection.copy(filePath = FileUtil.toSystemDependentName(path))
+            run.selection = run.selection.copy(filePath = backslashed(path))
             assertTrue(producer.isConfigurationFromContext(run, ownContext))
             assertFalse(producer.isConfigurationFromContext(run, otherType))
             assertFalse(producer.isConfigurationFromContext(run, otherClass))
@@ -75,9 +74,9 @@ class RunContextsBaselineTest : BasePlatformTestCase() {
             val run = checkNotNull(producer.createConfigurationFromContext(context)).configuration as TestoConfiguration
             val selection = run.selection
             val path = element.containingFile.virtualFile.path
-            run.selection = selection.copy(configurationFilePath = FileUtil.toSystemDependentName(path))
+            run.selection = selection.copy(configurationFilePath = backslashed(path))
             assertTrue(label, producer.isConfigurationFromContext(run, context))
-            run.selection = selection.copy(configurationFilePath = FileUtil.toSystemDependentName(otherPath))
+            run.selection = selection.copy(configurationFilePath = backslashed(otherPath))
             assertFalse(label, producer.isConfigurationFromContext(run, context))
         }
     }
@@ -173,5 +172,8 @@ class RunContextsBaselineTest : BasePlatformTestCase() {
     private companion object {
         /** The id every Testo configuration carries, whichever implementation registers its type. */
         const val TESTO_CONFIGURATION_TYPE = "TestoRunConfiguration"
+
+        /** A path as a Windows producer saves it, spelled out so every host runs the comparison. */
+        fun backslashed(path: String) = path.replace('/', '\\')
     }
 }

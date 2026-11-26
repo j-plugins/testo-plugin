@@ -75,6 +75,14 @@ class TestoLaunchCommandTest : BasePlatformTestCase() {
         )
     }
 
+    fun testLocalKeepsTheSelectorsNamespace() {
+        val configuration = configuration().apply { selection = selection.apply { methodName = "\\Ns\\CalcTest::median" } }
+
+        val command = commandIn(FakeLaunchEnvironment(), configuration)
+
+        assertTrue(command, command.endsWith("--filter \\Ns\\CalcTest::median"))
+    }
+
     fun testContainerTranslatesPathsAndMountsTheReport() {
         val container = FakeLaunchEnvironment(
             locality = PhpLaunchLocality.Container("host.docker.internal"),
