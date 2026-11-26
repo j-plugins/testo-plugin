@@ -7,8 +7,7 @@ import com.intellij.execution.configurations.LocatableRunConfigurationOptions
 
 /**
  * What an OpenIDE Testo configuration saves: every field of [TestoRunSelection] but the rerun filters, which only a
- * "Rerun Failed Tests" clone carries, and the launch fields OpenIDE's own form edits. No interpreter: a run takes the
- * active interpreter profile of the project.
+ * "Rerun Failed Tests" clone carries, and the launch fields OpenIDE's own form edits.
  */
 class TestoRunConfigurationOptions : LocatableRunConfigurationOptions() {
     var scope by enum(TestoScope.CONFIGURATION_FILE)
@@ -19,6 +18,7 @@ class TestoRunConfigurationOptions : LocatableRunConfigurationOptions() {
     var useAlternativeConfigurationFile by property(false)
     var configurationFilePath by string()
     var testRunnerOptions by string(DEFAULT_RUNNER_OPTIONS)
+    /** Not on the form, as on PhpStorm; a saved value still runs. */
     var command by string(DEFAULT_COMMAND)
     /** The single type earlier builds saved; read only while [testoTypes] is empty, cleared on save. */
     var testoType by string("")
@@ -47,6 +47,15 @@ class TestoRunConfigurationOptions : LocatableRunConfigurationOptions() {
     var infectionMutators by string("")
     var infectionStaticAnalysisTool by string("")
     var infectionOptions by string("")
+
+    /** The interpreter profile a run takes; empty follows the project's active profile. */
+    var interpreterId by string()
+
+    /** The profile's name when it was chosen, to name it once the profile is gone. */
+    var interpreterName by string()
+
+    /** Arguments to php itself, ahead of the ones a debug or coverage run adds. */
+    var interpreterOptions by string()
 
     /** The Testo binary; empty takes the one of the test framework page, then of composer. */
     var binaryPath by string()
