@@ -18,6 +18,8 @@ class TestoLaunchPathsTest : BasePlatformTestCase() {
     private lateinit var app: File
     private var rootConfig: File? = null
 
+    private val hostDirectory get() = FileUtil.toSystemIndependentName(app.path)
+
     override fun setUp() {
         super.setUp()
         originalEnvironment = TestoRunConfiguration.environmentProvider
@@ -89,7 +91,7 @@ class TestoLaunchPathsTest : BasePlatformTestCase() {
         withRootConfiguration()
         val config = configuration()
         assertEquals(File(app, "testo.php").path, selectedConfig(config))
-        assertEquals(app.path, config.launch(FakeLaunchEnvironment()).workingDirectory)
+        assertEquals(hostDirectory, config.launch(FakeLaunchEnvironment()).workingDirectory)
     }
 
     fun testFrameworkConfigurationHasPriorityOverDiscovery() {
@@ -105,7 +107,7 @@ class TestoLaunchPathsTest : BasePlatformTestCase() {
             locality = PhpLaunchLocality.Container("localhost"), mappings = mapOf(app.path to "/app"),
         )
         val config = configuration(environment)
-        assertEquals(app.path, config.launch(environment).workingDirectory)
+        assertEquals(hostDirectory, config.launch(environment).workingDirectory)
         assertEquals("/app/testo.php", selectedConfig(config))
         assertTrue(command(config).commandLineString, command(config).commandLineString.contains("--path tests/CalcTest.php"))
     }
@@ -122,7 +124,7 @@ class TestoLaunchPathsTest : BasePlatformTestCase() {
                 methodName = "adds"
             }
         }
-        assertEquals(app.path, config.launch(environment).workingDirectory)
+        assertEquals(hostDirectory, config.launch(environment).workingDirectory)
         assertTrue(command(config).commandLineString, command(config).commandLineString.contains("--path tests/CalcTest.php --filter adds"))
     }
 
@@ -146,7 +148,7 @@ class TestoLaunchPathsTest : BasePlatformTestCase() {
             locality = PhpLaunchLocality.Container("localhost"), mappings = mapOf(app.path to "/app"),
         )
         val config = configuration(environment)
-        assertEquals(app.path, config.launch(environment).workingDirectory)
+        assertEquals(hostDirectory, config.launch(environment).workingDirectory)
         assertEquals("/tools/testo.php", selectedConfig(config))
     }
 
@@ -162,7 +164,7 @@ class TestoLaunchPathsTest : BasePlatformTestCase() {
             }
         }
         val config = configuration(environment)
-        assertEquals(app.path, config.launch(environment).workingDirectory)
+        assertEquals(hostDirectory, config.launch(environment).workingDirectory)
         assertEquals("/home/app/testo.php", selectedConfig(config))
         assertTrue(command(config).commandLineString, command(config).commandLineString.contains("--path tests/CalcTest.php"))
     }

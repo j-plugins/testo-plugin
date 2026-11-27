@@ -14,6 +14,7 @@ import ru.openide.openphp.settings.launch.PhpExposedPath
 import ru.openide.openphp.settings.launch.PhpLaunchEnvironment
 import ru.openide.openphp.settings.launch.PhpLaunchLocality
 import java.io.File
+import java.nio.file.Path
 
 /** A Coverage run: the driver switched on, the reports where the IDE reads them, and what refuses it before start. */
 class TestoCoverageRunnerTest : BasePlatformTestCase() {
@@ -77,11 +78,12 @@ class TestoCoverageRunnerTest : BasePlatformTestCase() {
         val covered = covered(TestoCoverageDriver.XDEBUG)
         val configuration = TestoRunConfigurationType.instance().createTemplateConfiguration(project)
         val selection = configuration.selection.apply { coverageDriver = TestoCoverageDriver.XDEBUG }
-        val expected = TestoCoverageArguments.reportArguments(covered.flags, covered.flags.map { it.second }) +
+        val expected = TestoCoverageArguments.reportArguments(covered.flags, covered.flags.map { Path.of(it.second).toString() }) +
             TestoCoverageArguments.extraArguments(selection)
 
         val arguments = covered.run.command.parametersList.list
         val start = arguments.indexOf(expected.first())
+        assertTrue("Missing ${expected.first()} in $arguments", start >= 0)
         assertEquals(expected, arguments.subList(start, start + expected.size))
     }
 
