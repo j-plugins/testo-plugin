@@ -73,7 +73,7 @@ class TestoMutationService(private val project: Project) {
     internal var selected: TestoMutationRun? = null
 
     /** The run the editor marks show: the *Mutations* window's selected tab, else the latest started. */
-    fun current(): TestoMutationRun? = selected ?: runs.values.maxByOrNull { it.startedAt }
+    fun current(): TestoMutationRun? = selected?.takeUnless { it.discarded } ?: runs.values.maxByOrNull { it.startedAt }
 
     /** Drops what is kept of the Testo runs archived at [sourceRunDirs], which are deleted, and the marks they drew. */
     internal fun forget(sourceRunDirs: Collection<Path>) {
@@ -102,7 +102,7 @@ class TestoMutationService(private val project: Project) {
         val archived = TestoMutationArchive.runs(sourceRunDir)
             .filter { it != live?.workDir }
             .mapNotNull { dir -> TestoMutationArchive.summary(dir)?.let { TestoMutationHistoryEntry.of(dir, it) } }
-        return (archived + listOfNotNull(live?.let(TestoMutationHistoryEntry::of))).sortedByDescending { it.startedAt }
+        return mutationHistory(archived, live)
     }
 
     /** Brings up the mutation run archived in [dir]: its tab when one is open, else a new tab read from the archive. */
@@ -143,16 +143,17 @@ class TestoMutationService(private val project: Project) {
         previous?.takeIf { it.isBusy }?.let { return TestoMutationToolWindow.show(project, it) }
 
         val sources = coveredSources(recipe)
-        TestoMutationArchive.prune(runDir, TestoMutationArchive.KEEP - 1)
         val launch = TestoInfectionLaunch(recipe.ready, sources, TestoMutationArchive.newRunDir(runDir, System.currentTimeMillis()), recipe.options())
         val run = TestoMutationRun(recipe.title, runDir, launch.workDir) { recipe.environment.toLocal(it) }
         run.recipe = recipe
+        run.onDiscarded = { putBack(run, previous) }
         track(run)
         TestoMutationToolWindow.add(project, run)
 
         object : Task.Backgroundable(project, TestoBundle.message("infection.task.title", recipe.configuration.name), true) {
             override fun run(indicator: ProgressIndicator) {
                 val lingering = lingeringReason(runDir, previous)
+                var failure: Exception? = null
                 try {
                     launch.inputProtection = TestoMutationArchive.protectRunInputs(runDir, launch.workDir)
                     TestoMutationArchive.Recorder(launch.workDir).use { recorder ->
@@ -161,27 +162,51 @@ class TestoMutationService(private val project: Project) {
                         val exitCode = execute(recipe.environment, run, launch, stream, recorder, indicator) { run.stopRequested }
                         TestoInfectionHtmlReport.clean(launch.htmlReport)
                         run.finish(exitCode)
-                        recorder.summary(run)
                     }
                 } catch (e: ProcessCanceledException) {
                     run.stop()
                     if (run.isRunning) run.finish(null)
                     throw e
                 } catch (e: Exception) {
-                    if (e !is ExecutionException) thisLogger().warn("Mutation testing failed to start", e)
-                    val message = withLingering(e.message ?: e.javaClass.simpleName, lingering)
-                    run.appendLog(message)
+                    failure = e
+                    run.startError = e.message ?: e.javaClass.simpleName
+                    run.appendLog(withLingering(run.startError.orEmpty(), lingering))
                     if (run.isRunning) run.finish(null)
-                    notifyFailed(run, message)
                 } finally {
-                    runCatching { TestoMutationArchive.writeSummary(launch.workDir, run) }
-                        .onFailure { thisLogger().warn("Could not save mutation run", it) }
+                    val fate = run.fate()
+                    val cause = failure?.takeUnless { it is ExecutionException }
+                    if (fate != MutationRunFate.KEEP) {
+                        thisLogger().warn("Mutation testing of ${recipe.title} failed: ${run.failureDetail()}\n${run.log().takeLast(LOGGED_OUTPUT)}", cause)
+                    } else if (cause != null) {
+                        thisLogger().warn("Mutation testing of ${recipe.title} failed", cause)
+                    }
+                    if (fate != MutationRunFate.DISCARD) {
+                        runCatching {
+                            TestoMutationArchive.writeSummary(launch.workDir, run)
+                            if (fate == MutationRunFate.KEEP) TestoMutationArchive.prune(runDir)
+                        }.onFailure { thisLogger().warn("Could not save mutation run", it) }
+                    }
                     release(launch)
+                    if (fate == MutationRunFate.DISCARD) run.discard()
                 }
-                scored(runDir)
-                if (run.exitCode != null) notifyFinished(run, lingering)
+                if (!run.discarded) scored(runDir)
+                when {
+                    run.failed -> notify(run, failedContent(run, lingering), NotificationType.ERROR)
+                    failure != null -> notify(run, withLingering(run.startError.orEmpty(), lingering), NotificationType.ERROR)
+                    else -> notifyFinished(run)
+                }
             }
         }.queue()
+    }
+
+    // A discarded run never happened: the run it replaced is the latest again, else the archive's is read back.
+    private fun putBack(failed: TestoMutationRun, previous: TestoMutationRun?) {
+        val dir = failed.sourceRunDir
+        val back = previous?.takeUnless { it.discarded }
+        val replaced = if (back != null) runs.replace(dir, failed, back) else runs.remove(dir, failed)
+        if (!replaced) return
+        if (back == null) probed.remove(dir)
+        TestoMutationEditorMarks.getInstance(project).refresh()
     }
 
     /**
@@ -263,6 +288,7 @@ class TestoMutationService(private val project: Project) {
 
         object : Task.Backgroundable(project, TestoBundle.message("infection.rerun.task", targets.size.toString(), run.title), true) {
             override fun run(indicator: ProgressIndicator) {
+                var failure: String? = null
                 try {
                     val sources = coveredSources(recipe)
                     val options = recipe.options()
@@ -273,24 +299,28 @@ class TestoMutationService(private val project: Project) {
                         if (indicator.isCanceled) run.stop()
                         if (run.rerunStopRequested) break
                         indicator.fraction = index.toDouble() / units.size
-                        val unitOptions = when (unit) {
+                        val (unitOptions, unitTargets) = when (unit) {
                             is RerunUnit.One -> {
                                 indicator.text2 = "${unit.mutant.mutator} · ${unit.mutant.file.name}"
-                                options.copy(mutantId = unit.mutant.hash, mutantFile = sourceOf(unit.mutant.file.path, sources))
+                                options.copy(mutantId = unit.mutant.hash, mutantFile = sourceOf(unit.mutant.file.path, sources)) to listOf(unit.mutant)
                             }
                             is RerunUnit.File -> {
                                 indicator.text2 = unit.file.name
-                                options.copy(filter = TestoInfectionArguments.pathFilter(unit.file.path))
+                                options.copy(filter = TestoInfectionArguments.pathFilter(unit.file.path)) to unit.file.mutants
                             }
                         }
-                        rerunOne(recipe, run, unitOptions, sources, indicator)
+                        // Infection that fails once fails the same way for every other unit.
+                        failure = rerunOne(recipe, run, unitOptions, unitTargets, sources, indicator) ?: continue
+                        run.appendLog(withLingering(failure, lingering))
+                        break
                     }
                 } catch (e: ProcessCanceledException) {
                     run.stop()
                     throw e
                 } catch (e: Exception) {
-                    if (e !is ExecutionException) thisLogger().warn("Mutant rerun failed to start", e)
-                    run.appendLog(withLingering(e.message.orEmpty(), lingering))
+                    thisLogger().warn("Rerunning mutants of ${run.title} failed", e)
+                    failure = e.message ?: e.javaClass.simpleName
+                    run.appendLog(withLingering(failure, lingering))
                 } finally {
                     // A mutant no process reported keeps what it had: stopped before its turn, or its code changed and
                     // Infection gave it another ID.
@@ -309,30 +339,53 @@ class TestoMutationService(private val project: Project) {
                         .onFailure { thisLogger().warn("Could not update the summary of ${run.workDir}", it) }
                     run.changed()
                     scored(run.sourceRunDir)
-                    notifyRerun(run, targets - missing.toSet(), missing.size)
+                    if (failure != null) notifyRerunFailed(run, targets - missing.toSet(), failure, lingering)
+                    else notifyRerun(run, targets - missing.toSet(), missing.size)
                 }
             }
         }.queue()
     }
 
+    /** Reruns [targets] in one process. Null when it answered; else why not, its directory discarded. */
     private fun rerunOne(
         recipe: TestoMutationRecipe,
         run: TestoMutationRun,
         options: TestoInfectionOptions,
+        targets: List<Mutant>,
         sources: List<String>,
         indicator: ProgressIndicator,
-    ) {
+    ): String? {
         val dir = TestoMutationArchive.newRerunDir(run.workDir, System.currentTimeMillis())
         val launch = TestoInfectionLaunch(recipe.ready, sources, dir, options, withHtml = false)
+        val logFrom = run.log().length
+        var exitCode: Int? = null
+        var error: Exception? = null
         try {
             launch.inputProtection = TestoMutationArchive.protectRunInputs(run.sourceRunDir, dir)
             TestoMutationArchive.Recorder(dir).use { recorder ->
                 val stream = TestoMutationStream(run, recorder::line, rerun = true)
-                execute(recipe.environment, run, launch, stream, recorder, indicator) { run.rerunStopRequested }
+                exitCode = execute(recipe.environment, run, launch, stream, recorder, indicator) { run.rerunStopRequested }
             }
+        } catch (e: ProcessCanceledException) {
+            throw e
+        } catch (e: Exception) {
+            error = e
         } finally {
             release(launch)
         }
+        if (!isFailedRerun(run.rerunStopRequested, exitCode, targets.count { it.finished })) {
+            error?.let { e ->
+                if (e !is ExecutionException) thisLogger().warn("Rerunning mutants of ${run.title} failed", e)
+                run.appendLog(e.message ?: e.javaClass.simpleName)
+            }
+            return null
+        }
+        val reason = error?.let { it.message ?: it.javaClass.simpleName }
+            ?: TestoBundle.message("infection.failed.exitCode", exitCode?.toString() ?: "–")
+        thisLogger().warn("Rerunning mutants of ${run.title} failed: $reason\n${run.log().substring(logFrom).takeLast(LOGGED_OUTPUT)}",
+            error?.takeUnless { it is ExecutionException })
+        TestoMutationArchive.discard(dir)
+        return reason
     }
 
     private fun coveredSources(recipe: TestoMutationRecipe): List<String> =
@@ -377,11 +430,7 @@ class TestoMutationService(private val project: Project) {
 
     private fun notifyRerun(run: TestoMutationRun, rerun: List<Mutant>, missing: Int) {
         val content = buildList {
-            if (rerun.isNotEmpty()) {
-                val killed = rerun.count { it.status?.isDefeated == true }
-                val escaped = rerun.count { it.status == MutantStatus.ESCAPED }
-                add(TestoBundle.message("infection.rerun.finished", killed.toString(), escaped.toString(), rerun.size.toString()))
-            }
+            rerunScore(rerun)?.let(::add)
             when {
                 run.rerunStopRequested -> add(TestoBundle.message("infection.finished.stopped"))
                 missing > 0 -> add(TestoBundle.message("infection.rerun.notFound", missing.toString()))
@@ -391,24 +440,31 @@ class TestoMutationService(private val project: Project) {
         notify(run, content, type)
     }
 
-    private fun notifyFinished(run: TestoMutationRun, lingering: String?) {
-        val score = run.score()
-        val content = when {
-            run.stopRequested -> TestoBundle.message("infection.finished.stopped")
-            run.exitCode != 0 && run.mutants.isEmpty() ->
-                withLingering(TestoBundle.message("infection.finished.failed", run.exitCode.toString()), lingering)
-            else -> TestoBundle.message(
-                "infection.finished.score",
-                score.msi?.toString() ?: "–",
-                score.escaped.toString(),
-                run.mutants.size.toString(),
-            )
-        }
-        val failed = run.exitCode != 0 && !run.stopRequested && run.mutants.isEmpty()
-        notify(run, content, if (failed) NotificationType.ERROR else NotificationType.INFORMATION)
+    private fun notifyRerunFailed(run: TestoMutationRun, rerun: List<Mutant>, reason: String, lingering: String?) {
+        val content = listOfNotNull(
+            rerunScore(rerun),
+            withLingering(TestoBundle.message("infection.rerun.failed", reason.trimEnd().trimEnd('.')), lingering),
+        ).joinToString("\n")
+        notify(run, content, NotificationType.ERROR)
     }
 
-    private fun notifyFailed(run: TestoMutationRun, message: String) = notify(run, message, NotificationType.ERROR)
+    private fun rerunScore(rerun: List<Mutant>): String? = rerun.takeIf { it.isNotEmpty() }?.let {
+        val killed = it.count { mutant -> mutant.status?.isDefeated == true }
+        val escaped = it.count { mutant -> mutant.status == MutantStatus.ESCAPED }
+        TestoBundle.message("infection.rerun.finished", killed.toString(), escaped.toString(), it.size.toString())
+    }
+
+    private fun notifyFinished(run: TestoMutationRun) {
+        val score = run.score()
+        val content = if (run.stopRequested) TestoBundle.message("infection.finished.stopped")
+        else TestoBundle.message("infection.finished.score", score.msi?.toString() ?: "–", score.escaped.toString(), run.mutants.size.toString())
+        notify(run, content, NotificationType.INFORMATION)
+    }
+
+    private fun failedContent(run: TestoMutationRun, lingering: String?): String = listOfNotNull(
+        withLingering(run.failureDetail(), lingering),
+        TestoBundle.message("infection.failed.notKept").takeIf { run.discarded },
+    ).joinToString("\n")
 
     private fun notify(title: String, content: String, type: NotificationType) {
         ApplicationManager.getApplication().invokeLater({
@@ -435,6 +491,7 @@ class TestoMutationService(private val project: Project) {
 
     companion object {
         private const val MAX_RUNS = 10
+        private const val LOGGED_OUTPUT = 4000
 
         fun getInstance(project: Project): TestoMutationService = project.service()
     }
