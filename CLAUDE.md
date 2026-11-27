@@ -788,8 +788,8 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 
 ## CI/CD
 
-- **build.yml** (push to `main`, all PRs): `buildPlugin` → `check` (Kover XML → Codecov) → Qodana →
-  `verifyPlugin` → release PR → publish. Build and verify run for 252, 262 and `openide`; tests for 262 and `openide`
+- **build.yml** (push to `main`, all PRs): `buildPlugin`, `check` (Kover XML → Codecov), Qodana
+  (`--within-docker=false`, off the restored Gradle cache) and `verifyPlugin` run in parallel, then release PR → publish. Build and verify run for 252, 262 and `openide`; tests for 262 and `openide`
   on Ubuntu and Windows, where Windows does not fail the run until its known failures are fixed (#120, #122).
   Gradle provisions the OpenIDE variant's Java 25 toolchain itself. A run on `main` is never cancelled by the next
   push: it may be mid-publish.

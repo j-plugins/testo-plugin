@@ -41,13 +41,6 @@ jobs:
           - { phpApi: openide, buildDir: build/openide }
     steps:
 
-      # Free GitHub Actions Environment Disk Space
-      - name: Maximize Build Space
-        uses: jlumbroso/free-disk-space@v2.0.0
-        with:
-          tool-cache: false
-          large-packages: false
-
       # Check out the current repository
       - name: Fetch Sources
         uses: actions/checkout@v7
@@ -88,7 +81,6 @@ jobs:
   # Run tests and upload a code coverage report
   test:
     name: Test (${{ matrix.phpApi }}, ${{ matrix.os }})
-    needs: [ build ]
     runs-on: ${{ matrix.os }}
     # Windows is informational until its known failures are fixed (#120, #122).
     continue-on-error: ${{ matrix.os == 'windows-latest' }}
@@ -101,14 +93,6 @@ jobs:
           - { phpApi: 262, buildDir: build }
           - { phpApi: openide, buildDir: build/openide }
     steps:
-
-      # Free GitHub Actions Environment Disk Space
-      - name: Maximize Build Space
-        if: runner.os == 'Linux'
-        uses: jlumbroso/free-disk-space@v2.0.0
-        with:
-          tool-cache: false
-          large-packages: false
 
       # Check out the current repository
       - name: Fetch Sources
@@ -150,20 +134,12 @@ jobs:
   # Run Qodana inspections and provide a report
   inspectCode:
     name: Inspect code
-    needs: [ build ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
       checks: write
       pull-requests: write
     steps:
-
-      # Free GitHub Actions Environment Disk Space
-      - name: Maximize Build Space
-        uses: jlumbroso/free-disk-space@v2.0.0
-        with:
-          tool-cache: false
-          large-packages: false
 
       # Check out the current repository
       - name: Fetch Sources
@@ -179,16 +155,22 @@ jobs:
           distribution: zulu
           java-version: 21
 
+      # Qodana runs natively and resolves the Gradle project from the restored Gradle cache
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6.4.1
+        with:
+          cache-read-only: true
+
       # Run Qodana inspections
       - name: Qodana - Code Inspection
         uses: JetBrains/qodana-action@v2026.3.1
         with:
+          args: --within-docker false
           cache-default-branch-only: true
 
   # Run plugin structure verification along with IntelliJ Plugin Verifier
   verify:
     name: Verify plugin (${{ matrix.phpApi }})
-    needs: [ build ]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -198,13 +180,6 @@ jobs:
           - { phpApi: 262, buildDir: build }
           - { phpApi: openide, buildDir: build/openide }
     steps:
-
-      # Free GitHub Actions Environment Disk Space
-      - name: Maximize Build Space
-        uses: jlumbroso/free-disk-space@v2.0.0
-        with:
-          tool-cache: false
-          large-packages: false
 
       # Check out the current repository
       - name: Fetch Sources
