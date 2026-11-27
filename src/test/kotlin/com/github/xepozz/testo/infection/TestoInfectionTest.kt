@@ -26,6 +26,7 @@ class TestoInfectionTest {
                 "--teamcity",
                 "--no-progress",
                 "--no-interaction",
+                "--ignore-msi-with-no-mutations",
                 "--logger-html=/tmp/report.html",
                 "--logger-text=/tmp/mutations.log",
                 "--log-verbosity=all",
@@ -71,6 +72,7 @@ class TestoInfectionTest {
                 "--teamcity",
                 "--no-progress",
                 "--no-interaction",
+                "--ignore-msi-with-no-mutations",
                 "--git-diff-lines",
                 "--git-diff-base=origin/main",
                 "--threads=max",
@@ -85,7 +87,8 @@ class TestoInfectionTest {
             TestoInfectionArguments.build("/c", listOf("src/A.php"), null, null, options),
         )
         assertEquals(
-            listOf("--coverage=/c", "--skip-initial-tests", "--test-framework=testo", "--teamcity", "--no-progress", "--no-interaction"),
+            listOf("--coverage=/c", "--skip-initial-tests", "--test-framework=testo", "--teamcity", "--no-progress", "--no-interaction",
+                "--ignore-msi-with-no-mutations"),
             TestoInfectionArguments.build("/c", listOf("src/A.php"), null, null, TestoInfectionOptions(scope = TestoRunSelection.INFECTION_SCOPE_ALL)),
         )
     }
@@ -330,5 +333,54 @@ class TestoInfectionTest {
         assertFalse("stopped", isFailedMutationRun(running = false, stopped = true, exitCode = 143, mutants = 0))
         assertFalse("still running", isFailedMutationRun(running = true, stopped = false, exitCode = null, mutants = 0))
         assertFalse("below --min-msi", isFailedMutationRun(running = false, stopped = false, exitCode = 1, mutants = 3))
+    }
+
+    @Test
+    fun `a finished run is kept unless it failed, and a failed one stays while its process may be alive`() {
+        assertEquals(MutationRunFate.KEEP, mutationRunFate(stopped = false, exitCode = 0, mutants = 3, unconfirmed = false))
+        assertEquals(MutationRunFate.KEEP, mutationRunFate(stopped = false, exitCode = 0, mutants = 0, unconfirmed = false))
+        assertEquals(MutationRunFate.KEEP, mutationRunFate(stopped = true, exitCode = null, mutants = 0, unconfirmed = true))
+        assertEquals(MutationRunFate.KEEP, mutationRunFate(stopped = false, exitCode = null, mutants = 3, unconfirmed = true))
+        assertEquals(MutationRunFate.DISCARD, mutationRunFate(stopped = false, exitCode = 1, mutants = 0, unconfirmed = false))
+        assertEquals(MutationRunFate.DISCARD, mutationRunFate(stopped = false, exitCode = null, mutants = 0, unconfirmed = false))
+        assertEquals(MutationRunFate.KEEP_UNCONFIRMED, mutationRunFate(stopped = false, exitCode = null, mutants = 0, unconfirmed = true))
+    }
+
+    @Test
+    fun `a rerun fails when its process answered for none of its mutants and did not exit cleanly`() {
+        assertTrue("a non-zero exit", isFailedRerun(stopped = false, exitCode = 1, reported = 0))
+        assertTrue("not started", isFailedRerun(stopped = false, exitCode = null, reported = 0))
+        assertFalse("the mutant is gone", isFailedRerun(stopped = false, exitCode = 0, reported = 0))
+        assertFalse("below --min-msi", isFailedRerun(stopped = false, exitCode = 1, reported = 1))
+        assertFalse("stopped", isFailedRerun(stopped = true, exitCode = 143, reported = 0))
+    }
+
+    @Test
+    fun `the history leaves out a live run that failed`() {
+        val source = temp.newFolder("run").toPath()
+        val archived = TestoMutationHistoryEntry(source.resolve("infection/1"), 1, 10, 80, 1, 5, 5, false, false, 0)
+        fun live(exitCode: Int?, finish: Boolean = true) = TestoMutationRun("t", source, source.resolve("infection/2")) { null }
+            .apply { startedAt = 2; if (finish) finish(exitCode) }
+
+        assertEquals(listOf(archived), mutationHistory(listOf(archived), live(1)))
+        assertEquals(listOf(archived), mutationHistory(listOf(archived), live(null)))
+        assertEquals(listOf(archived), mutationHistory(listOf(archived), live(1).apply { discard() }))
+        assertEquals(listOf(2L, 1L), mutationHistory(listOf(archived), live(0)).map { it.startedAt })
+        assertEquals(listOf(2L, 1L), mutationHistory(listOf(archived), live(null, finish = false)).map { it.startedAt })
+    }
+
+    @Test
+    fun `a failed run's summary is one line and says only what is true`() {
+        val oneLine = failedSummary("Infection exited with code 1 before mutating anything.", hasOutput = true, discarded = true)
+        assertFalse(oneLine, oneLine.contains(".."))
+        assertFalse(oneLine, oneLine.contains("\n"))
+        assertTrue(oneLine, oneLine.contains("not kept"))
+        assertTrue(oneLine, oneLine.contains("output below"))
+
+        val multiLine = failedSummary("Infection is not installed where Testo looks for it:\n/app/vendor/bin/infection", hasOutput = false, discarded = false)
+        assertFalse(multiLine, multiLine.contains("\n"))
+        assertFalse(multiLine, multiLine.contains("/app/vendor"))
+        assertFalse(multiLine, multiLine.contains("output below"))
+        assertFalse(multiLine, multiLine.contains("not kept"))
     }
 }

@@ -16,7 +16,7 @@
 ### Fixed
 
 - Mutating from the Coverage view no longer resolves the interpreter on the UI thread (a "slow operations on EDT" error).
-- A mutation run that fails before its first mutant (Infection missing, a configuration error, a non-zero exit) is shown as failed with Infection's output and no longer kept in the history as a run of 0 mutants.
+- A mutation run or mutant rerun that fails before its first mutant (Infection missing, a configuration error, a non-zero exit) is reported with Infection's output and leaves the history and the shown results as they were; a run with nothing to mutate no longer fails on `--min-msi`.
 
 ## [2026.17] - 2026-10-22
 

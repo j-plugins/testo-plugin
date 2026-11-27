@@ -8,6 +8,7 @@ import java.nio.file.Path
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.Icon
 
 /** Infection's `DetectionStatus`, by the value its TeamCity logger prints after `Mutation result:`. */
@@ -180,7 +181,6 @@ class TestoMutationRun(
     internal var failureReason: String? = null
         private set
 
-    /** What starting Infection threw, when it did. */
     @Volatile
     internal var startError: String? = null
 
@@ -188,6 +188,25 @@ class TestoMutationRun(
 
     internal fun failureDetail(): String =
         startError ?: TestoBundle.message("infection.failed.exitCode", exitCode?.toString() ?: "–")
+
+    /** Meaningful once the run has finished. */
+    internal fun fate(): MutationRunFate = mutationRunFate(stopRequested, exitCode, mutants.size, unconfirmedReason != null)
+
+    private val discardedFlag = AtomicBoolean()
+
+    /** Not kept: its directory is gone, or marked for the next prune. */
+    val discarded: Boolean get() = discardedFlag.get()
+
+    /** Called once, when the run is discarded. */
+    @Volatile
+    internal var onDiscarded: (() -> Unit)? = null
+
+    internal fun discard() {
+        if (!discardedFlag.compareAndSet(false, true)) return
+        TestoMutationArchive.discard(workDir)
+        onDiscarded?.invoke()
+        changed()
+    }
 
     @Synchronized
     internal fun markUnconfirmed(tool: com.github.xepozz.testo.php.TestoPreparedTool, reason: String) {
@@ -340,16 +359,41 @@ internal fun mutationVerdict(running: Boolean, stopped: Boolean, escaped: Int, e
     running -> null
     failureReason != null -> TestoIcons.Status.FAILURE
     stopped -> TestoIcons.Status.FAILURE_CANCELLED
-    escaped > 0 || isFailedMutationRun(running, stopped, exitCode, mutants) -> TestoIcons.Status.FAILURE
+    escaped > 0 || endedBeforeFirstMutant(exitCode, mutants) -> TestoIcons.Status.FAILURE
     else -> TestoIcons.Status.SUCCESS
 }
 
 /**
- * Infection could not be started, or gave up before its first mutant: not a run to keep. One that exits 0 with no
- * mutant found nothing to mutate, which is an answer.
+ * Infection could not be started, or gave up before its first mutant. One that exits 0 with no mutant found nothing to
+ * mutate, which is an answer.
  */
+internal fun endedBeforeFirstMutant(exitCode: Int?, mutants: Int): Boolean = exitCode != 0 && mutants == 0
+
 internal fun isFailedMutationRun(running: Boolean, stopped: Boolean, exitCode: Int?, mutants: Int): Boolean =
-    !running && !stopped && mutants == 0 && exitCode != 0
+    !running && !stopped && endedBeforeFirstMutant(exitCode, mutants)
+
+internal enum class MutationRunFate { KEEP, DISCARD, KEEP_UNCONFIRMED }
+
+/**
+ * What becomes of a finished run's directory. A failed one whose process did not confirm its stop stays until it does:
+ * its summary tells the next start that the process may still be alive.
+ */
+internal fun mutationRunFate(stopped: Boolean, exitCode: Int?, mutants: Int, unconfirmed: Boolean): MutationRunFate = when {
+    !isFailedMutationRun(running = false, stopped, exitCode, mutants) -> MutationRunFate.KEEP
+    unconfirmed -> MutationRunFate.KEEP_UNCONFIRMED
+    else -> MutationRunFate.DISCARD
+}
+
+/** A rerun process that answered for none of its mutants and did not exit cleanly: their earlier statuses stand. */
+internal fun isFailedRerun(stopped: Boolean, exitCode: Int?, reported: Int): Boolean =
+    !stopped && endedBeforeFirstMutant(exitCode, reported)
+
+/** The history of a Testo run's mutation runs, newest first: a live run that failed was never kept, so it is not listed. */
+internal fun mutationHistory(archived: List<TestoMutationHistoryEntry>, live: TestoMutationRun?): List<TestoMutationHistoryEntry> {
+    val shown = live?.takeUnless { it.discarded || (!it.isRunning && it.fate() == MutationRunFate.DISCARD) }
+    return (archived.filter { it.dir != live?.workDir } + listOfNotNull(shown?.let(TestoMutationHistoryEntry::of)))
+        .sortedByDescending { it.startedAt }
+}
 
 /** SHA-256 of [file]'s bytes, or null when it cannot be read. */
 internal fun fingerprintOf(file: Path): String? = runCatching {

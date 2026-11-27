@@ -272,7 +272,7 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
             return TestoBundle.message(if (run.pendingTool != null) "infection.error.unconfirmed" else "infection.error.unconfirmedRestored", it)
         }
         run.failureReason?.let { return TestoBundle.message("infection.error.observationFailed", it) }
-        if (run.failed) return TestoBundle.message("infection.summary.failed", run.failureDetail())
+        if (run.failed) return failedSummary(run.failureDetail(), run.log().isNotBlank(), run.discarded)
         val score = run.score()
         val done = run.finishedCount().toString()
         val total = maxOf(run.expected, run.mutants.size).toString()
@@ -356,7 +356,8 @@ class TestoMutationPanel(val project: Project, val run: TestoMutationRun) :
     // Parts are hidden rather than taken out: moving the diff panel in and out of the hierarchy redrew it over and over.
     private fun layoutDetails() {
         val showDiff = TestoMutationDetails.showDiff
-        val showOutput = TestoMutationDetails.showOutput
+        // A failed run has no tree to pick from: its output is all there is to read.
+        val showOutput = TestoMutationDetails.showOutput || run.failed
         diff.component.isVisible = showDiff && diffShown
         outputPane.isVisible = showOutput
         diffSplitter.isVisible = showOutput || diffShown && showDiff
@@ -674,3 +675,10 @@ internal object TestoMutationDetails {
 
 /** The mutants of one mutator, or of one status (its name; empty while still running), under the tree's root. */
 internal data class MutantGroup(val grouping: TestoMutationGrouping, val key: String)
+
+/** The one-line summary of a failed run: [detail]'s first line, the rest being in the output under it. */
+internal fun failedSummary(detail: String, hasOutput: Boolean, discarded: Boolean): String = listOfNotNull(
+    TestoBundle.message("infection.summary.failed", detail.lineSequence().first().trimEnd().trimEnd('.', ':')),
+    TestoBundle.message("infection.summary.failed.output").takeIf { hasOutput },
+    TestoBundle.message("infection.failed.notKept").takeIf { discarded },
+).joinToString(" ")

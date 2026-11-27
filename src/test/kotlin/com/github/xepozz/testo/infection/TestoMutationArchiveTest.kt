@@ -394,27 +394,79 @@ class TestoMutationArchiveTest {
     fun `pruning keeps the newest runs and a directory without a summary is not a run`() {
         val testoRun = temp.newFolder("run").toPath()
         listOf(1L, 2L, 3L).forEach { record(testoRun, it) }
-        Files.createDirectories(TestoMutationArchive.newRunDir(testoRun, 4))
+        val stale = Files.createDirectories(TestoMutationArchive.newRunDir(testoRun, 4))
 
         assertEquals(listOf("1", "2", "3"), TestoMutationArchive.runs(testoRun).map { it.fileName.toString() })
 
         TestoMutationArchive.prune(testoRun, keep = 2)
 
-        assertEquals(listOf("3"), TestoMutationArchive.runs(testoRun).map { it.fileName.toString() })
+        assertEquals(listOf("2", "3"), TestoMutationArchive.runs(testoRun).map { it.fileName.toString() })
+        assertFalse(Files.exists(stale))
     }
 
     @Test
-    fun `a discarded run leaves the history, unless a process still reads its inputs`() {
+    fun `a failed run takes no slot from the oldest kept one`() {
+        val testoRun = temp.newFolder("run").toPath()
+        val good = (1L..TestoMutationArchive.KEEP).map { record(testoRun, it) }
+        val failed = TestoMutationArchive.newRunDir(testoRun, 100)
+        TestoMutationArchive.Recorder(failed).use { it.line("$ php vendor/bin/infection") }
+        val marked = record(testoRun, 200)
+        TestoMutationArchive.protectInputs(marked).use { TestoMutationArchive.discard(marked) }
+
+        TestoMutationArchive.prune(testoRun)
+
+        assertEquals(good, TestoMutationArchive.runs(testoRun))
+        assertFalse(Files.exists(failed))
+        assertFalse(Files.exists(marked))
+    }
+
+    @Test
+    fun `a discarded run leaves the history at once, and its directory once no process reads its inputs`() {
         val testoRun = temp.newFolder("run").toPath()
         val kept = record(testoRun, 1)
-        val failed = TestoMutationArchive.newRunDir(testoRun, 2)
-        TestoMutationArchive.Recorder(failed).use { it.line("$ php vendor/bin/infection") }
+        val failed = record(testoRun, 2)
 
         TestoMutationArchive.protectInputs(failed).use { TestoMutationArchive.discard(failed) }
         assertTrue(Files.isDirectory(failed))
+        assertEquals(listOf(kept), TestoMutationArchive.runs(testoRun))
+        assertNull(TestoMutationArchive.unconfirmedRun(testoRun))
 
         TestoMutationArchive.discard(failed)
         assertFalse(Files.exists(failed))
         assertEquals(listOf(kept), TestoMutationArchive.runs(testoRun))
+    }
+
+    @Test
+    fun `a discarded run left behind does not keep its Testo run from being deleted`() {
+        val source = temp.newFolder("left").toPath()
+        val failed = TestoMutationArchive.newRunDir(source, System.currentTimeMillis())
+        TestoMutationArchive.Recorder(failed).use { it.line("$ php vendor/bin/infection") }
+        assertFalse("a fresh run without a summary may still be going", TestoMutationArchive.claimForDeletion(source))
+
+        TestoMutationArchive.protectInputs(failed).use {
+            TestoMutationArchive.discard(failed)
+            assertFalse(TestoMutationArchive.deleteRunIfSafe(source))
+        }
+
+        assertTrue(TestoMutationArchive.deleteRunIfSafe(source))
+        assertFalse(Files.exists(source))
+    }
+
+    @Test
+    fun `a discarded rerun is not replayed`() {
+        val testoRun = temp.newFolder("run").toPath()
+        val dir = record(testoRun, 1000)
+        val name = "Infection\\Mutator\\Removal\\ReturnRemoval (7fef23dae843ecb8be780d94655a9f77)"
+        val rerun = TestoMutationArchive.newRerunDir(dir, 2000)
+        TestoMutationArchive.Recorder(rerun).use { recorder ->
+            recorder.line("##teamcity[testStarted name='$name' nodeId='a1' parentNodeId='f1']")
+            recorder.line("##teamcity[testFinished name='$name' nodeId='a1' duration='12']")
+        }
+        TestoMutationArchive.protectInputs(rerun).use { TestoMutationArchive.discard(rerun) }
+
+        val restored = TestoMutationArchive.load(testoRun, dir)!!.mutants.single { it.hash == "7fef23dae843ecb8be780d94655a9f77" }
+
+        assertEquals(MutantStatus.ESCAPED, restored.status)
+        assertNull(restored.previousStatus)
     }
 }
