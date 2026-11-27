@@ -1,0 +1,86 @@
+package com.github.xepozz.testo.openide.tests.run
+
+import com.github.xepozz.testo.launch.TestoCoverageDriver
+import com.github.xepozz.testo.launch.TestoRunSelection
+import com.github.xepozz.testo.launch.TestoScope
+import com.intellij.execution.configurations.LocatableRunConfigurationOptions
+import org.jdom.Element
+
+/**
+ * What an OpenIDE Testo configuration holds: every field of [TestoRunSelection] but the rerun filters, which only a
+ * "Rerun Failed Tests" clone carries, and the launch fields OpenIDE's own form edits. Saved through
+ * [com.github.xepozz.testo.launch.TestoSavedConfiguration], not in this shape, which only earlier builds wrote.
+ */
+class TestoRunConfigurationOptions : LocatableRunConfigurationOptions() {
+    var scope by enum(TestoScope.CONFIGURATION_FILE)
+    var selectedType by string()
+    var directoryPath by string()
+    var filePath by string()
+    var methodName by string()
+    var useAlternativeConfigurationFile by property(false)
+    var configurationFilePath by string()
+    var testRunnerOptions by string(DEFAULT_RUNNER_OPTIONS)
+    /** Not on the form, as on PhpStorm; a saved value still runs. */
+    var command by string(DEFAULT_COMMAND)
+    /** The single type earlier builds saved; read only while [testoTypes] is empty, cleared on save. */
+    var testoType by string("")
+    var testoTypes by list<String>()
+    var suites by list<String>()
+    var groups by list<String>()
+    var excludeGroups by list<String>()
+    var dataProviderIndex by property(-1)
+    var dataSetIndex by property(-1)
+    var coverageDriver by enum(TestoCoverageDriver.XDEBUG)
+    var coverageClover by property(false)
+    var coverageCobertura by property(true)
+    var coverageXml by property(true)
+    var coverageLevel by string(TestoRunSelection.COVERAGE_LEVEL_AUTO)
+    var coverageOptions by string(TestoRunSelection.DEFAULT_COVERAGE_OPTIONS)
+    var parallel by property(1)
+    var parallelTestingEnabled by property(false)
+    var logHtml by property(true)
+    var logJunit by property(true)
+    var infectionScope by string(TestoRunSelection.INFECTION_SCOPE_COVERED)
+    var infectionGitDiffBase by string("")
+    var infectionThreads by string("")
+    var infectionOnlyCoveringTestCases by property(false)
+    var infectionWithUncovered by property(false)
+    var infectionTimeoutsAsEscaped by property(false)
+    var infectionMutators by string("")
+    var infectionStaticAnalysisTool by string("")
+    var infectionOptions by string("")
+
+    /** The interpreter profile a run takes; empty follows the project's active profile. */
+    var interpreterId by string()
+
+    /** The profile's name when it was chosen, to name it once the profile is gone. */
+    var interpreterName by string()
+
+    /** Arguments to php itself, ahead of the ones a debug or coverage run adds. */
+    var interpreterOptions by string()
+
+    /** The Testo binary; empty takes the one of the test framework page, then of composer. */
+    var binaryPath by string()
+
+    /** Where the process runs; empty leaves it to Testo's rules — the configuration file's directory, then the project. */
+    var workingDirectory by string()
+    var environmentVariables by map<String, String>()
+    var passParentEnvironment by property(true)
+
+    companion object {
+        /** Quiet, no interaction, the machine-readable stream the results tree is built from — as on PhpStorm. */
+        const val DEFAULT_RUNNER_OPTIONS = "-q -n --teamcity"
+
+        const val DEFAULT_COMMAND = "run"
+
+        /** The names the fields of this class save under; earlier builds wrote them as `<option>`s of the configuration. */
+        private val NAMES: Set<String> = TestoRunConfigurationOptions::class.java.declaredFields
+            .map { it.name.removeSuffix("\$delegate") }
+            .toSet()
+
+        fun owns(option: Element): Boolean = option.name == "option" && option.getAttributeValue("name") in NAMES
+
+        /** Whether [configuration] was saved by an earlier build, in this class's own shape. */
+        fun isSavedIn(configuration: Element): Boolean = configuration.getChildren("option").any(::owns)
+    }
+}

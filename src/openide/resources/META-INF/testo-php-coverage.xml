@@ -1,0 +1,7 @@
+<!-- Coverage on the PHP for OpenIDE plugin. Included by coverage.xml, so it loads only where the coverage module does. -->
+<idea-plugin>
+    <extensions defaultExtensionNs="com.intellij">
+        <programRunner implementation="com.github.xepozz.testo.openide.coverage.TestoMutationProgramRunner"/>
+        <programRunner implementation="com.github.xepozz.testo.openide.coverage.TestoCoverageProgramRunner"/>
+    </extensions>
+</idea-plugin>

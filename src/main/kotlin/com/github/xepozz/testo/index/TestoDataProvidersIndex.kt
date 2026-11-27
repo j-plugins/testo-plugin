@@ -25,9 +25,12 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
     override fun getName() = KEY
 
     override fun getIndexer() = DataIndexer<String, TestoDataProvidersIndexType, FileContent?> { inputData ->
+        val php = TestoPhp.getInstance()
+        if (!php.mayContainDataProvider(inputData)) return@DataIndexer emptyMap()
+
         val map = mutableMapOf<String, TestoDataProvidersIndexType>()
 
-        for (testClass in TestoPhp.getInstance().allClasses(inputData.psiFile)) {
+        for (testClass in php.allClasses(inputData.psiFile)) {
             // An indexer must not query the global class index: it loads other files' stubs mid-indexing.
             if (!testClass.psi.isTestoClass(resolveHierarchy = false)) continue
             for (method in testClass.ownMethods) {

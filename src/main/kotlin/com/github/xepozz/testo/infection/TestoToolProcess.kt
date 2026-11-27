@@ -30,7 +30,9 @@ internal fun executeToolProcess(
         val wasUnconfirmed = run.unconfirmedReason != null
         run.releaseTool(prepared)
         if (wasUnconfirmed && run.finishedAt != null && java.nio.file.Files.isDirectory(run.workDir)) {
-            TestoMutationArchive.writeSummary(run.workDir, run)
+            // Kept only to say its process may be alive: now that it is not, a failed run goes like any other.
+            if (run.fate() == MutationRunFate.DISCARD) run.discard()
+            else TestoMutationArchive.writeSummary(run.workDir, run)
         }
     }
     run.stopper = {

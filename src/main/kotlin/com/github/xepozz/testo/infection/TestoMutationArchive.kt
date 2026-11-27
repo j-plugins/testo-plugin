@@ -51,8 +51,11 @@ internal object TestoMutationArchive {
     /** A run's reruns of single mutants, `<run>/reruns/<started at>/`: a stream and a text log each, replayed in order. */
     const val RERUNS_DIR = "reruns"
 
-    /** How many mutation runs of one Testo run are kept; the oldest go when a new one starts. */
+    /** How many mutation runs of one Testo run are kept; the oldest go once a new one is saved. */
     const val KEEP = 5
+
+    /** Marks a failed run or rerun that could not be deleted then: nothing reads it, and the next prune deletes it. */
+    const val DISCARDED_FILE = "discarded"
 
     private val gson = Gson()
     private val inputUsers = HashMap<Path, Int>()
@@ -97,6 +100,7 @@ internal object TestoMutationArchive {
 
     private fun mustKeep(dir: Path): Boolean {
         if (hasInputUsers(dir)) return true
+        if (isDiscarded(dir)) return false
         // No finished summary: a process the IDE died under may still read the inputs — for hours, not for days.
         val now = System.currentTimeMillis()
         val state = summary(dir)?.takeIf { it.finishedAt > 0 }
@@ -182,10 +186,13 @@ internal object TestoMutationArchive {
         return root.resolve(at.toString())
     }
 
+    private fun isDiscarded(dir: Path): Boolean = Files.exists(dir.resolve(DISCARDED_FILE))
+
     private fun reruns(workDir: Path): List<Path> {
         val root = workDir.resolve(RERUNS_DIR)
         if (!Files.isDirectory(root)) return emptyList()
-        return Files.list(root).use { it.toList() }.sortedBy { it.fileName.toString().toLongOrNull() ?: 0 }
+        return Files.list(root).use { it.toList() }.filter { !isDiscarded(it) }
+            .sortedBy { it.fileName.toString().toLongOrNull() ?: 0 }
     }
 
     /** The mutation runs of [testoRunDir], oldest first. */
@@ -193,17 +200,34 @@ internal object TestoMutationArchive {
         val root = testoRunDir.resolve(DIR)
         if (!Files.isDirectory(root)) return emptyList()
         return Files.list(root).use { stream ->
-            stream.filter { Files.isRegularFile(it.resolve(SUMMARY_FILE)) }.toList()
+            stream.filter { Files.isRegularFile(it.resolve(SUMMARY_FILE)) && !isDiscarded(it) }.toList()
         }.sortedBy { it.fileName.toString().toLongOrNull() ?: 0 }
     }
 
+    /** Keeps the newest [keep] of [runs]; a directory that is not one of them takes no slot and goes once nothing needs it. */
     @Synchronized
     fun prune(testoRunDir: Path, keep: Int = KEEP) {
         val root = testoRunDir.resolve(DIR)
         if (!Files.isDirectory(root)) return
-        val all = Files.list(root).use { it.toList() }.sortedBy { it.fileName.toString().toLongOrNull() ?: 0 }
-        all.dropLast(keep).filter { !mustKeep(it) }
-            .forEach { runCatching { NioFiles.deleteRecursively(it) } }
+        val kept = runs(testoRunDir).takeLast(keep).toSet()
+        Files.list(root).use { it.toList() }.filter { Files.isDirectory(it) && it !in kept && !mustKeep(it) }
+            .forEach { if (isDiscarded(it)) deleteOrMark(it) else runCatching { NioFiles.deleteRecursively(it) } }
+    }
+
+    /** Deletes [dir], a failed run or rerun; one still in use, or that cannot be deleted now, is marked instead. */
+    @Synchronized
+    fun discard(dir: Path) {
+        if (isBeingDeleted(dir) || !Files.isDirectory(dir)) return
+        if (hasInputUsers(dir)) mark(dir) else deleteOrMark(dir)
+    }
+
+    // A deletion that stops at a locked file may already have taken the marker.
+    private fun deleteOrMark(dir: Path) {
+        if (runCatching { NioFiles.deleteRecursively(dir) }.isFailure && Files.isDirectory(dir)) mark(dir)
+    }
+
+    private fun mark(dir: Path) {
+        runCatching { Files.writeString(dir.resolve(DISCARDED_FILE), "") }
     }
 
     /** A mutation run of [testoRunDir] whose process may still be alive: its stop went unconfirmed within the grace period. */

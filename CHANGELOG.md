@@ -4,19 +4,36 @@
 
 ## [Unreleased]
 
+### Added
+
+- The OpenIDE run configuration is laid out like PhpStorm's and has its own PHP interpreter and interpreter options; by default it follows the project's active interpreter profile.
+
+### Changed
+
+- The OpenIDE build targets OpenIDE 2026.3 with PHP for OpenIDE 0.9.10.
+- Testo run configurations are saved in one format on PhpStorm and OpenIDE, so a shared `.run.xml` works in both; OpenIDE converts configurations saved by earlier builds.
+- On OpenIDE, indexing data providers skips files that never mention `DataProvider` instead of parsing them.
+
+### Fixed
+
+- Mutating from the Coverage view no longer resolves the interpreter on the UI thread (a "slow operations on EDT" error).
+- A mutation run or mutant rerun that fails before its first mutant (Infection missing, a configuration error, a non-zero exit) is reported with Infection's output and leaves the history and the shown results as they were; a run with nothing to mutate no longer fails on `--min-msi`.
+- Class gutter runs on Windows reuse saved configurations when the same path is written with different separators.
+
 ## [2026.17] - 2026-10-22
 
 ### Added
 
+- An OpenIDE 2026.2 build, installed alongside PHP for OpenIDE: test discovery and gutter runs, Run / Debug / Coverage configurations, the channel console, run history, the Coverage view and mutation testing with Infection.
+- On OpenIDE a run takes the project's active PHP interpreter profile; an HTML or JUnit report the interpreter cannot reach is skipped with a notification instead of failing the run.
 - The run configuration's Type filter takes several types as tags, each passed as its own `--type`; existing configurations keep their type.
 
 ### Fixed
 
-- List tests sharing a data provider in source order for a consistent default selection.
-- Preserve stopped mutation reruns in run history after restarting the IDE, and protect active mutation archives
-  during cleanup.
+- Tests sharing a data provider are listed in source order, so the chooser preselects the same one every time.
+- A stopped mutant rerun stays in the run history after an IDE restart, and cleanup no longer deletes the archive of a mutation run in progress.
 - Clearing the run history, or retention deleting a run, now also removes that run's mutant marks and coverage.
-- Select the opened file in the Coverage view as soon as coverage loads, including from history.
+- The Coverage view selects the opened file as soon as coverage loads, including from history.
 
 ## [2026.16.262] - 2026-10-01
 

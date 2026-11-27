@@ -14,7 +14,14 @@ class TestoRunConfigurationSettings : PhpTestRunConfigurationSettings() {
 
     @Transient
     override fun setRunnerSettings(runnerSettings: PhpTestRunnerSettings) {
-        super.setRunnerSettings(TestoRunnerSettings.fromPhpTestRunnerSettings(runnerSettings))
+        val current = super.getRunnerSettings() as? TestoRunnerSettings
+        // Settings of the PHP plugin's own type carry none of Testo's fields, so those keep their saved values.
+        val copy = if (runnerSettings !is TestoRunnerSettings && current != null) {
+            TestoRunnerSettings.fromPhpTestRunnerSettings(current).apply { copyBaseFrom(runnerSettings) }
+        } else {
+            TestoRunnerSettings.fromPhpTestRunnerSettings(runnerSettings)
+        }
+        super.setRunnerSettings(copy)
     }
 
     @Property(surroundWithTag = false)

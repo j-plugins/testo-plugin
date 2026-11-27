@@ -80,6 +80,14 @@ class TestoRunnerSettings(
 
     @Attribute("infection_options")
     var infectionOptions: String = "",
+
+    /** Never passed to Testo by this build: kept only so a `.run.xml` shared with another build keeps the binary it runs. */
+    @Attribute("binary")
+    var binaryPath: String = "",
+
+    /** Never used by this build either: another build's handle on the interpreter its runs take. */
+    @Attribute("interpreter_id")
+    var interpreterId: String = "",
 ) : PhpTestRunnerSettings() {
     /** Types to run, one `--type` flag each (Testo ORs them); a `!` prefix excludes the type. */
     @get:XCollection(propertyElementName = "testo_types", style = XCollection.Style.v2)
@@ -140,6 +148,18 @@ class TestoRunnerSettings(
         }
     }
 
+    /** The fields every PHP test framework has; the Testo ones stay as they are. */
+    fun copyBaseFrom(settings: PhpTestRunnerSettings) {
+        scope = settings.scope
+        selectedType = settings.selectedType
+        directoryPath = settings.directoryPath
+        filePath = settings.filePath
+        methodName = settings.methodName
+        isUseAlternativeConfigurationFile = settings.isUseAlternativeConfigurationFile
+        configurationFilePath = settings.configurationFilePath
+        testRunnerOptions = settings.testRunnerOptions
+    }
+
     fun copyInfectionFrom(other: TestoRunnerSettings) {
         infectionScope = other.infectionScope
         infectionGitDiffBase = other.infectionGitDiffBase
@@ -195,15 +215,7 @@ class TestoRunnerSettings(
         @JvmStatic
         fun fromPhpTestRunnerSettings(settings: PhpTestRunnerSettings): TestoRunnerSettings {
             val runnerSettings = TestoRunnerSettings()
-
-            runnerSettings.scope = settings.scope
-            runnerSettings.selectedType = settings.selectedType
-            runnerSettings.directoryPath = settings.directoryPath
-            runnerSettings.filePath = settings.filePath
-            runnerSettings.methodName = settings.methodName
-            runnerSettings.isUseAlternativeConfigurationFile = settings.isUseAlternativeConfigurationFile
-            runnerSettings.configurationFilePath = settings.configurationFilePath
-            runnerSettings.testRunnerOptions = settings.testRunnerOptions
+            runnerSettings.copyBaseFrom(settings)
 
             if (settings is TestoRunnerSettings) {
                 runnerSettings.dataProviderIndex = settings.dataProviderIndex
@@ -228,6 +240,8 @@ class TestoRunnerSettings(
                 runnerSettings.logHtml = settings.logHtml
                 runnerSettings.logJunit = settings.logJunit
                 runnerSettings.copyInfectionFrom(settings)
+                runnerSettings.binaryPath = settings.binaryPath
+                runnerSettings.interpreterId = settings.interpreterId
                 runnerSettings.migrateLegacyNames()
             }
 

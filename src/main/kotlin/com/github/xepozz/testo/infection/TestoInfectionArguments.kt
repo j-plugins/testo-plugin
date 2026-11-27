@@ -54,6 +54,8 @@ internal object TestoInfectionArguments {
         add("--teamcity")
         add("--no-progress")
         add("--no-interaction")
+        // A --min-msi from infection.json5 fails a run with nothing to mutate, which then looks like Infection failing.
+        add("--ignore-msi-with-no-mutations")
         when {
             options.mutantId != null -> {
                 options.mutantFile?.let { add("--filter=$it") }

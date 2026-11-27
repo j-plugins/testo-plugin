@@ -25,6 +25,7 @@ import com.intellij.execution.testframework.AbstractTestProxy
 import com.intellij.execution.testframework.TestTreeView
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.openapi.project.DumbService
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiElement
@@ -179,12 +180,12 @@ class TestoRunContexts(private val host: Host) {
 
         if (view is PhpClassReferenceView && view.newExpression != null && view.fqn == TestoClasses.APPLICATION_CONFIG) {
             return selection.scope == TestoScope.CONFIGURATION_FILE
-                && selection.configurationFilePath == element.containingFile.virtualFile.path
+                && sameContextPath(selection.configurationFilePath, element.containingFile.virtualFile.path)
         }
         if (view is PhpClassReferenceView && view.newExpression != null && view.fqn == TestoClasses.SUITE_CONFIG) {
             val suiteName = view.newExpression?.firstStringArgument ?: return false
             return selection.scope == TestoScope.CONFIGURATION_FILE
-                && selection.configurationFilePath == element.containingFile.virtualFile.path
+                && sameContextPath(selection.configurationFilePath, element.containingFile.virtualFile.path)
                 && selection.suites == listOf(suiteName)
         }
         if (view is PhpAttributeView && view.fqn == TestoClasses.FILTER_GROUP) {
@@ -215,8 +216,14 @@ class TestoRunContexts(private val host: Host) {
 
     private fun classMatches(selection: TestoRunSelection, phpClass: PsiElement, testoType: String): Boolean =
         selection.scope == TestoScope.FILE
-            && selection.filePath == phpClass.containingFile.virtualFile.path
+            && sameContextPath(selection.filePath, phpClass.containingFile.virtualFile.path)
             && selection.testoTypes == typesOf(testoType)
+
+    private fun sameContextPath(savedPath: String?, virtualPath: String): Boolean {
+        if (savedPath == virtualPath) return true
+        return savedPath != null &&
+            FileUtil.toSystemIndependentName(savedPath) == FileUtil.toSystemIndependentName(virtualPath)
+    }
 
     /**
      * Whether [selection] is the run of a results-tree node announced as [target]; null to leave it to the

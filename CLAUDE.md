@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-IntelliJ IDEA Ultimate / PhpStorm plugin for **Testo** — a PHP testing framework.
+IntelliJ Platform plugin for **Testo** — a PHP testing framework, with PhpStorm and OpenIDE builds.
 Provides full IDE integration: test discovery, run/debug/coverage configurations, a channel-aware test console,
 run history, code generation, inspections, and navigation.
 
@@ -21,9 +21,9 @@ Dependabot bumps these regularly — read the files rather than trusting this ta
 | Component            | Version / Value                          |
 |----------------------|------------------------------------------|
 | Language             | Kotlin 2.4.20                             |
-| JVM Toolchain        | Java 21                                  |
-| IntelliJ Platform    | 2025.2 / 2026.2 (IU — IDEA Ultimate)     |
-| Build range          | 252–261.* and 262+ (two artifacts)       |
+| JVM Toolchain        | Java 21 (PhpStorm), Java 25 (OpenIDE)                                  |
+| IntelliJ Platform    | 2025.2 / 2026.2 (IU), OpenIDE 2026.3         |
+| Build range          | PhpStorm: 252–261.* and 262+; OpenIDE: 263.*       |
 | Plugin version       | `2026.16` (`pluginVersion`)             |
 | Build system         | Gradle wrapper 9.8.0                     |
 | IntelliJ Plugin SDK  | `org.jetbrains.intellij.platform` 2.19.0 |
@@ -32,15 +32,15 @@ Dependabot bumps these regularly — read the files rather than trusting this ta
 | Coverage             | Kover 0.9.10 (XML report on `check`)      |
 | Test framework       | JUnit 4.13.2, OpenTest4J 1.3.0           |
 
-`platformPlugins` (marketplace deps, pinned to builds matching the target platform): `com.jetbrains.php`,
+The PhpStorm `platformPlugins` (marketplace dependencies pinned to the target platform) are: `com.jetbrains.php`,
 `phpstorm-remote-interpreter`, `php.codeception`, `php.behat`, `gherkin`, `xepozz.ide.introspector`
 (+ `hackathon.indices.viewer` on 252 only — it has no 262 build).
 `platformBundledModules`: `intellij.platform.coverage`, `intellij.spellchecker` (+ `intellij.platform.smRunner`,
 `intellij.platform.testRunner`, `intellij.platform.ui.jcef` on 262, which split them out of the monolith).
 
-### Two build variants (`phpApi`)
+### PhpStorm build variants (`phpApi`)
 
-The plugin ships as two artifacts because the platform since/until ranges and a few bundled modules differ across
+The PhpStorm variant ships as two artifacts because the platform since/until ranges and a few bundled modules differ across
 2025.2 and 2026.2 (jcef / smRunner / testRunner split out of the monolith on 262). So every platform-dependent property
 in `gradle.properties` is declared twice with an API suffix and selected by `phpApi`:
 
@@ -51,7 +51,7 @@ in `gradle.properties` is declared twice with an API suffix and selected by `php
 
 **The two artifacts no longer differ in source** — coverage runs on 100 % public platform API (`coverage/`, see
 "Generated reports" / the `coverage/` tree), so the old `src/php252/kotlin` vs `src/php262/kotlin` typealias split is
-gone. `phpApi` is a build selector for the platform version, compatibility range and platform modules. The core
+gone. For PhpStorm, `phpApi` selects the platform version, compatibility range and platform modules. The core
 uses its own `TestoCoverageDriver`; only the PhpStorm implementation maps it to the PHP plugin's coverage driver.
 
 Source that is single but not version-agnostic is reached by reflection, never a direct symbol: `XDebuggerManager.newSessionBuilder` (`TestoDebugRunner`) exists only on 262, so a direct call compiles green locally on 262 and breaks the 252 build in CI. Guard any such 262-only platform symbol behind a reflective lookup with a 252 fallback, or compile both variants before calling it done.
@@ -72,6 +72,25 @@ for the missing variants only (`apis` input). The Marketplace serves each IDE th
 > Note: `gradleVersion` in `gradle.properties` (9.5.0) lags the wrapper (9.8.0) — the property only feeds the
 > `wrapper` task, so running `./gradlew wrapper` would downgrade it. Bump the property when syncing.
 
+### OpenIDE build (`phpApi=openide`)
+
+`-PphpApi=openide` selects `src/openide` and `src/openideTest` instead of the PhpStorm implementation.
+It compiles against OpenIDE 2026.3 and PHP for OpenIDE 0.9.10, using Java 25. The PHP dependency is resolved
+from the OpenIDE plugin store. Both implementations run the shared contract and run-context tests; isolation
+checks prevent dependencies between the two adapters.
+
+```shell
+./gradlew check buildPlugin verifyPlugin -PphpApi=openide
+```
+
+The OpenIDE build has its own output directory (`build/openide`) and ZIP name. It is excluded from the normal
+`phpApis` publishing list and uses `OPENIDE_PUBLISH_TOKEN` when explicitly published to the OpenIDE plugin store.
+Each variant's `clean` preserves the other variant's output; the OpenIDE distribution is retained because the
+platform plugin unpacks it during configuration.
+
+`verifyPlugin` stages the resolved PHP plugin in a local dependency repository and checks it in offline mode.
+This verifies the same dependency artifact used for compilation, without looking for it in JetBrains Marketplace.
+
 ## Build & Run Commands
 
 ```bash
@@ -88,15 +107,17 @@ Ready-made IDE run configurations live in `.run/`: *Run Plugin*, *Run Tests*, *R
 ## Project Structure
 
 The plugin keeps its shared logic in `src/main` and the PhpStorm implementation in `src/phpstorm`.
-The latter is compiled into both existing builds, selected with `-PphpApi=252` or `-PphpApi=262`.
+That implementation is selected with `-PphpApi=252` or `-PphpApi=262`. The OpenIDE implementation lives in
+`src/openide` and is selected with `-PphpApi=openide`.
 
 The shared code accesses PHP syntax, symbols and interpreter paths through `php/TestoPhp.kt`.
 Run selections and command arguments are represented by the platform-neutral types in `launch/`.
 Infection uses `TestoToolEnvironment` to prepare a process and manage its output, cancellation and resources.
-Classes extending the PHP plugin's APIs, along with their registrations, live in the PhpStorm source set.
+Classes using a PHP plugin's APIs, along with their registrations, live in the corresponding implementation source set.
 
-Shared tests belong in `src/test`; implementation-specific tests belong in `src/phpstormTest`.
-`CoreIsolationTest` checks that shared sources do not depend on the PHP implementation.
+Shared tests belong in `src/test`; implementation-specific tests belong in `src/phpstormTest` or `src/openideTest`.
+`CoreIsolationTest` checks that shared sources do not depend on a PHP implementation and that the implementations
+do not depend on each other.
 The contract tests and snapshots cover run contexts, commands, navigation, saved configurations and reruns.
 
 ```
@@ -117,6 +138,7 @@ src/main/kotlin/com/github/xepozz/testo/
 │   ├── TestoCoverageArguments.kt   # `--coverage-*` flags, coverage level, coverage-only options
 │   ├── TestoConfigurationNames.kt  # suggested names and action names of a configuration
 │   ├── TestoConfiguration.kt       # a Testo run configuration as the core sees it
+│   ├── TestoSavedConfiguration.kt  # the saved XML both builds share: <TestoRunnerSettings> + <CommandLine>
 │   └── TestoReportLocation.kt      # a report's local path and the interpreter's path to it
 │
 ├── util/
@@ -291,14 +313,29 @@ src/phpstorm/resources/META-INF/
 └── testo-php-coverage.xml      # the coverage program runner
 
 src/phpstormTest/kotlin/…        # implementation tests and behavior snapshots
+
+src/openide/kotlin/com/github/xepozz/testo/openide/
+├── OpenIdeTestoPhp.kt           # the shared PHP contract on PHP for OpenIDE's public API
+├── OpenIdeToolEnvironment.kt    # captured interpreter and managed tool processes
+├── OpenIdeConsole.kt            # console properties and path translation
+├── actions/                    # Generate | Test Method
+├── coverage/                   # coverage and mutation runners
+└── tests/                      # framework registration, locator, inspections and run configurations
+
+src/openide/resources/META-INF/
+├── testo-php.xml               # PHP for OpenIDE dependency and variant registrations
+└── testo-php-coverage.xml       # coverage program runner
+
+src/openideTest/kotlin/…        # implementation tests and shared test-project setup
 ```
 
 ## Architecture
 
 ### Extension points
 
-The main descriptor includes `src/phpstorm/resources/META-INF/testo-php.xml` for PHP-specific registrations.
-The optional coverage descriptor includes `testo-php-coverage.xml` from the same implementation.
+The main descriptor includes `META-INF/testo-php.xml` from the selected implementation
+(`src/phpstorm/resources` or `src/openide/resources`). The optional coverage descriptor includes
+`testo-php-coverage.xml` from the same implementation.
 
 `com.intellij` namespace: `fileType` (maps the `testo`/`testo.php`/`testo.bat` binaries onto PHP),
 `runLineMarkerContributor` (order="first"), `configurationType`, `runConfigurationProducer`,
@@ -323,8 +360,9 @@ replacement for the platform `Rerun`, a `Tools | Testo` menu (channel-icon previ
 
 ### Dependencies
 
-`com.intellij.modules.platform`, `com.jetbrains.php` (hard), `com.intellij.modules.coverage` (optional).
-Requires IDEA Ultimate or PhpStorm — the plugin cannot load without PHP support.
+Every build depends on `com.intellij.modules.platform`, with optional `com.intellij.modules.coverage` support.
+The PhpStorm implementation requires `com.jetbrains.php`; the OpenIDE implementation requires `ru.openide.openphp`.
+Each build must be installed with its corresponding PHP plugin.
 
 ### The Testo CLI contract
 
@@ -576,6 +614,9 @@ Non-obvious constraints already paid for in blood — read before touching the r
   inherits the interpreter and working directory), which starts the process itself — in PhpStorm through
   `PhpRunConfiguration.createProcessHandler`, which still handles Docker/WSL/SSH. Run through the executor, it took
   over the tab and the Run button of the Testo run it mutates.
+- **On OpenIDE a configuration's interpreter is a profile id**, resolved through `PhpLaunchEnvironment.of(project, id)` and
+  the `profileId` overloads of `PhpTestFrameworks.binaryPath`/`configFile` (PHP for OpenIDE 0.9.8+). The overloads without it
+  answer for the active profile, whatever the configuration names.
 - **`createPathMappings` misses what the interpreter's command line mounts**: a Docker interpreter's project volume is
   known only to `createPathMapper` (the console's translation), so every host ↔ interpreter path goes through
   `PhpToolLauncher`, which falls back to it and to the command's own `getPathProcessor`. The IDE system dir is in none,
@@ -663,6 +704,12 @@ Non-obvious constraints already paid for in blood — read before touching the r
   `TestoRunnerSettingsSerializationTest` pins the XML shape.
 - **`rerunFilters` is `@Transient`** — it lives only on the throwaway clone a "rerun failed" launch creates, and
   that clone's scope is reset to `ConfigurationFile` so no scope flag narrows the filters away.
+- **One `.run.xml` serves both builds.** PhpStorm's `XmlSerializer` output is the format; OpenIDE writes it through
+  `TestoSavedConfiguration`, which `TestoSavedConfigurationTest` checks against `persistence.txt`. A new runner field
+  goes into both, with the same attribute name. OpenIDE configurations saved by earlier builds as top-level `<option>`s
+  are read from those and rewritten. OpenIDE's interpreter options are `<CommandLine parameters>`; its profile id is
+  `interpreter_id`, and only while that is set does it write `<PhpTestInterpreterSettings>` — otherwise an Apply with
+  no interpreter chosen would erase PhpStorm's.
 - **`TestoRunConfigurationType.ID` is a pinned literal**, not `::class.simpleName`: renaming the class must not
   invalidate users' saved run configurations.
 - **`getVersion()` of both file-based indexes** (`TestoDataProvidersIndex`, `TestoGroupsIndex`) must be bumped whenever
@@ -712,7 +759,7 @@ JUnit 4, two flavours — prefer the first when the logic allows it:
 When adding behaviour, pull the pure logic into a top-level function (as `testoDisplayName` was) so it can be
 tested without the platform fixture.
 
-Run the checks for both supported platform variants:
+Run the checks for both PhpStorm platform variants:
 
 ```shell
 ./gradlew check buildPlugin verifyPlugin -PphpApi=252
@@ -723,11 +770,12 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 
 ## Constraints & Important Notes
 
-- **Platform:** IntelliJ IDEA Ultimate or PhpStorm (`com.jetbrains.php` is a hard dependency of the PhpStorm implementation).
+- **Platform:** IntelliJ IDEA Ultimate / PhpStorm with `com.jetbrains.php`, or OpenIDE with `ru.openide.openphp`,
+  selected by the build variant.
 - **Keep the core independent of PHP implementations.** Code in `src/main/kotlin` and `src/test/kotlin` uses the
-  contracts in `php/`; PHP-plugin classes and their registrations belong in `src/phpstorm*`.
-  `CoreIsolationTest` enforces this boundary, including references in comments.
-- **Min IDE version:** 2025.2 (build 252+), shipped as two artifacts — see "Two build variants (`phpApi`)"
+  contracts in `php/`; PHP-plugin classes and their registrations belong in `src/phpstorm*` or `src/openide*`.
+  `CoreIsolationTest` enforces these boundaries and prevents references between implementations, including comments.
+- **Min IDE version:** 2025.2 (build 252+) for PhpStorm; 2026.3 (build 263) for OpenIDE.
 - **Kotlin stdlib is NOT bundled** (`kotlin.stdlib.default.dependency = false`) — uses the IDE's own
 - **Gradle Configuration Cache** and **Build Cache** are enabled
 - **Code and comments language:** English. Comments should explain *why* (platform quirks, race conditions),
@@ -735,19 +783,22 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 - **Plugin description** is extracted from `README.md` between `<!-- Plugin description -->` markers at build
   time — the build fails if the markers go missing
 - **Release channel** is derived from the pre-release label in `pluginVersion` (e.g. `-alpha.3` → `alpha`)
-- **Signing & publishing** need `CERTIFICATE_CHAIN`, `PRIVATE_KEY`, `PRIVATE_KEY_PASSWORD`, `PUBLISH_TOKEN`
+- **Signing & publishing** use `CERTIFICATE_CHAIN`, `PRIVATE_KEY`, `PRIVATE_KEY_PASSWORD` and `PUBLISH_TOKEN`
+  for JetBrains Marketplace; the OpenIDE store uses `OPENIDE_PUBLISH_TOKEN`.
 
 ## CI/CD
 
 - **build.yml** (push to `main`, all PRs): `buildPlugin` → `check` (Kover XML → Codecov) → Qodana →
-  `verifyPlugin` → release PR → publish. Runs on `ubuntu-latest`, Java 21 (Zulu), free-disk-space step first. A run
-  on `main` is never cancelled by the next push: it may be mid-publish.
+  `verifyPlugin` → release PR → publish. Build and verify run for 252, 262 and `openide`; tests for 262 and `openide`
+  on Ubuntu and Windows, where Windows does not fail the run until its known failures are fixed (#120, #122).
+  Gradle provisions the OpenIDE variant's Java 25 toolchain itself. A run on `main` is never cancelled by the next
+  push: it may be mid-publish.
 - **Release PR** (`build.yml` job, on `main`): a `pluginVersion` whose `## [version]` section is on `main` and has no
   `v<version>` tag gets the tag plus a GitHub release; a non-empty `[Unreleased]` is kept in the `release/next` PR
   (version bumped, changelog patched), rebuilt on every push. Both the PR and the release come from `GITHUB_TOKEN`,
   whose events start no workflow: checks on the PR start only by hand, and publishing is called, not triggered.
 - **release.yml** (`workflow_call` from the publish job, `workflow_dispatch` with a `tag` to retry): publish to
-  JetBrains Marketplace; a matrix builds 252 and 262 and attaches each ZIP to the release.
+  JetBrains Marketplace; a matrix builds 252, 262 and `openide` and attaches each ZIP to the release.
 - **run-ui-tests.yml** (manual): UI tests on Ubuntu / Windows / macOS via robot-server.
 
 ## Conventions
@@ -756,7 +807,7 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
 - i18n strings in `messages/TestoBundle.properties`, accessed via `TestoBundle`
 - Icons follow IntelliJ conventions: SVG with a `_dark` variant
 - Register shared extension points in `plugin.xml` (coverage-only ones in `coverage.xml`). PHP-specific registrations
-  belong in `src/phpstorm/resources/META-INF/testo-php.xml` or `testo-php-coverage.xml`.
+  belong in the selected implementation's `META-INF/testo-php.xml` or `testo-php-coverage.xml`.
 - Version is `<year>.<N>`: every release bumps N, a new year starts at `<year>.0`, never a third component;
   `pluginVersion` in `gradle.properties` is the single source of truth, bumped only by the release PR
 - Notable user-visible changes go into `CHANGELOG.md` under `## [Unreleased]` (Keep a Changelog format) —
