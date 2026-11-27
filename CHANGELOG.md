@@ -12,6 +12,7 @@
 
 - The OpenIDE build targets OpenIDE 2026.3 with PHP for OpenIDE 0.9.10.
 - Testo run configurations are saved in one format on PhpStorm and OpenIDE, so a shared `.run.xml` works in both; OpenIDE converts configurations saved by earlier builds.
+- On OpenIDE, indexing data providers skips files that never mention `DataProvider` instead of parsing them.
 
 ### Fixed
 

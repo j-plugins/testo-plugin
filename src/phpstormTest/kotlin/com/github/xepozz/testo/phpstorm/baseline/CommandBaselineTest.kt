@@ -11,7 +11,6 @@ import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.intellij.util.execution.ParametersListUtil
 import com.jetbrains.php.config.commandLine.PhpCommandSettings
 import com.jetbrains.php.config.interpreters.PhpInterpreter
 import com.jetbrains.php.phpunit.coverage.PhpUnitCoverageEngine.CoverageEngine
@@ -25,8 +24,7 @@ import java.util.concurrent.TimeUnit
 /**
  * The whole command line a Testo run and a Testo Coverage run start, as the process sees it. Built by the
  * configuration's own `createCommand` and started through its own process handler, with a stand-in `php` that exits at
- * once. The Unix stand-in records the argument vector. The Windows stand-in records the batch command tail and the
- * test parses it for comparison with the same baseline.
+ * once and records its argument vector.
  */
 class CommandBaselineTest : BasePlatformTestCase() {
     private lateinit var phpDir: Path
@@ -39,20 +37,7 @@ class CommandBaselineTest : BasePlatformTestCase() {
         phpDir = Files.createTempDirectory("testo-baseline-php")
         record = phpDir.resolve("argv.txt")
         // Records where it ran and every argument on its own line, so the baseline shows the exact argv.
-        val php = phpDir.resolve(if (SystemInfo.isWindows) "php.cmd" else "php")
-        val script = if (SystemInfo.isWindows) {
-            """
-                @echo off
-                setlocal DisableDelayedExpansion
-                >"%~dp0argv.txt" echo(cwd=%CD%
-                >>"%~dp0argv.txt" echo(args=%*
-                exit /b 0
-            """.trimIndent().replace("\n", "\r\n") + "\r\n"
-        } else {
-            "#!/bin/sh\n{ echo \"cwd=${'$'}(pwd -P)\"; for a in \"${'$'}@\"; do echo \"arg=${'$'}a\"; done; } > '$record'\nexit 0\n"
-        }
-        Files.writeString(php, script)
-        if (!SystemInfo.isWindows) check(php.toFile().setExecutable(true))
+        val php = if (SystemInfo.isWindows) windowsStandIn() else unixStandIn()
         interpreter = PhpInterpreter().apply {
             name = "Baseline PHP"
             homePath = php.toString()
@@ -71,6 +56,25 @@ class CommandBaselineTest : BasePlatformTestCase() {
             addSuppressedException(e)
         } finally {
             super.tearDown()
+        }
+    }
+
+    private fun unixStandIn(): Path = phpDir.resolve("php").also { php ->
+        Files.writeString(php, "#!/bin/sh\n{ echo \"cwd=${'$'}(pwd -P)\"; for a in \"${'$'}@\"; do echo \"arg=${'$'}a\"; done; } > '$record'\nexit 0\n")
+        check(php.toFile().setExecutable(true))
+    }
+
+    // A batch file cannot split its own arguments faithfully, so it hands them to a program that gets the argv
+    // a native php.exe would.
+    private fun windowsStandIn(): Path {
+        val source = phpDir.resolve("Argv.java")
+        Files.writeString(source, ARGV_RECORDER)
+        val bin = Path.of(System.getProperty("java.home"), "bin")
+        val javac = ProcessBuilder(bin.resolve("javac.exe").toString(), source.toString()).inheritIO().start()
+        check(javac.waitFor(60, TimeUnit.SECONDS) && javac.exitValue() == 0) { "Argv.java did not compile" }
+        val java = bin.resolve("java.exe")
+        return phpDir.resolve("php.cmd").also {
+            Files.writeString(it, "@\"$java\" -cp \"%~dp0.\" \"-Drecord=%~dp0argv.txt\" Argv %*\r\n")
         }
     }
 
@@ -96,16 +100,7 @@ class CommandBaselineTest : BasePlatformTestCase() {
         try {
             check(process.waitFor(20, TimeUnit.SECONDS)) { "The stand-in php did not exit" }
             check(process.exitValue() == 0) { "The stand-in php exited with ${process.exitValue()}" }
-            val argv = if (SystemInfo.isWindows) {
-                // Batch positional parameters split on '=', so record and parse the full command tail instead.
-                val (cwd, arguments) = Files.readAllLines(record)
-                check(cwd.startsWith("cwd=") && arguments.startsWith("args="))
-                val params = ParametersListUtil.parse(arguments.removePrefix("args="))
-                (listOf(cwd) + params.map { "arg=$it" }).joinToString("\n")
-            } else {
-                Files.readString(record).trimEnd()
-            }
-            return normalise("commandLine=${handler.commandLine}\n$argv")
+            return normalise("commandLine=${handler.commandLine}\n${Files.readString(record).trimEnd()}")
         } finally {
             handler.destroyProcess()
         }
@@ -277,5 +272,15 @@ class CommandBaselineTest : BasePlatformTestCase() {
         const val COVERAGE = "/work/coverage/Baseline@testo.xml"
         // Convert fixture paths only, leaving PHP names such as \App\CalcTest intact.
         val FIXTURE_PATH = Regex("""(?<![\w\\])(?:<(?:wd|php-dir|system|project)>|[\\/]work|[\\/]elsewhere)[\\/][^\s"'<>]+""")
+
+        val ARGV_RECORDER = """
+            public class Argv {
+                public static void main(String[] args) throws Exception {
+                    StringBuilder out = new StringBuilder("cwd=").append(new java.io.File("").getCanonicalPath());
+                    for (String arg : args) out.append("\narg=").append(arg);
+                    java.nio.file.Files.writeString(java.nio.file.Path.of(System.getProperty("record")), out.append('\n'));
+                }
+            }
+        """.trimIndent()
     }
 }
