@@ -12,11 +12,13 @@
 
 - The OpenIDE build targets OpenIDE 2026.3 with PHP for OpenIDE 0.9.10.
 - Testo run configurations are saved in one format on PhpStorm and OpenIDE, so a shared `.run.xml` works in both; OpenIDE converts configurations saved by earlier builds.
+- On OpenIDE, indexing data providers skips files that never mention `DataProvider` instead of parsing them.
 
 ### Fixed
 
 - Mutating from the Coverage view no longer resolves the interpreter on the UI thread (a "slow operations on EDT" error).
 - A mutation run or mutant rerun that fails before its first mutant (Infection missing, a configuration error, a non-zero exit) is reported with Infection's output and leaves the history and the shown results as they were; a run with nothing to mutate no longer fails on `--min-msi`.
+- Class gutter runs on Windows reuse saved configurations when the same path is written with different separators.
 
 ## [2026.17] - 2026-10-22
 

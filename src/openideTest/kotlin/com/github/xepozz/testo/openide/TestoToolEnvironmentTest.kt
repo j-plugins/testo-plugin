@@ -90,9 +90,11 @@ class TestoToolEnvironmentTest : BasePlatformTestCase() {
         val untouched = Files.createDirectories(root.resolve(".testo-staging/keep"))
         var staged: Path? = null
         val environment = FakeLaunchEnvironment(locality = PhpLaunchLocality.WslDistribution("Ubuntu"), exposed = { path ->
-            if (path.contains("/.testo-staging/") && path.endsWith("junit.xml")) {
-                staged = Path.of(path).parent
-                PhpExposedPath.Visible("/app" + path.removePrefix(root.toString()))
+            val candidate = Path.of(path)
+            if (candidate.startsWith(root.resolve(".testo-staging")) && candidate.fileName.toString() == "junit.xml") {
+                staged = candidate.parent
+                val relative = root.relativize(candidate).joinToString("/")
+                PhpExposedPath.Visible("/app/$relative")
             } else PhpExposedPath.Unreachable("outside mapped project")
         })
         val prepared = captured(configuration(), environment).prepare(request(source))
@@ -108,9 +110,11 @@ class TestoToolEnvironmentTest : BasePlatformTestCase() {
 
     fun testPreparationFailureReleasesStaging() {
         var staged: Path? = null
+        val staging = Path.of(checkNotNull(project.basePath), ".idea", "testo", "staging")
         val environment = FakeLaunchEnvironment(exposed = { path ->
-            if (path.contains("/staging/") && path.endsWith("junit.xml")) {
-                staged = Path.of(path).parent
+            val candidate = Path.of(path)
+            if (candidate.startsWith(staging) && candidate.fileName.toString() == "junit.xml") {
+                staged = candidate.parent
                 PhpExposedPath.Visible("/visible/junit.xml")
             } else PhpExposedPath.Unreachable("not mapped")
         })

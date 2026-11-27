@@ -49,6 +49,38 @@ class RunContextsBaselineTest : BasePlatformTestCase() {
         }
     }
 
+    fun testClassAndAttributeContextsRecogniseNativePaths() {
+        val elements = projectFixture.contexts().toMap()
+        val wholeClass = ConfigurationContext(elements.getValue("class:CaseTest"))
+        val testAttribute = ConfigurationContext(elements.getValue("classAttr:Test@CaseTest"))
+        val otherClass = ConfigurationContext(elements.getValue("class:CalcTest"))
+
+        for ((ownContext, otherType) in listOf(wholeClass to testAttribute, testAttribute to wholeClass)) {
+            val run = checkNotNull(producer.createConfigurationFromContext(ownContext)).configuration as TestoConfiguration
+            val path = checkNotNull(ownContext.psiLocation).containingFile.virtualFile.path
+            run.selection = run.selection.copy(filePath = backslashed(path))
+            assertTrue(producer.isConfigurationFromContext(run, ownContext))
+            assertFalse(producer.isConfigurationFromContext(run, otherType))
+            assertFalse(producer.isConfigurationFromContext(run, otherClass))
+        }
+    }
+
+    fun testApplicationAndSuiteContextsRecogniseNativeConfigurationPaths() {
+        val elements = projectFixture.contexts().toMap()
+        val otherPath = elements.getValue("class:CalcTest").containingFile.virtualFile.path
+        for (label in listOf("new:ApplicationConfig", "new:SuiteConfig('Unit')")) {
+            val element = elements.getValue(label)
+            val context = ConfigurationContext(element)
+            val run = checkNotNull(producer.createConfigurationFromContext(context)).configuration as TestoConfiguration
+            val selection = run.selection
+            val path = element.containingFile.virtualFile.path
+            run.selection = selection.copy(configurationFilePath = backslashed(path))
+            assertTrue(label, producer.isConfigurationFromContext(run, context))
+            run.selection = selection.copy(configurationFilePath = backslashed(otherPath))
+            assertFalse(label, producer.isConfigurationFromContext(run, context))
+        }
+    }
+
     fun testRunsProducedFromContextsAndTheirRecognition() {
         val contexts = projectFixture.contexts()
         val produced = mutableListOf<Pair<String, RunConfiguration>>()
@@ -114,11 +146,11 @@ class RunContextsBaselineTest : BasePlatformTestCase() {
         buildString {
             appendLine("  scope=$scope")
             appendLine("  selectedType=$selectedType")
-            appendLine("  directoryPath=$directoryPath")
-            appendLine("  filePath=$filePath")
+            appendLine("  directoryPath=${BaselineFiles.hostPath(directoryPath)}")
+            appendLine("  filePath=${BaselineFiles.hostPath(filePath)}")
             appendLine("  methodName=$methodName")
             appendLine("  useAlternativeConfigurationFile=$useAlternativeConfigurationFile")
-            appendLine("  configurationFilePath=$configurationFilePath")
+            appendLine("  configurationFilePath=${BaselineFiles.hostPath(configurationFilePath)}")
             appendLine("  testRunnerOptions=$testRunnerOptions")
             appendLine("  command=$command")
             appendLine("  testoTypes=$testoTypes")
@@ -140,5 +172,8 @@ class RunContextsBaselineTest : BasePlatformTestCase() {
     private companion object {
         /** The id every Testo configuration carries, whichever implementation registers its type. */
         const val TESTO_CONFIGURATION_TYPE = "TestoRunConfiguration"
+
+        /** A path as a Windows producer saves it, spelled out so every host runs the comparison. */
+        fun backslashed(path: String) = path.replace('/', '\\')
     }
 }

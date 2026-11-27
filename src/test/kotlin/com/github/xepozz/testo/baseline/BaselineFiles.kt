@@ -1,5 +1,7 @@
 package com.github.xepozz.testo.baseline
 
+import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapi.util.text.StringUtil
 import org.junit.Assert.assertEquals
 import java.nio.file.Files
 import java.nio.file.Path
@@ -15,15 +17,17 @@ import java.nio.file.Path
 object BaselineFiles {
     private val DIR: Path = Path.of("src/test/testData/baseline")
 
+    fun hostPath(path: String?): String? = path?.let(FileUtil::toSystemIndependentName)
+
     fun assertMatches(name: String, actual: String) {
         val file = DIR.resolve("$name.txt")
-        val text = actual.trimEnd() + "\n"
+        val text = StringUtil.convertLineSeparators(actual).trimEnd() + "\n"
         if (System.getenv("TESTO_BASELINE_UPDATE") == "true") {
             Files.createDirectories(file.parent)
             Files.writeString(file, text)
             return
         }
         check(Files.exists(file)) { "No baseline $file; run with TESTO_BASELINE_UPDATE=true and review it" }
-        assertEquals("Baseline $name differs", Files.readString(file), text)
+        assertEquals("Baseline $name differs", StringUtil.convertLineSeparators(Files.readString(file)), text)
     }
 }

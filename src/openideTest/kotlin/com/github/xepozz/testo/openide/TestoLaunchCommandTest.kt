@@ -40,6 +40,7 @@ class TestoLaunchCommandTest : BasePlatformTestCase() {
     }
 
     private val wd get() = FileUtil.toSystemIndependentName(app.path)
+    private val fixturePath = Regex("""<(?:wd|system)>[\\/][^\s"]+""")
 
     private fun configuration(logHtml: Boolean = true) = TestoRunConfigurationType.instance().createTemplateConfiguration(project).apply {
         name = "Golden"
@@ -58,10 +59,14 @@ class TestoLaunchCommandTest : BasePlatformTestCase() {
     private fun commandIn(environment: PhpLaunchEnvironment, configuration: TestoRunConfiguration = configuration()): String {
         TestoRunConfiguration.environmentProvider = { environment }
         val prepared = configuration.prepare(processHandler = { NopProcessHandler() })
-        return prepared.command.commandLineString
-            .replace(FileUtil.toSystemIndependentName(PathManager.getSystemPath()), "<system>")
-            .replace(project.locationHash, "<project>")
+        val systemPath = FileUtil.toSystemIndependentName(PathManager.getSystemPath())
+        val withFixtureRoots = prepared.command.commandLineString
+            .replace(FileUtil.toSystemDependentName(systemPath), "<system>")
+            .replace(systemPath, "<system>")
+            .replace(FileUtil.toSystemDependentName(wd), "<wd>")
             .replace(wd, "<wd>")
+        return fixturePath.replace(withFixtureRoots) { FileUtil.toSystemIndependentName(it.value) }
+            .replace(project.locationHash, "<project>")
     }
 
     fun testLocal() {
@@ -71,6 +76,14 @@ class TestoLaunchCommandTest : BasePlatformTestCase() {
                 "--path tests/CalcTest.php --filter median:0:1",
             commandIn(FakeLaunchEnvironment()),
         )
+    }
+
+    fun testLocalKeepsTheSelectorsNamespace() {
+        val configuration = configuration().apply { selection = selection.apply { methodName = "\\Ns\\CalcTest::median" } }
+
+        val command = commandIn(FakeLaunchEnvironment(), configuration)
+
+        assertTrue(command, command.endsWith("--filter \\Ns\\CalcTest::median"))
     }
 
     fun testContainerTranslatesPathsAndMountsTheReport() {

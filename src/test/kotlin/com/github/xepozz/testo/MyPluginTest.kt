@@ -1,10 +1,12 @@
 package com.github.xepozz.testo
 
 import com.intellij.ide.highlighter.XmlFileType
+import com.intellij.openapi.util.io.FileUtil
+import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
 import com.intellij.psi.xml.XmlFile
-import com.intellij.testFramework.TestDataPath
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.PsiErrorElementUtil
+import java.nio.file.Path
 
 class MyPluginTest : BasePlatformTestCase() {
 
@@ -23,6 +25,7 @@ class MyPluginTest : BasePlatformTestCase() {
     }
 
     fun testRename() {
+        VfsRootAccess.allowRootAccess(testRootDisposable, FileUtil.toSystemIndependentName(Path.of(testDataPath).toRealPath().toString()))
         myFixture.testRename("foo.xml", "foo_after.xml", "a2")
     }
 

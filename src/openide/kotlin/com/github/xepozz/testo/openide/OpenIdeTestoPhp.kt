@@ -1,5 +1,6 @@
 package com.github.xepozz.testo.openide
 
+import com.github.xepozz.testo.TestoClasses
 import com.github.xepozz.testo.openide.tests.TestoFrameworkType
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfigurationType
 import com.github.xepozz.testo.php.PhpArgumentText
@@ -37,6 +38,8 @@ import com.intellij.psi.util.CachedValueProvider
 import com.intellij.psi.util.CachedValuesManager
 import com.intellij.psi.util.PsiModificationTracker
 import com.intellij.util.containers.ConcurrentFactoryMap
+import com.intellij.util.indexing.FileContent
+import com.intellij.util.indexing.FileContentImpl
 import ru.openide.openphp.lang.psi.symbols.PhpAttribute
 import ru.openide.openphp.lang.psi.symbols.PhpAttributes
 import ru.openide.openphp.lang.psi.symbols.PhpClassInfo
@@ -68,6 +71,8 @@ import java.util.concurrent.ConcurrentMap
  * - of the segments of a written name (`\Testo\Filter\Group`) only the last is an identifier leaf.
  */
 class OpenIdeTestoPhp : TestoPhp {
+    private val dataProviderShortName = TestoClasses.DATA_PROVIDER.substringAfterLast('\\')
+
     override fun toolEnvironment(configuration: TestoConfiguration): TestoToolEnvironment {
         val testo = configuration as TestoRunConfiguration
         return OpenIdeToolEnvironment(testo, testo.lastEnvironment ?: testo.launchEnvironment())
@@ -118,6 +123,15 @@ class OpenIdeTestoPhp : TestoPhp {
 
     override fun allClasses(file: PsiFile): List<PhpClassView> =
         PhpDeclarations.inFile(file, topLevelOnly = false).filter(::isNamedClass).map(::OpenIdeClass)
+
+    override fun mayContainDataProvider(content: FileContent): Boolean {
+        if (content !is FileContentImpl || content.isTransientContent) return true
+
+        // User data may supply a different PSI snapshot. The view provider exposes its committed text.
+        val text = if (content.isUserDataEmpty) content.contentAsText else content.psiFile.viewProvider.contents
+        // The short name must occur in the attribute reference or in its import in this file.
+        return text.contains(dataProviderShortName, ignoreCase = true)
+    }
 
     override fun attributesIn(file: PsiFile): List<PhpAttributeView> =
         PhpAttributes.inFile(file).map { OpenIdeAttribute(it.element) }
