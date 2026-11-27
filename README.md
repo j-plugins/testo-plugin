@@ -1,53 +1,83 @@
-# IntelliJ Idea Plugin for Testo PHP Testing Framework
+<p align="center">
+    <a href="#get-started"><img alt="TESTO"
+         src="https://github.com/php-testo/.github/blob/1.x/resources/logo-full.svg?raw=true"
+         style="width: 2in; display: block"
+    /></a>
+</p>
 
-![Build](https://github.com/j-plugins/testo-plugin/workflows/Build/badge.svg)
-[![Version](https://img.shields.io/jetbrains/plugin/v/28842-testo.svg)](https://plugins.jetbrains.com/plugin/28842-testo)
+<p align="center">Testo PHP testing framework support for PhpStorm, IntelliJ IDEA Ultimate and OpenIDE</p>
+
+<div align="center">
+
+[![Documentation](https://img.shields.io/badge/Documentation-blue?style=for-the-badge&logo=gitbook&logoColor=white)](https://php-testo.github.io)
+[![Sponsor](https://img.shields.io/static/v1?style=for-the-badge&label=&message=Sponsor&logo=githubsponsors&logoColor=white&color=%23EA4AAA)](https://github.com/xepozz/xepozz?tab=readme-ov-file#become-a-sponsor)
+
+[![Build](https://github.com/j-plugins/testo-plugin/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/j-plugins/testo-plugin/actions/workflows/build.yml?query=branch%3Amain)
+[![Codecov](https://codecov.io/gh/j-plugins/testo-plugin/branch/main/graph/badge.svg)](https://app.codecov.io/gh/j-plugins/testo-plugin/tree/main)
+[![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/28842-testo.svg?label=JetBrains%20Marketplace)](https://plugins.jetbrains.com/plugin/28842-testo)
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/28842-testo.svg)](https://plugins.jetbrains.com/plugin/28842-testo)
+[![OpenIDE Marketplace](https://img.shields.io/badge/OpenIDE-Marketplace-blue)](https://marketplace.openide.ru/plugin/testo/461/)
+
+</div>
+
+<br />
 
 <!-- Plugin description -->
 
-[Github](https://github.com/j-plugins/testo-plugin) | [Telegram](https://t.me/jb_plugins) | [Donation](https://github.com/xepozz/xepozz?tab=readme-ov-file#become-a-sponsor)
+IDE integration for [Testo](https://php-testo.github.io) — the PHP testing framework you control.
 
-Testo PHP – is a modern PHP testing library
+- Run, debug and coverage configurations for tests, classes, files, directories, suites, groups and data sets
+- Gutter run icons on tests, benchmarks, inline tests, data providers and each of their data sets
+- Test console with a tab per output channel, log-level filter and per-status run summary
+- Run history: every run is archived and can be replayed with the full test UI
+- Coverage with branches and per-test data, plus mutation testing with Infection
+- HTML and JUnit reports opened right in the IDE
+- Test generation, live templates, inspections and navigation from results to code
+
+Requires Testo 0.10.39 or newer.
+
+[Telegram](https://t.me/jb_plugins) | [Donation](https://github.com/xepozz/xepozz?tab=readme-ov-file#become-a-sponsor)
 
 <!-- Plugin description end -->
 
 ## Installation
 
-- Using the IDE built-in plugin system:
-  
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > <kbd>Search for "testo-plugin"</kbd> >
-  <kbd>Install</kbd>
-  
-- Using JetBrains Marketplace:
+### PhpStorm / IntelliJ IDEA Ultimate
 
-  Go to [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/28842-testo) and install it by clicking the <kbd>Install to ...</kbd> button in case your IDE is running.
+<kbd>Settings</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > search for <kbd>Testo</kbd> > <kbd>Install</kbd>,
+or open the [JetBrains Marketplace page](https://plugins.jetbrains.com/plugin/28842-testo) and click
+<kbd>Install to ...</kbd> while the IDE is running.
 
-  You can also download the [latest release](https://plugins.jetbrains.com/plugin/28842-testo/versions) from JetBrains Marketplace and install it manually using
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
+Supported: 2025.2 and newer, with the bundled PHP plugin.
 
-- Manually:
+### OpenIDE
 
-  Download the [latest release](https://github.com/j-plugins/testo-plugin/releases/latest) and install it manually using
-  <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
+<kbd>Settings</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > search for <kbd>Testo</kbd> > <kbd>Install</kbd>,
+or download it from the [OpenIDE Marketplace](https://marketplace.openide.ru/plugin/testo/461/).
 
+Supported: OpenIDE 2026.3 and newer, with PHP for OpenIDE 0.9.10 or newer.
 
-## OpenIDE
+### Manually
 
-Build the OpenIDE variant with `./gradlew buildPlugin -PphpApi=openide`. It uses PHP for OpenIDE 0.9.10 and
-OpenIDE 2026.3. Install the ZIP from `build/openide/distributions/` through **Install Plugin from Disk**.
-The PhpStorm builds remain selected by `-PphpApi=252` and `-PphpApi=262`.
+Download the ZIP for your IDE from the [latest release](../../releases/latest) and install it with
+<kbd>Settings</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install Plugin from Disk...</kbd>
 
-Runs use the project's active PHP interpreter. Infection retains the interpreter selected for the original test run.
-On macOS, Linux, Docker/Compose and WSL, that interpreter needs the `pcntl` and `posix` extensions so Testo can stop
-Infection and its child processes. PHP for OpenIDE checks these requirements before starting Infection; ordinary
-Testo test runs do not require those extensions.
+## Mutation testing in OpenIDE
 
-If the connection to an interpreter is lost, Testo keeps the temporary reports and blocks rerun. Use **Stop** to
-retry stopping the same process. After restarting the IDE, check the processes in that interpreter before starting
-a new test run if the previous run could not be confirmed as stopped.
+Infection runs on the interpreter selected for the original test run. On macOS, Linux, Docker/Compose and WSL that
+interpreter needs the `pcntl` and `posix` extensions, so Testo can stop Infection and its child processes. PHP for
+OpenIDE checks them before starting Infection; ordinary test runs do not need them.
 
----
-Plugin based on the [IntelliJ Platform Plugin Template][template].
+If the connection to the interpreter is lost, Testo keeps the temporary reports and blocks rerun. Use **Stop** to retry
+stopping the same process. After an IDE restart, check that interpreter's processes before starting a new run if the
+previous one could not be confirmed as stopped.
 
-[template]: https://github.com/JetBrains/intellij-platform-plugin-template
+## Building from source
+
+```bash
+./gradlew buildPlugin                   # PhpStorm 2026.2+
+./gradlew buildPlugin -PphpApi=252      # PhpStorm 2025.2 – 2026.1
+./gradlew buildPlugin -PphpApi=openide  # OpenIDE 2026.3+
+```
+
+The ZIP lands in `build/distributions/` (`build/openide/distributions/` for OpenIDE).
