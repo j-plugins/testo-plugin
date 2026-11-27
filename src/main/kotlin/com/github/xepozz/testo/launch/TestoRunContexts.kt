@@ -25,7 +25,6 @@ import com.intellij.execution.testframework.AbstractTestProxy
 import com.intellij.execution.testframework.TestTreeView
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.openapi.project.DumbService
-import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDirectory
@@ -222,7 +221,7 @@ class TestoRunContexts(private val host: Host) {
 
     private fun sameContextPath(savedPath: String?, virtualPath: String): Boolean {
         if (savedPath == virtualPath) return true
-        return SystemInfo.isWindows && savedPath != null &&
+        return savedPath != null &&
             FileUtil.toSystemIndependentName(savedPath) == FileUtil.toSystemIndependentName(virtualPath)
     }
 

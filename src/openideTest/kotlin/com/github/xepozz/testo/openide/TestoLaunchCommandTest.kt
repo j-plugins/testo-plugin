@@ -40,6 +40,7 @@ class TestoLaunchCommandTest : BasePlatformTestCase() {
     }
 
     private val wd get() = FileUtil.toSystemIndependentName(app.path)
+    private val fixturePath = Regex("""<(?:wd|system)>[\\/][^\s"]+""")
 
     private fun configuration(logHtml: Boolean = true) = TestoRunConfigurationType.instance().createTemplateConfiguration(project).apply {
         name = "Golden"
@@ -58,12 +59,14 @@ class TestoLaunchCommandTest : BasePlatformTestCase() {
     private fun commandIn(environment: PhpLaunchEnvironment, configuration: TestoRunConfiguration = configuration()): String {
         TestoRunConfiguration.environmentProvider = { environment }
         val prepared = configuration.prepare(processHandler = { NopProcessHandler() })
-        val line = prepared.command.commandLineString
-        val portable = if (environment.locality == PhpLaunchLocality.SameHost) FileUtil.toSystemIndependentName(line) else line
-        return portable
-            .replace(FileUtil.toSystemIndependentName(PathManager.getSystemPath()), "<system>")
-            .replace(project.locationHash, "<project>")
+        val systemPath = FileUtil.toSystemIndependentName(PathManager.getSystemPath())
+        val withFixtureRoots = prepared.command.commandLineString
+            .replace(FileUtil.toSystemDependentName(systemPath), "<system>")
+            .replace(systemPath, "<system>")
+            .replace(FileUtil.toSystemDependentName(wd), "<wd>")
             .replace(wd, "<wd>")
+        return fixturePath.replace(withFixtureRoots) { FileUtil.toSystemIndependentName(it.value) }
+            .replace(project.locationHash, "<project>")
     }
 
     fun testLocal() {

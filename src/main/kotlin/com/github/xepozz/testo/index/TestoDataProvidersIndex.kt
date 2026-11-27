@@ -51,8 +51,8 @@ class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvide
     override fun getValueExternalizer(): DataExternalizer<TestoDataProvidersIndexType> =
         DataProviderUsageExternalizer.INSTANCE
 
-    // Bump when stored results or their format change. Version 2 corrected DATA_PROVIDER_ATTRIBUTE.
-    // Version 3 stopped resolving subclasses. The fast path preserves empty results.
+    // Bump on any indexing-logic change so stale on-disk indexes rebuild: 2 corrected DATA_PROVIDER_ATTRIBUTE;
+    // 3 stopped resolving subclasses.
     override fun getVersion() = 3
 
     override fun getInputFilter() = PHP_INPUT_FILTER

@@ -25,7 +25,8 @@ import java.util.concurrent.TimeUnit
 /**
  * The whole command line a Testo run and a Testo Coverage run start, as the process sees it. Built by the
  * configuration's own `createCommand` and started through its own process handler, with a stand-in `php` that exits at
- * once — so the line is exactly what the platform would launch, down to argument order.
+ * once. The Unix stand-in records the argument vector. The Windows stand-in records the batch command tail and the
+ * test parses it for comparison with the same baseline.
  */
 class CommandBaselineTest : BasePlatformTestCase() {
     private lateinit var phpDir: Path
@@ -275,6 +276,6 @@ class CommandBaselineTest : BasePlatformTestCase() {
     private companion object {
         const val COVERAGE = "/work/coverage/Baseline@testo.xml"
         // Convert fixture paths only, leaving PHP names such as \App\CalcTest intact.
-        val FIXTURE_PATH = Regex("""(?<![\w\\])(?:<(?:wd|php-dir|system|project)>|[\\/]work|[\\/]elsewhere|tests)[\\/][^\s"'<>]+""")
+        val FIXTURE_PATH = Regex("""(?<![\w\\])(?:<(?:wd|php-dir|system|project)>|[\\/]work|[\\/]elsewhere)[\\/][^\s"'<>]+""")
     }
 }

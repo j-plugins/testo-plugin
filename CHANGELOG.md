@@ -16,6 +16,7 @@
 ### Fixed
 
 - Mutating from the Coverage view no longer resolves the interpreter on the UI thread (a "slow operations on EDT" error).
+- Class gutter runs on Windows reuse saved configurations when the same path is written with different separators.
 
 ## [2026.17] - 2026-10-22
 
