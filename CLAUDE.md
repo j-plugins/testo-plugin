@@ -83,8 +83,8 @@ checks prevent dependencies between the two adapters.
 ./gradlew check buildPlugin verifyPlugin -PphpApi=openide
 ```
 
-The OpenIDE build has its own output directory (`build/openide`) and ZIP name. It is excluded from the normal
-`phpApis` publishing list and uses `OPENIDE_PUBLISH_TOKEN` when explicitly published to the OpenIDE plugin store.
+The OpenIDE build has its own output directory (`build/openide`) and ZIP name. It is excluded from the Gradle
+`phpApis` fan-out; `release.yml` publishes it separately to the OpenIDE plugin store with `OPENIDE_PUBLISH_TOKEN`.
 Each variant's `clean` preserves the other variant's output; the OpenIDE distribution is retained because the
 platform plugin unpacks it during configuration.
 
@@ -797,8 +797,9 @@ The test task canonicalizes its temporary directory so VFS and filesystem paths 
   `v<version>` tag gets the tag plus a GitHub release; a non-empty `[Unreleased]` is kept in the `release/next` PR
   (version bumped, changelog patched), rebuilt on every push. Both the PR and the release come from `GITHUB_TOKEN`,
   whose events start no workflow: checks on the PR start only by hand, and publishing is called, not triggered.
-- **release.yml** (`workflow_call` from the publish job, `workflow_dispatch` with a `tag` to retry): publish to
-  JetBrains Marketplace; a matrix builds 252, 262 and `openide` and attaches each ZIP to the release.
+- **release.yml** (`workflow_call` from the publish job, `workflow_dispatch` with a `tag` to retry): publishes
+  `phpApis` to JetBrains Marketplace, then `openide` to the OpenIDE plugin store (the default `apis` list);
+  a matrix builds 252, 262 and `openide` and attaches each ZIP to the release.
 - **run-ui-tests.yml** (manual): UI tests on Ubuntu / Windows / macOS via robot-server.
 
 ## Conventions

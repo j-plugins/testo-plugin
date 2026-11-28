@@ -40,8 +40,8 @@ if (isOpenIde) {
 // variants cannot both be "2026.3.1". The target API becomes a fourth component: it keeps each variant unique, sorts
 // above the plain version so existing installs still see an update, and — unlike a `-252` suffix — is not a SemVer
 // pre-release, so `channels` below (which reads the bare pluginVersion) still resolves to the default channel.
-// The OpenIDE variant goes to a store of its own, where the platform branch it targets serves as that component.
-val versionTag = if (isOpenIde) apiProperty("pluginSinceBuild").get() else phpApi
+// The OpenIDE variant targets a platform branch PhpStorm reaches later, so its version also carries an `-OpenIDE` suffix.
+val versionTag = if (isOpenIde) apiProperty("pluginSinceBuild").get() + "-OpenIDE" else phpApi
 val artifactVersion = providers.gradleProperty("pluginVersion").map { "$it.$versionTag" }
 
 version = artifactVersion.get()
