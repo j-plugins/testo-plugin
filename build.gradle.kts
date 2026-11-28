@@ -221,6 +221,11 @@ tasks {
     runIde {
         autoReload = false
     }
+    publishPlugin {
+        // The default picks the signed archive by `signPlugin.didWork`, which the configuration cache reads before
+        // signing runs: every release went out unsigned.
+        archiveFiles.setFrom(signPlugin.flatMap { it.signedArchiveFile })
+    }
     buildPlugin {
         // The OpenIDE and 262 variants share a version, so the name tells their archives apart.
         if (isOpenIde) {
