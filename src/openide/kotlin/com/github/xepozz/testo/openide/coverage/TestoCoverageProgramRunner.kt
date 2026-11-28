@@ -33,6 +33,8 @@ import com.intellij.execution.ui.RunContentDescriptor
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import org.jetbrains.concurrency.Promise
+import ru.openide.openphp.settings.launch.PhpModuleProbeFailureKind
+import ru.openide.openphp.settings.launch.PhpModuleProbeResult
 import java.io.File
 import java.nio.file.Path
 
@@ -139,26 +141,36 @@ open class TestoCoverageProgramRunner : AsyncProgramRunner<RunnerSettings>() {
             if (driver == TestoCoverageDriver.XDEBUG) mapOf("XDEBUG_MODE" to "coverage") else emptyMap()
 
         /**
-         * Whether the driver's extension is loaded where the process runs: refuses when the module list says it is
-         * not, answers a warning when there is no module list — the probe failed, which says nothing either way.
+         * Whether the driver's extension is loaded where the process runs: refuses when the probe lists the modules
+         * without it, or when PHP did not start for the probe — the run would not start either. Any other failed
+         * probe says nothing either way and answers a warning naming why.
          */
         private fun checkExtension(driver: TestoCoverageDriver, launch: TestoLaunch): String? {
             val (extension, name) = when (driver) {
                 TestoCoverageDriver.PCOV -> "pcov" to "PCOV"
                 else -> "xdebug" to "Xdebug"
             }
-            val modules = launch.environment.modules(File(launch.workingDirectory))
-            if (modules.isEmpty()) {
-                return "Testo: could not tell whether $name is loaded in ${launch.environment.displayName}; " +
-                    "without it the run writes no coverage."
+            val environment = launch.environment.displayName
+            val failure = when (val probe = launch.environment.probeModules(File(launch.workingDirectory))) {
+                is PhpModuleProbeResult.Known -> {
+                    if (extension in probe.modules) return null
+                    throw ExecutionException(
+                        "Cannot collect coverage: $name is not loaded in the PHP of $environment. " +
+                            "Enable the $extension extension there, or choose the other engine in the configuration.",
+                    )
+                }
+                is PhpModuleProbeResult.Unknown -> probe.failure
             }
-            if (extension !in modules) {
-                throw ExecutionException(
-                    "Cannot collect coverage: $name is not loaded in the PHP of ${launch.environment.displayName}. " +
-                        "Enable the $extension extension there, or choose the other engine in the configuration.",
-                )
+            if (failure.kind == PhpModuleProbeFailureKind.START_FAILURE) {
+                throw ExecutionException(sentences("Cannot collect coverage: the PHP of $environment did not start.", failure.message))
             }
-            return null
+            return sentences(
+                "Testo: could not check whether $name is loaded in $environment.",
+                failure.message,
+                "Without it the run writes no coverage.",
+            )
         }
+
+        private fun sentences(vararg parts: String): String = parts.filter { it.isNotBlank() }.joinToString(" ")
     }
 }
