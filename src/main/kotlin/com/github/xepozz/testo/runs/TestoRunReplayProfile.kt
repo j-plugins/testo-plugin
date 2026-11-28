@@ -100,7 +100,11 @@ internal class TestoRunReplayProfile(
                     }
                 }
             })
-            DefaultExecutionResult(console, handler)
+            DefaultExecutionResult(console, handler).apply {
+                (console as? SMTRunnerConsoleView)?.let { view ->
+                    setRestartActions(configuration.rerunFailedTestsAction(view, props).apply { setModelProvider { view.resultsViewer } })
+                }
+            }
         }
 
     private fun feed(handler: ProcessHandler) {
