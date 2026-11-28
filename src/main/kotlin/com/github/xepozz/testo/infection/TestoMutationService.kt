@@ -142,9 +142,9 @@ class TestoMutationService(private val project: Project) {
         val previous = runs[runDir]
         previous?.takeIf { it.isBusy }?.let { return TestoMutationToolWindow.show(project, it) }
 
-        val sources = coveredSources(recipe)
-        val launch = TestoInfectionLaunch(recipe.ready, sources, TestoMutationArchive.newRunDir(runDir, System.currentTimeMillis()), recipe.options())
-        val run = TestoMutationRun(recipe.title, runDir, launch.workDir) { recipe.environment.toLocal(it) }
+        val workDir = TestoMutationArchive.newRunDir(runDir, System.currentTimeMillis())
+        val options = recipe.options()
+        val run = TestoMutationRun(recipe.title, runDir, workDir) { recipe.environment.toLocal(it) }
         run.recipe = recipe
         run.onDiscarded = { putBack(run, previous) }
         track(run)
@@ -153,6 +153,7 @@ class TestoMutationService(private val project: Project) {
         object : Task.Backgroundable(project, TestoBundle.message("infection.task.title", recipe.configuration.name), true) {
             override fun run(indicator: ProgressIndicator) {
                 val lingering = lingeringReason(runDir, previous)
+                val launch = TestoInfectionLaunch(recipe.ready, coveredSources(recipe), workDir, options)
                 var failure: Exception? = null
                 try {
                     launch.inputProtection = TestoMutationArchive.protectRunInputs(runDir, launch.workDir)
