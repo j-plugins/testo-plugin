@@ -213,6 +213,9 @@ internal fun restoreTestoConfiguration(project: Project, runDir: Path, manifest:
         runCatching { configuration.readExternal(JDOMUtil.load(xml)) }
             .onFailure { Logger.getInstance(TestoRunReplayProfile::class.java).warn("Failed to restore the run configuration of $runDir", it) }
     }
+    if (manifest.rerunFilters.isNotEmpty()) {
+        configuration.selection = configuration.selection.copy(rerunFilters = manifest.rerunFilters)
+    }
     configuration.name = manifest.configurationName.ifEmpty { runDir.fileName.toString() }
     return configuration
 }

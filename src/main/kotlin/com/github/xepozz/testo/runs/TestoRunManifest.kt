@@ -46,6 +46,8 @@ data class TestoRunManifest(
     val commandLine: String = "",
     /** The run configuration as XML (`RunConfiguration.writeExternal`), so a replayed tab can rerun the real thing. */
     val configuration: String = "",
+    /** A "Rerun Failed Tests" run's `--filter`s, which [configuration] never carries. */
+    val rerunFilters: List<String> = emptyList(),
     val startedAt: Long = 0,
     val finishedAt: Long = 0,
     val workingDirectory: String = "",
