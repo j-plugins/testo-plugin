@@ -11,6 +11,7 @@ import com.intellij.util.indexing.DataIndexer
 import com.intellij.util.indexing.FileBasedIndex
 import com.intellij.util.indexing.FileBasedIndexExtension
 import com.intellij.util.indexing.FileContent
+import com.intellij.util.indexing.FileContentImpl
 import com.intellij.util.indexing.ID
 import com.intellij.util.io.DataExternalizer
 import com.intellij.util.io.EnumeratorStringDescriptor
@@ -19,14 +20,28 @@ import java.io.DataInput
 import java.io.DataOutput
 import java.io.IOException
 
+private val DATA_PROVIDER_SHORT_NAME = TestoClasses.DATA_PROVIDER.substringAfterLast('\\')
+
+/**
+ * Whether the file's text can name a data provider at all: every form that reaches the attribute (import, alias,
+ * namespace alias, FQN) spells its short name, and PHP class names are case-insensitive.
+ */
+internal fun mayContainDataProvider(content: FileContent): Boolean {
+    if (content !is FileContentImpl || content.isTransientContent) return true
+
+    // Supplied PSI may be another snapshot than the file's bytes; its view provider holds the text it was built from.
+    val text = if (content.isUserDataEmpty) content.contentAsText else content.psiFile.viewProvider.contents
+    return text.contains(DATA_PROVIDER_SHORT_NAME, ignoreCase = true)
+}
+
 private typealias TestoDataProvidersIndexType = MutableSet<TestoDataProvidersIndex.DataProviderUsage>
 
 class TestoDataProvidersIndex : FileBasedIndexExtension<String, TestoDataProvidersIndexType>() {
     override fun getName() = KEY
 
     override fun getIndexer() = DataIndexer<String, TestoDataProvidersIndexType, FileContent?> { inputData ->
+        if (!mayContainDataProvider(inputData)) return@DataIndexer emptyMap()
         val php = TestoPhp.getInstance()
-        if (!php.mayContainDataProvider(inputData)) return@DataIndexer emptyMap()
 
         val map = mutableMapOf<String, TestoDataProvidersIndexType>()
 

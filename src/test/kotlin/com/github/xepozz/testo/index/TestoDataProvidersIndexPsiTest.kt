@@ -1,7 +1,5 @@
-package com.github.xepozz.testo.openide
+package com.github.xepozz.testo.index
 
-import com.github.xepozz.testo.index.TestoDataProvidersIndex
-import com.github.xepozz.testo.php.TestoPhp
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.psi.PsiDocumentManager
@@ -12,7 +10,7 @@ import com.intellij.util.indexing.FileContent
 import com.intellij.util.indexing.FileContentImpl
 import com.intellij.util.indexing.IndexingDataKeys
 
-class OpenIdeDataProvidersIndexTest : BasePlatformTestCase() {
+class TestoDataProvidersIndexPsiTest : BasePlatformTestCase() {
     private val indexer = TestoDataProvidersIndex().indexer
 
     fun testPhysicalFileWithoutProviderDoesNotNeedPsi() {
@@ -42,7 +40,7 @@ class OpenIdeDataProvidersIndexTest : BasePlatformTestCase() {
         val mixedCase = provider("use Testo\\Data\\dAtApRoViDeR as Cases;", "Cases")
         val expected = indexer.map(transient(mixedCase))
         val content = physical(mixedCase)
-        assertTrue(TestoPhp.getInstance().mayContainDataProvider(content))
+        assertTrue(mayContainDataProvider(content))
         assertEquals(expected, indexer.map(content))
     }
 
