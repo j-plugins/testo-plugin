@@ -15,12 +15,6 @@
 [![Build](https://github.com/j-plugins/testo-plugin/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/j-plugins/testo-plugin/actions/workflows/build.yml?query=branch%3Amain)
 [![Codecov](https://codecov.io/gh/j-plugins/testo-plugin/branch/main/graph/badge.svg)](https://app.codecov.io/gh/j-plugins/testo-plugin/tree/main)
 
-[![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/28842-testo.svg?label=JetBrains%20Marketplace)](https://plugins.jetbrains.com/plugin/28842-testo)
-[![Downloads](https://img.shields.io/jetbrains/plugin/d/28842-testo.svg)](https://plugins.jetbrains.com/plugin/28842-testo)
-[![Rating](https://img.shields.io/jetbrains/plugin/r/rating/28842-testo.svg)](https://plugins.jetbrains.com/plugin/28842-testo/reviews)
-
-[![OpenIDE Marketplace](https://img.shields.io/badge/OpenIDE-Marketplace-blue)](https://marketplace.openide.ru/plugin/testo/461/)
-
 </div>
 
 <br />
@@ -47,6 +41,10 @@ Requires Testo 0.10.39 or newer.
 
 ### PhpStorm / IntelliJ IDEA Ultimate
 
+[![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/28842-testo.svg?label=JetBrains%20Marketplace)](https://plugins.jetbrains.com/plugin/28842-testo)
+[![Downloads](https://img.shields.io/jetbrains/plugin/d/28842-testo.svg)](https://plugins.jetbrains.com/plugin/28842-testo)
+[![Rating](https://img.shields.io/jetbrains/plugin/r/rating/28842-testo.svg)](https://plugins.jetbrains.com/plugin/28842-testo/reviews)
+
 <kbd>Settings</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > search for <kbd>Testo</kbd> > <kbd>Install</kbd>,
 or open the [JetBrains Marketplace page](https://plugins.jetbrains.com/plugin/28842-testo) and click
 <kbd>Install to ...</kbd> while the IDE is running.
@@ -54,6 +52,8 @@ or open the [JetBrains Marketplace page](https://plugins.jetbrains.com/plugin/28
 Supported: 2025.2 and newer, with the bundled PHP plugin.
 
 ### OpenIDE
+
+[![OpenIDE Marketplace](https://img.shields.io/badge/OpenIDE-Marketplace-blue)](https://marketplace.openide.ru/plugin/testo/461/)
 
 <kbd>Settings</kbd> > <kbd>Plugins</kbd> > <kbd>Marketplace</kbd> > search for <kbd>Testo</kbd> > <kbd>Install</kbd>,
 or download it from the [OpenIDE Marketplace](https://marketplace.openide.ru/plugin/testo/461/).
