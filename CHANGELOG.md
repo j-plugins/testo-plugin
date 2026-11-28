@@ -8,6 +8,10 @@
 
 - On PhpStorm too, indexing data providers skips files that never mention `DataProvider` instead of parsing them.
 
+### Fixed
+
+- Starting a mutation run no longer reads the coverage report on the UI thread.
+
 ## [2026.18] - 2026-11-27
 
 ### Added
