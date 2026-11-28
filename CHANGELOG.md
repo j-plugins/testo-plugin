@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [2026.18] - 2026-11-27
+
 ### Added
 
 - The OpenIDE run configuration is laid out like PhpStorm's and has its own PHP interpreter and interpreter options; by default it follows the project's active interpreter profile.
@@ -282,7 +284,7 @@
 - Concurrent tests no longer nest inside one another in the test tree: the tree is built from the `nodeId`/`parentNodeId`
   Testo reports rather than from the order messages arrive in.
 
-[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.17...HEAD
+[Unreleased]: https://github.com/j-plugins/testo-plugin/compare/v2026.18...HEAD
 [2026.16.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.15.262...v2026.16.262
 [2026.15.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.14.262...v2026.15.262
 [2026.14.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.13.262...v2026.14.262
@@ -295,4 +297,5 @@
 [2026.5.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.4.262...v2026.5.262
 [2026.4.262]: https://github.com/j-plugins/testo-plugin/compare/v2026.3.1...v2026.4.262
 [2026.3.1]: https://github.com/j-plugins/testo-plugin/commits/v2026.3.1
+[2026.18]: https://github.com/j-plugins/testo-plugin/compare/v2026.17...v2026.18
 [2026.17]: https://github.com/j-plugins/testo-plugin/compare/v2026.16.262...v2026.17
