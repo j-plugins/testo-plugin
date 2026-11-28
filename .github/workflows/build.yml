@@ -129,6 +129,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           files: ${{ github.workspace }}/build/reports/kover/report.xml
+          disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
   # Run Qodana inspections and provide a report
