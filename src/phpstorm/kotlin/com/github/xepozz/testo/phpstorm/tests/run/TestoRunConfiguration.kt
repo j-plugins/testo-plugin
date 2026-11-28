@@ -102,6 +102,9 @@ class TestoRunConfiguration(project: Project, factory: ConfigurationFactory) : P
         properties: SMTRunnerConsoleProperties,
     ) = TestoRerunFailedTestsAction(consoleView, properties)
 
+    override fun rerunFailedTestsAction(console: ConsoleView, properties: SMTRunnerConsoleProperties) =
+        createRerunAction(console, properties)
+
     override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> {
         val editor = super.getConfigurationEditor() as PhpTestRunConfigurationEditor
         editor.setRunnerOptionsDocumentation("https://php-testo.github.io/docs/guide/cli-reference")

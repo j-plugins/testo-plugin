@@ -1,6 +1,7 @@
 package com.github.xepozz.testo.openide.tests.run
 
 import com.github.xepozz.testo.launch.TestoConfiguration
+import com.github.xepozz.testo.openide.tests.actions.TestoRerunFailedTestsAction
 import com.github.xepozz.testo.launch.TestoConfigurationNames
 import com.github.xepozz.testo.launch.TestoLaunchSettings
 import com.github.xepozz.testo.launch.TestoReportLocation
@@ -24,6 +25,7 @@ import com.intellij.execution.process.ProcessHandler
 import com.intellij.execution.process.ProcessTerminatedListener
 import com.intellij.execution.runners.ExecutionEnvironment
 import com.intellij.execution.testframework.sm.runner.SMTRunnerConsoleProperties
+import com.intellij.execution.ui.ConsoleView
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.options.SettingsEditor
 import com.intellij.openapi.project.Project
@@ -180,6 +182,9 @@ class TestoRunConfiguration(
             is PhpLaunchLocality.WslDistribution -> "wsl"
             null -> ""
         }
+
+    override fun rerunFailedTestsAction(console: ConsoleView, properties: SMTRunnerConsoleProperties) =
+        TestoRerunFailedTestsAction(console, properties)
 
     private fun archivedEnvironment(): PhpLaunchEnvironment? =
         lastEnvironment ?: runCatching { launchEnvironment() }.getOrNull()

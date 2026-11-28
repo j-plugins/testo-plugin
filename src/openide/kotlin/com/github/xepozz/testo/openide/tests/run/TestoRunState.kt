@@ -1,6 +1,5 @@
 package com.github.xepozz.testo.openide.tests.run
 
-import com.github.xepozz.testo.openide.tests.actions.TestoRerunFailedTestsAction
 import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.intellij.execution.DefaultExecutionResult
 import com.intellij.execution.ExecutionResult
@@ -30,7 +29,7 @@ internal class TestoRunState(
             properties,
         ) as SMTRunnerConsoleView
         // The platform hands the results model to the tree's own toolbar only; a restart action reads it from here.
-        val rerunFailed = TestoRerunFailedTestsAction(console, properties).apply { setModelProvider { console.resultsViewer } }
+        val rerunFailed = configuration.rerunFailedTestsAction(console, properties).apply { setModelProvider { console.resultsViewer } }
         return DefaultExecutionResult(console, prepared.handler).apply {
             setRestartActions(rerunFailed)
         }

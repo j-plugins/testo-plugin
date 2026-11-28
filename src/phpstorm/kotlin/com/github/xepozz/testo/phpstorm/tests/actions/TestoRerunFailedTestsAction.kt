@@ -3,6 +3,7 @@ package com.github.xepozz.testo.phpstorm.tests.actions
 import com.github.xepozz.testo.TestoBundle
 import com.github.xepozz.testo.phpstorm.tests.TestoFrameworkType
 import com.github.xepozz.testo.phpstorm.tests.run.TestoRunConfiguration
+import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoRunTarget
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.Executor
@@ -39,7 +40,7 @@ class TestoRerunFailedTestsAction(
             .toList()
 
     override fun getRunProfile(environment: ExecutionEnvironment): MyRunProfile? {
-        val profile = this.myConsoleProperties.configuration
+        val profile = (myConsoleProperties as? TestoConsoleProperties)?.testoConfiguration ?: myConsoleProperties.configuration
         if (profile !is TestoRunConfiguration) {
             LOG.warn(
                 TestoBundle.message(

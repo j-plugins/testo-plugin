@@ -136,6 +136,11 @@ class TestoConsoleProperties(
     override fun getConfiguration(): com.intellij.execution.configurations.RunProfile =
         replayProfile ?: super.getConfiguration()
 
+    /** The configuration this tab reruns: the live run's own, or the one a replayed archive was started with. */
+    val testoConfiguration: com.github.xepozz.testo.launch.TestoConfiguration?
+        get() = (replayProfile as? com.github.xepozz.testo.runs.TestoRunReplayProfile)?.testoConfiguration
+            ?: super.getConfiguration() as? com.github.xepozz.testo.launch.TestoConfiguration
+
     /** The archive this tab stands for: the one a history tab replays, or the one a live run is recorded into. */
     fun currentRunDir(): java.nio.file.Path? =
         (replayProfile as? com.github.xepozz.testo.runs.TestoRunReplayProfile)?.runDir ?: recording?.dir
