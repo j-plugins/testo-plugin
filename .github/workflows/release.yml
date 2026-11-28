@@ -1,5 +1,6 @@
-# Publishes a release tagged by the Build workflow: builds both variants, attaches the ZIPs, uploads to the Marketplace.
-# Running the publishPlugin task requires all the following secrets to be provided: PUBLISH_TOKEN, PRIVATE_KEY, PRIVATE_KEY_PASSWORD, CERTIFICATE_CHAIN.
+# Publishes a release tagged by the Build workflow: builds every variant, attaches the ZIPs, uploads the PhpStorm ones to
+# the JetBrains Marketplace and the OpenIDE one to the OpenIDE plugin store.
+# Running the publishPlugin task requires all the following secrets to be provided: PUBLISH_TOKEN, OPENIDE_PUBLISH_TOKEN, PRIVATE_KEY, PRIVATE_KEY_PASSWORD, CERTIFICATE_CHAIN.
 # See https://plugins.jetbrains.com/docs/intellij/plugin-signing.html for more information.
 
 name: Release
@@ -17,7 +18,7 @@ on:
         type: string
         required: true
       apis:
-        description: Variants to publish, comma-separated (default phpApis)
+        description: Variants to publish, comma-separated (default phpApis + openide)
         type: string
         required: false
 
@@ -94,16 +95,17 @@ jobs:
         with:
           cache-read-only: true
 
-      # Publish the plugin to JetBrains Marketplace
+      # Publish the plugin to JetBrains Marketplace and the OpenIDE plugin store
       - name: Publish Plugin
         env:
           PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
           CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
+          OPENIDE_PUBLISH_TOKEN: ${{ secrets.OPENIDE_PUBLISH_TOKEN }}
           APIS: ${{ inputs.apis }}
         # One Gradle run per variant, in turn: a failed upload can be retried for the variants still missing.
         run: |
-          for api in $(echo "${APIS:-$(sed -n 's/^phpApis *= *//p' gradle.properties)}" | tr ',' ' '); do
+          for api in $(echo "${APIS:-$(sed -n 's/^phpApis *= *//p' gradle.properties),openide}" | tr ',' ' '); do
             ./gradlew publishPlugin -PphpApi="$api" -PphpApiSingle=true
           done
