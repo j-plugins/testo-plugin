@@ -78,7 +78,6 @@ internal object TestoRunArchiver {
                     configurationName = recording.configurationName,
                     executorId = recording.executorId,
                     commandLine = props.commandLine.orEmpty(),
-                    configuration = serializeConfiguration(props),
                     startedAt = recording.startedAt,
                     finishedAt = finishedAt,
                     workingDirectory = props.workingDirectory.orEmpty(),
@@ -93,7 +92,7 @@ internal object TestoRunArchiver {
                     interpreterType = configuration?.interpreterKind.orEmpty(),
                     pluginVersion = pluginVersion(),
                     testoVersion = props.testoVersion.orEmpty(),
-                )
+                ).withConfiguration(configuration)
                 recording.writeManifest(manifest)
                 TestoRunStore.getInstance(project).prune()
                 // The archive is the lens's whole source of truth, and it only just became complete — so the lens is
@@ -154,17 +153,18 @@ internal object TestoRunArchiver {
         (javaClass.classLoader as? PluginAwareClassLoader)?.pluginDescriptor?.version.orEmpty()
 
     /**
-     * The run configuration as XML — the same form the IDE persists it in, so a replay can restore it and rerun the
-     * real thing. Empty when this console is not backed by a Testo configuration (nothing to rerun then).
+     * [configuration] as the IDE persists it, so a replay can restore it and rerun the real thing, plus the rerun
+     * filters that form leaves out. Unchanged when the console is not backed by a Testo configuration.
      */
-    private fun serializeConfiguration(props: TestoConsoleProperties): String =
-        (props.configuration as? TestoConfiguration)?.let { configuration ->
-            runCatching {
-                val element = Element("configuration")
-                configuration.writeExternal(element)
-                JDOMUtil.write(element)
-            }.onFailure { LOG.warn("Failed to serialize the Testo run configuration", it) }.getOrNull()
-        }.orEmpty()
+    fun TestoRunManifest.withConfiguration(configuration: TestoConfiguration?): TestoRunManifest {
+        if (configuration == null) return this
+        val xml = runCatching {
+            val element = Element("configuration")
+            configuration.writeExternal(element)
+            JDOMUtil.write(element)
+        }.onFailure { LOG.warn("Failed to serialize the Testo run configuration", it) }.getOrNull().orEmpty()
+        return copy(configuration = xml, rerunFilters = configuration.selection.rerunFilters)
+    }
 
     /**
      * Copies one report into the run's `reports/`, and returns the run-dir-relative path of its **entry** (what the

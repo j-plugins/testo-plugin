@@ -1,6 +1,9 @@
 package com.github.xepozz.testo.php
 
 import com.github.xepozz.testo.launch.TestoConfiguration
+import com.github.xepozz.testo.runs.TestoRunArchiver
+import com.github.xepozz.testo.runs.TestoRunManifest
+import com.github.xepozz.testo.runs.restoreTestoConfiguration
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.psi.PsiDocumentManager
@@ -8,6 +11,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import java.nio.file.Path
 
 /**
  * What the plugin relies on from a PHP implementation, asked through [TestoPhp] only — the same questions any
@@ -308,5 +312,17 @@ class TestoPhpContractTest : BasePlatformTestCase() {
 
         assertInstanceOf(factory.createTemplateConfiguration(project), TestoConfiguration::class.java)
         assertEquals("The type id saved configurations carry", "TestoRunConfiguration", factory.type.id)
+    }
+
+    fun testAReplayKeepsTheRerunFiltersTheSavedConfigurationDrops() {
+        val rerun = (php.configurationFactory().createTemplateConfiguration(project) as TestoConfiguration).apply {
+            selection = selection.copy(rerunFilters = listOf("\\App\\CalcTest::sum"))
+        }
+        val manifest = with(TestoRunArchiver) { TestoRunManifest().withConfiguration(rerun) }
+
+        val restored = restoreTestoConfiguration(project, Path.of("run"), manifest)
+
+        assertFalse("Saved configurations stay free of the filters", manifest.configuration.contains("CalcTest"))
+        assertEquals(listOf("\\App\\CalcTest::sum"), restored.selection.rerunFilters)
     }
 }

@@ -12,10 +12,12 @@ class TestoMutationProgramRunner : TestoCoverageProgramRunner() {
     override fun canRun(executorId: String, profile: RunProfile): Boolean =
         executorId == TestoMutationExecutor.ID && profile is TestoRunConfiguration
 
-    override fun prepare(configuration: TestoRunConfiguration): TestoRunConfiguration =
+    // clone() goes through writeExternal, which leaves out a "Rerun Failed Tests" run's transient filters.
+    public override fun prepare(configuration: TestoRunConfiguration): TestoRunConfiguration =
         (configuration.clone() as TestoRunConfiguration).apply {
             testoSettings.runnerSettings.coverageXml = true
             testoSettings.runnerSettings.logJunit = true
+            testoSettings.runnerSettings.rerunFilters = configuration.testoSettings.runnerSettings.rerunFilters
         }
 
     override fun started(env: ExecutionEnvironment, properties: TestoConsoleProperties) = mutateAfterArchive(env, properties)
