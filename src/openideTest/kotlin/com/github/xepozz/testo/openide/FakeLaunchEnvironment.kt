@@ -5,19 +5,21 @@ import com.intellij.openapi.util.io.FileUtil
 import ru.openide.openphp.settings.launch.PhpExposedPath
 import ru.openide.openphp.settings.launch.PhpLaunchEnvironment
 import ru.openide.openphp.settings.launch.PhpLaunchLocality
+import ru.openide.openphp.settings.launch.PhpModuleProbeResult
 import java.io.File
 
 /**
  * A launch environment with rules a test states outright: [mappings] from a host directory to the one the process sees,
- * [exposed] for what a report path turns into, [modules] for what the module probe finds. Its command shows plainly
- * what the plugin passed: a local one runs `php`, any other runs `env <locality>` with the mounts, the working
- * directory and then `php`.
+ * [exposed] for what a report path turns into, [modules] for what the module probe finds, [probe] for a probe that
+ * fails. Its command shows plainly what the plugin passed: a local one runs `php`, any other runs `env <locality>`
+ * with the mounts, the working directory and then `php`.
  */
 class FakeLaunchEnvironment(
     override val locality: PhpLaunchLocality = PhpLaunchLocality.SameHost,
     private val mappings: Map<String, String> = emptyMap(),
     private val exposed: (String) -> PhpExposedPath = { PhpExposedPath.Visible(it) },
     private val modules: Set<String> = emptySet(),
+    private val probe: PhpModuleProbeResult = PhpModuleProbeResult.Known(modules),
     override val projectRoot: String = "",
     override val displayName: String = "fake",
 ) : PhpLaunchEnvironment {
@@ -54,4 +56,6 @@ class FakeLaunchEnvironment(
     override fun exposeFile(hostFile: String, mountAt: String?): PhpExposedPath = exposed(hostFile)
 
     override fun modules(workDir: File?): Set<String> = modules
+
+    override fun probeModules(workDir: File?): PhpModuleProbeResult = probe
 }

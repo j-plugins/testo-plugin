@@ -11,6 +11,7 @@
 ### Fixed
 
 - Starting a mutation run no longer reads the coverage report on the UI thread.
+- OpenIDE: a Coverage run says why it could not check for Xdebug or PCOV, and refuses to start when PHP cannot be started at all.
 
 ## [2026.18] - 2026-11-27
 

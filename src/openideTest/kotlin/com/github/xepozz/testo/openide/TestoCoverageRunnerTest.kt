@@ -13,6 +13,9 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import ru.openide.openphp.settings.launch.PhpExposedPath
 import ru.openide.openphp.settings.launch.PhpLaunchEnvironment
 import ru.openide.openphp.settings.launch.PhpLaunchLocality
+import ru.openide.openphp.settings.launch.PhpModuleProbeFailure
+import ru.openide.openphp.settings.launch.PhpModuleProbeFailureKind
+import ru.openide.openphp.settings.launch.PhpModuleProbeResult
 import java.io.File
 import java.nio.file.Path
 
@@ -94,11 +97,38 @@ class TestoCoverageRunnerTest : BasePlatformTestCase() {
         assertTrue(refusal.message, refusal.message!!.contains("Xdebug is not loaded"))
     }
 
-    fun testAnUnknownModuleListRunsWithAWarning() {
-        val covered = covered(TestoCoverageDriver.PCOV, FakeLaunchEnvironment(modules = emptySet()))
+    fun testAProbeThatTimedOutRunsWithItsReason() {
+        val probe = failedProbe(PhpModuleProbeFailureKind.TIMEOUT, "The PHP module check timed out after 5000 ms.", timeoutMillis = 5000)
 
-        assertTrue(covered.unverifiedExtension, covered.unverifiedExtension!!.contains("could not tell whether PCOV is loaded"))
+        assertEquals(
+            "Testo: could not check whether PCOV is loaded in fake. The PHP module check timed out after 5000 ms. " +
+                "Without it the run writes no coverage.",
+            covered(TestoCoverageDriver.PCOV, probe).unverifiedExtension,
+        )
     }
+
+    fun testEveryInconclusiveProbeRunsWithItsReason() {
+        val failures = mapOf(
+            PhpModuleProbeFailureKind.NON_ZERO_EXIT to "The PHP module check exited with code 255.",
+            PhpModuleProbeFailureKind.INVALID_RESPONSE to "The PHP module check returned an empty or invalid module list.",
+            PhpModuleProbeFailureKind.NO_INFORMATION to "The interpreter did not return module information.",
+        )
+        for ((kind, message) in failures) {
+            val warning = covered(TestoCoverageDriver.XDEBUG, failedProbe(kind, message)).unverifiedExtension!!
+            assertTrue(warning, warning.contains(" $message Without it"))
+        }
+    }
+
+    fun testAPhpThatDidNotStartForTheProbeRefusesTheRun() {
+        val message = "The PHP module check could not start: Cannot run program \"php\": CreateProcess error=2."
+        val refusal = thrown<ExecutionException> {
+            covered(TestoCoverageDriver.XDEBUG, failedProbe(PhpModuleProbeFailureKind.START_FAILURE, message))
+        }
+        assertEquals("Cannot collect coverage: the PHP of fake did not start. $message", refusal.message)
+    }
+
+    private fun failedProbe(kind: PhpModuleProbeFailureKind, message: String, exitCode: Int? = null, timeoutMillis: Int? = null) =
+        FakeLaunchEnvironment(probe = PhpModuleProbeResult.Unknown(PhpModuleProbeFailure(kind, message, exitCode, timeoutMillis)))
 
     fun testPhpdbgIsRefusedBeforeStart() {
         val refusal = thrown<ExecutionException> { covered(TestoCoverageDriver.PHPDBG) }
