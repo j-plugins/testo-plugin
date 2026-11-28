@@ -2,6 +2,7 @@ package com.github.xepozz.testo.openide.tests.actions
 
 import com.github.xepozz.testo.launch.TestoScope
 import com.github.xepozz.testo.openide.tests.run.TestoRunConfiguration
+import com.github.xepozz.testo.tests.TestoConsoleProperties
 import com.github.xepozz.testo.tests.console.TestoRunTarget
 import com.intellij.execution.Executor
 import com.intellij.execution.configurations.RunProfileState
@@ -25,7 +26,8 @@ class TestoRerunFailedTestsAction(
     }
 
     override fun getRunProfile(environment: ExecutionEnvironment): MyRunProfile? {
-        val configuration = myConsoleProperties.configuration as? TestoRunConfiguration ?: return null
+        val configuration = (myConsoleProperties as? TestoConsoleProperties)?.testoConfiguration as? TestoRunConfiguration
+            ?: return null
         val clone = rerunConfiguration(configuration, failedFilters(configuration.project)) ?: return null
         return object : MyRunProfile(clone) {
             override fun getState(executor: Executor, environment: ExecutionEnvironment): RunProfileState =
