@@ -12,7 +12,6 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.pom.Navigatable
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
-import com.intellij.util.indexing.FileContent
 
 /**
  * What the plugin reads from the PHP plugin of the IDE it runs in: PHP code, the class index, how the interpreter sees
@@ -43,9 +42,6 @@ interface TestoPhp {
 
     /** Every class of the file, including those declared inside `namespace { }` blocks, in the PHP plugin's order. */
     fun allClasses(file: PsiFile): List<PhpClassView>
-
-    /** Whether the data provider index must check PSI for this input. */
-    fun mayContainDataProvider(content: FileContent): Boolean = true
 
     fun attributesIn(file: PsiFile): List<PhpAttributeView>
 

@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- On PhpStorm too, indexing data providers skips files that never mention `DataProvider` instead of parsing them.
+
 ## [2026.18] - 2026-11-27
 
 ### Added
