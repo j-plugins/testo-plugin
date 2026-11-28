@@ -14,8 +14,11 @@
 
 [![Build](https://github.com/j-plugins/testo-plugin/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/j-plugins/testo-plugin/actions/workflows/build.yml?query=branch%3Amain)
 [![Codecov](https://codecov.io/gh/j-plugins/testo-plugin/branch/main/graph/badge.svg)](https://app.codecov.io/gh/j-plugins/testo-plugin/tree/main)
+
 [![JetBrains Marketplace](https://img.shields.io/jetbrains/plugin/v/28842-testo.svg?label=JetBrains%20Marketplace)](https://plugins.jetbrains.com/plugin/28842-testo)
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/28842-testo.svg)](https://plugins.jetbrains.com/plugin/28842-testo)
+[![Rating](https://img.shields.io/jetbrains/plugin/r/rating/28842-testo.svg)](https://plugins.jetbrains.com/plugin/28842-testo/reviews)
+
 [![OpenIDE Marketplace](https://img.shields.io/badge/OpenIDE-Marketplace-blue)](https://marketplace.openide.ru/plugin/testo/461/)
 
 </div>
